@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Build output — WXT writes to `dist/` (see outDir in wxt.config.ts); tsup writes to mcp/dist/.
+# The bare `dist/` pattern matches at any depth, so it covers both.
+dist/
+.output/
+*.tsbuildinfo
+
+# WXT generated types + bundle stats
+.wxt/
+stats.html
+stats-*.json
+
+# Local browser-startup overrides (Chrome binary path, profile dir) — machine-specific
+web-ext.config.ts
+web-ext.config.ts.timestamp-*
+
+# `npm run mcp:link` artifacts: mcp/bin holds symlinks into mcp/lib/node_modules
+mcp/bin/
+mcp/lib/
+
+# Secrets & environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.keystore
+
+# Runtime state written by the daemon. It normally lives in ~/.voicelink (pairing session
+# keys, the auth store, logs) and never inside the repo — this is a belt-and-braces guard
+# for anyone who points HOME or a config override at the working tree.
+.voicelink/
+auth.json
+daemon.json
+daemon.log
+
+# Local Claude Code state (project skills under .claude/skills/ ARE committed)
+.claude/settings.local.json
+.claude/*.local.json
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

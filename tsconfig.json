@@ -1,0 +1,11 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  // `mcp` is a separate Node package with its own tsconfig — `npm run compile:mcp` checks it.
+  "exclude": ["node_modules", "dist", ".wxt/types-check", "mcp"]
+}
