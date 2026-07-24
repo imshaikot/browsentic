@@ -1,0 +1,212 @@
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { RunEvent } from '@/lib/actions/protocol';
+import { stateDir } from '../lockfile';
+import { log } from '../log';
+import type { AgentConfig } from './config';
+import { buildSystemPrompt } from './prompt';
+import type { Skill } from './skills';
+
+export interface RunRequest {
+  runId: string;
+  instruction: string;
+  skill: Skill;
+  config: AgentConfig;
+  /** The Claude Code session this browser's conversation lives in. */
+  sessionId: string;
+  /** False on the first instruction, true once the session exists to be resumed. */
+  resume: boolean;
+  signal: AbortSignal;
+  emit: (event: RunEvent) => void;
+}
+
+export interface RunOutcome {
+  stopReason: string;
+  /** True once Claude Code has persisted the session, so the next run may `--resume` it. */
+  established: boolean;
+}
+
+/** Same directory as this bundle in `dist/` — the stdio MCP entry the spawned agent loads. */
+const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');
+
+const KILL_GRACE_MS = 5_000;
+
+/**
+ * Spawn the user's Claude Code with the daemon's env hygiene, shared by the interactive run
+ * loop and the one-shot file summarizer: drop the nested-session markers a daemon started from
+ * inside Claude Code would otherwise inherit, run in a fixed cwd so no project CLAUDE.md leaks
+ * in, and wire abort → SIGTERM/SIGKILL. The caller owns stdout parsing; call `release()` once
+ * the process has closed so the abort listener does not outlive it.
+ */
+export function spawnClaude(
+  args: string[],
+  config: AgentConfig,
+  signal: AbortSignal,
+  extraEnv?: Record<string, string>,
+) {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+
+  const child = spawn(config.claudeBin, args, { cwd: stateDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const kill = () => {
+    child.kill('SIGTERM');
+    const hardKill = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS);
+    hardKill.unref();
+  };
+  signal.addEventListener('abort', kill, { once: true });
+  return { child, release: () => signal.removeEventListener('abort', kill) };
+}
+
+/**
+ * One instruction, run by the user's own Claude Code (`claude -p`) rather than a direct API
+ * call — no key to manage, and the user's existing login, model choice and limits apply.
+ *
+ * The child reaches the browser through our own MCP server: `--mcp-config` points it back at
+ * `cli.js`, which dials this daemon's control socket, so every page tool travels the exact
+ * path an external MCP client would use. `VOICELINK_AGENT_RUN` rides along in the child's
+ * environment and comes back attached to those invocations, which is how the daemon knows to
+ * gate and report them against this run.
+ */
+export function runInstruction(request: RunRequest): Promise<RunOutcome> {
+  const { config, emit, signal } = request;
+
+  const args = [
+    '-p',
+    request.instruction,
+    // stream-json is the machine interface; --verbose is required for it in print mode, and
+    // --include-partial-messages is what turns on token-level text deltas.
+    '--output-format',
+    'stream-json',
+    '--include-partial-messages',
+    '--verbose',
+    // Only our MCP server — never the user's other configured servers.
+    '--mcp-config',
+    JSON.stringify({ mcpServers: { voicelink: { command: process.execPath, args: [cliPath] } } }),
+    '--strict-mcp-config',
+    // Print mode auto-denies tools that would prompt; the server-level grant lets every
+    // voicelink tool run. The daemon applies its own approval gate on top.
+    '--allowedTools',
+    'mcp__voicelink',
+    // The job is in the browser. Filesystem, shell, web and subagent tools stay off, so a
+    // hostile page cannot talk the agent into reaching outside it.
+    '--disallowedTools',
+    'Bash',
+    'Edit',
+    'Write',
+    'NotebookEdit',
+    'Read',
+    'Glob',
+    'Grep',
+    'WebFetch',
+    'WebSearch',
+    'Task',
+    '--append-system-prompt',
+    buildSystemPrompt(request.skill),
+    ...(request.resume ? ['--resume', request.sessionId] : ['--session-id', request.sessionId]),
+    ...(config.model ? ['--model', config.model] : []),
+    ...(config.effort ? ['--effort', config.effort] : []),
+  ];
+
+  return new Promise<RunOutcome>((resolve, reject) => {
+    // VOICELINK_AGENT_RUN rides along so the browser invocations this run makes come back
+    // tagged to it; the summarizer path spawns without it, since it drives nothing.
+    const { child, release } = spawnClaude(args, config, signal, { VOICELINK_AGENT_RUN: request.runId });
+
+    let established = false;
+    let settledByResult = false;
+    let stderrTail = '';
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrTail = (stderrTail + chunk.toString()).slice(-2_000);
+    });
+
+    const lines = createInterface({ input: child.stdout });
+    lines.on('line', (line) => {
+      let message: StreamLine;
+      try {
+        message = JSON.parse(line) as StreamLine;
+      } catch {
+        return; // Not every line of a misbehaving child is JSON; skip rather than die.
+      }
+
+      switch (message.type) {
+        case 'system':
+          if (message.subtype === 'init') {
+            established = true;
+            log(`agent run ${request.runId}: claude session ${message.session_id} up`);
+          }
+          return;
+
+        case 'stream_event': {
+          // Subagent output carries a parent id; only top-level assistant text is the answer.
+          if (message.parent_tool_use_id) return;
+          const event = message.event;
+          if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+            emit({ kind: 'text', delta: event.delta.text });
+          }
+          return;
+        }
+
+        case 'result':
+          settledByResult = true;
+          if (message.is_error) {
+            reject(new RunError('AGENT_FAILED', message.result || message.subtype || 'Claude Code reported an error'));
+          } else {
+            resolve({ stopReason: message.stop_reason || 'end_turn', established });
+          }
+          return;
+      }
+    });
+
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') {
+        reject(
+          new RunError(
+            'NO_CLAUDE',
+            `Could not find "${config.claudeBin}". Install Claude Code, or set {"claudeBin": "/path/to/claude"} in the daemon's config.json.`,
+          ),
+        );
+      } else {
+        reject(new RunError('AGENT_FAILED', error.message));
+      }
+    });
+
+    child.on('close', (exitCode) => {
+      release();
+      if (settledByResult) return;
+      // No result line: the child died mid-run or was cancelled.
+      if (signal.aborted) reject(new RunError('CANCELLED', 'Run cancelled.'));
+      else {
+        reject(
+          new RunError(
+            'AGENT_FAILED',
+            `Claude Code exited with code ${exitCode} before finishing${stderrTail ? `: ${stderrTail.trim()}` : ''}`,
+          ),
+        );
+      }
+    });
+  });
+}
+
+/** The stream-json lines this runner reads; everything else on stdout is ignored. */
+type StreamLine =
+  | { type: 'system'; subtype?: string; session_id?: string }
+  | {
+      type: 'stream_event';
+      parent_tool_use_id?: string | null;
+      event?: { type?: string; delta?: { type?: string; text?: string } };
+    }
+  | { type: 'result'; is_error?: boolean; subtype?: string; stop_reason?: string | null; result?: string };
+
+export class RunError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'RunError';
+  }
+}
