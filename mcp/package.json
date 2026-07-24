@@ -1,0 +1,35 @@
+{
+  "name": "@voicelink/mcp",
+  "version": "0.1.0",
+  "description": "MCP server and local daemon that drive the VoiceLink browser extension",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "voicelink-mcp": "dist/cli.js",
+    "voicelink-mcpd": "dist/daemon-main.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "compile": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.21.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2"
+  }
+}
