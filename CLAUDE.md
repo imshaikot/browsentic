@@ -18,34 +18,39 @@ VoiceLink is an AI voice assistant Chrome extension (Manifest V3) built with WXT
 
 ## Commands
 
-```sh
-npm run dev            # build + launch Chrome (throwaway profile) with the extension loaded, HMR
-npm run dev:firefox    # same, for Firefox
-npm run build          # production build → dist/chrome-mv3/
-npm run compile        # type-check only (tsc --noEmit)
-npm run intent:check   # route the fixture table through lib/intent/ in plain Node; the only assertion-style check
-npm run zip            # store-ready zip
-npm run icons          # regenerate placeholder icons in public/icon/
-npx shadcn@latest add <component>   # add shadcn/ui components → components/ui/
-```
-
-The MCP harness lives in `mcp/` and is a **separate npm package** with its own `node_modules`, `tsconfig.json`, and dependency install:
+The package manager is **Yarn 4**, pinned via `yarnPath` to the release vendored in `.yarn/releases/`, so whatever `yarn` is on PATH re-execs into it and no Corepack setup is needed. Do not reintroduce `package-lock.json`. Two settings are load-bearing: `nodeLinker: node-modules` (PnP would break WXT/Vite, tsup, and every bare-Node entry point), and the pin itself — Yarn ≤ 4.9 applies its builtin TypeScript compat patch unconditionally, and that patch targets the old JS compiler layout (`lib/_tsc.js`), which TypeScript 7's native port does not have, so an older Yarn dies in the fetch step.
 
 ```sh
-npm run mcp:install    # one-time; `npm install` at the root does NOT cover mcp/
-npm run mcp:build      # tsup → mcp/dist/ (bundles lib/actions via the @/* path alias)
-npm run mcp:link       # one-time; puts `voicelink-mcp` on PATH (npm run mcp:unlink undoes it)
-npm run compile:mcp    # type-check mcp/ (the root `npm run compile` excludes it)
-npm run mcp:manifest   # build + print the tool manifest from plain Node — no browser
+yarn install                        # deps + postinstall `wxt prepare`
+yarn dev                            # build + launch Chrome (throwaway profile) with the extension loaded, HMR
+yarn dev:firefox                    # same, for Firefox
+yarn build                          # production build → dist/chrome-mv3/
+yarn compile                        # type-check only (tsc --noEmit)
+yarn intent:check                   # route the fixture table through lib/intent/ in plain Node; the only assertion-style check
+yarn zip                            # store-ready zip
+yarn icons                          # regenerate the icons in public/icon/
+yarn dlx shadcn@latest add <name>   # add shadcn/ui components → components/ui/
 ```
+
+The MCP harness lives in `mcp/` and is a **separate package** — its own `node_modules`, `tsconfig.json`, lockfile, and dependency install:
+
+```sh
+yarn mcp:install    # one-time; `yarn install` at the root does NOT cover mcp/
+yarn mcp:build      # tsup → mcp/dist/ (bundles lib/actions via the @/* path alias)
+yarn mcp:link       # one-time; puts `voicelink-mcp` on PATH (yarn mcp:unlink undoes it)
+yarn compile:mcp    # type-check mcp/ (the root `yarn compile` excludes it)
+yarn mcp:manifest   # build + print the tool manifest from plain Node — no browser
+```
+
+What keeps `mcp/` a separate Yarn project rather than part of the root install is **`mcp/yarn.lock`**: Yarn picks a project root by walking up to the nearest lockfile. Both lockfiles are committed. `mcp:link`/`mcp:unlink` are the only scripts still on npm — Yarn 4 dropped global installs and has no equivalent, and putting a binary on PATH is independent of what installed the dependencies.
 
 Docs and daemon-printed hints all use the bare `voicelink-mcp` name, so `mcp:link` is effectively required for the documented workflow; without it, invoke `node mcp/dist/cli.js` instead.
 
-`npm run mcp:manifest` is the standing check that no action gained a top-level DOM reference: it loads the shipped bundle in bare Node, where `document` at module scope throws on import.
+`yarn mcp:manifest` is the standing check that no action gained a top-level DOM reference: it loads the shipped bundle in bare Node, where `document` at module scope throws on import.
 
-`npm run compile` depends on generated types in `.wxt/` — run `npm install` (its postinstall runs `wxt prepare`) if they're missing.
+`yarn compile` depends on generated types in `.wxt/` — run `yarn install` (its postinstall runs `wxt prepare`) if they're missing.
 
-`npm run intent:check` bundles `lib/intent/` with esbuild (already present via Vite; no new dependency) and runs it in Node against a fixture table of utterances, printing the threshold's headroom. There is no lint step and no other test runner. `npm run intent:check -- "<utterance>"` explains a single routing decision.
+`yarn intent:check` bundles `lib/intent/` with esbuild (already present via Vite; no new dependency) and runs it in Node against a fixture table of utterances, printing the threshold's headroom. There is no lint step and no other test runner. `yarn intent:check "<utterance>"` explains a single routing decision.
 
 ## Architecture
 
@@ -119,14 +124,14 @@ Every instruction — spoken or typed, popup or side panel — reaches `instruct
 - **The bias is toward escalating**, because the two errors are not symmetric — a needless escalation costs a round trip, a wrong local action spends a real click on the user's page. Hard stops (before any rule is tried): questions, `and then`-style multi-step, conditionals, `@skill` prefixes; and after matching, consequential labels (`CONSEQUENTIAL` in `grammar.ts`) escalate so the agent's **approval gate** sees them — a local invocation has no gate and no confirmation.
 - **A failed local action escalates too**, and its failed row stays on the timeline. `TARGET_NOT_FOUND` on "click Sign in" is exactly the case an agent that can snapshot the page handles better.
 - **Local steps are marked.** `RunEvent`'s tool variant carries `source?: 'local'` (never set by the daemon); the timeline draws a ⚡ and the summary reports elapsed ms.
-- **Adding a rule** means one entry in `RULES` plus fixtures in `scripts/check-intent.mjs` — in **both** directions, one utterance the rule should catch and one near-miss it must not. Run `npm run intent:check`. Keep `lib/intent/` free of `browser.*` and DOM: it is bundled and run in bare Node by that check.
+- **Adding a rule** means one entry in `RULES` plus fixtures in `scripts/check-intent.mjs` — in **both** directions, one utterance the rule should catch and one near-miss it must not. Run `yarn intent:check`. Keep `lib/intent/` free of `browser.*` and DOM: it is bundled and run in bare Node by that check.
 - Local runs never reach `~/.voicelink/daemon.log`, so "the command worked but the daemon log is empty" is the fast path, not a bug.
 
 ### Adding an action
 
 One module per action: `lib/actions/page/<name>.ts` exporting `defineAction({ name: 'page.<name>', … })`, then add it to the array in `registry.ts`. That single edit also publishes it as an MCP tool. The conventions below are load-bearing — breaking them fails at runtime or silently corrupts the MCP manifest, not at compile time:
 
-- **No top-level DOM access.** Touch `document`/`window` only inside `execute()`. `registry.ts` is imported by the background worker (for `describeActions()`), by the MCP daemon, and by plain Node, where a top-level DOM reference throws at import time. `npm run mcp:manifest` is the check.
+- **No top-level DOM access.** Touch `document`/`window` only inside `execute()`. `registry.ts` is imported by the background worker (for `describeActions()`), by the MCP daemon, and by plain Node, where a top-level DOM reference throws at import time. `yarn mcp:manifest` is the check.
 - **No underscores in action names** — they break the round trip to MCP tool names.
 - **`.describe()` every input field** — that text becomes the MCP tool's parameter documentation.
 - **No zod `.refine()`/`.transform()`** — they don't survive `z.toJSONSchema()`. Validate inside `execute()` with `throw new ActionError(msg, 'CODE')`, using a stable code: `INVALID_INPUT`, `INVALID_TARGET`, `TARGET_NOT_FOUND`, `TIMEOUT`, `UNSUPPORTED`.
