@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join, resolve, sep } from 'node:path';
 import { readAgentConfig } from './agent/config';
+import { uploadedSkillsDir } from './agent/skills';
 
 /**
  * Save a base64 `data:` image (produced by the `page.screenshot` capture in the background) to
@@ -10,9 +11,9 @@ import { readAgentConfig } from './agent/config';
  * `config.screenshotDir` (from `~/.voicelink/config.json`) or, by default, the user-facing
  * `~/voicelink/screenshot`. Mirrors the mkdir/write pattern in `lockfile.ts`.
  */
-export function saveScreenshot(dataUrl: string, opts: { filename?: string } = {}): string {
+export function saveScreenshot(dataUrl: string, opts: { filename?: string; dir?: string } = {}): string {
   const { mime, bytes } = parseDataUrl(dataUrl);
-  const dir = resolveDir();
+  const dir = opts.dir ? containedSkillDir(opts.dir) : resolveDir();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
 
   const ext = extensionFor(mime);
@@ -24,6 +25,20 @@ export function saveScreenshot(dataUrl: string, opts: { filename?: string } = {}
   // only applies `mode` when creating the file (mirrors lockfile.ts / auth-store.ts).
   writeFileSync(target, bytes, { mode: 0o600 });
   chmodSync(target, 0o600);
+  return target;
+}
+
+/**
+ * An explicit destination is only ever computed by the daemon (a mapping run's staging
+ * directory), never taken from a caller — but this is the one place a constructed path reaches
+ * `mkdirSync`/`writeFileSync`, so it is worth asserting rather than assuming.
+ */
+function containedSkillDir(dir: string): string {
+  const root = resolve(uploadedSkillsDir());
+  const target = resolve(dir);
+  if (target !== root && !target.startsWith(root + sep)) {
+    throw new Error(`refusing to write a screenshot outside ${root}`);
+  }
   return target;
 }
 

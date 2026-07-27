@@ -25,6 +25,55 @@ export interface AgentConfig {
    * dotted `~/.voicelink` state dir, since screenshots are user-facing artifacts to browse.
    */
   screenshotDir?: string;
+  /**
+   * Where skills uploaded from the extension are written. Absolute path; `~` is expanded.
+   * Defaults to `~/voicelink/skills` — user-facing like the screenshot dir, and separate from
+   * the hand-authored `~/.voicelink/skills` so the daemon only ever writes files it owns.
+   */
+  skillsDir?: string;
+  /** Bounds on a site-mapping run. Every value is clamped on read — see `readAgentConfig`. */
+  siteMap?: {
+    /** Let the mapping run use WebSearch/WebFetch for public background. Default true. */
+    research?: boolean;
+    /** Let it click, to reach routes that only exist behind an interaction. Default false. */
+    allowClicks?: boolean;
+    maxPages?: number;
+    maxScreenshots?: number;
+    /** Wall clock for the whole run, after which it is aborted and whatever it has is kept. */
+    timeoutMs?: number;
+  };
+}
+
+/** Defaults and hard bounds for a mapping run; a config value may narrow these, never widen them. */
+export const SITE_MAP_LIMITS = {
+  pages: { fallback: 15, max: 40 },
+  screenshots: { fallback: 10, max: 24 },
+  timeoutMs: { fallback: 10 * 60_000, max: 30 * 60_000 },
+} as const;
+
+export interface SiteMapSettings {
+  research: boolean;
+  allowClicks: boolean;
+  maxPages: number;
+  maxScreenshots: number;
+  timeoutMs: number;
+}
+
+/** Resolve the mapping bounds, clamping anything a malformed config might try to widen. */
+export function siteMapSettings(config: AgentConfig): SiteMapSettings {
+  const stored = config.siteMap ?? {};
+  return {
+    research: stored.research !== false,
+    allowClicks: stored.allowClicks === true,
+    maxPages: clamp(stored.maxPages, SITE_MAP_LIMITS.pages),
+    maxScreenshots: clamp(stored.maxScreenshots, SITE_MAP_LIMITS.screenshots),
+    timeoutMs: clamp(stored.timeoutMs, SITE_MAP_LIMITS.timeoutMs),
+  };
+}
+
+function clamp(value: unknown, { fallback, max }: { fallback: number; max: number }): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) return fallback;
+  return Math.min(Math.floor(value), max);
 }
 
 export const configPath = join(stateDir, 'config.json');
