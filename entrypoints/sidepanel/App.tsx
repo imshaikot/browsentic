@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { AudioLines, Bot, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
+import { AudioLines, Bot, BookOpen, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
 import { RunTimeline } from '@/components/run-timeline';
+import { SiteMapReview } from '@/components/site-map-review';
+import { SkillsPanel } from '@/components/skills-panel';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { putFile, removeFile, type StoredFileMeta } from '@/lib/bridge/file-store';
+import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
@@ -27,7 +30,9 @@ export default function App() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const files = useStoredFiles();
+  const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
 
   const connected = daemon?.connected ?? false;
 
@@ -145,6 +150,20 @@ export default function App() {
             {attachError}
           </p>
         )}
+        {run.draft && (
+          <SiteMapReview draft={run.draft} onActivate={run.activateMap} onDiscard={run.discardMap} />
+        )}
+        {skillsOpen && (
+          <SkillsPanel
+            tabUrl={tabUrl}
+            connected={connected}
+            onMapSite={() => {
+              setSkillsOpen(false);
+              run.mapSite();
+            }}
+            mapping={run.running}
+          />
+        )}
         <FilesList files={files} onRemove={(id) => void removeFile(id)} />
         <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} connected={connected} />
 
@@ -180,6 +199,14 @@ export default function App() {
               disabled={!connected}
             >
               <FileUp />
+            </Button>
+            <Button
+              variant={skillsOpen ? 'default' : 'ghost'}
+              size="icon"
+              aria-label={skillsOpen ? 'Hide skills' : 'Show skills'}
+              onClick={() => setSkillsOpen(!skillsOpen)}
+            >
+              <BookOpen />
             </Button>
             <Button
               variant={voiceEnabled && !voice.error ? 'default' : 'ghost'}
