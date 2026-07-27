@@ -3,8 +3,9 @@ import { describeActions } from '@/lib/actions/registry';
 import { injectContentScript } from '@/lib/actions/client';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
+import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { serveRunPorts } from '@/lib/bridge/run-port';
-import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, pairDaemon } from '@/lib/bridge/socket';
+import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, onWelcome, pairDaemon } from '@/lib/bridge/socket';
 
 export default defineBackground(() => {
   // Action bridge for extension pages (the side panel).
@@ -30,6 +31,19 @@ export default defineBackground(() => {
       sendResponse(success(true));
       return;
     }
+    // Push an uploaded skill to the daemon's skills directory, or take it back off. Same
+    // fire-and-forget shape as analyzeFile — the worker reads the body from storage itself and
+    // writes the sync status back to the index, so the panel need not stay open for it.
+    if (message.op === 'saveSkill' && typeof message.skillId === 'string') {
+      void pushSkill(message.skillId);
+      sendResponse(success(true));
+      return;
+    }
+    if (message.op === 'removeSkill' && typeof message.skillId === 'string') {
+      void removeSkill(message.skillId);
+      sendResponse(success(true));
+      return;
+    }
     // Pairing is driven from the popup: the worker owns the socket, the UI just asks.
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
@@ -45,7 +59,12 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
-    sendResponse(failure('INVALID_REQUEST', 'Expected {op:"describe"|"invoke"|"pair"|"disconnect"}'));
+    sendResponse(
+      failure(
+        'INVALID_REQUEST',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"pair"|"disconnect"}',
+      ),
+    );
     return;
   });
 
@@ -64,6 +83,10 @@ export default defineBackground(() => {
   // Free-text instructions from the popup and side panel, and the run events that come back.
   // A port rather than sendMessage, because assistant text streams in token by token.
   serveRunPorts();
+
+  // A skill uploaded while the daemon was down never reached disk. Push those, and only those,
+  // once it is back — re-pushing everything would rewrite every file on every reconnect.
+  onWelcome(() => void resyncSkills());
 
   // The same actions, reached from outside the browser by the local MCP daemon — but only
   // once the user has paired this browser. An unpaired extension never dials out.

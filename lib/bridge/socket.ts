@@ -6,11 +6,15 @@ import {
   failure,
   parseFrame,
   type ActionResult,
+  type RunContext,
   type RunEvent,
+  type SavedSkill,
   type SocketAuth,
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import { describeActions } from '@/lib/actions/registry';
+import type { SkillDraft } from '@/lib/skills/format';
+import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { invokeForHarness } from './invoke';
 
 export const DAEMON_STATE_KEY = 'voicelink/daemon';
@@ -37,6 +41,13 @@ let socket: WebSocket | null = null;
 let attempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let runListener: ((runId: string, event: RunEvent) => void) | null = null;
+let welcomeListener: (() => void) | null = null;
+let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
+
+/** Register the sink for a staged site map awaiting review. The background worker owns it. */
+export function onSiteMapDraft(listener: (runId: string, draft: SiteMapDraft) => void): void {
+  draftListener = listener;
+}
 
 /** Register the single sink for agent run events. The background worker owns it. */
 export function onRunEvent(listener: (runId: string, event: RunEvent) => void): void {
@@ -44,12 +55,22 @@ export function onRunEvent(listener: (runId: string, event: RunEvent) => void): 
 }
 
 /**
- * Ask the daemon to act on a free-text instruction. Returns the run id to correlate the
- * events that follow, or null when no daemon is attached to send it to.
+ * Called on every accepted connection, so the worker can push anything that queued up while
+ * the daemon was away. A listener rather than a direct call because the things that need to
+ * re-sync already import from this module, and the arrow has to stay one-way.
  */
-export function sendInstruction(text: string): string | null {
+export function onWelcome(listener: () => void): void {
+  welcomeListener = listener;
+}
+
+/**
+ * Ask the daemon to act on a free-text instruction. `context` names the tab it was typed
+ * against, which is what decides whether a site-exploration skill applies. Returns the run id
+ * to correlate the events that follow, or null when no daemon is attached to send it to.
+ */
+export function sendInstruction(text: string, context?: RunContext): string | null {
   const id = crypto.randomUUID();
-  return post({ t: 'instruct', id, text }) ? id : null;
+  return post({ t: 'instruct', id, text, context }) ? id : null;
 }
 
 /** Reply must arrive before this, or the caller gets a TIMEOUT. Longer than the daemon's own. */
@@ -78,6 +99,56 @@ export function analyzeFile(file: {
       resolve(failure('TIMEOUT', 'The daemon did not return a summary in time.'));
     }, ANALYZE_TIMEOUT_MS);
     pendingAnalyses.set(id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
+/** The daemon answers these synchronously, so a slow reply means something is wrong. */
+const SKILL_TIMEOUT_MS = 15_000;
+
+const pendingSkillOps = new Map<string, (result: ActionResult<SavedSkill>) => void>();
+
+/** Write an uploaded skill into the daemon's skills directory, replacing one of the same name. */
+export function saveSkill(skill: SkillDraft): Promise<ActionResult<SavedSkill>> {
+  return skillOp({ t: 'saveSkill', id: crypto.randomUUID(), skill });
+}
+
+/** Take an uploaded skill back off disk. Unknown names succeed — the file is gone either way. */
+export function deleteSkill(name: string): Promise<ActionResult<SavedSkill>> {
+  return skillOp({ t: 'deleteSkill', id: crypto.randomUUID(), name });
+}
+
+/** Remove a generated map's whole directory. Deliberately not `deleteSkill`: different objects. */
+export function deleteSiteMap(name: string): Promise<ActionResult<SavedSkill>> {
+  return skillOp({ t: 'deleteSiteMap', id: crypto.randomUUID(), name });
+}
+
+/** Arm a staged map. `exactHost` narrows it from the domain to the precise host that was mapped. */
+export function activateSiteMap(stagingId: string, exactHost = false): Promise<ActionResult<SavedSkill>> {
+  return skillOp({ t: 'activateSiteMap', id: crypto.randomUUID(), stagingId, exactHost });
+}
+
+export function discardSiteMap(stagingId: string): Promise<ActionResult<SavedSkill>> {
+  return skillOp({ t: 'discardSiteMap', id: crypto.randomUUID(), stagingId });
+}
+
+function skillOp(
+  frame: Extract<
+    SocketFrame,
+    { t: 'saveSkill' | 'deleteSkill' | 'deleteSiteMap' | 'activateSiteMap' | 'discardSiteMap' }
+  >,
+): Promise<ActionResult<SavedSkill>> {
+  if (!post(frame)) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingSkillOps.delete(frame.id);
+      resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
+    }, SKILL_TIMEOUT_MS);
+    pendingSkillOps.set(frame.id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
@@ -235,13 +306,19 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
         manifestInSync: frame.manifestInSync,
         lastChangeAt: Date.now(),
       });
+      // The daemon is reachable again; anything that failed to reach it can go now.
+      welcomeListener?.();
       return;
 
     case 'describe':
       return send(ws, { t: 'manifest', id: frame.id, tools: describeActions() });
 
     case 'invoke':
-      return send(ws, { t: 'result', id: frame.id, result: await invokeForHarness(frame.action, frame.input) });
+      return send(ws, {
+        t: 'result',
+        id: frame.id,
+        result: await invokeForHarness(frame.action, frame.input, frame.tabId),
+      });
 
     case 'run':
       return runListener?.(frame.id, frame.event);
@@ -251,6 +328,15 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
       pendingAnalyses.delete(frame.id);
       return;
     }
+
+    case 'skillResult': {
+      pendingSkillOps.get(frame.id)?.(frame.result);
+      pendingSkillOps.delete(frame.id);
+      return;
+    }
+
+    case 'siteMapDraft':
+      return draftListener?.(frame.id, frame.draft);
 
     default:
       return;
