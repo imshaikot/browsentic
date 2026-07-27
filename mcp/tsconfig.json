@@ -18,5 +18,5 @@
       "@/*": ["../*"]
     }
   },
-  "include": ["src/**/*", "../lib/actions/**/*"]
+  "include": ["src/**/*", "../lib/actions/**/*", "../lib/skills/**/*"]
 }
