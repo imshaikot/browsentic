@@ -1,91 +1,132 @@
 # VoiceLink
 
-**Talk to any web page.** VoiceLink is a Manifest V3 Chrome extension that turns a spoken or typed
-instruction into real actions on the tab in front of you — clicking, filling, reading, navigating —
-and narrates what it did as it goes.
+> Talk to your browser. VoiceLink turns a spoken or typed instruction into real actions on the tab in front of you: clicking, filling, reading, navigating.
 
-Three pieces make that work:
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Chrome](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)
+![Node](https://img.shields.io/badge/node-%3E%3D20-339933)
 
-- **An action layer** (`lib/actions/`) — 17 declarative, self-describing page capabilities that run
-  in the content script.
-- **An MCP harness** (`mcp/`) — the same registry exposed as an MCP server, so Claude Code or any
-  other MCP client can drive your real, logged-in browser through a local daemon.
-- **An agent harness** (`mcp/src/agent/`) — the reverse direction: an instruction typed into the
-  side panel spawns **your own Claude Code**, which drives the browser back through that same
-  server. There is no Anthropic API client in this repo and no API key anywhere in it.
+VoiceLink is a browser extension plus a small local daemon. Say what you want and it drives the page. Ask a question and it reads the page and answers. Every action it takes shows up on a live timeline, and anything consequential waits for your approval first.
 
-Built with:
+It runs on **your own [Claude Code](https://claude.com/claude-code) login**. There is no Anthropic API client in this repository and no API key to configure.
 
-- **[WXT](https://wxt.dev)** — Vite-powered extension framework (auto-generated manifest, HMR, multi-browser builds)
-- **React 19 + TypeScript** — UI entrypoints
-- **Tailwind CSS v4** — styling via `@tailwindcss/vite`
-- **[shadcn/ui](https://ui.shadcn.com)** — the component system used by most modern AI products (Radix primitives + CVA + `lucide-react` icons)
-- **[zod](https://zod.dev)** — one schema per action, doubling as its MCP tool definition
+## Features
 
-## Getting started
+- **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
+- **Real page control.** 17 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
+- **Site maps.** Point VoiceLink at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
+- **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
+- **Works as an MCP server.** Claude Code or any other MCP client can drive your real, logged in browser through the same local daemon.
+- **Off by default.** A fresh install connects to nothing until you redeem a one time pairing code.
 
-```sh
-npm install
-npm run dev        # builds, launches Chrome with the extension loaded, and hot-reloads
+## How it works
+
+```
+You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your Claude Code
+                            ▲                                                   │
+                            └──────────────── page actions ─────────────────────┘
+
+Any MCP client ──stdio──> voicelink-mcp ──> the same daemon ──> the same browser
 ```
 
-Other commands:
+The extension dials out to the daemon, because a Manifest V3 service worker cannot listen for
+connections. One daemon owns the browser link, so several MCP clients can share one browser.
+
+## Requirements
+
+- Chrome or another Chromium browser (Firefox builds work too)
+- Node.js 20 or newer
+- [Claude Code](https://claude.com/claude-code) on your `PATH`
+
+## Quick start
 
 ```sh
-npm run build          # production build → dist/chrome-mv3/
-npm run build:firefox  # firefox build
-npm run zip            # store-ready zip
-npm run compile        # type-check only (tsc --noEmit)
-npm run intent:check   # route a fixture table of utterances through lib/intent/
-npm run icons          # regenerate placeholder icons in public/icon/
+git clone https://github.com/your-org/voicelink.git
+cd voicelink
+yarn install
+yarn build
 ```
 
-To load the production build manually: `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select `dist/chrome-mv3`.
+Load the extension: open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**
+and select `dist/chrome-mv3`.
 
-## What's included
+Then install the daemon and pair your browser:
 
-| Surface | File | Notes |
+```sh
+yarn mcp:install     # the daemon is a separate package with its own dependencies
+yarn mcp:build
+yarn mcp:link        # puts `voicelink-mcp` on your PATH
+voicelink-mcp pair   # prints a single use code, valid for 10 minutes
+```
+
+Open the VoiceLink popup, paste the code and press **Connect**. The daemon issues a long lived
+session key that survives browser and daemon restarts, and dies only when you revoke it.
+
+That is the whole setup. Open the side panel and start talking.
+
+## Usage
+
+Type or speak an instruction into the side panel. Replies stream back token by token, each page
+action appears on a timeline as it happens, and follow ups continue the same conversation, so
+"now click the second one" works.
+
+Actions that change something other people can see wait for an explicit **Allow** or **Deny**.
+Form submission is gated by default.
+
+## Site maps: teach it a site once
+
+An agent that has never seen your site spends its first minutes rediscovering it: where search
+lives, what a button is really called, why the list looks empty until you scroll. Site maps do
+that exploration once and keep the result.
+
+Press **Map** in the Skills panel, or say:
+
+```
+@site-mapper map this site
+```
+
+VoiceLink reads the site's own `robots.txt` and `sitemap.xml`, looks up public background on the
+domain, then walks the site for a few minutes, taking screenshots as it goes. The result is a set
+of notes scoped to that domain:
+
+```
+~/voicelink/skills/acme-com/
+├── SKILL.md          landmarks, key pages, how they connect, quirks
+├── map.json          the structured report behind it
+├── screenshots/      captures taken during the crawl
+├── evidence/         the robots.txt and sitemap it worked from
+└── pages/            longer per page notes, kept out of the prompt
+```
+
+From then on, any instruction you give on that domain carries those notes. Elsewhere they are
+inert.
+
+**Nothing takes effect until you say so.** A map in flight is written to a staging directory the
+skill loader cannot read, so an unreviewed map is not merely unused, it is never opened. The panel
+shows you the exact markdown as plain text, never rendered, along with the domain it will match.
+**Activate** arms it, **Discard** deletes it.
+
+The crawl is read only and locked to one host. It cannot click, fill or submit, it cannot leave the
+site, and it is pinned to the tab it started in, so switching tabs stops it rather than following
+you. Size limits are enforced by the daemon, and config can narrow them but never widen them:
+
+| Setting | Default | Ceiling |
 | --- | --- | --- |
-| Popup | `entrypoints/popup/` | Press-to-talk mic, instruction box, pairing UI, "open side panel" |
-| Side panel | `entrypoints/sidepanel/` | The agent chat: always-on dictation, streamed replies, live tool timeline, approval prompts |
-| Background | `entrypoints/background.ts` | MV3 service worker + the action bridge (`describe`/`invoke`) + the MCP daemon link + the run port |
-| Content script | `entrypoints/content.ts` | Exposes the action layer in every page (`exposeActions()`) |
-| MCP harness | `mcp/` | Installable MCP server + daemon that drives the browser (see below) |
-| Agent harness | `mcp/src/agent/`, `mcp/skills/` | Turns typed instructions into agent runs by spawning your own Claude Code (see below) |
-| Intent funnel | `lib/intent/` | Scores each instruction first; confident quick commands run in the browser instead of becoming a run (see below) |
+| `maxPages` | 15 | 40 |
+| `maxScreenshots` | 10 | 24 |
+| `timeoutMs` | 600000 (10 min) | 1800000 (30 min) |
 
-```
-assets/globals.css     # Tailwind v4 + shadcn theme (violet, dark-mode aware)
-components/ui/         # shadcn/ui components (button, badge, card, input, textarea, scroll-area)
-lib/actions/           # the declarative page-control action layer (see below)
-lib/intent/            # the local intent funnel — quick commands the extension answers itself
-lib/bridge/            # extension side of the harness (daemon socket, invoke path, speech hooks)
-lib/skills/            # the skill file format — parser + serializer, shared with the daemon
-mcp/                   # the installable MCP server + daemon
-mcp/skills/            # markdown system prompts the daemon routes instructions to
-lib/utils.ts           # cn() helper
-public/icon/           # generated placeholder icons
-wxt.config.ts          # manifest + Vite/Tailwind config
-components.json        # shadcn CLI config
-```
+Two switches change what a mapping run is allowed to do. `allowClicks` (off by default) lets it
+reach routes that only exist behind an interaction. `research` (on by default) lets it use web
+search for public background on the domain.
 
-### Adding more shadcn/ui components
+> A map is written from pages an agent read, so read it before activating, as you would any
+> generated content. `research` is the one case where a run both reads pages and makes outbound
+> requests; turn it off to keep everything inside the browser.
 
-```sh
-npx shadcn@latest add dialog dropdown-menu tooltip
-```
+### Writing notes by hand
 
-Components land in `components/ui/` and import via the `@/` alias (provided by WXT).
-
-## The agent harness — instructions in, actions out
-
-Type an instruction into the side panel (or the popup) of a paired browser and the daemon runs it as an agent: it routes the text to a **skill** (a markdown system prompt from `mcp/skills/`, user-overridable in `~/.voicelink/skills/`), spawns **your own Claude Code** (`claude -p` — your login, your model, no API key anywhere in this repo), and hands it the browser through the same MCP server external clients use. Text streams back token by token; every `page_*` call shows up as a row on the side panel's timeline as it happens; gated actions (`page.submitForm` by default — edit `requireApproval` in `~/.voicelink/config.json`) pause for an Allow/Deny in the panel. Follow-ups resume the same Claude Code session, so "now click the second one" works.
-
-Requires [Claude Code](https://claude.com/claude-code) on your PATH (or `{"claudeBin": "/path/to/claude"}` in `~/.voicelink/config.json`).
-
-### Site notes — teaching it about one site
-
-The bundled skills are general: how to drive any page, how to read any page. What they cannot know is how *your* sites work. Open the book icon in the side panel's composer and upload a markdown file of notes — where things are, how a list loads, what a button is really called — tagged with the domains it applies to:
+If you would rather describe a site by hand, upload a markdown file from the side panel composer:
 
 ```markdown
 ---
@@ -96,240 +137,137 @@ domains: [admin.acme.com]
 ---
 
 Search is `#q` and submits on Enter, not on the button.
-Results lazy-load — click "Load more" until it disappears before counting anything.
+Results lazy load. Click "Load more" until it disappears before counting anything.
 ```
 
-Uploaded skills are **overlays**, not replacements: on a matching site the notes are added *on top of* whichever skill routing picked, so `browser-control`'s driving loop and `page-research`'s read-only rules still apply. Off that site they are inert. `@acme-admin …` pins one on regardless of where you are.
+Notes are overlays rather than replacements: on a matching site they are added on top of whatever
+VoiceLink was already doing, so the normal driving and read only rules still apply. Prefix an
+instruction with `@acme-admin` to pin one regardless of where you are.
 
-They are written to `~/voicelink/skills/` (override with `skillsDir` in `config.json`) — outside the repo, never committed, and re-read on every run so an edit takes effect on the next thing you ask. The extension keeps its own copy, so an upload made while the daemon was down lands when it comes back. `voicelink-mcp skills` lists everything the router can see and where it came from.
+Notes live outside the repository, are re-read on every run so an edit applies to the next thing
+you ask, and `voicelink-mcp skills` lists everything currently in scope.
 
-### Mapping a site automatically
+## Instant commands
 
-Rather than writing those notes yourself, press **Map** in the Skills panel (or say `@site-mapper map this site`). VoiceLink reads the site's own `robots.txt`/`sitemap.xml`, looks up public background on the domain, then walks the site for a few minutes — screenshotting as it goes — and writes the skill for you:
+Sending "go back" out to a language model costs a round trip and a few seconds to arrive at
+something the extension could do immediately. So every instruction is scored against a local
+grammar first. Confident single step commands run in the browser and stop there, marked with a
+bolt on the timeline. Everything else goes to the agent with the text untouched.
 
-```
-~/voicelink/skills/acme-com/
-├── SKILL.md          the routed skill: landmarks, pages, how they connect, quirks
-├── map.json          the structured report behind it
-├── screenshots/      captures taken during the crawl
-├── evidence/         the raw sitemap and background it worked from
-└── pages/            longer per-page notes, kept out of the prompt
-```
-
-**Nothing takes effect until you say so.** The map is written to a staging directory the skill loader cannot see, and the panel shows you the exact markdown — literally, never rendered — with the domain it will match and where it landed. Activate arms it; Discard bins it.
-
-The crawl is **read-only and locked to one host**: it cannot click, fill, or submit (set `siteMap.allowClicks` if you want clicking), it cannot leave the site, and it is pinned to the tab it started in, so switching tabs mid-crawl stops it rather than following you. Bounds live in `config.json`:
-
-```json
-{ "siteMap": { "research": true, "allowClicks": false, "maxPages": 15, "maxScreenshots": 10, "timeoutMs": 600000 } }
-```
-
-> A mapped skill is written from pages the agent read, so treat it as you would any generated content — read it before activating. `research: true` lets the mapping run use web search, which is the one place a run both reads pages and can make outbound requests; set it to `false` to keep the run entirely inside the browser.
-
-## The fast path — what never reaches the agent (`lib/intent/`)
-
-"Go back." "Scroll to the top." "Open github.com." Sending those out to the daemon to be spawned
-as a Claude Code run costs a socket round trip and a few seconds of thinking to arrive at a tool
-call the extension could have made in milliseconds. So every instruction — typed or spoken, popup
-or side panel — first passes through a **local intent funnel** in the background worker.
-
-[`routeIntent()`](lib/intent/route.ts) normalizes the utterance ("Hey VoiceLink, could you scroll
-down a bit please?" → `scroll down`), matches it against a fixed grammar of quick commands, and
-scores the best match as `rule certainty × slot confidence`. Clear the threshold (0.75) and the
-extension runs the action itself and stops there; otherwise the untouched original text goes to the
-agent exactly as before. Steps taken locally appear on the timeline like any other, marked ⚡ and
-timed, so it is always visible which path handled a request.
-
-The funnel is biased toward escalating, because the two mistakes are not symmetric: escalating
-something it could have handled costs a round trip, while acting on something it misread spends a
-wrong action on your real page. Questions, multi-step asks, conditionals, consequential clicks
-("click Buy now"), vague targets ("click it") and anything the grammar does not recognize all go to
-the agent — as does any quick command that *runs and fails*, since a "Sign in" button the grammar
-could not find is exactly what an agent that can look at the page does better.
-
-| Handled locally | Sent to the agent |
+| Runs locally | Goes to the agent |
 | --- | --- |
-| back / forward / reload | "is there a login button?" |
-| go to github.com · open gmail · open localhost:3000 | "open the settings menu" |
-| google &lt;something&gt; · search the web for &lt;something&gt; | "search for wireless headphones" |
-| scroll up/down/top/bottom · page down · scroll to the reviews | "scroll down and tell me what it says" |
-| press enter · hit escape · press arrow down | "click sign in and then fill in my email" |
-| click Sign in · tap Continue · click the Next button | "click Buy now" · "click it" |
+| back, forward, reload | "is there a login button?" |
+| open github.com, open localhost:3000 | "open the settings menu" |
+| google something, search the web for something | "search for wireless headphones" |
+| scroll up, down, top, bottom, page down | "scroll down and tell me what it says" |
+| press enter, hit escape, press arrow down | "click sign in and then fill in my email" |
+| click Sign in, tap Continue | "click Buy now", "click it" |
 
-`npm run intent:check` routes a table of utterances through the funnel in plain Node and reports
-where the threshold sits relative to the best case it rejects and the worst it accepts — that table
-is where the threshold is tuned. Pass an utterance to see one decision explained:
+The bias is toward escalating, because the two mistakes are not symmetric. Escalating something it
+could have handled costs a round trip. Acting on something it misread spends a wrong click on your
+real page. Questions, multi step asks, conditionals, vague targets and consequential clicks all go
+to the agent, as does any local command that runs and fails.
+
+## Use it from Claude Code
 
 ```sh
-npm run intent:check -- "take me to the checkout page"
-```
-
-## Voice input
-
-Dictation is live, on the browser's own **Web Speech API** (`webkitSpeechRecognition`) — Chrome
-streams the audio to Google to transcribe, so there is no model bundled here and nothing to
-download.
-
-- [`use-speech.ts`](lib/bridge/use-speech.ts) wraps recognition itself: the mic-permission prompt,
-  continuous mode, silence-driven auto-restart, and feature detection.
-- [`use-voice-composer.ts`](lib/bridge/use-voice-composer.ts) layers hands-free dictation on top.
-  Finalized phrases append to an *editable* buffer and auto-send after ~1.6 s of silence; more
-  speech, typing, or an explicit cancel all call the pending send off, so you are never racing a
-  timer.
-
-The **side panel** listens by default (persisted under `voicelink:voiceEnabled`, toggled by the mic
-button, and muted while a run is in flight or the browser is unpaired). The **popup** is
-press-to-talk instead — a popup is destroyed the moment it loses focus and cannot hold continuous
-listening. Both surfaces fall back to plain typing when recognition is unavailable or the mic is
-blocked.
-
-Swapping in a different speech-to-text engine is a one-file change: [`use-speech.ts`](lib/bridge/use-speech.ts)
-is the only module that knows the Web Speech API exists.
-
-## The action layer (`lib/actions/`)
-
-A set of **declarative, first-class functions** that read and control the current web page. Each is a self-describing value — a semantic name, a one-line description, and a [zod](https://zod.dev) input schema — so the same registry drives in-extension calls today and an external **MCP harness** later.
-
-```ts
-// lib/actions/page/scroll-to.ts
-export const scrollTo = defineAction({
-  name: 'page.scrollTo',
-  description: 'Scroll the page to an element, an absolute position, or by one viewport.',
-  input: z.object({ target: targetSchema.optional(), /* … every field .describe()d */ }),
-  execute({ target, position, direction, behavior }) { /* the side effect */ },
-});
-```
-
-One action per module under `lib/actions/page/`:
-
-| Action | Effect |
-| --- | --- |
-| `page.getPageInfo` | Snapshot: metadata, viewport/scroll, **semantic layout tree + text diagram**, heading outline, inventory of links/buttons/fields/forms with stable selectors |
-| `page.scrollTo` | Scroll to an element, a position, or by a viewport (`up`/`down`/`top`/`bottom`) |
-| `page.clickElement` | Realistic click (pointer/mouse sequence + native `.click()`) |
-| `page.hoverElement` | Pointer/mouse hover sequence to trigger menus & tooltips |
-| `page.focusInput` | Focus an element and place the caret (`start`/`end`/`all`) |
-| `page.fillInput` | Type into an input/textarea/contenteditable (React/Vue-compatible), optional Enter |
-| `page.selectOption` | Choose a `<select>` option by value, label, or index |
-| `page.selectText` | Select an element's text, or the nth match of a phrase (spans inline markup) |
-| `page.extractText` | Read rendered text or HTML of an element or the page |
-| `page.pressKey` | Send a key with modifiers, with Enter-to-submit emulation |
-| `page.submitForm` | Submit a form via `requestSubmit()` (runs validation) |
-| `page.waitForElement` | Await `attached`/`visible`/`hidden`/`detached`, with timeout |
-| `page.highlightElement` | Flash a temporary overlay on an element |
-| `page.navigate` | Open a URL, or go `back`/`forward`/`reload` |
-| `page.screenshot` | Capture the tab (full scroll view, viewport, or a targeted element) as a PNG/JPEG — stitched in the background worker; optionally saved under `~/voicelink/screenshot/` and returned as an image the agent can see |
-| `page.listFiles` | List the user's files stored in VoiceLink, with their AI-generated summaries (resolved in the background from extension storage) |
-| `page.attachFile` | Attach a stored file (by id) to a page's `<input type="file">` — the background reads the bytes, the page sets `input.files` via a `DataTransfer` |
-
-**Targeting** is shared and declarative — most actions take a `target: { selector?, text?, role?, nth? }`, resolved by [`resolveTarget`](lib/actions/page/dom.ts) (visible elements only; text matches the innermost accessible element).
-
-### Calling actions
-
-```ts
-import { invokeInActiveTab } from '@/lib/actions/client';
-import { fillInput } from '@/lib/actions/page/fill-input';
-
-// Fully typed from the action's schema; returns { ok: true, data } | { ok: false, error }
-const res = await invokeInActiveTab(fillInput, { target: { text: 'Email' }, value: 'a@b.com' });
-```
-
-- [`client.ts`](lib/actions/client.ts) — `invokeInTab` / `invokeInActiveTab`, typed end-to-end (input is compile-time required when the schema needs it).
-- [`host.ts`](lib/actions/host.ts) — `exposeActions()`, run by the content script ([content.ts](entrypoints/content.ts)), dispatches actions in the page.
-- [`dispatch.ts`](lib/actions/dispatch.ts) — validates input and returns the `{ ok }` envelope; unknown actions and bad input are structured failures, never throws.
-
-### The MCP harness (`mcp/`)
-
-[`@voicelink/mcp`](mcp/) turns the same registry into an MCP server, so Claude Code (or any MCP client) can drive the browser. It ships two binaries:
-
-| Binary | Role |
-| --- | --- |
-| `voicelink-mcp` | MCP server on stdio — what an MCP client spawns. Starts the daemon if needed. |
-| `voicelink-mcpd` | The daemon: a loopback WebSocket server on `127.0.0.1:8765` (falling back to 8766/8767) |
-
-```sh
-npm run mcp:install     # one-time: install the package's own dependencies
-npm run mcp:build       # → mcp/dist/
-npm run mcp:link        # one-time: put `voicelink-mcp` on your PATH
-npm run mcp:manifest    # print the tool manifest (no browser needed)
-
 claude mcp add voicelink -- voicelink-mcp
 ```
 
-`mcp:link` runs `npm link`, symlinking both binaries into your npm prefix — rebuilds are picked up automatically, and `npm run mcp:unlink` removes them. Without it the CLI still works as `node mcp/dist/cli.js`, but every command below (and the hints the daemon prints) assumes the linked name.
+Claude Code now has 17 page tools plus `voicelink_status`, and three read only resources that
+return page context without spending a tool call. Tool definitions are generated from the same
+registry the extension ships, so they cannot drift from what the browser can actually do.
 
+## What it can do
+
+| Category | Capabilities |
+| --- | --- |
+| Read | Structured page snapshot with a layout diagram and stable selectors, rendered text or HTML, wait for an element to appear or vanish, screenshot the tab or one element |
+| Act | Click, hover, focus, type into inputs and contenteditables, choose a `<select>` option, select text, press keys with modifiers, submit a form |
+| Move | Open a URL, back, forward, reload, scroll to an element or position |
+| Files | List files stored in VoiceLink and attach one to a file input on the page |
+
+Most capabilities take a target described by CSS selector, visible text, ARIA role or index.
+Targeting by visible text survives redesigns that break selectors.
+
+## Configuration
+
+Optional, at `~/.voicelink/config.json`:
+
+```json
+{
+  "claudeBin": "/opt/homebrew/bin/claude",
+  "requireApproval": ["page.submitForm"],
+  "screenshotDir": "~/voicelink/screenshot",
+  "skillsDir": "~/voicelink/skills",
+  "siteMap": { "research": true, "allowClicks": false, "maxPages": 15 }
+}
 ```
-Claude Code ──stdio──> voicelink-mcp ──ws(control)──┐
-                                                    ▼
-                                          voicelink-mcpd (127.0.0.1:8765)
-                                                    ▲
-                                            ws(extension, Origin-pinned)
-                                                    │
-                                   background.ts ──> content script ──> execute()
-```
 
-The extension dials **out** to the daemon because an MV3 service worker cannot listen for connections. One daemon owns the browser link, so several MCP clients can share one browser.
-
-**Tool parity is structural.** The daemon bundles [`describeActions()`](lib/actions/registry.ts) from this repo, so `tools/list` *is* the registry — 17 page tools plus `voicelink_status`. Dots are illegal in MCP tool names, so `page.clickElement` is exposed as `page_clickElement` ([tool-names.ts](lib/actions/tool-names.ts) round-trips the mapping and refuses collisions). On connect both sides exchange a hash of their manifest ([manifest.ts](lib/actions/manifest.ts)); if an installed extension was built from a different registry the daemon adopts the browser's list and emits `tools/list_changed`.
-
-Three read-only resources avoid spending a tool call on page context: `voicelink://page/current` (full snapshot), `voicelink://page/diagram` (the layout diagram alone — the cheapest useful view), and `voicelink://page/text`.
-
-### Pairing — agent control is off until you turn it on
-
-A freshly installed extension connects to nothing. It dials the daemon only after you redeem a one-time code, so no agent can drive the browser without an explicit, deliberate act:
+Useful commands:
 
 ```sh
-voicelink-mcp pair          # prints e.g.  PQC3-3RQ7  (single use, expires in 10 min)
-```
-
-Then open the VoiceLink popup, paste the code, and press **Connect**. The daemon consumes the code and issues a long-lived session key that the extension stores; it survives service-worker teardown, daemon restarts, and browser restarts, and dies only when you revoke it.
-
-```sh
-voicelink-mcp sessions        # which browsers are paired, and which is live
-voicelink-mcp revoke          # unpair everything (or pass one origin)
-voicelink-mcp status          # daemon + extension state
-voicelink-mcp tools           # the bundled manifest
-voicelink-mcp skills          # every skill the router can reach, and where it came from
-voicelink-mcp logs            # ~/.voicelink/daemon.log
+voicelink-mcp status      # daemon and extension state
+voicelink-mcp sessions    # which browsers are paired
+voicelink-mcp revoke      # unpair everything, or one origin
+voicelink-mcp skills      # every skill in scope, and where it came from
+voicelink-mcp logs        # run starts, routed skills, every tool call
 voicelink-mcp stop
 ```
 
-**How the daemon decides who may connect.** Any web page can open a WebSocket to loopback, so there are two independent gates:
+## Privacy and security
 
-1. *At the HTTP upgrade*, by handshake `Origin`. Browsers set `Origin` themselves and pages can neither forge nor omit it, so the branches are mutually exclusive: an extension origin takes the extension path, `http(s)` origins get a flat 403, and a header-less local process (the CLI, the stdio server) must present the token from the `0600` lockfile. A web page can never reach the control path.
-2. *In the `hello` frame*, by credential. Reaching the extension door proves only that you are **an** extension — a pairing token or a valid session key proves you are **the paired** one. Credentials travel in the frame rather than the URL (the browser `WebSocket` API cannot set headers), so they never land in a log or a process list.
+- **Nothing connects until you pair.** An unpaired extension never contacts the daemon.
+- **Two independent gates.** Any web page can open a WebSocket to loopback, so the daemon first
+  classifies the peer by handshake `Origin`, which browsers set themselves and pages cannot forge,
+  then requires a pairing token or a session key bound to that same origin. A web page can never
+  reach the control path.
+- **Consequential actions ask first.** Approval prompts appear in the side panel with the action
+  named. Cancelling a run stops it mid flight.
+- **Speech uses the browser's built in recognition.** Chrome's Web Speech API streams audio to
+  Google to transcribe it. No model is bundled and nothing is downloaded. Replacing the speech
+  engine is a one file change.
+- **State stays outside the repository.** Pairing keys, logs, config, skills and screenshots live
+  under `~/.voicelink` and `~/voicelink`.
 
-Session keys are bound to the origin that paired them, pairing codes are consumed on first use, and revoking drops any live connection immediately. State lives in `~/.voicelink/auth.json` (`0600`), separate from the lockfile so shutting the daemon down never unpairs your browser.
+Two limits worth stating plainly. Pairing controls **which browser**, not which local process:
+anything running as your user can read the daemon lockfile and drive an already paired browser.
+And an agent reading a hostile page is still susceptible to prompt injection, so treat page content
+as data, never as instructions.
 
-> The token gates *which browser*, not *which local process*. Anything running as your user can read the lockfile and drive an already-paired browser — that is the real perimeter. And a paired agent reading a malicious page is still susceptible to prompt injection; pairing controls access, not intent.
+## Development
 
-Extension-page callers still use the in-process bridge on [background.ts](entrypoints/background.ts) (`{ channel: 'voicelink/bridge', op: 'describe' | 'invoke' }`); both routes share [`invokeForHarness`](lib/bridge/invoke.ts).
+```sh
+yarn dev              # build, launch a throwaway Chrome profile, hot reload
+yarn dev:firefox
+yarn build            # production build
+yarn zip              # store ready archive
+yarn compile          # type check
+yarn intent:check     # route a fixture table of utterances through the local grammar
+yarn mcp:build        # rebuild the daemon and MCP server
+yarn mcp:manifest     # print the tool manifest, no browser needed
+```
 
-### Adding an action
+Explain a single routing decision:
 
-Create `lib/actions/page/<name>.ts` exporting a `defineAction({ name: 'page.<name>', … })`, then add it to the array in [registry.ts](lib/actions/registry.ts). Keep every input field `.describe()`d and validate at runtime with `throw new ActionError(msg, 'CODE')` (no zod `.refine`/`.transform`, so schemas stay JSON-Schema-clean).
+```sh
+yarn intent:check "take me to the checkout page"
+```
 
-## Local state & what never reaches the repo
+Yarn 4 is the package manager and the release is pinned inside the repository, so whichever `yarn`
+is on your `PATH` re-executes into the right one. No global install or Corepack setup is needed.
 
-Everything the daemon persists lives under `~/.voicelink/`, outside the working tree:
+Built with [WXT](https://wxt.dev), React 19, TypeScript, Tailwind CSS v4,
+[shadcn/ui](https://ui.shadcn.com) and [zod](https://zod.dev).
 
-| Path | Contents |
-| --- | --- |
-| `~/.voicelink/auth.json` (`0600`) | Pairing session keys, bound to the extension origin that redeemed them. Survives daemon restarts; cleared by `voicelink-mcp revoke`. |
-| `~/.voicelink/daemon.json` | The lockfile — port and the control-client bearer token. Deleted on shutdown, so it is deliberately *not* where pairing state is kept. |
-| `~/.voicelink/daemon.log` | Run starts/finishes, routed skill, every tool call — `voicelink-mcp logs`. |
-| `~/.voicelink/config.json` | Optional: `claudeBin`, `requireApproval`, `screenshotDir`, `skillsDir`. |
-| `~/.voicelink/skills/` | Optional hand-written skills that override the bundled ones by name. |
-| `~/voicelink/skills/` | Skills uploaded from the extension. Machine-managed — the daemon writes and deletes only here, so nothing hand-written is ever clobbered. |
-| `~/voicelink/screenshot/` | Where `page.screenshot { save: true }` writes. |
+## Contributing
 
-There are **no credentials in this repository and none to add** — the agent runs on your existing
-Claude Code login, and speech goes through the browser's built-in recognition. `.gitignore` still
-guards the paths above (plus `.env*`, key material, and the `mcp/bin/` + `mcp/lib/` symlinks that
-`npm run mcp:link` creates) so a stray copy of any of them cannot be committed by accident.
+Issues and pull requests are welcome. Adding a page capability is a single file plus one line in
+the registry, which publishes it as an MCP tool at the same time. Architecture notes and the
+conventions that are load bearing at runtime live in [CLAUDE.md](CLAUDE.md).
 
-## Notes
+Before opening a pull request, run `yarn compile`, `yarn intent:check` and `yarn mcp:manifest`.
 
-- The manifest is generated by WXT from `wxt.config.ts` — edit permissions/name there, not in `dist/`.
-- Popup and side panel follow the system light/dark preference (`.dark` class toggled in each `main.tsx`).
-- The dark-launch Chrome profile used by `npm run dev` is throwaway; see [WXT's browser startup docs](https://wxt.dev/guide/essentials/config/browser-startup.html) to customize it.
+## License
+
+MIT
