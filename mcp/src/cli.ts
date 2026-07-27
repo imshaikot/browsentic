@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
+import { join } from 'node:path';
+import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
 import { clearLockfile, logPath, readLockfile } from './lockfile';
 import { log } from './log';
@@ -16,6 +18,7 @@ const USAGE = `voicelink-mcp ${pkg.version} — MCP access to your browser via t
   voicelink-mcp sessions     list paired browsers
   voicelink-mcp revoke [origin]   unpair one browser, or all of them
   voicelink-mcp tools        print the bundled tool manifest (no browser needed)
+  voicelink-mcp skills       list the skills the agent can route to, and where they came from
   voicelink-mcp status       show daemon and extension connection state
   voicelink-mcp stop         stop the background daemon
   voicelink-mcp logs         print the daemon log
@@ -53,6 +56,9 @@ switch (command) {
   case 'stop':
     stop();
     break;
+  case 'skills':
+    printSkills();
+    break;
   case 'logs':
     showLogs();
     break;
@@ -79,7 +85,8 @@ async function serve(): Promise<void> {
   // Present when the daemon spawned a Claude Code run and that run spawned us: tagging the
   // invocations is what routes them through the run's approval gate and timeline.
   const bridge = await RemoteBridge.connect(lock.port, lock.token, process.env.VOICELINK_AGENT_RUN);
-  const server = createMcpServer(bridge, pkg.version);
+  // Only a spawned agent run gets the map-writing tool; an ordinary MCP client never sees it.
+  const server = createMcpServer(bridge, pkg.version, { agentRun: !!process.env.VOICELINK_AGENT_RUN });
   await server.connect(new StdioServerTransport());
   log(`stdio MCP server attached to daemon on port ${lock.port}`);
 
@@ -106,6 +113,34 @@ function printTools(): void {
       2,
     ),
   );
+}
+
+/**
+ * Every skill the router can reach, in precedence order — the answer to "did my upload land,
+ * and is it shadowing something?". Reads the same directories a run does, so it needs no daemon.
+ *
+ * It also puts the skill loader in this bundle's import graph, which is what makes
+ * `npm run mcp:manifest` catch a browser-only import creeping into `lib/skills/`.
+ */
+function printSkills(): void {
+  const skills = loadSkills();
+  if (!skills.length) {
+    console.log(`No skills found. Looked in:\n  ${skillDirNames().join('\n  ')}`);
+    return;
+  }
+  for (const skill of skills) {
+    const scope = skill.category === 'site-exploration' ? skill.domains.join(', ') || 'no domains — @name only' : '';
+    const tags = [
+      skill.source,
+      skill.provenance === 'generated' ? 'mapped' : skill.category,
+      scope,
+      skill.isDefault ? 'default' : '',
+    ].filter(Boolean);
+    console.log(`${skill.name}  (${tags.join(' · ')})`);
+    if (skill.description) console.log(`  ${skill.description}`);
+    if (skill.provenance === 'generated') console.log(`  ${join(uploadedSkillsDir(), skill.name)}/`);
+  }
+  console.log(`\nRead in order: ${skillDirNames().join(' → ')} (a later one shadows an earlier one by name)`);
 }
 
 async function showStatus(): Promise<void> {
