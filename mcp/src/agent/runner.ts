@@ -6,14 +6,22 @@ import type { RunEvent } from '@/lib/actions/protocol';
 import { stateDir } from '../lockfile';
 import { log } from '../log';
 import type { AgentConfig } from './config';
-import { buildSystemPrompt } from './prompt';
-import type { Skill } from './skills';
 
 export interface RunRequest {
   runId: string;
   instruction: string;
-  skill: Skill;
+  /** Already composed by the caller, which needs `dropped` and must not build it twice. */
+  systemPrompt: string;
   config: AgentConfig;
+  /**
+   * Enable Claude Code's own `WebSearch`/`WebFetch` for this run. Only a mapping run sets it,
+   * and only to satisfy "public info about this domain".
+   *
+   * Worth being plain about what this costs: these are not MCP tools, so they do not pass
+   * through the daemon, the approval gate, or `invokeForRun`. Nothing can gate them; the
+   * `tool_use` rows below exist so they are at least *visible* on the timeline.
+   */
+  research?: boolean;
   /** The Claude Code session this browser's conversation lives in. */
   sessionId: string;
   /** False on the first instruction, true once the session exists to be resumed. */
@@ -87,11 +95,18 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
     JSON.stringify({ mcpServers: { voicelink: { command: process.execPath, args: [cliPath] } } }),
     '--strict-mcp-config',
     // Print mode auto-denies tools that would prompt; the server-level grant lets every
-    // voicelink tool run. The daemon applies its own approval gate on top.
+    // voicelink tool run. The daemon applies its own approval gate on top. One flag, not two:
+    // the option is variadic, so a second `--allowedTools` would replace this list rather than
+    // extend it.
     '--allowedTools',
     'mcp__voicelink',
-    // The job is in the browser. Filesystem, shell, web and subagent tools stay off, so a
-    // hostile page cannot talk the agent into reaching outside it.
+    // The web tools are the one exception to the deny list below, and only for a mapping run,
+    // which is asked to report what public sources say about a domain. That run therefore both
+    // reads hostile page text and can make outbound requests — the exfiltration shape the deny
+    // list otherwise prevents. A deliberate trade, switchable off with `siteMap.research: false`.
+    ...(request.research ? ['WebSearch', 'WebFetch'] : []),
+    // The job is in the browser. Filesystem, shell and subagent tools stay off, so a hostile
+    // page cannot talk the agent into reaching outside it.
     '--disallowedTools',
     'Bash',
     'Edit',
@@ -100,11 +115,10 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
     'Read',
     'Glob',
     'Grep',
-    'WebFetch',
-    'WebSearch',
+    ...(request.research ? [] : ['WebFetch', 'WebSearch']),
     'Task',
     '--append-system-prompt',
-    buildSystemPrompt(request.skill),
+    request.systemPrompt,
     ...(request.resume ? ['--resume', request.sessionId] : ['--session-id', request.sessionId]),
     ...(config.model ? ['--model', config.model] : []),
     ...(config.effort ? ['--effort', config.effort] : []),
@@ -146,6 +160,15 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
           const event = message.event;
           if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
             emit({ kind: 'text', delta: event.delta.text });
+            return;
+          }
+          // Claude Code's own tools never reach the daemon — they are not MCP calls — so this
+          // is the only place a web search can be reported at all. Not a gate; a record.
+          if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+            const name = event.content_block.name ?? 'tool';
+            if (name === 'WebSearch' || name === 'WebFetch') {
+              emit({ kind: 'tool', toolId: event.content_block.id ?? `web-${Date.now()}`, action: name, input: {} });
+            }
           }
           return;
         }
@@ -197,7 +220,11 @@ type StreamLine =
   | {
       type: 'stream_event';
       parent_tool_use_id?: string | null;
-      event?: { type?: string; delta?: { type?: string; text?: string } };
+      event?: {
+        type?: string;
+        delta?: { type?: string; text?: string };
+        content_block?: { type?: string; id?: string; name?: string };
+      };
     }
   | { type: 'result'; is_error?: boolean; subtype?: string; stop_reason?: string | null; result?: string };
 

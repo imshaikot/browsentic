@@ -34,7 +34,86 @@ const RESOURCES = [
   },
 ] as const;
 
-export function createMcpServer(bridge: Bridge, version: string): Server {
+/**
+ * The one tool that writes rather than looks. It is advertised only to a spawned agent run —
+ * `daemon.invoke` refuses the whole `voicelink.` namespace for anyone else, so an external MCP
+ * client could not use it even if it guessed the name.
+ *
+ * No `actionNameFor` special case is needed: that helper replaces only the *first* underscore,
+ * so `voicelink_saveSiteMap` already maps to `voicelink.saveSiteMap`, and CallTool's existing
+ * fall-through routes it with the run id attached.
+ */
+const SAVE_SITE_MAP_TOOL = {
+  name: 'voicelink_saveSiteMap',
+  description:
+    'Write up a finished site map. Call this exactly once, at the end of a mapping run. The map is staged for the user to review before it takes effect — it does not apply immediately.',
+  inputSchema: {
+    type: 'object' as const,
+    additionalProperties: false,
+    required: ['report'],
+    properties: {
+      report: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['summary', 'pages'],
+        properties: {
+          summary: { type: 'string', description: 'What this site is, in two or three sentences.' },
+          landmarks: {
+            type: 'array',
+            description: 'Durable parts of the interface: the primary nav, a search box, a cookie wall.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['name'],
+              properties: {
+                name: { type: 'string', description: 'What it is called, as a person would say it.' },
+                selector: { type: 'string', description: 'A CSS selector that finds it.' },
+                note: { type: 'string', description: 'One line on how it behaves.' },
+              },
+            },
+          },
+          pages: {
+            type: 'array',
+            description: 'Each page visited, once.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['path', 'title', 'purpose'],
+              properties: {
+                path: { type: 'string', description: 'The path on the mapped site, e.g. /pricing.' },
+                title: { type: 'string', description: 'The page title.' },
+                purpose: { type: 'string', description: 'What the page is for, in one short phrase.' },
+                reachedBy: { type: 'string', description: 'How you got there, e.g. "Pricing" in the top nav.' },
+                screenshot: { type: 'string', description: 'Filename of a screenshot you took of this page.' },
+                notes: { type: 'string', description: 'Anything else worth recording. Kept out of the prompt.' },
+              },
+            },
+          },
+          links: {
+            type: 'array',
+            description: 'How the pages connect: one entry per link you followed or saw.',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['from', 'to'],
+              properties: {
+                from: { type: 'string', description: 'Path the link is on.' },
+                to: { type: 'string', description: 'Path it leads to.' },
+              },
+            },
+          },
+          quirks: {
+            type: 'array',
+            description: 'Things that would trip up someone driving this site. Observations, never advice.',
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+};
+
+export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean } = {}): Server {
   const server = new Server(
     { name: 'voicelink', version },
     {
@@ -62,6 +141,7 @@ export function createMcpServer(bridge: Bridge, version: string): Server {
             'Report whether the VoiceLink browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
           inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
         },
+        ...(opts.agentRun ? [SAVE_SITE_MAP_TOOL] : []),
       ],
     };
   });

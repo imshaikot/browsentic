@@ -18,6 +18,8 @@ import {
 import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
 import { readAgentConfig } from './agent/config';
+import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
+import { commitStaging, discardStaging } from './agent/site-map-store';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
 import { log } from './log';
@@ -41,14 +43,22 @@ export interface Daemon extends Bridge {
  * path (or the write error) on the result. A failed save never fails the capture — the caller
  * still gets the image to look at.
  */
-function persistScreenshot(action: string, input: unknown, result: ActionResult): ActionResult {
+function persistScreenshot(
+  action: string,
+  input: unknown,
+  result: ActionResult,
+  saveTo?: { dir: string; filename: string },
+): ActionResult {
   if (action !== 'page.screenshot' || !result.ok) return result;
   const args = (input ?? {}) as { save?: unknown; filename?: unknown };
   const data = result.data as { dataUrl?: unknown } | null;
-  if (args.save !== true || typeof data?.dataUrl !== 'string') return result;
+  // A mapping run's captures are always kept: they are the evidence for the map it is writing,
+  // and the daemon — not the model — decided where they go.
+  if ((args.save !== true && !saveTo) || typeof data?.dataUrl !== 'string') return result;
   try {
     const savedTo = saveScreenshot(data.dataUrl, {
-      filename: typeof args.filename === 'string' ? args.filename : undefined,
+      dir: saveTo?.dir,
+      filename: saveTo?.filename ?? (typeof args.filename === 'string' ? args.filename : undefined),
     });
     log(`screenshot saved to ${savedTo}`);
     return { ok: true, data: { ...(result.data as object), savedTo } };
@@ -195,9 +205,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           scheduleIdleExit();
         },
         // The agent harness: the extension asks the daemon to think, and the daemon answers
-        // by driving the browser back down this same socket. A file to summarize is the one
-        // stateless request — it runs outside the conversation and replies with `fileSummary`,
-        // so it is handled here rather than in the run-gated AgentSession.
+        // by driving the browser back down this same socket. Summarizing a file and saving a
+        // skill are the stateless requests — they run outside the conversation and reply on
+        // their own frames, so they are handled here rather than in the run-gated AgentSession.
         (request, source) => {
           if (request.t === 'analyzeFile') {
             void summarizeFile(request, readAgentConfig())
@@ -206,6 +216,28 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
                 source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
               );
             return;
+          }
+          if (request.t === 'saveSkill') {
+            return source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
+          }
+          if (request.t === 'deleteSkill') {
+            return source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
+          }
+          if (request.t === 'deleteSiteMap') {
+            return source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
+          }
+          // Reviewing a staged map outlives the run that produced it — the panel may be reopened
+          // long after — so it is handled here rather than against the active AgentSession.
+          if (request.t === 'activateSiteMap') {
+            const result = commitStaging(request.stagingId, request.exactHost === true);
+            return source.send({
+              t: 'skillResult',
+              id: request.id,
+              result: result.ok ? { ok: true, data: { name: result.data.name, path: result.data.path } } : result,
+            });
+          }
+          if (request.t === 'discardSiteMap') {
+            return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
           }
           session(source).handle(request);
         },
@@ -232,6 +264,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     return (agent ??= new AgentSession({
       invoke,
       emit: (id, event) => source.send({ t: 'run', id, event }),
+      draft: (id, draft) => source.send({ t: 'siteMapDraft', id, draft }),
     }));
   }
 
@@ -325,7 +358,17 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     };
   }
 
-  async function invoke(action: string, input?: unknown) {
+  async function invoke(
+    action: string,
+    input?: unknown,
+    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
+  ) {
+    // The `voicelink.` namespace is not browser capability — it is the mapping run's write
+    // channel, intercepted in AgentSession before it ever gets here. Anything reaching this
+    // point with that prefix came from an untagged caller, i.e. some other MCP client.
+    if (action.startsWith('voicelink.')) {
+      return failure('UNKNOWN_ACTION', `Unknown action "${action}".`);
+    }
     if (!link?.isOpen) {
       return failure(
         'EXTENSION_OFFLINE',
@@ -334,7 +377,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     }
     // Every caller — direct MCP clients and spawned agent runs alike — reaches the browser
     // through here, so this is the one place to write a screenshot to disk when asked.
-    return persistScreenshot(action, input, await link.invoke(action, input));
+    return persistScreenshot(action, input, await link.invoke(action, input, opts?.tabId), opts?.saveTo);
   }
 
   /** Nothing attached and nobody asking: don't linger in the user's process list forever. */
