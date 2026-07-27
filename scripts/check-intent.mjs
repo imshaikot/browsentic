@@ -7,7 +7,7 @@
  * The funnel is pure TypeScript with no DOM and no `browser.*`, so it can be bundled and run
  * in plain Node — which also proves the module stays free of extension-only imports.
  *
- * Usage: npm run intent:check [-- "an utterance to route"]
+ * Usage: yarn intent:check ["an utterance to route"]
  */
 import { build } from 'esbuild';
 import { mkdir, rm, writeFile } from 'node:fs/promises';

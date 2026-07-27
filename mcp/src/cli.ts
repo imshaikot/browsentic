@@ -120,7 +120,7 @@ function printTools(): void {
  * and is it shadowing something?". Reads the same directories a run does, so it needs no daemon.
  *
  * It also puts the skill loader in this bundle's import graph, which is what makes
- * `npm run mcp:manifest` catch a browser-only import creeping into `lib/skills/`.
+ * `yarn mcp:manifest` catch a browser-only import creeping into `lib/skills/`.
  */
 function printSkills(): void {
   const skills = loadSkills();
