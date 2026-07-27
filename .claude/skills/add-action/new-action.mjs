@@ -4,7 +4,7 @@
 // One action == one page capability == one MCP tool. This driver does the
 // three edits that must stay in lockstep (the action module, the registry
 // import, the registry array) correct-by-construction, then runs the same
-// checks a reviewer would (`npm run compile` + the bundled tool manifest) and
+// checks a reviewer would (`yarn compile` + the bundled tool manifest) and
 // asserts the new tool actually materialized.
 //
 // Usage (paths are relative to the repo root):
@@ -136,7 +136,7 @@ function removeFromArray(src, n) {
 /** Build the MCP bundle and return the parsed tool manifest (no browser needed). */
 function toolManifest() {
   try {
-    execFileSync('npm', ['--prefix', 'mcp', 'run', 'build', '--silent'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
+    execFileSync('yarn', ['--cwd', 'mcp', 'build'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
   } catch (e) {
     die(`mcp build failed:\n${e.stderr?.toString() ?? e.message}`);
   }
@@ -157,10 +157,10 @@ function toolManifest() {
 
 function typecheck() {
   try {
-    execFileSync('npm', ['run', 'compile'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
-    ok('npm run compile — type-check passed');
+    execFileSync('yarn', ['compile'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
+    ok('yarn compile — type-check passed');
   } catch (e) {
-    die(`npm run compile failed:\n${e.stdout?.toString() ?? ''}${e.stderr?.toString() ?? e.message}`);
+    die(`yarn compile failed:\n${e.stdout?.toString() ?? ''}${e.stderr?.toString() ?? e.message}`);
   }
 }
 
