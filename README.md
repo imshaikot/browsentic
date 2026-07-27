@@ -36,6 +36,7 @@ npm run build          # production build → dist/chrome-mv3/
 npm run build:firefox  # firefox build
 npm run zip            # store-ready zip
 npm run compile        # type-check only (tsc --noEmit)
+npm run intent:check   # route a fixture table of utterances through lib/intent/
 npm run icons          # regenerate placeholder icons in public/icon/
 ```
 
@@ -51,12 +52,15 @@ To load the production build manually: `chrome://extensions` → enable **Develo
 | Content script | `entrypoints/content.ts` | Exposes the action layer in every page (`exposeActions()`) |
 | MCP harness | `mcp/` | Installable MCP server + daemon that drives the browser (see below) |
 | Agent harness | `mcp/src/agent/`, `mcp/skills/` | Turns typed instructions into agent runs by spawning your own Claude Code (see below) |
+| Intent funnel | `lib/intent/` | Scores each instruction first; confident quick commands run in the browser instead of becoming a run (see below) |
 
 ```
 assets/globals.css     # Tailwind v4 + shadcn theme (violet, dark-mode aware)
 components/ui/         # shadcn/ui components (button, badge, card, input, textarea, scroll-area)
 lib/actions/           # the declarative page-control action layer (see below)
+lib/intent/            # the local intent funnel — quick commands the extension answers itself
 lib/bridge/            # extension side of the harness (daemon socket, invoke path, speech hooks)
+lib/skills/            # the skill file format — parser + serializer, shared with the daemon
 mcp/                   # the installable MCP server + daemon
 mcp/skills/            # markdown system prompts the daemon routes instructions to
 lib/utils.ts           # cn() helper
@@ -78,6 +82,87 @@ Components land in `components/ui/` and import via the `@/` alias (provided by W
 Type an instruction into the side panel (or the popup) of a paired browser and the daemon runs it as an agent: it routes the text to a **skill** (a markdown system prompt from `mcp/skills/`, user-overridable in `~/.voicelink/skills/`), spawns **your own Claude Code** (`claude -p` — your login, your model, no API key anywhere in this repo), and hands it the browser through the same MCP server external clients use. Text streams back token by token; every `page_*` call shows up as a row on the side panel's timeline as it happens; gated actions (`page.submitForm` by default — edit `requireApproval` in `~/.voicelink/config.json`) pause for an Allow/Deny in the panel. Follow-ups resume the same Claude Code session, so "now click the second one" works.
 
 Requires [Claude Code](https://claude.com/claude-code) on your PATH (or `{"claudeBin": "/path/to/claude"}` in `~/.voicelink/config.json`).
+
+### Site notes — teaching it about one site
+
+The bundled skills are general: how to drive any page, how to read any page. What they cannot know is how *your* sites work. Open the book icon in the side panel's composer and upload a markdown file of notes — where things are, how a list loads, what a button is really called — tagged with the domains it applies to:
+
+```markdown
+---
+name: acme-admin
+description: Our internal admin tool.
+category: site-exploration
+domains: [admin.acme.com]
+---
+
+Search is `#q` and submits on Enter, not on the button.
+Results lazy-load — click "Load more" until it disappears before counting anything.
+```
+
+Uploaded skills are **overlays**, not replacements: on a matching site the notes are added *on top of* whichever skill routing picked, so `browser-control`'s driving loop and `page-research`'s read-only rules still apply. Off that site they are inert. `@acme-admin …` pins one on regardless of where you are.
+
+They are written to `~/voicelink/skills/` (override with `skillsDir` in `config.json`) — outside the repo, never committed, and re-read on every run so an edit takes effect on the next thing you ask. The extension keeps its own copy, so an upload made while the daemon was down lands when it comes back. `voicelink-mcp skills` lists everything the router can see and where it came from.
+
+### Mapping a site automatically
+
+Rather than writing those notes yourself, press **Map** in the Skills panel (or say `@site-mapper map this site`). VoiceLink reads the site's own `robots.txt`/`sitemap.xml`, looks up public background on the domain, then walks the site for a few minutes — screenshotting as it goes — and writes the skill for you:
+
+```
+~/voicelink/skills/acme-com/
+├── SKILL.md          the routed skill: landmarks, pages, how they connect, quirks
+├── map.json          the structured report behind it
+├── screenshots/      captures taken during the crawl
+├── evidence/         the raw sitemap and background it worked from
+└── pages/            longer per-page notes, kept out of the prompt
+```
+
+**Nothing takes effect until you say so.** The map is written to a staging directory the skill loader cannot see, and the panel shows you the exact markdown — literally, never rendered — with the domain it will match and where it landed. Activate arms it; Discard bins it.
+
+The crawl is **read-only and locked to one host**: it cannot click, fill, or submit (set `siteMap.allowClicks` if you want clicking), it cannot leave the site, and it is pinned to the tab it started in, so switching tabs mid-crawl stops it rather than following you. Bounds live in `config.json`:
+
+```json
+{ "siteMap": { "research": true, "allowClicks": false, "maxPages": 15, "maxScreenshots": 10, "timeoutMs": 600000 } }
+```
+
+> A mapped skill is written from pages the agent read, so treat it as you would any generated content — read it before activating. `research: true` lets the mapping run use web search, which is the one place a run both reads pages and can make outbound requests; set it to `false` to keep the run entirely inside the browser.
+
+## The fast path — what never reaches the agent (`lib/intent/`)
+
+"Go back." "Scroll to the top." "Open github.com." Sending those out to the daemon to be spawned
+as a Claude Code run costs a socket round trip and a few seconds of thinking to arrive at a tool
+call the extension could have made in milliseconds. So every instruction — typed or spoken, popup
+or side panel — first passes through a **local intent funnel** in the background worker.
+
+[`routeIntent()`](lib/intent/route.ts) normalizes the utterance ("Hey VoiceLink, could you scroll
+down a bit please?" → `scroll down`), matches it against a fixed grammar of quick commands, and
+scores the best match as `rule certainty × slot confidence`. Clear the threshold (0.75) and the
+extension runs the action itself and stops there; otherwise the untouched original text goes to the
+agent exactly as before. Steps taken locally appear on the timeline like any other, marked ⚡ and
+timed, so it is always visible which path handled a request.
+
+The funnel is biased toward escalating, because the two mistakes are not symmetric: escalating
+something it could have handled costs a round trip, while acting on something it misread spends a
+wrong action on your real page. Questions, multi-step asks, conditionals, consequential clicks
+("click Buy now"), vague targets ("click it") and anything the grammar does not recognize all go to
+the agent — as does any quick command that *runs and fails*, since a "Sign in" button the grammar
+could not find is exactly what an agent that can look at the page does better.
+
+| Handled locally | Sent to the agent |
+| --- | --- |
+| back / forward / reload | "is there a login button?" |
+| go to github.com · open gmail · open localhost:3000 | "open the settings menu" |
+| google &lt;something&gt; · search the web for &lt;something&gt; | "search for wireless headphones" |
+| scroll up/down/top/bottom · page down · scroll to the reviews | "scroll down and tell me what it says" |
+| press enter · hit escape · press arrow down | "click sign in and then fill in my email" |
+| click Sign in · tap Continue · click the Next button | "click Buy now" · "click it" |
+
+`npm run intent:check` routes a table of utterances through the funnel in plain Node and reports
+where the threshold sits relative to the best case it rejects and the worst it accepts — that table
+is where the threshold is tuned. Pass an utterance to see one decision explained:
+
+```sh
+npm run intent:check -- "take me to the checkout page"
+```
 
 ## Voice input
 
@@ -204,6 +289,7 @@ voicelink-mcp sessions        # which browsers are paired, and which is live
 voicelink-mcp revoke          # unpair everything (or pass one origin)
 voicelink-mcp status          # daemon + extension state
 voicelink-mcp tools           # the bundled manifest
+voicelink-mcp skills          # every skill the router can reach, and where it came from
 voicelink-mcp logs            # ~/.voicelink/daemon.log
 voicelink-mcp stop
 ```
@@ -232,8 +318,10 @@ Everything the daemon persists lives under `~/.voicelink/`, outside the working 
 | `~/.voicelink/auth.json` (`0600`) | Pairing session keys, bound to the extension origin that redeemed them. Survives daemon restarts; cleared by `voicelink-mcp revoke`. |
 | `~/.voicelink/daemon.json` | The lockfile — port and the control-client bearer token. Deleted on shutdown, so it is deliberately *not* where pairing state is kept. |
 | `~/.voicelink/daemon.log` | Run starts/finishes, routed skill, every tool call — `voicelink-mcp logs`. |
-| `~/.voicelink/config.json` | Optional: `claudeBin`, `requireApproval`. |
-| `~/.voicelink/skills/` | Optional user skills that override the bundled ones by name. |
+| `~/.voicelink/config.json` | Optional: `claudeBin`, `requireApproval`, `screenshotDir`, `skillsDir`. |
+| `~/.voicelink/skills/` | Optional hand-written skills that override the bundled ones by name. |
+| `~/voicelink/skills/` | Skills uploaded from the extension. Machine-managed — the daemon writes and deletes only here, so nothing hand-written is ever clobbered. |
+| `~/voicelink/screenshot/` | Where `page.screenshot { save: true }` writes. |
 
 There are **no credentials in this repository and none to add** — the agent runs on your existing
 Claude Code login, and speech goes through the browser's built-in recognition. `.gitignore` still
