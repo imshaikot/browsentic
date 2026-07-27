@@ -18,6 +18,7 @@
     "mcp:link": "npm --prefix mcp link",
     "mcp:unlink": "npm rm -g @voicelink/mcp",
     "mcp:manifest": "npm --prefix mcp run build --silent && node mcp/dist/cli.js tools",
+    "intent:check": "node scripts/check-intent.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "postinstall": "wxt prepare"
   },
