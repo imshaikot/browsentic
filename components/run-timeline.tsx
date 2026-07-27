@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Check, Info, User, Wrench, X } from 'lucide-react';
+import { AlertTriangle, Bot, Check, Info, User, Wrench, X, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { RunItem } from '@/lib/bridge/use-run';
@@ -64,6 +64,9 @@ function ToolRow({
       <div className="flex items-center gap-2 text-xs">
         <StatusIcon ok={item.ok} awaiting={item.awaiting} />
         <span className="font-mono text-muted-foreground">{item.action.replace(/^page\./, '')}</span>
+        {item.source === 'local' && (
+          <Zap className="size-3 shrink-0 text-amber-500" aria-label="Handled in the browser" />
+        )}
         {item.summary && (
           <span className={cn('truncate', item.ok === false ? 'text-destructive' : 'text-muted-foreground')}>
             {item.summary}
