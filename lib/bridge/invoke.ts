@@ -16,13 +16,20 @@ const LOAD_TIMEOUT_MS = 10_000;
  * Run an action in the active tab on behalf of an outside caller (the MCP daemon or the
  * side panel). Same path as `invokeInActiveTab`, except for navigation — see below.
  */
-export async function invokeForHarness(action: string, input?: unknown): Promise<ActionResult> {
+export async function invokeForHarness(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
   // The file repository lives in extension storage, which a content script cannot read, so both
   // file actions resolve here. listFiles needs no tab at all — it only reads storage.
   if (action === listFiles.name) return listStoredFiles(input);
 
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id == null) return failure('NO_ACTIVE_TAB', 'No active tab to control');
+  // A pinned tab is a mapping run holding on to the tab it started in. Resolving the active tab
+  // instead would let a mid-run tab switch redirect the crawl onto whatever the user opened —
+  // reading, and screenshotting, a page they never asked to be mapped.
+  const tab = tabId == null ? (await browser.tabs.query({ active: true, currentWindow: true }))[0] : await pinnedTab(tabId);
+  if (tab?.id == null) {
+    return tabId == null
+      ? failure('NO_ACTIVE_TAB', 'No active tab to control')
+      : failure('MAPPING_TAB_CHANGED', 'The tab this run started in has been closed.');
+  }
   // Navigation and screenshots are special-cased: both need background-only APIs (the tabs API,
   // captureVisibleTab) that a content script cannot reach, so they run here rather than in-page.
   if (action === navigate.name) return navigateTab(tab.id, input);
@@ -30,6 +37,15 @@ export async function invokeForHarness(action: string, input?: unknown): Promise
   // attachFile reads the stored bytes here (a page cannot), then runs the DOM write in-page.
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   return invokeInTab(tab.id, action, input);
+}
+
+/** The tab a run pinned itself to, or undefined once it has gone away. */
+async function pinnedTab(tabId: number) {
+  try {
+    return await browser.tabs.get(tabId);
+  } catch {
+    return undefined;
+  }
 }
 
 /** page.listFiles: read the file index from extension storage; hand back metadata, never bytes. */
