@@ -28,7 +28,7 @@ That prints `✓ manifest publishes it as MCP tool "page_getAttribute"` and a **
 node .claude/skills/add-action/new-action.mjs verify getAttribute
 ```
 
-`verify` runs `npm run compile` then builds and parses the bundled manifest, confirms your action is present, lists its params, and warns on any field missing a `.describe()`. Run it with no name to just re-check the whole registry (`node .claude/skills/add-action/new-action.mjs verify`).
+`verify` runs `yarn compile` then builds and parses the bundled manifest, confirms your action is present, lists its params, and warns on any field missing a `.describe()`. Run it with no name to just re-check the whole registry (`node .claude/skills/add-action/new-action.mjs verify`).
 
 **Back out cleanly** (removes the file *and* unwires the registry):
 
@@ -68,14 +68,14 @@ Edit each, then re-run `verify`:
 `verify` proves the tool is *published*; it does not load it into a running client. A `page_*` tool becomes callable in the real browser only after **both** sides are rebuilt and reloaded:
 
 ```sh
-npm run build && npm run mcp:build   # rebuild extension + daemon from the new registry
+yarn build && yarn mcp:build   # rebuild extension + daemon from the new registry
 ```
 
 Then: reload the unpacked extension at `chrome://extensions` (Chrome does **not** auto-reload it), and **restart your MCP session** — MCP servers enumerate tools at session start, so a new tool won't appear mid-session. Check alignment with `node mcp/dist/cli.js status` → `manifest: in sync`; `DRIFTED` means one side wasn't rebuilt/reloaded. See the `voicelink` skill for driving the browser once it's live.
 
 ## Gotchas
 
-- **"Everything compiles" is not "it works."** A used top-level `document.x` type-checks fine (tsc has DOM types) and only blows up when the manifest bundle loads in Node. Always finish with `verify`, never just `npm run compile`.
+- **"Everything compiles" is not "it works."** A used top-level `document.x` type-checks fine (tsc has DOM types) and only blows up when the manifest bundle loads in Node. Always finish with `verify`, never just `yarn compile`.
 - **The new tool is missing from the current session even after a rebuild.** Expected — restart the session. `verify`/`mcp:manifest` read the freshly-built bundle from disk, which is why they're the source of truth here, not your live tool list.
 - **`create` refuses an existing file / already-imported name.** That's the guard against half-wired duplicates — pick another name or edit the existing module directly.
 - **Don't hand-edit `dist/` or `.wxt/`** — both are generated; your action lives only in `lib/actions/`.
@@ -84,11 +84,11 @@ Then: reload the unpacked extension at `chrome://extensions` (Chrome does **not*
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `verify` fails at `npm run compile` with an unused-variable error | The scaffold's `example` field/param is still unused after your edits | Use or delete it; the placeholder is meant to be replaced |
+| `verify` fails at `yarn compile` with an unused-variable error | The scaffold's `example` field/param is still unused after your edits | Use or delete it; the placeholder is meant to be replaced |
 | `tool manifest failed … ReferenceError: document is not defined` | Top-level DOM access | Move it inside `execute()` |
 | `does not survive the tool-name round trip` from `mcp:manifest` | Underscore in the action name | Rename to camelCase |
-| `status` shows `manifest: DRIFTED` | Extension and daemon built from different registries | `npm run build && npm run mcp:build`, reload the extension |
+| `status` shows `manifest: DRIFTED` | Extension and daemon built from different registries | `yarn build && yarn mcp:build`, reload the extension |
 
 ## The driver
 
-[`new-action.mjs`](new-action.mjs) — dependency-free Node, lives beside this file. Commands: `create <name> "<desc>"`, `verify [<name>]`, `remove <name>`, `docs`. It shells out to `npm run compile` and the MCP build, so run it from anywhere inside the repo.
+[`new-action.mjs`](new-action.mjs) — dependency-free Node, lives beside this file. Commands: `create <name> "<desc>"`, `verify [<name>]`, `remove <name>`, `docs`. It shells out to `yarn compile` and the MCP build, so run it from anywhere inside the repo.
