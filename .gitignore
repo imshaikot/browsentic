@@ -1,5 +1,15 @@
-# Dependencies
+# Dependencies. Both yarn.lock files (root and mcp/) are committed — mcp/yarn.lock is also
+# what keeps `yarn --cwd mcp` a separate project rather than part of the root install.
 node_modules/
+
+# Yarn 4 keeps per-project state in .yarn/, and there are two projects here. install-state.gz
+# is a local cache; the package cache is global (enableGlobalCache), so nothing else lands
+# here except .yarn/releases/, which holds the pinned Yarn binary that .yarnrc.yml's yarnPath
+# resolves to — that one has to stay committed, or a fresh clone has no working Yarn.
+**/.yarn/*
+!**/.yarn/releases
+!**/.yarn/patches
+.pnp.*
 
 # Build output — WXT writes to `dist/` (see outDir in wxt.config.ts); tsup writes to mcp/dist/.
 # The bare `dist/` pattern matches at any depth, so it covers both.
@@ -16,7 +26,9 @@ stats-*.json
 web-ext.config.ts
 web-ext.config.ts.timestamp-*
 
-# `npm run mcp:link` artifacts: mcp/bin holds symlinks into mcp/lib/node_modules
+# Stray `npm link` artifacts. `yarn mcp:link` links into the real npm prefix and writes
+# nothing here, but the `npm --prefix mcp link` it used to run treated mcp/ as the *global*
+# prefix and left self-referential symlinks (mcp/bin -> mcp/lib/node_modules) behind.
 mcp/bin/
 mcp/lib/
 
