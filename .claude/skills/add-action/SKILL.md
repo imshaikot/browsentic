@@ -8,7 +8,7 @@ argument-hint: "The capability, e.g. 'add page.getAttribute that reads an elemen
 
 In VoiceLink there is **no separate step to register the harness tool**. One `defineAction()` in `lib/actions/` that you add to `registry.ts` becomes, from that single edit, both the extension's page capability *and* the `page_*` MCP tool — the daemon bundles the same registry (`describeActions()`), so `tools/list` cannot drift from it. This skill's job is to make that one edit correct-by-construction and prove it landed.
 
-> Paths below are relative to the repo root (`/Users/shahriar/Workspace/voicelink`), the unit this skill lives under.
+> Paths below are relative to the repo root, the unit this skill lives under.
 
 ## Run this (agent path)
 
