@@ -13,8 +13,9 @@ It runs on **your own [Claude Code](https://claude.com/claude-code) login**. The
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 17 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
+- **Real page control.** 19 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
 - **Site maps.** Point VoiceLink at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
+- **Recordings.** Do a repetitive job once yourself and VoiceLink keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
 - **Works as an MCP server.** Claude Code or any other MCP client can drive your real, logged in browser through the same local daemon.
 - **Off by default.** A fresh install connects to nothing until you redeem a one time pairing code.
@@ -147,6 +148,39 @@ instruction with `@acme-admin` to pin one regardless of where you are.
 Notes live outside the repository, are re-read on every run so an edit applies to the next thing
 you ask, and `voicelink-mcp skills` lists everything currently in scope.
 
+## Recordings: show it once, repeat it later
+
+A site map teaches VoiceLink what a site **is**. A recording teaches it what **you do** there.
+
+Press the red record button in the composer, then do the job yourself — click through the pages,
+fill the fields, submit the form — and press stop. VoiceLink splits what you did into ordered
+steps, names them after what you accomplished, and keeps them in a list you can rename. Later,
+"do it like last time" runs them again. You can also just say it:
+
+```
+record my browsing session
+stop recording
+```
+
+A recording follows the tab it started in and nothing else. Navigations inside that tab become
+steps, other tabs are ignored, and closing the tab stops and saves. It runs for at most **15
+minutes**, warns you at 13, and stops itself at the limit.
+
+**What you type is not saved by default.** Every field you fill becomes a placeholder — `{{email}}`,
+`{{invoice_number}}` — and the assistant asks you for the value when it replays. Tick **Save what I
+type** if you would rather keep the literal values; passwords, hidden fields, one time codes and
+anything shaped like a card number are dropped either way.
+
+Replaying is not blind playback. The steps are a plan, not a script: the agent re-checks each target
+against the live page before acting, and prefers the visible text it recorded over the CSS selector,
+because selectors are what a redesign breaks first. Anything consequential still waits for your
+approval, even though you performed it yourself while recording. If a step no longer lands, the run
+stops and tells you which one, rather than improvising a different route to the same effect.
+
+Recordings live in the extension's own storage rather than on disk, so `voicelink-mcp skills` does
+not list them. The one time a recording leaves the browser is the local `claude -p` call that turns
+the raw trace into steps.
+
 ## Instant commands
 
 Sending "go back" out to a language model costs a round trip and a few seconds to arrive at
@@ -162,6 +196,7 @@ bolt on the timeline. Everything else goes to the agent with the text untouched.
 | scroll up, down, top, bottom, page down | "scroll down and tell me what it says" |
 | press enter, hit escape, press arrow down | "click sign in and then fill in my email" |
 | click Sign in, tap Continue | "click Buy now", "click it" |
+| record my browsing session, stop recording | "record a video of this page" |
 
 The bias is toward escalating, because the two mistakes are not symmetric. Escalating something it
 could have handled costs a round trip. Acting on something it misread spends a wrong click on your
@@ -174,7 +209,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add voicelink -- voicelink-mcp
 ```
 
-Claude Code now has 17 page tools plus `voicelink_status`, and three read only resources that
+Claude Code now has 19 page tools plus `voicelink_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -225,6 +260,10 @@ voicelink-mcp stop
   reach the control path.
 - **Consequential actions ask first.** Approval prompts appear in the side panel with the action
   named. Cancelling a run stops it mid flight.
+- **Recordings capture what you do, not what you type.** A recording stores the identity of each
+  field you fill and a placeholder for its value. Opting in to keeping literal values is per
+  recording and off by default, and passwords, hidden fields, one time codes and card numbers are
+  never stored either way. Recording only ever starts from your own click or your own words.
 - **Speech uses the browser's built in recognition.** Chrome's Web Speech API streams audio to
   Google to transcribe it. No model is bundled and nothing is downloaded. Replacing the speech
   engine is a one file change.
