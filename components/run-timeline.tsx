@@ -1,5 +1,6 @@
 import { AlertTriangle, Bot, Check, Info, User, Wrench, X, Zap } from 'lucide-react';
 
+import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
 import type { RunItem } from '@/lib/bridge/use-run';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,7 @@ interface RunTimelineProps {
 /** The transcript: what the user asked, what the agent said, and every action it took. */
 export function RunTimeline({ items, onDecide }: RunTimelineProps) {
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex min-w-0 flex-col gap-4 p-4">
       {items.map((item) =>
         item.kind === 'tool' ? (
           <ToolRow key={item.id} item={item} onDecide={onDecide} />
@@ -29,7 +30,7 @@ export function RunTimeline({ items, onDecide }: RunTimelineProps) {
 function Bubble({ item }: { item: Extract<RunItem, { kind: 'user' | 'assistant' }> }) {
   const isAssistant = item.kind === 'assistant';
   return (
-    <div className={cn('flex gap-2', !isAssistant && 'flex-row-reverse')}>
+    <div className={cn('flex min-w-0 gap-2', !isAssistant && 'flex-row-reverse')}>
       <div
         className={cn(
           'flex size-7 shrink-0 items-center justify-center rounded-full',
@@ -42,11 +43,18 @@ function Bubble({ item }: { item: Extract<RunItem, { kind: 'user' | 'assistant' 
       </div>
       <div
         className={cn(
-          'max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap',
+          // `min-w-0` matters as much as the max: without it the bubble takes its flex basis from
+          // its content's min-content width, which a long URL makes wider than the panel.
+          'min-w-0 max-w-[85%] rounded-2xl px-3 py-2 text-sm',
           isAssistant ? 'rounded-tl-sm bg-muted' : 'rounded-tr-sm bg-primary text-primary-foreground',
         )}
       >
-        {item.text}
+        {isAssistant ? (
+          <Markdown text={item.text} />
+        ) : (
+          // The user's own words render as typed — reading their prose as markup would rewrite it.
+          <span className="whitespace-pre-wrap wrap-anywhere">{item.text}</span>
+        )}
       </div>
     </div>
   );
@@ -60,15 +68,15 @@ function ToolRow({
   onDecide: (toolId: string, allow: boolean) => void;
 }) {
   return (
-    <div className="ml-9 flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 text-xs">
+    <div className="ml-9 flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 items-center gap-2 text-xs">
         <StatusIcon ok={item.ok} awaiting={item.awaiting} />
-        <span className="font-mono text-muted-foreground">{item.action.replace(/^page\./, '')}</span>
+        <span className="shrink-0 font-mono text-muted-foreground">{item.action.replace(/^page\./, '')}</span>
         {item.source === 'local' && (
           <Zap className="size-3 shrink-0 text-amber-500" aria-label="Handled in the browser" />
         )}
         {item.summary && (
-          <span className={cn('truncate', item.ok === false ? 'text-destructive' : 'text-muted-foreground')}>
+          <span className={cn('min-w-0 truncate', item.ok === false ? 'text-destructive' : 'text-muted-foreground')}>
             {item.summary}
           </span>
         )}
