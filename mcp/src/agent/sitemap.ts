@@ -80,7 +80,9 @@ export async function fetchSiteIndex(origin: string, signal: AbortSignal): Promi
 
   const queue = [...candidates];
   const seen = new Set<string>();
-  while (queue.length && budget.documents < MAX_DOCUMENTS && urls.length < MAX_URLS) {
+  // `signal` reaches each `get`, but an aborted fetch here comes back as null rather than throwing,
+  // so the loop would keep working through the queue for its whole document budget after a cancel.
+  while (!signal.aborted && queue.length && budget.documents < MAX_DOCUMENTS && urls.length < MAX_URLS) {
     const next = queue.shift()!;
     if (seen.has(next)) continue;
     seen.add(next);

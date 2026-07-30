@@ -64,8 +64,98 @@ export function spawnClaude(
     const hardKill = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS);
     hardKill.unref();
   };
-  signal.addEventListener('abort', kill, { once: true });
+  // A listener added to an already-aborted signal never fires, so a signal that aborted while the
+  // caller was awaiting something before this point would spawn a child nothing could ever kill.
+  if (signal.aborted) kill();
+  else signal.addEventListener('abort', kill, { once: true });
   return { child, release: () => signal.removeEventListener('abort', kill) };
+}
+
+/**
+ * Everything a one-shot run must not be able to reach; `allowedTools` opens back only what it needs,
+ * and is filtered out of this list so the two flags never name the same tool. `Read` is on it
+ * because denying by default is the point — the summarizer asks for it back, the namer does not.
+ */
+const ONE_SHOT_DENIED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep', 'Read', 'WebFetch', 'WebSearch', 'Task'];
+
+/**
+ * One run of `claude -p --output-format json`, resolving the `result` text or rejecting `RunError`.
+ * The stateless side of the harness: no MCP config, no `VOICELINK_AGENT_RUN`, no stream parsing —
+ * these runs answer a question and drive nothing.
+ *
+ * Shared by the file summarizer and the session namer rather than copied into each: the stdout
+ * shape, the ENOENT wording and the abort handling are all things that must not drift between them.
+ */
+export function runClaudeJson(
+  prompt: string,
+  config: AgentConfig,
+  signal: AbortSignal,
+  { allowedTools = [], timedOut, empty }: { allowedTools?: string[]; timedOut: string; empty: string },
+): Promise<string> {
+  const args = [
+    '-p',
+    prompt,
+    '--output-format',
+    'json',
+    // Whatever the caller needs and nothing else, so the material being read cannot talk the
+    // one-shot out of its lane. An empty list is the honest default: most of these read nothing.
+    ...(allowedTools.length ? ['--allowedTools', ...allowedTools] : []),
+    '--disallowedTools',
+    ...ONE_SHOT_DENIED.filter((tool) => !allowedTools.includes(tool)),
+    ...(config.model ? ['--model', config.model] : []),
+    ...(config.effort ? ['--effort', config.effort] : []),
+  ];
+
+  return new Promise<string>((resolve, reject) => {
+    const { child, release } = spawnClaude(args, config, signal);
+    let stdout = '';
+    let stderrTail = '';
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrTail = (stderrTail + chunk.toString()).slice(-2_000);
+    });
+
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      release();
+      if (error.code === 'ENOENT') {
+        reject(
+          new RunError(
+            'NO_CLAUDE',
+            `Could not find "${config.claudeBin}". Install Claude Code, or set {"claudeBin": "/path/to/claude"} in the daemon's config.json.`,
+          ),
+        );
+      } else {
+        reject(new RunError('AGENT_FAILED', error.message));
+      }
+    });
+
+    child.on('close', () => {
+      release();
+      if (signal.aborted) return reject(new RunError('TIMEOUT', timedOut));
+      let parsed: { is_error?: boolean; subtype?: string; result?: unknown };
+      try {
+        parsed = JSON.parse(stdout) as typeof parsed;
+      } catch {
+        return reject(
+          new RunError(
+            'AGENT_FAILED',
+            `Claude Code returned no parseable result${stderrTail ? `: ${stderrTail.trim()}` : ''}`,
+          ),
+        );
+      }
+      if (parsed.is_error) {
+        return reject(
+          new RunError('AGENT_FAILED', String(parsed.result || parsed.subtype || 'Claude Code reported an error')),
+        );
+      }
+      const text = typeof parsed.result === 'string' ? parsed.result.trim() : '';
+      if (!text) return reject(new RunError('AGENT_FAILED', empty));
+      resolve(text);
+    });
+  });
 }
 
 /**

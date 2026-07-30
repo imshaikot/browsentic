@@ -17,6 +17,7 @@ import {
 } from './auth-store';
 import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
+import { nameSession } from './agent/title';
 import { readAgentConfig } from './agent/config';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { commitStaging, discardStaging } from './agent/site-map-store';
@@ -214,6 +215,14 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
               .then((result) => source.send({ t: 'fileSummary', id: request.id, result }))
               .catch((error) =>
                 source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
+              );
+            return;
+          }
+          if (request.t === 'nameSession') {
+            void nameSession(request, readAgentConfig())
+              .then((result) => source.send({ t: 'sessionName', id: request.id, result }))
+              .catch((error) =>
+                source.send({ t: 'sessionName', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
               );
             return;
           }

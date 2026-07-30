@@ -3,6 +3,7 @@ import {
   failure,
   success,
   type ActionResult,
+  type AttachedFile,
   type ExtensionRequest,
   type RunContext,
   type RunEvent,
@@ -196,11 +197,22 @@ export class AgentSession {
         built = prepared.built;
         instructionText = prepared.instruction;
       } else {
-        built = buildSystemPrompt(routed.base, routed.overlays);
+        built = buildSystemPrompt(routed.base, routed.overlays, { attachments: filesBlock(context?.files) });
       }
     } catch (error) {
       this.active = null;
       return emit({ kind: 'error', code: 'AGENT_FAILED', message: String(error) });
+    }
+
+    // Preparing a mapping run fetches the site's sitemap over the network, which takes seconds —
+    // easily long enough for the user to hit Stop first. `fetchSiteIndex` never throws (a site
+    // without a sitemap is the normal case), so the abort arrives as no signal at all, and without
+    // this check the crawl starts anyway on a run the user already stopped.
+    if (run.abort.signal.aborted) {
+      if (run.map) discardStaging(run.map.staging.id);
+      if (this.active === run) this.active = null;
+      log(`agent run ${runId} was cancelled before it started`);
+      return emit({ kind: 'error', code: 'CANCELLED', message: 'Run cancelled.' });
     }
 
     log(
@@ -212,8 +224,14 @@ export class AgentSession {
 
     // A mapping run is a side quest, not part of the conversation: resuming it later would put
     // the whole crawl transcript behind the user's next message.
-    const resume = !mapping && this.claudeSession !== null;
-    const sessionId = mapping ? randomUUID() : (this.claudeSession ?? randomUUID());
+    //
+    // The extension's id wins over ours. It comes from the saved session record, so it is the one
+    // that survives this daemon being restarted or its socket replaced — both of which drop
+    // `claudeSession` (see `dispose`). Ours stays as the fallback for callers that send none.
+    const supplied = mapping ? null : validSessionId(context?.claudeSessionId);
+    const known = supplied ?? this.claudeSession;
+    const resume = !mapping && known !== null;
+    const sessionId = mapping ? randomUUID() : (known ?? randomUUID());
     const budget = run.map ? setTimeout(() => run.abort.abort(), run.map.settings.timeoutMs) : undefined;
 
     try {
@@ -230,6 +248,15 @@ export class AgentSession {
       });
       // Only a session Claude Code actually created can be resumed by the next instruction.
       if (outcome.established) this.claudeSession = sessionId;
+      // Told to the extension before `done`, so it lands while the run it belongs to is still the
+      // one on screen. A mapping run is excluded for the same reason it never resumes.
+      if (!mapping) {
+        // `established` false after a resume attempt says exactly one thing: Claude Code does not
+        // have that session. Null tells the extension to drop the stored id instead of retrying it
+        // on every instruction from here on.
+        if (outcome.established) emit({ kind: 'session', claudeSessionId: sessionId });
+        else if (supplied) emit({ kind: 'session', claudeSessionId: null });
+      }
       log(`agent run ${runId} finished (${outcome.stopReason})`);
       emit({ kind: 'done', stopReason: outcome.stopReason });
     } catch (error) {
@@ -306,7 +333,9 @@ export class AgentSession {
       submitted: false,
     };
 
-    const built = buildSystemPrompt(skill, [], fetchedBlock(target.target.origin, index));
+    // No attachments block: a mapping run reads one site and writes one report. Files it cannot
+    // use are prompt it does not need, and `page.attachFile` is refused by the read-only gate.
+    const built = buildSystemPrompt(skill, [], { fetched: fetchedBlock(target.target.origin, index) });
     return { built, instruction: mappingBrief(target.target.host, settings) };
   }
 
@@ -348,13 +377,32 @@ export class AgentSession {
     });
   }
 
+  /**
+   * Stop the named run. Dropping `active` here rather than waiting for `start()`'s `finally` is
+   * what makes the cancellation authoritative: that `finally` does not run until the child
+   * process closes, and a child can outlive its abort (it gets SIGTERM, then SIGKILL 5s later, and
+   * a hung one longer still). Until `active` is cleared, `invokeForRun` keeps matching this run
+   * and honouring its tool calls — a cancelled agent going on driving the user's tab, which is the
+   * one invariant this class exists to hold.
+   */
   private cancel(runId: string): void {
-    if (!this.active || this.active.id !== runId) return;
+    if (!this.active || this.active.id !== runId) {
+      // Nothing here to stop, so nothing would otherwise emit — and the extension is waiting for
+      // an answer before it will let the user do anything else. Answering only the id that was
+      // asked about is what keeps a late cancel from ending a run that started after it.
+      log(`cancel for run ${runId}, which is not the active run`);
+      this.deps.emit(runId, { kind: 'done', stopReason: 'cancelled' });
+      return;
+    }
     // Release anything blocked on approval first — an aborted run would otherwise leave a
     // tool call awaiting a promise that can never settle.
-    for (const [, settle] of this.active.pending) settle(false);
-    this.active.pending.clear();
-    this.active.abort.abort();
+    const cancelled = this.active;
+    for (const [, settle] of cancelled.pending) settle(false);
+    cancelled.pending.clear();
+    cancelled.abort.abort();
+    // `start()`'s finally already guards with `this.active === run`, so releasing the slot early
+    // is safe; it also lets the next instruction through without waiting for the child to die.
+    this.active = null;
     log(`agent run ${runId} cancelled`);
   }
 
@@ -379,6 +427,61 @@ export class AgentSession {
  */
 function explicitlyAsked(text: string): boolean {
   return /^@site-mapper\b/i.test(text.trim());
+}
+
+/** Total budget for the attached-file block, so a big library cannot crowd out the skill. */
+const MAX_FILES_BLOCK = 8 * 1024;
+
+/**
+ * The attached-file library as prompt text. The extension already capped the count and each
+ * digest; this caps the assembled whole, and drops entire files rather than cutting one off
+ * mid-sentence into something that reads like a directive.
+ */
+function filesBlock(files: AttachedFile[] | undefined): string | undefined {
+  if (!files?.length) return undefined;
+  const sections: string[] = [];
+  let used = 0;
+  let dropped = 0;
+
+  for (const file of files) {
+    const lines = [`## ${flatten(file.name)} (${file.mime || 'unknown type'}, ${Math.ceil(file.size / 1024)} KB)`, ''];
+    lines.push(`File id for page_attachFile: ${flatten(file.id)}`);
+    if (file.status === 'pending') lines.push('', 'VoiceLink is still reading this file; no notes yet.');
+    else if (file.status === 'error') lines.push('', 'VoiceLink could not read this file, so there are no notes on it.');
+    if (file.summary) lines.push('', `Summary: ${flatten(file.summary)}`);
+    if (file.digest) lines.push('', 'Notes from reading the file:', '', file.digest.trim());
+
+    const section = lines.join('\n');
+    if (used + section.length > MAX_FILES_BLOCK) {
+      dropped++;
+      continue;
+    }
+    used += section.length;
+    sections.push(section);
+  }
+
+  if (!sections.length) return undefined;
+  if (dropped) {
+    log(`attached-file context is full; left out ${dropped} file(s)`);
+    sections.push(`(${dropped} more attached file(s) did not fit here — page_listFiles still lists them.)`);
+  }
+  return sections.join('\n\n');
+}
+
+/** A name or summary is one line. A newline in it could otherwise fake a heading of its own. */
+const flatten = (text: string) => text.replace(/\s+/g, ' ').trim();
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The session id the extension asked us to resume, or null if it is not one we would have issued.
+ *
+ * `spawn` takes an argv array, so there is no shell here to inject into — but this value is read
+ * back out of browser storage and handed to `claude --resume`, and every other value that crosses
+ * that boundary is checked rather than assumed.
+ */
+function validSessionId(id: string | undefined): string | null {
+  return typeof id === 'string' && UUID.test(id) ? id : null;
 }
 
 /** The sitemap findings, as data the run was handed rather than as anything anyone said. */

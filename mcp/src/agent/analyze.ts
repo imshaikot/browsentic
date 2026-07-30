@@ -5,7 +5,7 @@ import { failure, success, type ActionResult, type SocketFrame } from '@/lib/act
 import { stateDir } from '../lockfile';
 import { log } from '../log';
 import type { AgentConfig } from './config';
-import { RunError, spawnClaude } from './runner';
+import { RunError, runClaudeJson } from './runner';
 
 type AnalyzeFileFrame = Extract<SocketFrame, { t: 'analyzeFile' }>;
 
@@ -28,7 +28,7 @@ const tmpDir = join(stateDir, 'tmp');
 export async function summarizeFile(
   req: AnalyzeFileFrame,
   config: AgentConfig,
-): Promise<ActionResult<{ summary: string }>> {
+): Promise<ActionResult<{ summary: string; digest?: string }>> {
   const bytes = Buffer.from(req.content, 'base64');
   if (bytes.length === 0) return failure('INVALID_INPUT', 'The file is empty.');
   if (bytes.length > MAX_BYTES) {
@@ -43,9 +43,15 @@ export async function summarizeFile(
   const timer = setTimeout(() => controller.abort(), SUMMARIZE_TIMEOUT_MS);
   log(`summarizing ${req.name} (${bytes.length} bytes, ${req.mime || 'unknown type'})`);
   try {
-    const summary = await runClaudeJson(promptFor(path, req), config, controller.signal);
-    log(`summarized ${req.name}`);
-    return success({ summary });
+    const output = await runClaudeJson(promptFor(path, req), config, controller.signal, {
+      // Read is the whole point of this one — it natively parses text, PDFs, images and notebooks.
+      allowedTools: ['Read'],
+      timedOut: 'Summarizing the file took too long.',
+      empty: 'Claude Code returned an empty summary.',
+    });
+    const { summary, digest } = split(output);
+    log(`summarized ${req.name}${digest ? ` (+${digest.length} chars of notes)` : ''}`);
+    return success({ summary, digest });
   } catch (error) {
     const { code, message } = error instanceof RunError ? error : new RunError('AGENT_FAILED', String(error));
     log(`summarizing ${req.name} failed: ${code}: ${message}`);
@@ -60,86 +66,50 @@ export async function summarizeFile(
   }
 }
 
+/** How much of the file's contents to keep. This is the whole of what a later run gets to see. */
+const MAX_DIGEST_CHARS = 4_000;
+/** The summary is one line in the panel's file chip, so it is capped like one. */
+const MAX_SUMMARY_CHARS = 500;
+
+const SUMMARY_HEADING = '=== SUMMARY ===';
+const NOTES_HEADING = '=== NOTES ===';
+
+/**
+ * Two things are wanted from one read, because the file is only on disk during this call: the
+ * line the panel shows, and the extract that later runs are given as their only view of the file
+ * (see `filesBlock` in agent/service.ts). Asking for both in one pass keeps it to one spawn.
+ */
 function promptFor(path: string, req: AnalyzeFileFrame): string {
   return (
-    `Read the file at ${path} and write a concise 2-4 sentence summary of what it is and its ` +
-    `key contents, so it can be recognized later. The file's original name is "${req.name}"` +
-    `${req.mime ? ` (type: ${req.mime})` : ''}. Output only the summary, with no preamble.`
+    `Read the file at ${path}. Its original name is "${req.name}"${req.mime ? ` (type: ${req.mime})` : ''}.\n\n` +
+    `Output exactly two sections, in this order, with these headings on their own lines and ` +
+    `nothing before or after them:\n\n` +
+    `${SUMMARY_HEADING}\n` +
+    `2-4 sentences on what this file is and what it contains, enough to recognize it later.\n\n` +
+    `${NOTES_HEADING}\n` +
+    `Up to ${MAX_DIGEST_CHARS} characters capturing what is actually in the file, for an ` +
+    `assistant that will have to answer questions about it without being able to open it. Keep ` +
+    `the structure (headings, sections, columns) and the specifics that cannot be re-derived — ` +
+    `figures, names, dates, totals, identifiers, key wording. Prefer terse lines over prose. If ` +
+    `the file is too large to cover, say what you covered and what you left out.`
   );
 }
 
-/** One run of `claude -p --output-format json`; resolves the `result` text or rejects RunError. */
-function runClaudeJson(prompt: string, config: AgentConfig, signal: AbortSignal): Promise<string> {
-  const args = [
-    '-p',
-    prompt,
-    '--output-format',
-    'json',
-    // Read is the whole point; everything else stays off so a file can't talk the agent out of its lane.
-    '--allowedTools',
-    'Read',
-    '--disallowedTools',
-    'Bash',
-    'Edit',
-    'Write',
-    'NotebookEdit',
-    'Glob',
-    'Grep',
-    'WebFetch',
-    'WebSearch',
-    'Task',
-    ...(config.model ? ['--model', config.model] : []),
-    ...(config.effort ? ['--effort', config.effort] : []),
-  ];
-
-  return new Promise<string>((resolve, reject) => {
-    const { child, release } = spawnClaude(args, config, signal);
-    let stdout = '';
-    let stderrTail = '';
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderrTail = (stderrTail + chunk.toString()).slice(-2_000);
-    });
-
-    child.on('error', (error: NodeJS.ErrnoException) => {
-      release();
-      if (error.code === 'ENOENT') {
-        reject(
-          new RunError(
-            'NO_CLAUDE',
-            `Could not find "${config.claudeBin}". Install Claude Code, or set {"claudeBin": "/path/to/claude"} in the daemon's config.json.`,
-          ),
-        );
-      } else {
-        reject(new RunError('AGENT_FAILED', error.message));
-      }
-    });
-
-    child.on('close', () => {
-      release();
-      if (signal.aborted) return reject(new RunError('TIMEOUT', 'Summarizing the file took too long.'));
-      let parsed: { is_error?: boolean; subtype?: string; result?: unknown };
-      try {
-        parsed = JSON.parse(stdout) as typeof parsed;
-      } catch {
-        return reject(
-          new RunError(
-            'AGENT_FAILED',
-            `Claude Code returned no parseable result${stderrTail ? `: ${stderrTail.trim()}` : ''}`,
-          ),
-        );
-      }
-      if (parsed.is_error) {
-        return reject(new RunError('AGENT_FAILED', String(parsed.result || parsed.subtype || 'Claude Code reported an error')));
-      }
-      const summary = typeof parsed.result === 'string' ? parsed.result.trim() : '';
-      if (!summary) return reject(new RunError('AGENT_FAILED', 'Claude Code returned an empty summary.'));
-      resolve(summary);
-    });
-  });
+/**
+ * Split the two sections back apart. A misbehaving child that ignored the format still gives a
+ * usable summary — the whole reply becomes one, which is what the old single-section prompt
+ * returned anyway — so this never fails the analysis over its shape.
+ */
+function split(output: string): { summary: string; digest?: string } {
+  const marker = output.indexOf(NOTES_HEADING);
+  const head = (marker === -1 ? output : output.slice(0, marker)).replace(SUMMARY_HEADING, '').trim();
+  const notes = marker === -1 ? '' : output.slice(marker + NOTES_HEADING.length).trim();
+  // Capped even in the no-heading case: the prompt asks for thousands of characters of notes, so an
+  // ignored format would otherwise put all of them in the field every consumer treats as one line.
+  return {
+    summary: (head || notes || output.trim()).slice(0, MAX_SUMMARY_CHARS),
+    digest: notes ? notes.slice(0, MAX_DIGEST_CHARS) : undefined,
+  };
 }
 
 /** Strip anything that could escape the temp dir or upset the filesystem. */
