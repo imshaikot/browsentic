@@ -39,11 +39,6 @@ export interface Daemon extends Bridge {
   stop(): Promise<void>;
 }
 
-/**
- * When a `page.screenshot { save: true }` succeeds, write the captured image to disk and note the
- * path (or the write error) on the result. A failed save never fails the capture — the caller
- * still gets the image to look at.
- */
 function persistScreenshot(
   action: string,
   input: unknown,
@@ -53,8 +48,6 @@ function persistScreenshot(
   if (action !== 'page.screenshot' || !result.ok) return result;
   const args = (input ?? {}) as { save?: unknown; filename?: unknown };
   const data = result.data as { dataUrl?: unknown } | null;
-  // A mapping run's captures are always kept: they are the evidence for the map it is writing,
-  // and the daemon — not the model — decided where they go.
   if ((args.save !== true && !saveTo) || typeof data?.dataUrl !== 'string') return result;
   try {
     const savedTo = saveScreenshot(data.dataUrl, {
@@ -86,7 +79,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const lock: Lockfile = {
     pid: process.pid,
     port: 0,
-    // Reuse the previous token so CLIs holding a stale copy keep working across restarts.
     token: previous?.token ?? randomBytes(24).toString('base64url'),
     protocolVersion: SOCKET_PROTOCOL_VERSION,
     daemonVersion: version,
@@ -117,14 +109,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   log(`daemon ${version} listening on 127.0.0.1:${port} (pid ${process.pid})`);
   scheduleIdleExit();
 
-  /**
-   * Gate the HTTP upgrade by peer *kind*. Browsers set `Origin` themselves and pages cannot
-   * forge or omit it, so the two branches are mutually exclusive: a web page can never reach
-   * the control path, and a local process can never impersonate the extension.
-   *
-   * This only decides which door to knock on. An extension still has to authenticate with a
-   * pairing token or session key in its `hello` frame before it can do anything.
-   */
   function authorize(req: IncomingMessage): 'extension' | 'control' | null {
     const origin = req.headers.origin;
     if (origin && EXTENSION_ORIGIN.test(origin)) return 'extension';
@@ -132,7 +116,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       log(`rejected web origin ${origin}`);
       return null;
     }
-    // No Origin header: a local process. Must prove it can read the 0600 lockfile.
     if (!hasValidToken(req)) {
       log('rejected control client: missing or invalid token');
       return null;
@@ -148,13 +131,11 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function acceptExtension(ws: WebSocket, req: IncomingMessage): void {
-    // Nothing is served on this socket until `hello` proves the extension was paired.
     const reject = (reason: string, retryable: boolean) => {
       log(`rejected extension: ${reason}`);
       try {
         ws.send(JSON.stringify({ t: 'unauthorized', reason, retryable }));
       } catch {
-        // Closing anyway.
       }
       ws.close(4401, 'unauthorized');
     };
@@ -183,7 +164,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         log(`paired ${origin} (extension ${hello.extensionVersion})`);
       } else if (auth && 'sessionKey' in auth) {
         if (!validateSession(auth.sessionKey, origin)) {
-          // Revoked, or the auth store was cleared: tell the extension to forget its key.
           return reject('This browser is no longer paired. Run "voicelink-mcp pair" to pair again.', false);
         }
       } else {
@@ -199,16 +179,11 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         (closing) => {
           if (link !== closing) return;
           link = null;
-          // The conversation was about a browser that is gone; nothing survives it.
           agent?.dispose();
           agent = null;
           log('extension disconnected');
           scheduleIdleExit();
         },
-        // The agent harness: the extension asks the daemon to think, and the daemon answers
-        // by driving the browser back down this same socket. Summarizing a file and saving a
-        // skill are the stateless requests — they run outside the conversation and reply on
-        // their own frames, so they are handled here rather than in the run-gated AgentSession.
         (request, source) => {
           if (request.t === 'analyzeFile') {
             void summarizeFile(request, readAgentConfig())
@@ -235,8 +210,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           if (request.t === 'deleteSiteMap') {
             return source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
           }
-          // Reviewing a staged map outlives the run that produced it — the panel may be reopened
-          // long after — so it is handled here rather than against the active AgentSession.
           if (request.t === 'activateSiteMap') {
             const result = commitStaging(request.stagingId, request.exactHost === true);
             return source.send({
@@ -265,10 +238,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     });
   }
 
-  /**
-   * The agent state for the connected browser, created on its first instruction. It routes tool
-   * calls through the same `invoke` MCP clients use, so the agent has no privileged path.
-   */
   function session(source: ExtensionLink): AgentSession {
     return (agent ??= new AgentSession({
       invoke,
@@ -277,7 +246,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     }));
   }
 
-  /** The installed extension was built from a different registry — believe the browser, not the bundle. */
   async function adoptExtensionManifest(source: ExtensionLink): Promise<void> {
     const reported = await source.describe();
     if (!reported?.length) {
@@ -303,9 +271,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', tools });
       if (request.op === 'status') return send(ws, { id: request.id, op: 'status', status: statusNow() });
       if (request.op === 'invoke') {
-        // A run-tagged invocation belongs to a spawned agent: it goes through the run's
-        // approval gate and shows up on the extension's timeline. Anything else is a plain
-        // MCP client and takes the direct path.
         const result = request.runId
           ? ((await agent?.invokeForRun(request.runId, request.action, request.input)) ??
             failure('RUN_INACTIVE', 'This agent run is no longer active'))
@@ -323,7 +288,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       if (request.op === 'revoke') {
         const target = request.origin;
         const revoked = revokeSessions((session) => !target || session.origin === target);
-        // A revoked browser must not keep driving the tab it is already attached to.
         if (revoked && link?.isOpen && (!target || link.origin === target)) {
           link.close('pairing revoked');
         }
@@ -372,9 +336,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     input?: unknown,
     opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
   ) {
-    // The `voicelink.` namespace is not browser capability — it is the mapping run's write
-    // channel, intercepted in AgentSession before it ever gets here. Anything reaching this
-    // point with that prefix came from an untagged caller, i.e. some other MCP client.
     if (action.startsWith('voicelink.')) {
       return failure('UNKNOWN_ACTION', `Unknown action "${action}".`);
     }
@@ -384,12 +345,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         'The VoiceLink extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
-    // Every caller — direct MCP clients and spawned agent runs alike — reaches the browser
-    // through here, so this is the one place to write a screenshot to disk when asked.
     return persistScreenshot(action, input, await link.invoke(action, input, opts?.tabId), opts?.saveTo);
   }
 
-  /** Nothing attached and nobody asking: don't linger in the user's process list forever. */
   function scheduleIdleExit(): void {
     if (idleTimer) clearTimeout(idleTimer);
     if (!idleExit) return;
@@ -409,7 +367,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     for (const ws of controls) ws.close(1001, 'daemon shutting down');
     wss.close();
     await new Promise<void>((resolve) => http.close(() => resolve()));
-    // Only clear the lockfile if it still describes us; a successor may have replaced it.
     if (readLockfile()?.pid === process.pid) clearLockfile();
     log('daemon stopped');
   }
@@ -425,10 +382,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   };
 }
 
-/**
- * Bind the first free port in the fixed range. The bind is also the mutex against two
- * daemons racing to start: the loser sees EADDRINUSE and connects to the winner instead.
- */
 function listen(http: Server): Promise<number> {
   return new Promise((resolve, reject) => {
     const remaining = [...DAEMON_PORTS];
@@ -443,8 +396,6 @@ function listen(http: Server): Promise<number> {
         resolve(port);
       };
       const onError = (error: NodeJS.ErrnoException) => {
-        // Drop this attempt's success handler too: a later attempt's bind would otherwise
-        // fire it as well, resolving with a port the daemon is not actually listening on.
         http.removeListener('listening', onListening);
         if (error.code !== 'EADDRINUSE') return reject(error);
         http.removeListener('error', onError);

@@ -22,7 +22,6 @@ export const waitForElement = defineAction({
   async execute({ target, state, timeoutMs }) {
     const find = (): HTMLElement | null => {
       try {
-        // Keep hidden matches so 'attached'/'hidden'/'detached' can observe them; judge visibility below.
         return resolveTarget(target, { includeHidden: true });
       } catch (error) {
         if (error instanceof ActionError && error.code === 'INVALID_TARGET') throw error;

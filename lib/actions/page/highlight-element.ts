@@ -49,7 +49,6 @@ export const highlightElement = defineAction({
       });
       overlay.append(chip);
     }
-    // body can carry CSS transforms that would make position: fixed resolve against it
     document.documentElement.append(overlay);
     setTimeout(() => overlay.remove(), durationMs);
     return { element: describeElement(element), durationMs };

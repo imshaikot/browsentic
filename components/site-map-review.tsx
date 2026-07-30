@@ -5,16 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 
-/**
- * The review step for a freshly mapped site.
- *
- * This is the only place a person sees what a mapping run actually wrote. Everything in the map
- * was derived from pages the agent read, and once armed it joins the system prompt of every
- * future run on that host — so the whole point of this sheet is that nothing is summarised away.
- *
- * The markdown is rendered **literally**, in a monospaced block. Rendering it would let a
- * heading, a link or a zero-width run hide text that the model will still read.
- */
 export function SiteMapReview({
   draft,
   onActivate,
@@ -62,12 +52,6 @@ export function SiteMapReview({
           </div>
         )}
 
-        {/*
-          Literal, never rendered — a rendered heading or link can hide what the model reads.
-          A plain scroller, not ScrollArea: Radix wraps the viewport contents in a `display: table`
-          element sized `h-full`, which against a `max-h-*` parent with no definite height resolves
-          to auto — so it clips neither axis and the document spills over the buttons below.
-        */}
         <div className="max-h-56 overflow-x-hidden overflow-y-auto rounded border bg-background/60">
           <pre className="px-2 py-1.5 font-mono text-[10px] leading-relaxed break-words whitespace-pre-wrap">
             {draft.markdown}

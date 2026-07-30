@@ -5,15 +5,6 @@ import { SKILL_NAME_RE, serializeSkillFile, validateSkillDraft, type SkillDraft 
 import { log } from '../log';
 import { SKILL_FILE, bundledSkillNames, existingUserSkill, uploadedSkillsDir, userSkillPath } from './skills';
 
-/**
- * The write side of the uploaded skills directory. Everything here is synchronous: the files
- * are a few KB of markdown, and the daemon answers the extension on the same tick.
- *
- * The extension sends structured fields, never a finished file — this module composes the front
- * matter, so an upload can only ever set the keys it was offered.
- */
-
-/** `loadSkills()` reads every file in the directory on every instruction; keep it small. */
 const MAX_SKILL_FILES = 50;
 
 export function saveSkill(draft: SkillDraft): ActionResult<SavedSkill> {
@@ -21,8 +12,6 @@ export function saveSkill(draft: SkillDraft): ActionResult<SavedSkill> {
   if (!checked.ok) return failure('INVALID_INPUT', checked.message);
   const skill = checked.draft;
 
-  // A hand-authored skill of the same name lives in a directory we do not own; an upload that
-  // shadowed it would silently win on every run with no way to tell from the extension.
   if (existingUserSkill(skill.name)) {
     return failure(
       'NAME_TAKEN',
@@ -34,8 +23,6 @@ export function saveSkill(draft: SkillDraft): ActionResult<SavedSkill> {
   const path = pathIn(dir, skill.name);
   if (!path) return failure('INVALID_INPUT', `"${skill.name}" is not a usable skill name.`);
 
-  // A generated map owns the directory form of this name. The loader would prefer this flat
-  // file, silently making the map inert, so refuse rather than quietly win.
   if (existsSync(join(dir, skill.name, SKILL_FILE))) {
     return failure(
       'NAME_TAKEN',
@@ -50,8 +37,6 @@ export function saveSkill(draft: SkillDraft): ActionResult<SavedSkill> {
 
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-    // Write then rename: `loadSkills()` reads these files on every instruction, and a plain
-    // write leaves a window where a run in flight parses a half-written body.
     const temp = `${path}.tmp`;
     writeFileSync(temp, serializeSkillFile(skill), { mode: 0o600 });
     chmodSync(temp, 0o600);
@@ -65,11 +50,6 @@ export function saveSkill(draft: SkillDraft): ActionResult<SavedSkill> {
   return success({ name: skill.name, path, replaced });
 }
 
-/**
- * Remove an uploaded skill — the flat `<name>.md` and **only** that. A generated map of the same
- * name is a different object with its own op: one `deleteSkill` must never take both down,
- * because the panel sends this when the user removes an upload and the map is not what they meant.
- */
 export function deleteSkill(name: string): ActionResult<SavedSkill> {
   const dir = uploadedSkillsDir();
   const path = pathIn(dir, name);
@@ -84,12 +64,6 @@ export function deleteSkill(name: string): ActionResult<SavedSkill> {
   return success({ name });
 }
 
-/**
- * Remove a generated map: its directory and everything under it. Three guards stand between a
- * name off the socket and a recursive delete — the name shape, the resolved parent, and the
- * presence of a `SKILL.md` inside. The last is the one that matters: it proves the target is a
- * skill directory and not, say, `screenshots`.
- */
 export function deleteSiteMap(name: string): ActionResult<SavedSkill> {
   const dir = uploadedSkillsDir();
   const path = pathIn(dir, name);
@@ -108,22 +82,12 @@ export function deleteSiteMap(name: string): ActionResult<SavedSkill> {
   return success({ name });
 }
 
-/**
- * The file a skill of this name occupies, or null if it would land anywhere but `dir`. The
- * name regex already rules out separators, but delete takes a name straight off the wire —
- * so the containment check is done on the resolved path, not on the input.
- */
 function pathIn(dir: string, name: string): string | null {
   if (!SKILL_NAME_RE.test(name)) return null;
   const candidate = resolve(join(dir, `${name}.md`));
   return dirname(candidate) === resolve(dir) ? candidate : null;
 }
 
-/**
- * Both skill forms, since `MAX_SKILL_FILES` bounds a per-instruction cost — `loadSkills()`
- * re-reads every directory on every run — and a directory-form map costs the same read as a
- * flat file. Dot-prefixed entries are staging and do not count against the user.
- */
 function countSkills(dir: string): number {
   try {
     return readdirSync(dir, { withFileTypes: true }).filter(

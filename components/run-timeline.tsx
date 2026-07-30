@@ -10,7 +10,6 @@ interface RunTimelineProps {
   onDecide: (toolId: string, allow: boolean) => void;
 }
 
-/** The transcript: what the user asked, what the agent said, and every action it took. */
 export function RunTimeline({ items, onDecide }: RunTimelineProps) {
   return (
     <div className="flex min-w-0 flex-col gap-4 p-4">
@@ -43,8 +42,6 @@ function Bubble({ item }: { item: Extract<RunItem, { kind: 'user' | 'assistant' 
       </div>
       <div
         className={cn(
-          // `min-w-0` matters as much as the max: without it the bubble takes its flex basis from
-          // its content's min-content width, which a long URL makes wider than the panel.
           'min-w-0 max-w-[85%] rounded-2xl px-3 py-2 text-sm',
           isAssistant ? 'rounded-tl-sm bg-muted' : 'rounded-tr-sm bg-primary text-primary-foreground',
         )}
@@ -52,7 +49,6 @@ function Bubble({ item }: { item: Extract<RunItem, { kind: 'user' | 'assistant' 
         {isAssistant ? (
           <Markdown text={item.text} />
         ) : (
-          // The user's own words render as typed — reading their prose as markup would rewrite it.
           <span className="whitespace-pre-wrap wrap-anywhere">{item.text}</span>
         )}
       </div>
@@ -101,7 +97,6 @@ function StatusIcon({ ok, awaiting }: { ok?: boolean; awaiting?: boolean }) {
   if (awaiting) return <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />;
   if (ok === true) return <Check className="size-3.5 shrink-0 text-emerald-500" />;
   if (ok === false) return <X className="size-3.5 shrink-0 text-destructive" />;
-  // Still running: no verdict yet.
   return <Wrench className="size-3.5 shrink-0 animate-pulse text-muted-foreground" />;
 }
 

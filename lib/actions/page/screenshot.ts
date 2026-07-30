@@ -2,14 +2,6 @@ import { z } from 'zod';
 import { ActionError, defineAction } from '../core';
 import { documentBounds, resolveTarget, targetSchema } from './dom';
 
-/**
- * Screenshotting is a cross-context capability, like `page.navigate`: a content script cannot
- * call `chrome.tabs.captureVisibleTab` (background-only) nor write files (daemon-only). So this
- * action's `execute()` does the one part the page *can* do — measure — and returns a capture
- * *plan*. The background worker reads the plan, scrolls + captures + stitches the pixels
- * (`lib/bridge/screenshot.ts`, routed from `lib/bridge/invoke.ts`), and the daemon saves the
- * file. Running this action in-page has no side effect; it never touches the pixels itself.
- */
 export const screenshot = defineAction({
   name: 'page.screenshot',
   description:
@@ -49,7 +41,6 @@ export const screenshot = defineAction({
       .describe('Base filename when saving; defaults to screenshot-<timestamp>.<ext>. Sanitized before use.'),
   }),
   execute({ target, fullPage, format, quality, maxLongSide }) {
-    // Validate what the schema can't express (no .refine — it wouldn't survive z.toJSONSchema).
     if (quality !== undefined && format !== 'jpeg') {
       throw new ActionError('"quality" only applies when format is "jpeg"', 'INVALID_INPUT');
     }
@@ -59,8 +50,6 @@ export const screenshot = defineAction({
     const root = document.documentElement;
     const page = { w: root.scrollWidth, h: root.scrollHeight };
 
-    // The region to capture, in *document* coordinates. The background tiles the viewport across
-    // it, so a region larger than the viewport (a tall page or a big element) is expected.
     let mode: 'fullPage' | 'viewport' | 'element';
     let region: { x: number; y: number; w: number; h: number };
     if (target) {
@@ -78,10 +67,8 @@ export const screenshot = defineAction({
       region = { x: Math.round(window.scrollX), y: Math.round(window.scrollY), w: viewport.w, h: viewport.h };
     }
 
-    // The current scroll, so the background can put the page back where it found it.
     const scroll = { x: Math.round(window.scrollX), y: Math.round(window.scrollY) };
 
-    // The plan crosses sendMessage, so it stays small and JSON-serializable (no pixels here).
     return { mode, dpr, viewport, page, region, scroll, format, quality, maxLongSide };
   },
 });

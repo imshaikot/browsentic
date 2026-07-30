@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { DAEMON_STATE_KEY, type DaemonState } from './socket';
 
-/** Live view of the background worker's link to the MCP daemon, for extension pages. */
 export function useDaemonState(): DaemonState | null {
   const [state, setState] = useState<DaemonState | null>(null);
 

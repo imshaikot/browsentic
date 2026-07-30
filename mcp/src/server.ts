@@ -34,15 +34,6 @@ const RESOURCES = [
   },
 ] as const;
 
-/**
- * The one tool that writes rather than looks. It is advertised only to a spawned agent run —
- * `daemon.invoke` refuses the whole `voicelink.` namespace for anyone else, so an external MCP
- * client could not use it even if it guessed the name.
- *
- * No `actionNameFor` special case is needed: that helper replaces only the *first* underscore,
- * so `voicelink_saveSiteMap` already maps to `voicelink.saveSiteMap`, and CallTool's existing
- * fall-through routes it with the run id attached.
- */
 const SAVE_SITE_MAP_TOOL = {
   name: 'voicelink_saveSiteMap',
   description:
@@ -149,7 +140,6 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     if (params.name === STATUS_TOOL) return render(await status(bridge));
     const result = await bridge.invoke(actionNameFor(params.name), params.arguments ?? {});
-    // A screenshot comes back as an image the model can actually see, not JSON.
     return params.name === SCREENSHOT_TOOL ? renderScreenshot(result) : render(result);
   });
 
@@ -171,7 +161,6 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     return text(uri, resource.mimeType, unwrap(result, (data) => JSON.stringify(data, null, 2)));
   });
 
-  // The connected extension may ship a different registry than this build; re-advertise if so.
   bridge.onManifestChanged(() => {
     log('manifest changed; notifying MCP client');
     void server.sendToolListChanged().catch((error) => log('failed to notify tool list change', error));
@@ -193,7 +182,6 @@ async function status(bridge: Bridge) {
       data: { ...base, activeTab: null, hint: 'Open your browser with the VoiceLink extension loaded.' },
     };
   }
-  // getPageInfo is the cheapest way to see the active tab without a `tabs` permission.
   const page = await bridge.invoke('page.getPageInfo', { maxPerKind: 1 });
   if (page.ok) return { ok: true as const, data: { ...base, activeTab: (page.data as PageInfo).document } };
   return {
@@ -201,17 +189,11 @@ async function status(bridge: Bridge) {
     data: {
       ...base,
       activeTab: null,
-      // Almost always a page that hosts no content script; page_navigate still works there.
       hint: `Cannot read the active tab (${page.error.code}). Use page_navigate to open an http(s) page first.`,
     },
   };
 }
 
-/**
- * Screenshots return an MCP image content block so the model — an external client or the spawned
- * agent, both of which pass through here — can look at the pixels, plus a text line with the
- * dimensions and where it was saved. The base64 is never dumped as text.
- */
 function renderScreenshot(result: ActionResult) {
   if (!result.ok) return render(result);
   const data = result.data as {
@@ -243,13 +225,11 @@ function renderScreenshot(result: ActionResult) {
   };
 }
 
-/** Split a `data:<mime>;base64,<payload>` URL into its parts for an MCP image content block. */
 function splitDataUrl(dataUrl: string): [mimeType: string, base64: string] {
   const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl);
   return match ? [match[1], match[2]] : ['image/png', ''];
 }
 
-/** Failures come back as tool errors so the model can adapt (retry a target, open a page) rather than abort. */
 function render(result: ActionResult) {
   if (result.ok) {
     return { content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }] };

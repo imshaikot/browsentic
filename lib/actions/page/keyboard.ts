@@ -32,7 +32,6 @@ function physical(key: string): { code: string; keyCode: number } {
   return { code: '', keyCode: 0 };
 }
 
-/** Build a realistic KeyboardEventInit, including legacy keyCode/which for older handlers. */
 export function keyboardInit(key: string, modifiers: Modifier[] = []): LegacyKeyboardEventInit {
   const { code, keyCode } = physical(key);
   return {

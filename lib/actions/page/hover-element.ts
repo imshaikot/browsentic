@@ -15,7 +15,6 @@ export const hoverElement = defineAction({
     const rect = el.getBoundingClientRect();
     const clientX = rect.x + rect.width / 2;
     const clientY = rect.y + rect.height / 2;
-    // enter events do not bubble, unlike the rest of the hover sequence
     const sequence: Array<['pointer' | 'mouse', string, boolean]> = [
       ['pointer', 'pointerover', true],
       ['pointer', 'pointerenter', false],

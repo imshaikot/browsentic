@@ -5,24 +5,13 @@ import { RunError, runClaudeJson } from './runner';
 
 type NameSessionFrame = Extract<SocketFrame, { t: 'nameSession' }>;
 
-/** A name is one line on a narrow list row. The extension clamps it again on arrival. */
 const MAX_TITLE_CHARS = 60;
 
-/** How much of the conversation to read. Names come from what was asked, not from every word of it. */
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_CHARS = 400;
 
-/** A name is a handful of words from a tiny prompt; a spawn this slow has gone wrong. */
 const NAME_TIMEOUT_MS = 30_000;
 
-/**
- * Name one saved conversation with a one-shot `claude -p`, outside the agent conversation and with
- * no tools at all — it reads what it is given and answers.
- *
- * What it is given is only the user's own messages, chosen by the extension. That is the whole
- * safety story here: an assistant turn is a restatement of whatever page the agent was reading, so
- * feeding one in would let a site decide what a conversation in the user's own history is called.
- */
 export async function nameSession(
   req: NameSessionFrame,
   config: AgentConfig,
@@ -67,11 +56,6 @@ function promptFor(messages: string[], host?: string): string {
   );
 }
 
-/**
- * One line, bounded. A name goes straight into a row in the user's own history, so its shape is
- * enforced here rather than trusted: newlines flattened (the extension stores it as a single field),
- * the wrapping quotes a model reaches for stripped, and the length cut.
- */
 function clamp(output: string): string {
   return output
     .replace(/\s+/g, ' ')

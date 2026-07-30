@@ -13,24 +13,12 @@ import { log } from '../log';
 import { SKILL_FILE, bundledSkillNames, existingUserSkill, uploadedSkillsDir } from './skills';
 import type { SiteIndex } from './sitemap';
 
-/**
- * Where a generated site map lives before and after review.
- *
- * Everything in flight sits under `<skillsDir>/.staging/<uuid>/`. The loader skips dot-prefixed
- * entries, so an unreviewed map is not merely unrouted — it is never opened. That is the whole
- * quarantine: a filesystem fact rather than a flag some future parser change could misread.
- * Activation is a directory rename, which is atomic within a filesystem.
- */
-
 const STAGING = '.staging';
 
 export interface MapTarget {
-  /** The full host, e.g. `www.acme.com`. */
   host: string;
   origin: string;
-  /** What the skill will match on — the host with a leading `www.` removed. */
   domain: string;
-  /** The skill and directory name; the two cannot disagree because both come from here. */
   name: string;
 }
 
@@ -42,12 +30,6 @@ export interface Staging {
   pages: string;
 }
 
-/**
- * Decide up front whether this tab can be mapped at all.
- *
- * Everything here would also be caught at save time, which is exactly why it runs now: refusing
- * after a ten-minute crawl wastes the crawl, and the user has already walked away.
- */
 export function mapTargetFor(url: string): { ok: true; target: MapTarget } | { ok: false; message: string } {
   let parsed: URL;
   try {
@@ -81,11 +63,6 @@ export function mapTargetFor(url: string): { ok: true; target: MapTarget } | { o
   return { ok: true, target: { host, origin: parsed.origin, domain, name } };
 }
 
-/**
- * The plain name, unless it is already taken by a map of a *different* host — the dot-to-hyphen
- * mangle is lossy (`a.b.com` and `a-b.com` both give `a-b-com`), and a collision would rename one
- * site's map over another's, screenshots and all.
- */
 function uniqueName(domain: string, host: string): string | null {
   const plain = skillNameForHost(domain);
   if (!SKILL_NAME_RE.test(plain)) return null;
@@ -95,7 +72,6 @@ function uniqueName(domain: string, host: string): string | null {
   return SKILL_NAME_RE.test(disambiguated) ? disambiguated : null;
 }
 
-/** The host an existing map claims, or null when no map of that name exists. */
 function mappedHostOf(name: string): string | null {
   try {
     const meta = JSON.parse(readFileSync(join(uploadedSkillsDir(), name, 'meta.json'), 'utf8')) as { host?: unknown };
@@ -105,7 +81,6 @@ function mappedHostOf(name: string): string | null {
   }
 }
 
-/** A fresh quarantine directory. The id is minted here, never taken from the wire. */
 export function prepareStaging(): Staging {
   const id = randomUUID();
   const dir = join(uploadedSkillsDir(), STAGING, id);
@@ -122,7 +97,6 @@ export function prepareStaging(): Staging {
   return staging;
 }
 
-/** Screenshot basenames the daemon actually wrote — the only ones a report may reference. */
 export function stagedScreenshots(staging: Staging): string[] {
   try {
     return readdirSync(staging.screenshots).filter((name) => !name.startsWith('.'));
@@ -136,10 +110,6 @@ export function writeEvidence(staging: Staging, name: 'sitemap.txt' | 'backgroun
   writeFileSync(join(staging.evidence, name), body, { mode: 0o600 });
 }
 
-/**
- * Render and stage the map. The daemon owns every heading and every front-matter key; the
- * report only fills slots that `validateSiteMapReport` has already flattened and capped.
- */
 export function stageSiteMap(args: {
   staging: Staging;
   target: MapTarget;
@@ -163,16 +133,12 @@ export function stageSiteMap(args: {
   }).replace('\n---\n\n', `\nprovenance: generated\ngeneratedAt: ${generatedAt}\n---\n\n`);
 
   writeFileSync(join(staging.dir, SKILL_FILE), markdown, { mode: 0o600 });
-  // The VALIDATED report, not the raw submission — an audit trail should record what was
-  // accepted, and the raw one is unbounded attacker-shaped JSON.
   writeFileSync(join(staging.dir, 'map.json'), JSON.stringify(report, null, 2), { mode: 0o600 });
   writeFileSync(
     join(staging.dir, 'meta.json'),
     JSON.stringify({ name: target.name, host: target.host, domain: target.domain, generatedAt, runId }, null, 2),
     { mode: 0o600 },
   );
-  // Page notes are written but never rendered into the body: they are the largest per-page slot
-  // and there is no reason for them to sit inside every future prompt.
   for (const [index_, page] of report.pages.entries()) {
     if (!page.notes) continue;
     const file = `${String(index_ + 1).padStart(2, '0')}-${skillNameForHost(page.path) || 'page'}.md`;
@@ -193,7 +159,6 @@ export function stageSiteMap(args: {
   };
 }
 
-/** The document a future run will be given. Every heading is written here, none by the model. */
 function renderSiteMapBody(args: {
   target: MapTarget;
   report: SiteMapReport;
@@ -259,10 +224,6 @@ function renderSiteMapBody(args: {
   return body.length > MAX_MAP_BODY_BYTES ? `${body.slice(0, MAX_MAP_BODY_BYTES - 40)}\n\n(map truncated)` : body;
 }
 
-/**
- * Promote a staged map to a live skill. The rename is the activation; nothing else changes, so
- * there is no window where a half-written map is loadable.
- */
 export function commitStaging(stagingId: string, exactHost = false): ActionResult<{ name: string; path: string }> {
   const staging = stagingDirFor(stagingId);
   if (!staging) return failure('NOT_FOUND', 'That mapping run is no longer staged.');
@@ -278,14 +239,10 @@ export function commitStaging(stagingId: string, exactHost = false): ActionResul
   const domain = typeof meta.domain === 'string' ? meta.domain : '';
   if (!SKILL_NAME_RE.test(name) || !host || !domain) return failure('NOT_FOUND', 'That staged map is incomplete.');
 
-  // Re-check now, not just at run start: a hand-authored skill of this name may have appeared
-  // during the minutes the crawl was running.
   if (existingUserSkill(name)) {
     return failure('NAME_TAKEN', `"${name}" is now a skill you wrote by hand. Remove it first, or discard this map.`);
   }
 
-  // Narrowing to the exact host is the only edit the panel may make, and it is computed here
-  // rather than sent — a caller-supplied domain list is a way to aim a map at another site.
   if (exactHost && host !== domain) {
     const path = join(staging, SKILL_FILE);
     writeFileSync(path, readFileSync(path, 'utf8').replace(`domains: [${domain}]`, `domains: [${host}]`), {
@@ -295,8 +252,6 @@ export function commitStaging(stagingId: string, exactHost = false): ActionResul
 
   const destination = join(uploadedSkillsDir(), name);
   if (!contained(destination)) return failure('INVALID_INPUT', 'Refusing to write outside the skills directory.');
-  // Keep any previous map of this name under staging rather than deleting it here: a rename is
-  // reversible for as long as the directory exists, an rm is not.
   if (existsSync(destination)) {
     renameSync(destination, join(uploadedSkillsDir(), STAGING, `${name}-replaced-${randomUUID().slice(0, 8)}`));
   }
@@ -313,7 +268,6 @@ export function discardStaging(stagingId: string): ActionResult<{ name: string }
   return success({ name: stagingId });
 }
 
-/** A staging directory, addressed only by a UUID this process minted. */
 function stagingDirFor(stagingId: string): string | null {
   if (!/^[0-9a-f-]{36}$/i.test(stagingId)) return null;
   const dir = resolve(join(uploadedSkillsDir(), STAGING, stagingId));
@@ -327,7 +281,6 @@ function contained(path: string): boolean {
   return target === root || target.startsWith(root + sep);
 }
 
-/** Clean up staging left behind by a crashed daemon, so quarantine does not accumulate. */
 export function sweepStaging(maxAgeMs = 24 * 60 * 60 * 1000, now = Date.now()): void {
   const root = join(uploadedSkillsDir(), STAGING);
   let entries: string[];
@@ -342,7 +295,6 @@ export function sweepStaging(maxAgeMs = 24 * 60 * 60 * 1000, now = Date.now()): 
       const at = typeof meta.generatedAt === 'string' ? Date.parse(meta.generatedAt) : 0;
       if (at && now - at < maxAgeMs) continue;
     } catch {
-      // No readable meta: it never finished, so age it out on the next sweep regardless.
     }
     rmSync(join(root, entry), { recursive: true, force: true });
     log(`swept abandoned staging ${entry}`);

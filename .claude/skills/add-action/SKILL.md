@@ -21,7 +21,7 @@ node .claude/skills/add-action/new-action.mjs create getAttribute "Read an HTML 
 
 That prints `✓ manifest publishes it as MCP tool "page_getAttribute"` and a **doc-sync report** (see below). It scaffolds a *valid, compiling* action immediately — but with a placeholder `example` field. Now write the real thing:
 
-1. **Edit** `lib/actions/page/<name>.ts` — replace the placeholder input field(s) and the `execute()` body with the real capability. The scaffold's comments name every load-bearing rule inline.
+1. **Edit** `lib/actions/page/<name>.ts` — replace the placeholder input field(s) and the `execute()` body with the real capability. The load-bearing rules are listed under **Conventions** below — the scaffold is deliberately comment-free, as is the rest of the codebase.
 2. **Re-verify** — this is the loop you repeat while iterating:
 
 ```sh

@@ -1,15 +1,8 @@
 import { RULES, type Rule } from './grammar';
 import { normalize } from './normalize';
 
-/**
- * Score at which the extension acts on its own instead of waking the agent. Set from the
- * fixture table in `scripts/check-intent.mjs` — raise it and more quick commands take the
- * slow path, lower it and the grammar starts guessing. Every miss is recoverable (a failed
- * local action escalates), so the cost of being wrong is a round trip, not a wrong click.
- */
 export const ACT_THRESHOLD = 0.75;
 
-/** Why an utterance went to the agent. Surfaced for debugging, not shown to the user. */
 export type EscalationReason =
   | 'no-match'
   | 'below-threshold'
@@ -20,12 +13,9 @@ export type EscalationReason =
   | 'skill-prefix';
 
 export interface LocalIntent {
-  /** The rule that matched, e.g. "navigate.url". */
   ruleId: string;
-  /** Registry action name — the same call the agent would have made. */
   action: string;
   input: unknown;
-  /** One line for the timeline, e.g. "Go back". */
   label: string;
   score: number;
 }
@@ -34,27 +24,15 @@ export type Routing =
   | { decision: 'act'; intent: LocalIntent }
   | { decision: 'escalate'; reason: EscalationReason; score: number; ruleId?: string };
 
-/** An utterance in question form is asking for an answer, which only the agent can give. */
 const QUESTION =
   /^(?:what|whats|why|how|who|when|where|which|is|are|was|were|do|does|did|can|could|should|would|tell|explain|describe|summarize|summarise|read|find|show|check|look|see|list|compare|help|write|draft|fill)\b/;
 
-/** Two commands in one sentence. The grammar handles one thing at a time. */
 const MULTI_STEP = /\b(?:and then|then|after that|and also|followed by)\b/;
 
-/** A condition to evaluate, which means looking at the page and deciding — the agent's job. */
 const HEDGE = /\b(?:if|unless|whenever|maybe|might|try to|see if|as soon as|in case|otherwise)\b/;
 
-/**
- * Decide whether the extension can carry out an utterance itself.
- *
- * The funnel is deliberately biased toward escalating: a false "act" spends a wrong action on
- * the user's real page, while a false "escalate" only costs the round trip this exists to
- * avoid. Hard stops come first (questions, multiple steps, consequential clicks), then the
- * highest-scoring rule has to clear {@link ACT_THRESHOLD}.
- */
 export function routeIntent(input: string): Routing {
   const utterance = normalize(input);
-  // "@skill do the thing" is an explicit request for a particular agent skill.
   if (utterance.raw.startsWith('@')) return escalate('skill-prefix', 0);
   if (!utterance.text) return escalate('no-match', 0);
   if (utterance.question || QUESTION.test(utterance.text)) return escalate('question', 0);

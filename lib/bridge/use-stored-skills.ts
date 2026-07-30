@@ -2,11 +2,6 @@ import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { SKILLS_INDEX_KEY, type StoredSkillMeta } from './skill-store';
 
-/**
- * The uploaded-skill index, kept live through `storage.local.onChanged` so it stays in sync
- * across extension pages and re-renders pending→saved as the background pushes each one to
- * the daemon.
- */
 export function useStoredSkills(): StoredSkillMeta[] {
   const [skills, setSkills] = useState<StoredSkillMeta[]>([]);
 

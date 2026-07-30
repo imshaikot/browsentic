@@ -3,14 +3,8 @@ import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:
 import { join } from 'node:path';
 import { stateDir } from './lockfile';
 
-/**
- * Persistent pairing state, deliberately separate from the lockfile: the lockfile describes a
- * running process and is deleted on shutdown, while sessions must survive daemon and browser
- * restarts until the user explicitly revokes them.
- */
 const authPath = join(stateDir, 'auth.json');
 
-/** Unambiguous when read aloud or typed: no 0/O, 1/I/L, U/V. */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTWXYZ23456789';
 const CODE_LENGTH = 8;
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -48,7 +42,6 @@ function write(auth: AuthFile): void {
   chmodSync(authPath, 0o600);
 }
 
-/** Mint a one-time pairing code for the user to type into the extension. */
 export function createPairing(): { code: string; expiresAt: number } {
   const auth = read();
   const code = Array.from(
@@ -56,15 +49,10 @@ export function createPairing(): { code: string; expiresAt: number } {
     () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)],
   ).join('');
   const expiresAt = Date.now() + PAIRING_TTL_MS;
-  // One outstanding code at a time: minting a new one invalidates any earlier code.
   write({ ...auth, pairings: [{ code, expiresAt }] });
   return { code, expiresAt };
 }
 
-/**
- * Redeem a pairing code. Single use — it is removed whether or not it had expired, so a
- * leaked code cannot be replayed after the legitimate pairing consumed it.
- */
 export function consumePairing(offered: string): boolean {
   const auth = read();
   const normalized = offered.replace(/[\s-]/g, '').toUpperCase();
@@ -87,13 +75,11 @@ export function createSession(origin: string, extensionVersion: string): Session
     pairedAt: now,
     lastSeenAt: now,
   };
-  // One browser at a time: a new pairing replaces any session for the same origin.
   const sessions = auth.sessions.filter((existing) => existing.origin !== origin);
   write({ ...auth, sessions: [...sessions, session] });
   return session;
 }
 
-/** A session key is only valid from the origin that paired it. */
 export function validateSession(offeredKey: string, origin: string): Session | null {
   const auth = read();
   const session = auth.sessions.find(

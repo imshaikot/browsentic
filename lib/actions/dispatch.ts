@@ -3,7 +3,6 @@ import { ActionError } from './core';
 import { failure, success, type ActionResult } from './protocol';
 import { actions } from './registry';
 
-/** Validate and run a named action in the current context. */
 export async function dispatch(name: string, input: unknown): Promise<ActionResult> {
   const action = actions.get(name);
   if (!action) return failure('UNKNOWN_ACTION', `No action named "${name}"`);

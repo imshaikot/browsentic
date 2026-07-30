@@ -35,7 +35,6 @@ export const selectOption = defineAction({
         'TARGET_NOT_FOUND',
       );
     }
-    // Set through the native setter so frameworks with controlled selects (React) see the change.
     Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
       el,
       option.value,

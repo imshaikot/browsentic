@@ -15,7 +15,6 @@ export const clickElement = defineAction({
     try {
       el.focus({ preventScroll: true });
     } catch {
-      // Some elements (e.g. inside closed shadow roots) refuse focus; clicking still works.
     }
     const init = { bubbles: true, cancelable: true, composed: true };
     el.dispatchEvent(new PointerEvent('pointerdown', init));

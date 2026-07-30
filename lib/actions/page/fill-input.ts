@@ -18,7 +18,6 @@ export const fillInput = defineAction({
     let next: string;
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
       next = clear ? value : el.value + value;
-      // React/Vue ignore direct .value writes on controlled inputs, so use the native prototype setter.
       const proto =
         el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
       Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, next);
@@ -35,7 +34,6 @@ export const fillInput = defineAction({
       const enter = keyboardInit('Enter');
       const notPrevented = el.dispatchEvent(new KeyboardEvent('keydown', enter));
       el.dispatchEvent(new KeyboardEvent('keyup', enter));
-      // A real Enter submits only when the keydown wasn't cancelled, and never from a textarea.
       if (notPrevented && !(el instanceof HTMLTextAreaElement)) el.closest('form')?.requestSubmit();
     }
     return { element: describeElement(el), value: next };

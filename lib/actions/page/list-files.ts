@@ -11,8 +11,6 @@ export const listFiles = defineAction({
       .describe('Only return files whose name contains this text (case-insensitive).'),
   }),
   execute() {
-    // Resolved by the VoiceLink extension background, which reads extension storage a page
-    // cannot reach (see lib/bridge/invoke.ts). The in-page path is never taken via the harness.
     throw new ActionError('page.listFiles is resolved by the VoiceLink extension, not in the page', 'UNSUPPORTED');
   },
 });

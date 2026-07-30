@@ -79,13 +79,9 @@ switch (command) {
     process.exit(1);
 }
 
-/** Serve MCP on stdio. Nothing may write to stdout past this point — it is the JSON-RPC stream. */
 async function serve(): Promise<void> {
   const lock = await ensureDaemon();
-  // Present when the daemon spawned a Claude Code run and that run spawned us: tagging the
-  // invocations is what routes them through the run's approval gate and timeline.
   const bridge = await RemoteBridge.connect(lock.port, lock.token, process.env.VOICELINK_AGENT_RUN);
-  // Only a spawned agent run gets the map-writing tool; an ordinary MCP client never sees it.
   const server = createMcpServer(bridge, pkg.version, { agentRun: !!process.env.VOICELINK_AGENT_RUN });
   await server.connect(new StdioServerTransport());
   log(`stdio MCP server attached to daemon on port ${lock.port}`);
@@ -98,11 +94,6 @@ async function serve(): Promise<void> {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => void shutdown());
 }
 
-/**
- * Print the tool manifest straight from the bundled registry — no daemon, no browser.
- * Also the standing check that no action grew a top-level DOM reference: this bundle is
- * loaded in plain Node, where `document` at module scope would throw on import.
- */
 function printTools(): void {
   const actions = describeActions();
   assertToolNamesRoundTrip(actions.map((action) => action.name));
@@ -115,13 +106,6 @@ function printTools(): void {
   );
 }
 
-/**
- * Every skill the router can reach, in precedence order — the answer to "did my upload land,
- * and is it shadowing something?". Reads the same directories a run does, so it needs no daemon.
- *
- * It also puts the skill loader in this bundle's import graph, which is what makes
- * `yarn mcp:manifest` catch a browser-only import creeping into `lib/skills/`.
- */
 function printSkills(): void {
   const skills = loadSkills();
   if (!skills.length) {
@@ -188,7 +172,6 @@ function printToken(): void {
   console.log(lock.token);
 }
 
-/** Issue a one-time code. The daemon must be running to hold it, so start it if needed. */
 async function pair(): Promise<void> {
   const bridge = await connect();
   const { code, expiresAt } = await bridge.pair();
@@ -221,7 +204,6 @@ async function revoke(origin?: string): Promise<void> {
   console.log(`Revoked ${revoked} session(s). Pair again with "voicelink-mcp pair".`);
 }
 
-/** Every command that talks to the daemon needs it running; start it if it is not. */
 async function connect(): Promise<RemoteBridge> {
   const lock = await ensureDaemon();
   return RemoteBridge.connect(lock.port, lock.token);

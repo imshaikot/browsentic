@@ -2,17 +2,6 @@ import { useMemo, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-/**
- * Markdown for agent replies, rendered to React elements.
- *
- * Hand-rolled rather than a markdown library, for two reasons that both matter here. The text
- * being rendered is written by a model that has just been reading untrusted pages, so nothing
- * in this file may produce HTML: every node is a React element, there is no
- * `dangerouslySetInnerHTML`, link hrefs pass a scheme allowlist, and an image becomes a link
- * rather than a remote fetch from the panel. And it re-runs on every streamed token, so it
- * parses in one pass and tolerates half-written syntax — an unclosed fence or a dangling `**`
- * renders as literal text until the rest of it arrives.
- */
 export function Markdown({ text, className }: { text: string; className?: string }) {
   const blocks = useMemo(() => parseBlocks(text), [text]);
   return (
@@ -42,12 +31,6 @@ const QUOTE = /^ {0,3}>[ \t]?/;
 const ITEM = /^([ \t]*)(?:([-*+])|(\d{1,9})[.)])[ \t]+(.*)$/;
 const TABLE_DELIM = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$/;
 
-/**
- * Nesting cap for blocks. Quotes and lists recurse a level per `>` or per indent step, and
- * rendering recurses again, so depth is a function of the input — one `>` is one stack frame, and
- * enough of them overflow the stack, which in React means the whole panel unmounts. Past this,
- * the remaining text renders as the plain lines it is.
- */
 const MAX_BLOCK_DEPTH = 12;
 
 function parseBlocks(source: string, depth = 0): Block[] {
@@ -65,8 +48,6 @@ function parseBlocks(source: string, depth = 0): Block[] {
       continue;
     }
 
-    // A fence with no closer runs to the end of the text, which is what a half-streamed code
-    // block should look like — the alternative is its contents flickering as prose.
     if (FENCE_OPEN.test(line)) {
       const open = /^ {0,3}(`{3,}|~{3,})/.exec(line)![1];
       const body: string[] = [];
@@ -99,7 +80,6 @@ function parseBlocks(source: string, depth = 0): Block[] {
 
     if (QUOTE.test(line)) {
       const quoted: string[] = [];
-      // Lazy continuation: an unmarked line still belongs to the quote it follows.
       while (i < lines.length && (QUOTE.test(lines[i]) || (quoted.length > 0 && lines[i].trim()))) {
         quoted.push(lines[i].replace(QUOTE, ''));
         i++;
@@ -123,8 +103,6 @@ function parseBlocks(source: string, depth = 0): Block[] {
       continue;
     }
 
-    // Paragraph. We only reach here when this line opens nothing else, so it always consumes at
-    // least one line and the outer loop cannot stall.
     const text: string[] = [];
     while (i < lines.length && lines[i].trim() && !opensBlock(lines, i)) {
       text.push(lines[i].trim());
@@ -148,11 +126,6 @@ function opensBlock(lines: string[], at: number): boolean {
   );
 }
 
-/**
- * One list, plus the index to resume at. A line indented past the marker belongs to the item it
- * follows and is re-parsed there, which is what makes nested lists and multi-paragraph items
- * work without this function knowing anything about either.
- */
 function parseList(lines: string[], start: number, first: RegExpExecArray, depth: number): [Block, number] {
   const indent = leading(first[1]);
   const ordered = first[3] !== undefined;
@@ -161,7 +134,6 @@ function parseList(lines: string[], start: number, first: RegExpExecArray, depth
 
   while (i < lines.length) {
     const item = ITEM.exec(lines[i]);
-    // A different marker kind, or a different indent, is a different list.
     if (!item || (item[3] !== undefined) !== ordered) break;
     const at = leading(item[1]);
     if (at < indent || at > indent + 1) break;
@@ -171,7 +143,6 @@ function parseList(lines: string[], start: number, first: RegExpExecArray, depth
     while (i < lines.length) {
       const line = lines[i];
       if (!line.trim()) {
-        // A blank line stays inside the item only if indented content follows it.
         const after = lines[i + 1] ?? '';
         if (!after.trim() || leading(after) <= indent) break;
         body.push('');
@@ -194,7 +165,6 @@ function parseList(lines: string[], start: number, first: RegExpExecArray, depth
   return [list, i];
 }
 
-/** A table needs its delimiter row to be visible before the header row means anything. */
 function startsTable(lines: string[], at: number): boolean {
   return lines[at].includes('|') && at + 1 < lines.length && TABLE_DELIM.test(lines[at + 1]);
 }
@@ -231,13 +201,11 @@ function splitRow(line: string): string[] {
     cell += line[i];
   }
   cells.push(cell);
-  // The outer pipes are decoration, not empty cells.
   if (!cells[0].trim()) cells.shift();
   if (cells.length && !cells[cells.length - 1]?.trim()) cells.pop();
   return cells.map((text) => text.trim());
 }
 
-/** Indent width in columns, counting a tab as two — enough to compare nesting depth. */
 function leading(line: string): number {
   const ws = /^[ \t]*/.exec(line)![0];
   return ws.length + (ws.match(/\t/g)?.length ?? 0);
@@ -245,15 +213,11 @@ function leading(line: string): number {
 
 const dedent = (line: string, by: number) => line.replace(/^[ \t]+/, (ws) => ws.replace(/\t/g, '  ').slice(by));
 
-// Tinted against the current text colour rather than a theme token: these render inside both the
-// muted assistant bubble and the violet user bubble.
 const CHIP = 'rounded bg-black/8 px-1 py-px font-mono text-[0.85em] dark:bg-white/12';
 
 function renderBlock(block: Block, key: string): ReactNode {
   switch (block.kind) {
     case 'heading': {
-      // h2 and down: the panel's own header owns the h1, and starting at h2 keeps the outline in
-      // order rather than jumping a level.
       const Tag = `h${Math.min(block.level + 1, 6)}` as 'h2';
       return (
         <Tag key={key} className={cn('wrap-anywhere font-semibold', block.level <= 2 && 'text-[0.95rem]')}>
@@ -347,37 +311,23 @@ function renderBlock(block: Block, key: string): ReactNode {
 
 const ALIGN: Record<Align, string> = { left: 'text-left', center: 'text-center', right: 'text-right' };
 
-/** A one-paragraph item renders bare, so `<li>` does not inherit paragraph spacing. */
 function renderItem(blocks: Block[]): ReactNode {
   if (blocks.length === 1 && blocks[0].kind === 'paragraph') return renderInline(blocks[0].text);
   return <div className="flex flex-col gap-1.5">{blocks.map((block, index) => renderBlock(block, String(index)))}</div>;
 }
 
-/** Emphasis can nest, but not indefinitely — past this, markup renders as the text it is. */
 const MAX_DEPTH = 4;
-/** Characters that can begin a span. Anything else skips the rule loop entirely. */
 const MARKERS = '`*_~[!<h';
 const ESCAPABLE = /[\\`*_~[\]()#+\-.!>|]/;
 
 interface InlineRule {
   re: RegExp;
-  /** Set on the rules that produce an anchor, so they can be skipped inside one. */
   linking?: true;
-  /** `inLink` has to be passed on by anything that recurses, or the no-links-in-links rule ends. */
   node: (match: RegExpExecArray, key: string, depth: number, inLink: boolean) => ReactNode;
 }
 
-// Order is significant: code spans win over everything inside them, `**` must be tried before
-// `*`, and an image must be tried before the link it otherwise looks like.
-/**
- * Bounds on the link and image patterns. Each pairs an unbounded run with another unbounded run
- * before a required `)`, so an unterminated `](`  makes every `[` in the line a fresh O(L)
- * backtrack — measured at 14s of blocked main thread for 800 openers in an 11 KB line, and this
- * parser re-runs on every streamed token. A label or target past these lengths is not a link.
- */
 const MAX_LABEL = 512;
 const MAX_HREF = 2048;
-/** The most characters a link or image match can possibly span, from its `[` to its `)`. */
 const MAX_LINK_SPAN = MAX_LABEL * 2 + MAX_HREF + 8;
 
 const INLINE: InlineRule[] = [
@@ -386,10 +336,7 @@ const INLINE: InlineRule[] = [
   { re: /__(?!\s)([^\n]+?)__/y, node: (m, key, d, inLink) => <strong key={key}>{renderInline(m[1], d + 1, inLink)}</strong> },
   { re: /~~(?!\s)([^\n]+?)~~/y, node: (m, key, d, inLink) => <del key={key}>{renderInline(m[1], d + 1, inLink)}</del> },
   { re: /\*(?!\s)([^*\n]+?)\*/y, node: (m, key, d, inLink) => <em key={key}>{renderInline(m[1], d + 1, inLink)}</em> },
-  // Underscores only around whole words, so snake_case identifiers survive.
   { re: /(?<![\w\\])_(?!\s)([^_\n]+?)_(?!\w)/y, node: (m, key, d, inLink) => <em key={key}>{renderInline(m[1], d + 1, inLink)}</em> },
-  // An image is rendered as a link: loading a remote one would tell its host what the panel is
-  // showing, and the extension's CSP would refuse it anyway.
   {
     re: new RegExp(`!\\[([^\\]\\n]{0,${MAX_LABEL}})\\]\\([ \\t]*([^)\\s]{0,${MAX_HREF}})[^)\\n]{0,${MAX_LABEL}}\\)`, 'y'),
     linking: true,
@@ -401,11 +348,9 @@ const INLINE: InlineRule[] = [
     node: (m, key, depth) => link(m[2], m[1], key, depth),
   },
   { re: /<(https?:\/\/[^>\s]+)>/y, linking: true, node: (m, key, depth) => link(m[1], m[1], key, depth) },
-  // Bare URLs, stopping short of the punctuation that usually ends the sentence around them.
   { re: /https?:\/\/[^\s<>"'`]*[^\s<>"'`.,;:!?)\]}]/y, linking: true, node: (m, key, depth) => link(m[0], m[0], key, depth) },
 ];
 
-/** `inLink` renders a link's own label: emphasis still applies, another anchor cannot. */
 function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
   const out: ReactNode[] = [];
   let plain = '';
@@ -414,11 +359,6 @@ function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
     if (plain) out.push(plain);
     plain = '';
   };
-  // Cursor on the next `)`. A link needs one within `MAX_LINK_SPAN` to have any chance of matching,
-  // and establishing that up front is what keeps a line of unterminated `](` linear: otherwise the
-  // pattern discovers it by backtracking the full bound at every bracket, which measured in
-  // seconds of blocked main thread — on a parser that re-runs for every streamed token.
-  // `pos` only moves forward, so the cursor scans each character at most once overall.
   let closeAt = text.indexOf(')');
 
   while (pos < text.length) {
@@ -429,8 +369,6 @@ function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
       pos += 2;
       continue;
     }
-    // A single newline is a line break here. Chat replies lean on them, and the alternative is
-    // paragraphs of prose reflowed into one another.
     if (char === '\n') {
       flush();
       out.push(<br key={`br${pos}`} />);
@@ -438,7 +376,6 @@ function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
       continue;
     }
 
-    // `[` and `!` start nothing but a link or an image, so with no `)` in reach they are just text.
     if (char === '[' || char === '!') {
       if (closeAt !== -1 && closeAt < pos) closeAt = text.indexOf(')', pos);
       if (closeAt === -1 || closeAt - pos > MAX_LINK_SPAN) {
@@ -451,17 +388,10 @@ function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
     let matched = false;
     if (depth < MAX_DEPTH && MARKERS.includes(char)) {
       for (const rule of INLINE) {
-        // A bare URL is its own label, so without this it would match again inside itself and
-        // nest anchors until the depth cap — invalid markup, and unclickable in places.
         if (inLink && rule.linking) continue;
         rule.re.lastIndex = pos;
         const match = rule.re.exec(text);
-        // Read `lastIndex` before rendering, not after: `node` recurses into this function for
-        // the span's contents, and every level shares these regex objects. Reading it afterwards
-        // gets the inner call's position, which can be behind `pos` — a loop that never ends.
         const next = rule.re.lastIndex;
-        // A rule that consumed nothing would also loop forever. None can today; this is what
-        // keeps that true of the next one added.
         if (!match || next <= pos) continue;
         flush();
         out.push(rule.node(match, `n${pos}`, depth, inLink));
@@ -480,7 +410,6 @@ function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
   return out;
 }
 
-/** A link, or its label as plain text when the target is not something safe to offer. */
 function link(href: string, label: string, key: string, depth: number): ReactNode {
   const target = safeHref(href);
   const text = renderInline(label, depth + 1, true);
@@ -498,10 +427,6 @@ function link(href: string, label: string, key: string, depth: number): ReactNod
   );
 }
 
-/**
- * Only schemes that mean something from an extension page. `javascript:` is the obvious one to
- * keep out, but a relative path is just as wrong here — it would resolve against the panel.
- */
 function safeHref(raw: string): string | null {
   const href = raw.trim();
   return /^(https?:\/\/|mailto:)/i.test(href) ? href : null;

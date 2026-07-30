@@ -1,21 +1,4 @@
 #!/usr/bin/env node
-// new-action.mjs — scaffold, wire, verify, and remove VoiceLink actions.
-//
-// One action == one page capability == one MCP tool. This driver does the
-// three edits that must stay in lockstep (the action module, the registry
-// import, the registry array) correct-by-construction, then runs the same
-// checks a reviewer would (`yarn compile` + the bundled tool manifest) and
-// asserts the new tool actually materialized.
-//
-// Usage (paths are relative to the repo root):
-//   node .claude/skills/add-action/new-action.mjs create <name> "<description>"
-//   node .claude/skills/add-action/new-action.mjs verify [<name>]
-//   node .claude/skills/add-action/new-action.mjs remove <name>
-//   node .claude/skills/add-action/new-action.mjs docs
-//
-// <name> is either a bare camelCase verb (`getAttribute`, namespaced to
-// `page.`) or a full `namespace.name` (`page.getAttribute`). Underscores are
-// rejected — they break the reversible action-name <-> MCP-tool-name mapping.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
@@ -23,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = resolve(HERE, '..', '..', '..'); // .claude/skills/add-action -> repo root
+const ROOT = resolve(HERE, '..', '..', '..');
 const REGISTRY = join(ROOT, 'lib/actions/registry.ts');
 const PAGE_DIR = join(ROOT, 'lib/actions/page');
 
@@ -40,10 +23,8 @@ const die = (msg) => {
 const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const info = (msg) => console.log(`  ${msg}`);
 
-// camelCase -> kebab-case: getAttribute -> get-attribute, getPageInfo -> get-page-info
 const kebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 
-/** Parse & validate a name into its parts, or die with a precise reason. */
 function parseName(raw) {
   if (!raw) die('Missing <name>. Try: create getAttribute "Read an attribute from an element"');
   if (raw.includes('_')) {
@@ -60,9 +41,9 @@ function parseName(raw) {
   if (!/^[a-z][a-zA-Z0-9]*$/.test(namespace)) die(`Namespace "${namespace}" must be camelCase`);
   return {
     namespace,
-    local,                                // export const name, e.g. getAttribute
-    actionName: `${namespace}.${local}`,  // page.getAttribute
-    toolName: `${namespace}_${local}`,    // page_getAttribute (the MCP tool)
+    local,
+    actionName: `${namespace}.${local}`,
+    toolName: `${namespace}_${local}`,
     file: join(PAGE_DIR, `${kebab(local)}.ts`),
     relFile: `lib/actions/page/${kebab(local)}.ts`,
     importPath: `./page/${kebab(local)}`,
@@ -77,23 +58,14 @@ export const ${n.local} = defineAction({
   name: '${n.actionName}',
   description: ${JSON.stringify(description)},
   input: z.object({
-    // .describe() EVERY field — this text becomes the MCP tool's parameter docs.
     target: targetSchema.describe('Element to act on'),
-    // Example option. Rename or delete. No .refine()/.transform(): they don't
-    // survive z.toJSONSchema(), so the MCP manifest would silently lose them.
     example: z.string().default('').describe('Replace with a real parameter'),
   }),
   execute({ target, example }) {
-    // Touch document/window ONLY in here. A top-level DOM reference throws when
-    // the registry is imported in plain Node — that is what verify (mcp:manifest) catches.
-    const el = resolveTarget(target); // throws TARGET_NOT_FOUND if nothing matches
-    // Validate anything the schema can't express with a stable code:
-    // INVALID_INPUT | INVALID_TARGET | TARGET_NOT_FOUND | TIMEOUT | UNSUPPORTED
+    const el = resolveTarget(target);
     if (!(el instanceof HTMLElement)) {
       throw new ActionError('Target is not an element we can act on', 'INVALID_TARGET');
     }
-    // ...do the side effect here (dispatch events, read attributes, etc.)...
-    // Return a SMALL, JSON-serializable result — it crosses sendMessage, so no DOM nodes.
     return { element: describeElement(el), example };
   },
 });
@@ -104,7 +76,6 @@ function readRegistry() {
   return readFileSync(REGISTRY, 'utf8');
 }
 
-/** Insert the page-import line alphabetically by symbol, else after the last one. */
 function addImport(src, n) {
   const line = `import { ${n.local} } from '${n.importPath}';`;
   if (src.includes(line)) return src;
@@ -117,7 +88,6 @@ function addImport(src, n) {
   return src.slice(0, at) + '\n' + line + src.slice(at);
 }
 
-/** Insert the export symbol into the actions array, before its closing bracket. */
 function addToArray(src, n) {
   const close = src.indexOf('] as AnyAction[]');
   if (close === -1) die('could not find "] as AnyAction[]" in registry.ts');
@@ -133,7 +103,6 @@ function removeFromArray(src, n) {
   return src.replace(new RegExp(`^\\s*${n.local},\\n`, 'm'), '');
 }
 
-/** Build the MCP bundle and return the parsed tool manifest (no browser needed). */
 function toolManifest() {
   try {
     execFileSync('yarn', ['--cwd', 'mcp', 'build'], { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
@@ -144,7 +113,6 @@ function toolManifest() {
   try {
     out = execFileSync('node', ['mcp/dist/cli.js', 'tools'], { cwd: ROOT, encoding: 'utf8' });
   } catch (e) {
-    // assertToolNamesRoundTrip / top-level-DOM errors surface here.
     die(`tool manifest failed (this is the top-level-DOM & tool-name check):\n${e.stderr?.toString() ?? e.message}`);
   }
   const start = out.indexOf('[');
@@ -171,8 +139,6 @@ function docReport(tools) {
   const last = tools[tools.length - 1];
   info(`| \`${last.action}\` | ${last.description} |`);
 }
-
-// ---- commands -------------------------------------------------------------
 
 function cmdCreate(rawName, description) {
   const n = parseName(rawName);

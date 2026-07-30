@@ -66,7 +66,6 @@ function visibleTextSegments(): Segment[] {
   return segments;
 }
 
-/** Map an offset in the concatenated text back to a (node, offset) DOM point. */
 function pointAt(segments: Segment[], offset: number): [Text, number] {
   for (const seg of segments) {
     if (offset <= seg.start + seg.node.data.length) return [seg.node, offset - seg.start];

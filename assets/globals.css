@@ -80,7 +80,6 @@
   }
 }
 
-/* Drains left-to-right over the voice auto-send delay; the bar's inline duration sets timing. */
 @keyframes voicelink-countdown {
   from {
     width: 100%;

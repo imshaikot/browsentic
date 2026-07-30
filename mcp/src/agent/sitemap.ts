@@ -3,29 +3,14 @@ import { isIP } from 'node:net';
 import { gunzipSync } from 'node:zlib';
 import { log } from '../log';
 
-/**
- * Phase A of a mapping run: read the site's own index of itself.
- *
- * Deterministic Node rather than a model, for two reasons. It is *better* at the job — a 5,000
- * entry sitemap yields URL patterns (`/docs/{section}/{page} — 412 pages`) that no twelve-page
- * crawl could infer, and no fetch-and-summarise tool parses reliably. And it keeps the one
- * component that makes arbitrary outbound requests free of any model in the loop.
- *
- * Every request is therefore hostile-input handling, not convenience code: the URLs come from a
- * file the mapped site controls, so this module is where SSRF, redirect laundering, DNS
- * rebinding and decompression bombs have to be stopped.
- */
-
 const MAX_DOCUMENTS = 20;
 const MAX_DOC_BYTES = 4 * 1024 * 1024;
-/** Across every document in one run, so twenty near-limit fetches cannot add up to 80 MB. */
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024;
 const MAX_URLS = 5_000;
 const MAX_PATHS = 200;
 const MAX_PATTERNS = 12;
 const MAX_REDIRECTS = 2;
 const REQUEST_TIMEOUT_MS = 10_000;
-/** Kept for the evidence file, which a reviewer may open; not for the prompt. */
 const MAX_EVIDENCE_BYTES = 512 * 1024;
 
 export interface SiteIndex {
@@ -35,7 +20,6 @@ export interface SiteIndex {
   truncated: boolean;
   paths: string[];
   patterns: { pattern: string; count: number; example: string }[];
-  /** robots.txt plus the first sitemap document, for `evidence/sitemap.txt`. */
   raw: string;
 }
 
@@ -49,11 +33,6 @@ const EMPTY: SiteIndex = {
   raw: '',
 };
 
-/**
- * Read `robots.txt`, follow its `Sitemap:` directives, and fall back to the conventional
- * locations. Never throws: a site with no sitemap is the common case, not an error, and a
- * mapping run must still produce a map.
- */
 export async function fetchSiteIndex(origin: string, signal: AbortSignal): Promise<SiteIndex> {
   let seed: Seed;
   try {
@@ -80,8 +59,6 @@ export async function fetchSiteIndex(origin: string, signal: AbortSignal): Promi
 
   const queue = [...candidates];
   const seen = new Set<string>();
-  // `signal` reaches each `get`, but an aborted fetch here comes back as null rather than throwing,
-  // so the loop would keep working through the queue for its whole document budget after a cancel.
   while (!signal.aborted && queue.length && budget.documents < MAX_DOCUMENTS && urls.length < MAX_URLS) {
     const next = queue.shift()!;
     if (seen.has(next)) continue;
@@ -92,8 +69,6 @@ export async function fetchSiteIndex(origin: string, signal: AbortSignal): Promi
     if (evidence.length < 2) evidence.push(`# ${next}\n${body}`);
     if (source === 'none') source = 'sitemap.xml';
 
-    // A <sitemapindex> points at more sitemaps; expand exactly one level so a site cannot
-    // hand us an unbounded tree to walk.
     if (/<sitemapindex[\s>]/i.test(body) && seen.size <= candidates.length) {
       source = 'sitemap-index';
       for (const child of locs(body)) {
@@ -123,14 +98,6 @@ export async function fetchSiteIndex(origin: string, signal: AbortSignal): Promi
   };
 }
 
-/**
- * The seed the whole run is pinned to: one scheme, one host, one port, one IP address.
- *
- * Pinning the *address* rather than re-resolving is what closes DNS rebinding — a name whose
- * record flips to 127.0.0.1 between the page load and our fetch would otherwise be a way into
- * loopback services. Pinning the *port* is what stops a mapped dev server at localhost:3000
- * from advertising a sitemap at localhost:6379.
- */
 interface Seed {
   origin: string;
   protocol: string;
@@ -161,14 +128,6 @@ async function resolveOnce(hostname: string): Promise<string> {
   return address;
 }
 
-/**
- * One request, with the redirect chain walked by hand.
- *
- * `redirect: 'follow'` would be a hole rather than a shortcut: Node performs every hop
- * internally and exposes only the final URL, so a site can bounce through
- * `169.254.169.254/latest/meta-data/` and land back on itself, and the final-URL check passes
- * while the request to the metadata service has already been made from the user's machine.
- */
 async function get(
   target: string,
   seed: Seed,
@@ -208,7 +167,7 @@ async function get(
       const bytes = await readCapped(response.body, budget);
       return decode(bytes, url);
     } catch {
-      return null; // A refused, timed-out or malformed response is a missing sitemap, not a failure.
+      return null;
     } finally {
       clearTimeout(deadline);
       signal.removeEventListener('abort', abort);
@@ -217,23 +176,15 @@ async function get(
   return null;
 }
 
-/** Same scheme, host, port and pinned address as the seed — and never a private address. */
 async function allowed(url: URL, seed: Seed): Promise<boolean> {
   if (url.protocol !== seed.protocol) return false;
   if (url.hostname.toLowerCase() !== seed.hostname) return false;
   if (url.port !== seed.port) return false;
   const address = await resolveOnce(url.hostname).catch(() => '');
   if (!address || address !== seed.address) return false;
-  // A loopback seed may reach loopback — the user asked to map their dev server — but only at
-  // the exact origin they named, which the port check above already pinned.
   return seed.loopback || !isPrivateAddress(address);
 }
 
-/**
- * Read with a running counter and abort the moment the cap is crossed. `res.text()` would
- * buffer the whole body first, and `content-length` is written by the peer, so neither can
- * bound anything.
- */
 async function readCapped(body: ReadableStream<Uint8Array>, budget: { bytes: number }): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -256,7 +207,6 @@ async function readCapped(body: ReadableStream<Uint8Array>, budget: { bytes: num
   return Buffer.concat(chunks);
 }
 
-/** Gunzip with a bounded output — a 4 MB archive of zeros expands to gigabytes otherwise. */
 function decode(bytes: Buffer, url: URL): string {
   const gzipped = url.pathname.endsWith('.gz') || (bytes[0] === 0x1f && bytes[1] === 0x8b);
   if (!gzipped) return bytes.toString('utf8');
@@ -289,7 +239,6 @@ function decodeEntities(value: string): string {
     .replace(/&#39;/g, "'");
 }
 
-/** Paths of the URLs that belong to the seed origin, deduped and in document order. */
 function pathsOf(urls: string[], seed: Seed): string[] {
   const seen = new Set<string>();
   const paths: string[] = [];
@@ -302,17 +251,11 @@ function pathsOf(urls: string[], seed: Seed): string[] {
       seen.add(path);
       paths.push(path);
     } catch {
-      // A malformed <loc> is not worth a log line at sitemap scale.
     }
   }
   return paths;
 }
 
-/**
- * Collapse paths into shapes: `/docs/intro`, `/docs/setup`, `/docs/api` → `/docs/{n}` × 3.
- * This is the part a crawl cannot produce — the size and structure of everything it will not
- * have time to visit.
- */
 function patternsOf(paths: string[]): { pattern: string; count: number; example: string }[] {
   const groups = new Map<string, { count: number; example: string }>();
   for (const path of paths) {
@@ -338,13 +281,12 @@ function placeholder(segment: string): string {
   return '{slug}';
 }
 
-/** RFC1918, loopback, link-local (incl. cloud metadata at 169.254.169.254), CGNAT and IPv6 equivalents. */
 export function isPrivateAddress(address: string): boolean {
   if (isIP(address) === 6) {
     const lower = address.toLowerCase();
     if (lower === '::1' || lower === '::') return true;
-    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique-local
-    if (lower.startsWith('fe80')) return true; // link-local
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+    if (lower.startsWith('fe80')) return true;
     const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
     return mapped ? isPrivateAddress(mapped[1]) : false;
   }
@@ -354,7 +296,7 @@ export function isPrivateAddress(address: string): boolean {
   if (a === 10 || a === 127 || a === 0) return true;
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
-  if (a === 169 && b === 254) return true; // link-local, and the cloud metadata endpoint
-  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-  return a >= 224; // multicast and reserved
+  if (a === 169 && b === 254) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  return a >= 224;
 }

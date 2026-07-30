@@ -15,11 +15,6 @@ export type Navigation =
   | { kind: 'url'; href: string }
   | { kind: 'history'; action: 'back' | 'forward' | 'reload' };
 
-/**
- * Validate a navigate request. Shared so the in-page action and the background worker's
- * tab-level path agree on what is allowed; `base` resolves relative URLs and is only
- * available in the page, so callers without one must pass an absolute URL.
- */
 export function resolveNavigation({ url, action }: NavigateInput, base?: string): Navigation {
   if (!url === !action) {
     throw new ActionError('Provide either "url" or "action"', 'INVALID_INPUT');
@@ -51,7 +46,6 @@ export const navigate = defineAction({
   execute(request) {
     const plan = resolveNavigation(request, location.href);
     if (plan.kind === 'url') {
-      // The page unloads on navigation, so the caller may never receive this response.
       location.assign(plan.href);
       return { navigatingTo: plan.href };
     }

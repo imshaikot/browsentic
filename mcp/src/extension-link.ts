@@ -11,7 +11,6 @@ import {
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import { log } from './log';
 
-/** Chrome kills an idle MV3 worker after 30s; socket traffic resets that timer. */
 const PING_INTERVAL_MS = 20_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DESCRIBE_TIMEOUT_MS = 10_000;
@@ -21,7 +20,6 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
-/** One live connection to the extension's service worker. */
 export class ExtensionLink {
   readonly extensionVersion: string;
   readonly manifestHash: string;
@@ -34,7 +32,6 @@ export class ExtensionLink {
     private readonly socket: WebSocket,
     hello: { extensionVersion: string; manifestHash: string; origin: string },
     private readonly onClose: (link: ExtensionLink) => void,
-    /** Extension-initiated frames — the agent harness. Absent means "ignore them". */
     private readonly onRequest?: (request: ExtensionRequest, link: ExtensionLink) => void,
   ) {
     this.extensionVersion = hello.extensionVersion;
@@ -75,7 +72,6 @@ export class ExtensionLink {
     try {
       this.socket.close(1000, reason);
     } catch {
-      // Already gone.
     }
   }
 
@@ -98,8 +94,6 @@ export class ExtensionLink {
     if (!frame) return log('dropped unparseable frame from extension');
     if (frame.t === 'ping') return this.send({ t: 'pong', id: frame.id });
     if (frame.t === 'pong') return;
-    // Requests, not replies: their ids name an agent run, so they must not be matched
-    // against `pending`, which only tracks invocations the daemon itself started.
     if (isExtensionRequest(frame)) return this.onRequest?.(frame, this);
 
     const id = 'id' in frame ? frame.id : undefined;
@@ -124,11 +118,6 @@ export class ExtensionLink {
   }
 }
 
-/**
- * `page.screenshot` scrolls and captures the tab tile by tile, so its worst case (bounded by the
- * background's tile cap) far exceeds a single action's budget; give it a generous fixed window.
- * Actions that wait (only `page.waitForElement` today) declare their own `timeoutMs`.
- */
 const SCREENSHOT_TIMEOUT_MS = 120_000;
 
 function timeoutFor(action: string, input: unknown): number {

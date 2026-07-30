@@ -27,18 +27,12 @@ import { fetchSiteIndex, type SiteIndex } from './sitemap';
 import { loadSkills, routeSkill, skillDirNames, type Skill } from './skills';
 
 export interface AgentSessionDeps {
-  /**
-   * The daemon's own invoke path, so the agent reaches the browser exactly as MCP clients do.
-   * `opts.saveTo` is how a mapping run's screenshots are placed by the daemon rather than named
-   * by the model; `opts.tabId` pins a long autonomous run to the tab it started in.
-   */
   invoke: (
     action: string,
     input?: unknown,
     opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
   ) => Promise<ActionResult>;
   emit: (runId: string, event: RunEvent) => void;
-  /** A staged site map awaiting review. Separate from run events: it outlives the run. */
   draft: (runId: string, draft: import('@/lib/skills/site-map').SiteMapDraft) => void;
 }
 
@@ -46,20 +40,11 @@ interface ActiveRun {
   id: string;
   config: AgentConfig;
   abort: AbortController;
-  /** Approvals the run is blocked on, keyed by tool-use id. */
   pending: Map<string, (allow: boolean) => void>;
-  /** Present only while this run is mapping a site. */
   map?: MapRun;
 }
 
-/**
- * One browser's agent state: the Claude Code session its conversation lives in and the run it
- * is in the middle of. Created when an extension connects and dropped when it disconnects, so
- * a reconnecting browser starts clean rather than resuming a conversation about a page that
- * has moved on.
- */
 export class AgentSession {
-  /** The `claude --resume` id. Null until a run establishes it; null again after `reset`. */
   private claudeSession: string | null = null;
   private active: ActiveRun | null = null;
 
@@ -83,23 +68,15 @@ export class AgentSession {
     }
   }
 
-  /**
-   * A browser invocation made on behalf of a run — the spawned Claude Code tags its tool calls
-   * with the run id from its environment, and the daemon routes them here. This is where the
-   * timeline learns about tool calls, and where gated actions stop until the user decides.
-   */
   async invokeForRun(runId: string, action: string, input?: unknown): Promise<ActionResult> {
     const run = this.active;
     if (!run || run.id !== runId) {
-      // A cancelled or superseded agent does not get to keep driving the browser.
       return failure('RUN_INACTIVE', 'This agent run is no longer active');
     }
     const emit = (event: RunEvent) => this.deps.emit(runId, event);
     const toolId = randomUUID();
     emit({ kind: 'tool', toolId, action, input });
 
-    // The reserved write action exists only for a mapping run. An ordinary run reaching it means
-    // something is wrong with the tool list, not that it should be honoured.
     if (action === SAVE_SITE_MAP_ACTION) {
       if (!run.map) {
         emit({ kind: 'toolResult', toolId, ok: false, summary: 'not a mapping run' });
@@ -141,7 +118,6 @@ export class AgentSession {
     return result;
   }
 
-  /** Called when the browser goes away mid-run, so nothing is left waiting on a dead socket. */
   dispose(): void {
     if (this.active) this.cancel(this.active.id);
     this.claudeSession = null;
@@ -170,10 +146,6 @@ export class AgentSession {
     }
 
     const config = readAgentConfig();
-    // Mapping mode turns on the run's *identity*, never on front matter: `~/.voicelink/skills`
-    // is parsed with no key allowlist, so a skill that could name its own privileges would be
-    // granting them to itself. A hand-authored shadow of this name is `source: 'user'` and gets
-    // an ordinary, fully locked-down run.
     const mapping = routed.base.name === SITE_MAPPER_SKILL && routed.base.source === 'bundled';
     if (mapping && !explicitlyAsked(text)) {
       return emit({
@@ -204,10 +176,6 @@ export class AgentSession {
       return emit({ kind: 'error', code: 'AGENT_FAILED', message: String(error) });
     }
 
-    // Preparing a mapping run fetches the site's sitemap over the network, which takes seconds —
-    // easily long enough for the user to hit Stop first. `fetchSiteIndex` never throws (a site
-    // without a sitemap is the normal case), so the abort arrives as no signal at all, and without
-    // this check the crawl starts anyway on a run the user already stopped.
     if (run.abort.signal.aborted) {
       if (run.map) discardStaging(run.map.staging.id);
       if (this.active === run) this.active = null;
@@ -222,12 +190,6 @@ export class AgentSession {
     );
     emit({ kind: 'started', skill: routed.base.name, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
 
-    // A mapping run is a side quest, not part of the conversation: resuming it later would put
-    // the whole crawl transcript behind the user's next message.
-    //
-    // The extension's id wins over ours. It comes from the saved session record, so it is the one
-    // that survives this daemon being restarted or its socket replaced — both of which drop
-    // `claudeSession` (see `dispose`). Ours stays as the fallback for callers that send none.
     const supplied = mapping ? null : validSessionId(context?.claudeSessionId);
     const known = supplied ?? this.claudeSession;
     const resume = !mapping && known !== null;
@@ -246,14 +208,8 @@ export class AgentSession {
         signal: run.abort.signal,
         emit,
       });
-      // Only a session Claude Code actually created can be resumed by the next instruction.
       if (outcome.established) this.claudeSession = sessionId;
-      // Told to the extension before `done`, so it lands while the run it belongs to is still the
-      // one on screen. A mapping run is excluded for the same reason it never resumes.
       if (!mapping) {
-        // `established` false after a resume attempt says exactly one thing: Claude Code does not
-        // have that session. Null tells the extension to drop the stored id instead of retrying it
-        // on every instruction from here on.
         if (outcome.established) emit({ kind: 'session', claudeSessionId: sessionId });
         else if (supplied) emit({ kind: 'session', claudeSessionId: null });
       }
@@ -265,22 +221,11 @@ export class AgentSession {
       emit({ kind: 'error', code, message });
     } finally {
       clearTimeout(budget);
-      // A mapping run that never submitted leaves nothing behind: an empty quarantine directory
-      // would otherwise sit there until the next sweep looking like a map that failed to appear.
       if (run.map && !run.map.submitted) discardStaging(run.map.staging.id);
-      // Only clear if this run is still the current one; a cancel may already have moved on.
       if (this.active === run) this.active = null;
     }
   }
 
-  /**
-   * Everything a mapping run needs before Claude Code starts: a target it is allowed to map, a
-   * quarantine directory to write into, and the two phases that do not need a browser.
-   *
-   * Phase A (the sitemap) is plain Node, and Phase B (public background) is the run's own web
-   * tools. Both feed the prompt as *fetched data* rather than as the user speaking — see
-   * `buildSystemPrompt`'s third argument.
-   */
   private async prepareMapping(
     run: ActiveRun,
     skill: Skill,
@@ -309,7 +254,6 @@ export class AgentSession {
     try {
       index = await fetchSiteIndex(target.target.origin, run.abort.signal);
     } catch (error) {
-      // A sitemap is a nice-to-have; a site without one still gets mapped by walking it.
       log('sitemap phase failed', error);
       index = { source: 'none', documents: 0, urlCount: 0, truncated: false, paths: [], patterns: [], raw: '' };
     }
@@ -333,16 +277,10 @@ export class AgentSession {
       submitted: false,
     };
 
-    // No attachments block: a mapping run reads one site and writes one report. Files it cannot
-    // use are prompt it does not need, and `page.attachFile` is refused by the read-only gate.
     const built = buildSystemPrompt(skill, [], { fetched: fetchedBlock(target.target.origin, index) });
     return { built, instruction: mappingBrief(target.target.host, settings) };
   }
 
-  /**
-   * The agent's one persistence channel. The report is typed, every leaf is scrubbed and capped,
-   * and the daemon renders the document itself — the model fills slots, it never writes a file.
-   */
   private submitSiteMap(run: ActiveRun, input: unknown): ActionResult {
     const map = run.map!;
     if (map.submitted) return failure('ALREADY_SUBMITTED', 'This run has already written its map.');
@@ -377,31 +315,16 @@ export class AgentSession {
     });
   }
 
-  /**
-   * Stop the named run. Dropping `active` here rather than waiting for `start()`'s `finally` is
-   * what makes the cancellation authoritative: that `finally` does not run until the child
-   * process closes, and a child can outlive its abort (it gets SIGTERM, then SIGKILL 5s later, and
-   * a hung one longer still). Until `active` is cleared, `invokeForRun` keeps matching this run
-   * and honouring its tool calls — a cancelled agent going on driving the user's tab, which is the
-   * one invariant this class exists to hold.
-   */
   private cancel(runId: string): void {
     if (!this.active || this.active.id !== runId) {
-      // Nothing here to stop, so nothing would otherwise emit — and the extension is waiting for
-      // an answer before it will let the user do anything else. Answering only the id that was
-      // asked about is what keeps a late cancel from ending a run that started after it.
       log(`cancel for run ${runId}, which is not the active run`);
       this.deps.emit(runId, { kind: 'done', stopReason: 'cancelled' });
       return;
     }
-    // Release anything blocked on approval first — an aborted run would otherwise leave a
-    // tool call awaiting a promise that can never settle.
     const cancelled = this.active;
     for (const [, settle] of cancelled.pending) settle(false);
     cancelled.pending.clear();
     cancelled.abort.abort();
-    // `start()`'s finally already guards with `this.active === run`, so releasing the slot early
-    // is safe; it also lets the next instruction through without waiting for the child to die.
     this.active = null;
     log(`agent run ${runId} cancelled`);
   }
@@ -419,24 +342,12 @@ export class AgentSession {
   }
 }
 
-/**
- * Mapping must be asked for, never inferred. Trigger scoring is `haystack.includes(...)`, and the
- * side panel listens continuously and auto-sends after a pause — so a phrase like "show me the
- * site map" spoken near the laptop would otherwise start a ten-minute crawl that screenshots
- * whatever is on screen.
- */
 function explicitlyAsked(text: string): boolean {
   return /^@site-mapper\b/i.test(text.trim());
 }
 
-/** Total budget for the attached-file block, so a big library cannot crowd out the skill. */
 const MAX_FILES_BLOCK = 8 * 1024;
 
-/**
- * The attached-file library as prompt text. The extension already capped the count and each
- * digest; this caps the assembled whole, and drops entire files rather than cutting one off
- * mid-sentence into something that reads like a directive.
- */
 function filesBlock(files: AttachedFile[] | undefined): string | undefined {
   if (!files?.length) return undefined;
   const sections: string[] = [];
@@ -468,23 +379,14 @@ function filesBlock(files: AttachedFile[] | undefined): string | undefined {
   return sections.join('\n\n');
 }
 
-/** A name or summary is one line. A newline in it could otherwise fake a heading of its own. */
 const flatten = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * The session id the extension asked us to resume, or null if it is not one we would have issued.
- *
- * `spawn` takes an argv array, so there is no shell here to inject into — but this value is read
- * back out of browser storage and handed to `claude --resume`, and every other value that crosses
- * that boundary is checked rather than assumed.
- */
 function validSessionId(id: string | undefined): string | null {
   return typeof id === 'string' && UUID.test(id) ? id : null;
 }
 
-/** The sitemap findings, as data the run was handed rather than as anything anyone said. */
 function fetchedBlock(origin: string, index: SiteIndex): string {
   if (!index.urlCount) return `No sitemap is published at ${origin}. Discover the site by walking its own links.`;
   const lines = [
@@ -512,11 +414,9 @@ function mappingBrief(host: string, settings: { maxPages: number; maxScreenshots
 
 const SUMMARY_LIMIT = 80;
 
-/** A one-line "what just happened" for the timeline — the detail, not the action name. */
 function summarize(input: unknown, result: ActionResult): string {
   if (!result.ok) return clip(`${result.error.code}: ${result.error.message}`);
 
-  // A screenshot's data is an image; describe it rather than dumping the base64 or the target.
   const shot = result.data as { dataUrl?: unknown; width?: unknown; height?: unknown; savedTo?: unknown } | null;
   if (shot && typeof shot.dataUrl === 'string') {
     const saved = typeof shot.savedTo === 'string' ? ` → ${shot.savedTo.split('/').pop()}` : '';

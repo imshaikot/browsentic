@@ -20,7 +20,6 @@ export const focusInput = defineAction({
         el.select();
       } else {
         const position = caret === 'start' ? 0 : el.value.length;
-        // Some input types (email, number) throw on setSelectionRange.
         try {
           el.setSelectionRange(position, position);
         } catch {}

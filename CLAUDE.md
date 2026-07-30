@@ -141,7 +141,7 @@ One module per action: `lib/actions/page/<name>.ts` exporting `defineAction({ na
 - **Return a small JSON-serializable result** (usually `describeElement(el)`). It crosses `sendMessage`, so never put a DOM node in it — read form attributes with `getAttribute('action')`, since a control named `action`/`method` shadows the IDL property with an element.
 - **Write to inputs through the native prototype setter** (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, next)`) then dispatch `input`/`change`. React/Vue ignore direct `.value` writes on controlled inputs. See `fill-input.ts`, `press-key.ts`, `select-option.ts`.
 - **Synthetic events perform no default action.** Dispatched keys don't insert text or submit forms, so actions emulate that explicitly — and honor cancellation by checking `dispatchEvent()`'s return value before emulating.
-- Keep comments to genuine DOM quirks only; the layer is deliberately low-noise.
+- The codebase carries no code comments. Everything load-bearing is documented here or in the relevant `SKILL.md` instead, so rules stay in one findable place rather than scattered inline.
 
 ## AI integration points
 

@@ -13,9 +13,6 @@ import { cn } from '@/lib/utils';
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
-  // A popup is torn down the moment it loses focus, so it can't hold the panel's always-on
-  // listening. Here the mic is press-to-talk: tap to listen, and a captured phrase dispatches
-  // and hands off to the side panel, where the run is actually watched.
   const [micOn, setMicOn] = useState(false);
 
   const connected = daemon?.connected ?? false;
@@ -44,7 +41,6 @@ export default function App() {
 
   function toggleMic() {
     if (!voice.supported) return;
-    // A standing mic error means the last attempt was blocked; tapping now (a gesture) retries.
     if (micOn && voice.error) {
       voice.retry();
       return;

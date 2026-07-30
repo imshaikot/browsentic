@@ -3,13 +3,6 @@ import { Badge } from '@/components/ui/badge';
 import { isNaming, type StoredSessionMeta } from '@/lib/bridge/session-store';
 import { cn } from '@/lib/utils';
 
-/**
- * The session library, shown in place of the chat. Rows are conversations, newest first; picking one
- * reopens it — its messages, the agent's memory of it, and the page it was left on.
- *
- * Titles are model-written, so they are rendered as text and never through `Markdown`: this is a
- * list, not the transcript, and a name is not a place markup should be able to appear.
- */
 export function SessionList({
   sessions,
   currentId,
@@ -18,9 +11,7 @@ export function SessionList({
   onRemove,
 }: {
   sessions: StoredSessionMeta[];
-  /** The conversation on screen, so reopening it is not offered as if it were somewhere else. */
   currentId?: string;
-  /** A run is in flight, so reopening anything is refused — say so rather than ignoring the click. */
   busy?: boolean;
   onOpen: (sessionId: string) => void;
   onRemove: (sessionId: string) => void;
@@ -127,7 +118,6 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** Coarse and relative: on a row this narrow, "3h ago" reads faster than a timestamp. */
 function formatWhen(at: number): string {
   const ago = Date.now() - at;
   if (ago < MINUTE) return 'just now';

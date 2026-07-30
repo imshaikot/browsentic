@@ -23,12 +23,10 @@ import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
 import { cn } from '@/lib/utils';
 
-/** Files larger than this are refused before storing — the daemon rejects them anyway. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export default function App() {
   const daemon = useDaemonState();
-  // The panel is the surface that owns a conversation, so it is the one that saves it.
   const run = useRun({ persist: true });
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -44,8 +42,6 @@ export default function App() {
   const connected = daemon?.connected ?? false;
 
   const voice = useVoiceComposer({
-    // Audio by default: listen whenever the switch is on and there is nothing else to wait on.
-    // Pause while a run works — the daemon takes one instruction at a time — then resume.
     active: voiceEnabled && connected && !run.running,
     onSubmit: (text) => run.send(text),
   });
@@ -56,8 +52,6 @@ export default function App() {
 
   function handleSend() {
     if (run.running || !connected) return;
-    // Sending while the history is open would leave the composer talking to a view that is not the
-    // conversation it is writing into.
     setHistoryOpen(false);
     voice.submitNow();
   }
@@ -67,11 +61,6 @@ export default function App() {
     void run.restore(sessionId);
   }
 
-  /**
-   * Clicking the composer's padding lands in the input, the way it would if this were one control
-   * rather than a box with a textarea in it — but not when the click was meant for a button
-   * sitting inside that box. The textarea is focusable on its own, so this adds no keyboard path.
-   */
   function focusComposer(event: MouseEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).closest('button, textarea')) return;
     composerRef.current?.focus();
@@ -88,12 +77,10 @@ export default function App() {
     voice.setInput(`${voice.input ? `${voice.input}\n\n` : ''}[Page: ${doc.title} — ${doc.url}${snippet}]\n`);
   }
 
-  // Store the picked file and hand it to the background, which sends it to the daemon to
-  // summarize and writes the result back to the file index (see file-store.ts / background.ts).
   async function onPickFile() {
     const input = fileInputRef.current;
     const file = input?.files?.[0];
-    if (input) input.value = ''; // let the same file be picked again later
+    if (input) input.value = '';
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) {
       setAttachError(`"${file.name}" is larger than ${MAX_FILE_BYTES / 1024 / 1024} MB.`);
@@ -121,7 +108,6 @@ export default function App() {
       setVoiceEnabled(true);
       return;
     }
-    // On when a mic error is standing: this click is a gesture, so retry the prompt, don't mute.
     if (voice.error) {
       voice.retry();
       return;
@@ -208,12 +194,6 @@ export default function App() {
         <FilesList files={files} onRemove={(id) => void removeFile(id)} />
         <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} connected={connected} />
 
-        {/*
-          One composer, not an input beside a toolbar: the container carries the border and the
-          focus ring, the textarea inside it is transparent and full width, and the buttons sit on
-          their own row within the same box. `has-[textarea:focus]` rather than `focus-within`, so
-          tabbing to one of those buttons doesn't ring the whole thing.
-        */}
         <div
           onClick={focusComposer}
           className={cn(
@@ -235,10 +215,6 @@ export default function App() {
             placeholder={connected ? 'Speak, or type what to do on this page…' : 'Pair the browser to get started'}
             disabled={!connected}
             rows={2}
-            // The container owns the frame now, so every part of it is turned off here. `text-sm`
-            // is not only smaller: the base is `text-base md:text-sm`, and this panel is never wide
-            // enough for `md`, so the input was rendering at 16px while every message that came out
-            // of it rendered at 14px. `min-h-16` is the resting height, ~3 lines at this size.
             className="max-h-48 min-h-16 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
 
@@ -320,7 +296,6 @@ export default function App() {
   );
 }
 
-/** The strip above the composer: mic errors, the live transcript, and the auto-send countdown. */
 function VoiceStatus({
   voice,
   voiceEnabled,
@@ -378,7 +353,6 @@ function VoiceStatus({
   return null;
 }
 
-/** The stored-file repository: each file with its size and the daemon's summary or status. */
 function FilesList({ files, onRemove }: { files: StoredFileMeta[]; onRemove: (id: string) => void }) {
   if (files.length === 0) return null;
   return (
@@ -420,7 +394,6 @@ function FilesList({ files, onRemove }: { files: StoredFileMeta[]; onRemove: (id
   );
 }
 
-/** Read a File as raw base64 (no `data:` prefix), the encoding the store and daemon expect. */
 function readAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

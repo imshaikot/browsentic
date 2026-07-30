@@ -18,14 +18,6 @@ import {
 } from '@/lib/skills/format';
 import { cn } from '@/lib/utils';
 
-/**
- * The library of skills the user has uploaded. A skill is markdown the agent is given as part
- * of its system prompt; a site-exploration one carries the domains it applies to and engages
- * only on those, which is what makes it safe to keep several around at once.
- *
- * Uploads live in `storage.local` and are pushed to the daemon, which writes them into its
- * skills directory — nothing here ever reaches the repo.
- */
 export function SkillsPanel({
   tabUrl,
   connected,
@@ -34,9 +26,7 @@ export function SkillsPanel({
 }: {
   tabUrl: string;
   connected: boolean;
-  /** Start a mapping run for the current tab. Absent when the surface cannot host one. */
   onMapSite?: () => void;
-  /** True while any run is active — one at a time, and a crawl takes minutes. */
   mapping?: boolean;
 }) {
   const skills = useStoredSkills();
@@ -54,9 +44,8 @@ export function SkillsPanel({
   async function onPickFile() {
     const input = fileInputRef.current;
     const file = input?.files?.[0];
-    if (input) input.value = ''; // let the same file be picked again later
+    if (input) input.value = '';
     if (!file) return;
-    // Markdown is text — read it as text, and let the form fill in whatever the file omits.
     const parsed = draftFromFile(await file.text(), file.name);
     setDraft(parsed);
     setDomainText(parsed.domains.join(', '));
@@ -102,7 +91,6 @@ export function SkillsPanel({
                 className="h-6 px-2 text-xs"
                 onClick={onMapSite}
                 disabled={!mappable}
-                // Naming the host makes the consent unambiguous: this drives that site for minutes.
                 title={mappable ? `Map ${host}` : 'Open an http(s) page, with no run in progress'}
               >
                 <Compass className="size-3" /> {alreadyMapped ? 'Re-map' : 'Map'} {host || 'site'}
@@ -150,7 +138,6 @@ export function SkillsPanel({
   );
 }
 
-/** Everything the daemon needs, prefilled from the file's own front matter where it had any. */
 function SkillForm({
   draft,
   domainText,
@@ -260,7 +247,6 @@ function SkillList({ skills, host }: { skills: StoredSkillMeta[]; host: string }
 }
 
 function SkillRow({ skill, host }: { skill: StoredSkillMeta; host: string }) {
-  // The one thing worth knowing at a glance: is this skill in play on the tab I am looking at?
   const activeHere = skill.category === 'site-exploration' && hostMatchesDomains(host, skill.domains);
   const generated = skill.origin === 'generated';
   const Icon = generated ? Compass : BookOpen;

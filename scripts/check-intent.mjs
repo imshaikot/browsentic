@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-/**
- * Run the local intent funnel (`lib/intent/`) over a table of utterances and check each one
- * routes where it should. This is where ACT_THRESHOLD is tuned: the summary prints the
- * margin on both sides of it, so raising or lowering it is an evidence-backed edit.
- *
- * The funnel is pure TypeScript with no DOM and no `browser.*`, so it can be bundled and run
- * in plain Node — which also proves the module stays free of extension-only imports.
- *
- * Usage: yarn intent:check ["an utterance to route"]
- */
 import { build } from 'esbuild';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -16,13 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/**
- * Each case is `[utterance, 'act:<ruleId>' | 'escalate:<reason>', expectedInput?]`.
- * Cases exist for the decisions worth defending, in both directions — a grammar that only
- * proves what it catches is half-checked.
- */
 const CASES = [
-  // ── History ────────────────────────────────────────────────────────────────
   ['back', 'act:history.back', { action: 'back' }],
   ['go back', 'act:history.back'],
   ['Hey VoiceLink, could you go back please?', 'act:history.back'],
@@ -32,7 +16,6 @@ const CASES = [
   ['refresh the page', 'act:history.reload'],
   ['reload this page.', 'act:history.reload'],
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
   ['go to github.com', 'act:navigate.url', { url: 'https://github.com' }],
   ['open github dot com', 'act:navigate.url', { url: 'https://github.com' }],
   ['visit https://example.com/docs', 'act:navigate.url', { url: 'https://example.com/docs' }],
@@ -44,7 +27,6 @@ const CASES = [
   ['google best noise cancelling headphones', 'act:navigate.search'],
   ['search the web for tide times', 'act:navigate.search'],
 
-  // ── Scrolling ──────────────────────────────────────────────────────────────
   ['scroll down', 'act:scroll.direction', { direction: 'down' }],
   ['scroll down a bit', 'act:scroll.direction'],
   ['can you scroll down?', 'act:scroll.direction'],
@@ -54,20 +36,17 @@ const CASES = [
   ['page down', 'act:scroll.page', { direction: 'down' }],
   ['scroll to the reviews', 'act:scroll.element', { target: { text: 'reviews' } }],
 
-  // ── Keys ───────────────────────────────────────────────────────────────────
   ['press enter', 'act:key.press', { key: 'Enter' }],
   ['hit escape', 'act:key.press', { key: 'Escape' }],
   ['press the tab key', 'act:key.press', { key: 'Tab' }],
   ['press arrow down', 'act:key.press', { key: 'ArrowDown' }],
 
-  // ── Clicks ─────────────────────────────────────────────────────────────────
   ['click sign in', 'act:click.text', { target: { text: 'sign in' } }],
   ['Click the Sign In button', 'act:click.text', { target: { text: 'sign in', role: 'button' } }],
   ['tap continue', 'act:click.text'],
   ['click on next', 'act:click.text'],
   ['click terms and conditions', 'act:click.text', { target: { text: 'terms and conditions' } }],
 
-  // ── Questions and reading: only the agent can answer ───────────────────────
   ['what is on this page', 'escalate:question'],
   ['summarize this article', 'escalate:question'],
   ['is there a login button?', 'escalate:question'],
@@ -75,22 +54,18 @@ const CASES = [
   ['read me the reviews', 'escalate:question'],
   ['find the cheapest flight', 'escalate:question'],
 
-  // ── More than one step ─────────────────────────────────────────────────────
   ['click sign in and then fill in my email', 'escalate:multi-step'],
   ['scroll down and tell me what it says', 'escalate:no-match'],
   ['press the red button and then wait', 'escalate:multi-step'],
 
-  // ── Conditions need the page to be looked at ───────────────────────────────
   ['click sign in if you see it', 'escalate:conditional'],
   ['reload the page unless it already loaded', 'escalate:conditional'],
 
-  // ── Consequential: the agent's approval gate should see these ──────────────
   ['click buy now', 'escalate:consequential'],
   ['click the submit button', 'escalate:consequential'],
   ['click send', 'escalate:consequential'],
   ['click delete', 'escalate:consequential'],
 
-  // ── Understood shape, unusable slot ────────────────────────────────────────
   ['click it', 'escalate:below-threshold'],
   ['click the blue one at the bottom of the sidebar', 'escalate:below-threshold'],
   ['open the settings menu', 'escalate:no-match'],
@@ -102,7 +77,6 @@ const CASES = [
   ['', 'escalate:no-match'],
   ['hey voicelink', 'escalate:no-match'],
 
-  // ── Explicit skill routing always reaches the agent ────────────────────────
   ['@shopping go to amazon.com', 'escalate:skill-prefix'],
 ];
 
@@ -115,7 +89,6 @@ await build({
   format: 'esm',
   platform: 'node',
   logLevel: 'warning',
-  // The same `@/*` → repo root alias the extension build and the MCP daemon use.
   alias: { '@': root },
 });
 
@@ -140,8 +113,6 @@ for (const [say, expected, expectedInput] of CASES) {
     expectedInput && JSON.stringify(routing.intent?.input) !== JSON.stringify(expectedInput);
 
   if (routing.decision === 'act') lowestAct = Math.min(lowestAct, routing.intent.score);
-  // Only the threshold's own verdicts bound it. A hard stop (a question, a consequential
-  // click) can score high and still escalate, and says nothing about where the line sits.
   else if (routing.reason === 'below-threshold') highestEscalate = Math.max(highestEscalate, routing.score);
 
   if (got !== expected || inputMismatch) {

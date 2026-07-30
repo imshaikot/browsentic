@@ -1,22 +1,15 @@
 import { ActionError } from './core';
 
-/** MCP tool names must match this; the dot in `page.clickElement` is not allowed. */
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
 
-/** `page.clickElement` → `page_clickElement`. */
 export function toolNameFor(actionName: string): string {
   return actionName.replaceAll('.', '_');
 }
 
-/** `page_clickElement` → `page.clickElement`. Only the first underscore is a namespace separator. */
 export function actionNameFor(toolName: string): string {
   return toolName.replace('_', '.');
 }
 
-/**
- * The mapping is only reversible while no action name segment contains an underscore.
- * Two actions could otherwise collapse onto one tool name, silently shadowing each other.
- */
 export function assertToolNamesRoundTrip(actionNames: Iterable<string>): void {
   const seen = new Map<string, string>();
   for (const actionName of actionNames) {

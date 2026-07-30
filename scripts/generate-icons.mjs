@@ -1,9 +1,3 @@
-// Generates the extension icons as raw PNGs with no image dependencies. Run: yarn icons
-//
-// The mark is the product in three parts: the tile itself is the *browser* (a lighter chrome
-// strip across the top with tab dots), the waveform below it is *voice*, and the two
-// interlocking rings threaded through the waveform are the *link*. Detail is dropped as the
-// canvas shrinks — see DETAIL below — because a 16px toolbar icon cannot hold three glyphs.
 import { deflateSync } from 'node:zlib';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -48,8 +42,8 @@ function png(size, pixelAt) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
   ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
+  ihdr[8] = 8;
+  ihdr[9] = 6;
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),
@@ -63,12 +57,10 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const VIOLET = [139, 92, 246];
 const INDIGO = [79, 70, 229];
 
-// Every measurement is a fraction of the icon's edge, so one layout drives all five sizes.
 const CORNER = 0.22;
-const STRIP_H = 0.26; // browser chrome: a lighter band across the top of the tile
+const STRIP_H = 0.26;
 const DOTS = { y: 0.135, r: 0.036, x: [0.135, 0.225, 0.315] };
-const CENTER_Y = 0.62; // middle of the content area below the strip
-// `half` is half the bar's total height, caps included.
+const CENTER_Y = 0.62;
 const BARS_FULL = [
   { x: 0.215, half: 0.07 },
   { x: 0.3, half: 0.14 },
@@ -80,22 +72,12 @@ const BARS_PLAIN = [
   { x: 0.5, half: 0.19 },
   { x: 0.68, half: 0.1 },
 ];
-// Two rings on the 45° diagonal — the orientation every link glyph uses. Side by side they
-// read as the letters "CO" instead; tilting them is what makes the pair say "chain". `off`
-// is each centre's distance from the middle along that diagonal, at 0.79×r so the strokes
-// cross: closer and the holes merge, further and it is two loose circles.
 const CHAIN = { off: 0.059, r: 0.075, halfW: 0.021 };
 
-// Below 48px the rings close up into a blob and the dots land on half a pixel, so both drop
-// out and the waveform widens to carry the icon alone. 16px keeps only the strip and bars.
 function detailFor(size) {
   return { rings: size >= 48, dots: size >= 32, barHalfW: size >= 48 ? 0.026 : 0.06 };
 }
 
-// At 16 and 32 a bar is one or two pixels wide, and a fractional centre splits it across two
-// columns at half coverage each — the bar washes out into the gradient instead of reading as
-// white. Snapping edges to the pixel grid is what keeps the toolbar icon crisp; the larger
-// sizes have the resolution to anti-alias smoothly and are left alone.
 const snapEdge = (v, on) => (on ? Math.round(v) : v);
 const snapMid = (v, on) => (on ? Math.floor(v) + 0.5 : v);
 
@@ -114,9 +96,8 @@ function makePixelFn(size) {
   const stripY = snapEdge(size * STRIP_H, snap);
   const ringR = size * CHAIN.r;
   const ringHalfW = size * CHAIN.halfW;
-  // The break that makes one ring read as passing behind the other; never below a pixel.
   const ringGap = Math.max(1, size * 0.014);
-  const ringOff = (size * CHAIN.off) / Math.SQRT2; // 45°, so the same offset on both axes
+  const ringOff = (size * CHAIN.off) / Math.SQRT2;
   const backX = size * 0.5 - ringOff;
   const backY = cy + ringOff;
   const frontX = size * 0.5 + ringOff;
@@ -125,7 +106,6 @@ function makePixelFn(size) {
   return (ix, iy) => {
     const x = ix + 0.5;
     const y = iy + 0.5;
-    // Rounded-rect coverage with ~1px anti-aliasing
     const dx = Math.max(corner - x, x - (size - corner), 0);
     const dy = Math.max(corner - y, y - (size - corner), 0);
     const bg = clamp(corner + 0.5 - Math.hypot(dx, dy), 0, 1);
@@ -136,7 +116,6 @@ function makePixelFn(size) {
     let g = lerp(VIOLET[1], INDIGO[1], t);
     let b = lerp(VIOLET[2], INDIGO[2], t);
 
-    // Browser: the chrome strip, then the tab dots once they have pixels to land on.
     let white = 0.18 * clamp(stripY + 0.5 - y, 0, 1);
     if (dots) {
       const dotR = snap ? Math.max(1, Math.round(DOTS.r * size)) : DOTS.r * size;
@@ -147,7 +126,6 @@ function makePixelFn(size) {
       }
     }
 
-    // Voice: the waveform.
     let ink = 0;
     for (const bar of bars) {
       const halfH = Math.max(snapEdge(bar.half * size, snap) - barHalfW, 0);
@@ -155,9 +133,6 @@ function makePixelFn(size) {
       ink = Math.max(ink, clamp(barHalfW + 0.5 - d, 0, 1));
     }
 
-    // Link: two rings threaded through the waveform. The back one is hidden by the whole
-    // front disc, not just where the strokes cross — clip only at the stroke and its far arc
-    // still shows through the front ring's hole, which reads as a smudge rather than a chain.
     if (rings) {
       const toFront = Math.hypot(x - frontX, y - frontY);
       const back = Math.abs(Math.hypot(x - backX, y - backY) - ringR);

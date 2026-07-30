@@ -17,13 +17,11 @@ export const submitForm = defineAction({
     if (!form) {
       throw new ActionError('No form found to submit', 'TARGET_NOT_FOUND');
     }
-    // requestSubmit runs validation and submit handlers; form.submit() bypasses both.
     if (typeof form.requestSubmit === 'function') {
       form.requestSubmit();
     } else {
       form.submit();
     }
-    // Read attributes, not the IDL props: a control named "action"/"method" shadows them with a DOM node.
     return {
       form: cssPath(form),
       action: form.getAttribute('action') || undefined,

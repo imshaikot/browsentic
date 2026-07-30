@@ -61,7 +61,6 @@ export function accessibleText(el: Element): string {
   const aria = el.getAttribute('aria-label')?.trim();
   if (aria) return aria;
   if (el instanceof HTMLInputElement) {
-    // Button-like inputs are named by their value, not a label or placeholder.
     if (el.type === 'submit' || el.type === 'button' || el.type === 'reset') {
       return el.value.trim() || el.type;
     }

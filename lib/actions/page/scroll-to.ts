@@ -34,7 +34,6 @@ export const scrollTo = defineAction({
       }[direction ?? 'down'];
       window.scrollTo({ top: destination, behavior });
     }
-    // Smooth scrolling is async; wait for it to settle so the returned position is the final one.
     if (behavior === 'smooth') await scrollSettled();
     return { scrollX: Math.round(window.scrollX), scrollY: Math.round(window.scrollY) };
   },

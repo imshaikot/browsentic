@@ -19,7 +19,6 @@ import { selectText } from './page/select-text';
 import { submitForm } from './page/submit-form';
 import { waitForElement } from './page/wait-for-element';
 
-/** Every capability the extension can perform against a page, keyed by name. */
 export const actions: ReadonlyMap<string, AnyAction> = new Map(
   (
     [
@@ -44,12 +43,10 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
   ).map((action) => [action.name, action]),
 );
 
-/** Serializable manifest of all actions — the source for MCP tool definitions. */
 export function describeActions(): ToolDescriptor[] {
   return [...actions.values()].map(({ name, description, input }) => ({
     name,
     description,
-    // io: 'input' describes what a caller must SEND: defaulted fields stay optional, matching dispatch.
     inputSchema: z.toJSONSchema(input, { io: 'input' }),
   }));
 }

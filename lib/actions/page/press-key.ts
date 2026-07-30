@@ -33,8 +33,6 @@ export const pressKey = defineAction({
       const start = el.selectionStart ?? el.value.length;
       const end = el.selectionEnd ?? el.value.length;
       const next = el.value.slice(0, start) + key + el.value.slice(end);
-      // Synthetic key events never insert text; write through the native value setter so
-      // framework-controlled inputs (e.g. React) observe the change.
       const proto = el instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
       Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, next);
       const caret = start + key.length;
@@ -44,7 +42,6 @@ export const pressKey = defineAction({
       el.dispatchEvent(new InputEvent('input', { bubbles: true, data: key, inputType: 'insertText' }));
     }
     el.dispatchEvent(new KeyboardEvent('keyup', init));
-    // Synthetic Enter performs no default action; emulate implicit form submission from a single input.
     if (key === 'Enter' && notPrevented && el instanceof HTMLInputElement) el.form?.requestSubmit();
     return { key, modifiers, receivedBy: describeElement(el) };
   },

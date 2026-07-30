@@ -6,17 +6,12 @@ import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSumma
 
 const REQUEST_TIMEOUT_MS = 60_000;
 
-/**
- * A `Bridge` backed by the daemon's control socket. Used by the stdio MCP process, which
- * owns no browser connection of its own — the daemon is the single owner.
- */
 export class RemoteBridge implements Bridge {
   private readonly pending = new Map<string, (message: ControlMessage) => void>();
   private readonly manifestListeners = new Set<() => void>();
 
   private constructor(
     private readonly socket: WebSocket,
-    /** Set when this process serves a spawned agent run; tags every invoke with the run id. */
     private readonly runId?: string,
   ) {
     socket.on('message', (raw) => this.receive(String(raw)));
@@ -24,7 +19,6 @@ export class RemoteBridge implements Bridge {
 
   static connect(port: number, token: string, runId?: string): Promise<RemoteBridge> {
     return new Promise((resolve, reject) => {
-      // No Origin header from Node, so the daemon classifies this as a control client.
       const socket = new WebSocket(`ws://127.0.0.1:${port}/control`, {
         headers: { authorization: `Bearer ${token}` },
       });

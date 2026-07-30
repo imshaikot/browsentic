@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { SESSIONS_INDEX_KEY, type StoredSessionMeta } from './session-store';
 
-/**
- * The saved-conversation index, kept live through `storage.local.onChanged` so the history list
- * re-renders as the current session grows and as the background worker writes each title back.
- */
 export function useStoredSessions(): StoredSessionMeta[] {
   const [sessions, setSessions] = useState<StoredSessionMeta[]>([]);
 

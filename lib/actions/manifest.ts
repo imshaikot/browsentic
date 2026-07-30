@@ -1,15 +1,9 @@
-/** One action as it crosses the wire and becomes an MCP tool. */
 export interface ToolDescriptor {
   name: string;
   description: string;
   inputSchema: unknown;
 }
 
-/**
- * Fingerprint a manifest so the daemon can spot an extension built from a different registry.
- * FNV-1a: sync and dependency-free, so the browser and Node agree without WebCrypto's async split.
- * Drift detection only — never a security boundary.
- */
 export function hashManifest(tools: readonly ToolDescriptor[]): string {
   let hash = 0x811c9dc5;
   const canonical = JSON.stringify(

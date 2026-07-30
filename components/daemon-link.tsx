@@ -8,10 +8,6 @@ import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { cn } from '@/lib/utils';
 
-/**
- * Pairing UI for the MCP daemon. The browser is controllable only after the user redeems a
- * code from `voicelink-mcp pair`, so this is the switch that turns the harness on.
- */
 export function DaemonLink() {
   const daemon = useDaemonState();
   const [code, setCode] = useState('');

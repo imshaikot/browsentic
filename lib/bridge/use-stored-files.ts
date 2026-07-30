@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { FILES_INDEX_KEY, type StoredFileMeta } from './file-store';
 
-/**
- * The stored-file index, kept live through `storage.local.onChanged` so it stays in sync across
- * extension pages and re-renders pending→ready as the background writes each file's summary back.
- */
 export function useStoredFiles(): StoredFileMeta[] {
   const [files, setFiles] = useState<StoredFileMeta[]>([]);
 
