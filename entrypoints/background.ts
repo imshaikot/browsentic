@@ -4,6 +4,7 @@ import { injectContentScript } from '@/lib/actions/client';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
+import { nameStoredSession } from '@/lib/bridge/session-store';
 import { serveRunPorts } from '@/lib/bridge/run-port';
 import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, onWelcome, pairDaemon } from '@/lib/bridge/socket';
 
@@ -44,6 +45,14 @@ export default defineBackground(() => {
       sendResponse(success(true));
       return;
     }
+    // Name a saved conversation. Same fire-and-forget shape again: the worker reads the transcript
+    // from storage and writes the title back to the session index, so the name arrives even if the
+    // panel that crossed the turn threshold has since been closed.
+    if (message.op === 'nameSession' && typeof message.sessionId === 'string') {
+      void nameStoredSession(message.sessionId);
+      sendResponse(success(true));
+      return;
+    }
     // Pairing is driven from the popup: the worker owns the socket, the UI just asks.
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
@@ -62,7 +71,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"pair"|"disconnect"}',
       ),
     );
     return;

@@ -41,7 +41,7 @@ let socket: WebSocket | null = null;
 let attempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let runListener: ((runId: string, event: RunEvent) => void) | null = null;
-let welcomeListener: (() => void) | null = null;
+const welcomeListeners = new Set<() => void>();
 let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
 
 /** Register the sink for a staged site map awaiting review. The background worker owns it. */
@@ -56,11 +56,13 @@ export function onRunEvent(listener: (runId: string, event: RunEvent) => void): 
 
 /**
  * Called on every accepted connection, so the worker can push anything that queued up while
- * the daemon was away. A listener rather than a direct call because the things that need to
- * re-sync already import from this module, and the arrow has to stay one-way.
+ * the daemon was away — and so anything that assumed daemon state can reconcile, since a fresh
+ * `welcome` means the daemon dropped whatever it was holding for the previous connection.
+ * Listeners rather than direct calls because the things that need this already import from
+ * here, and the arrow has to stay one-way.
  */
 export function onWelcome(listener: () => void): void {
-  welcomeListener = listener;
+  welcomeListeners.add(listener);
 }
 
 /**
@@ -76,7 +78,10 @@ export function sendInstruction(text: string, context?: RunContext): string | nu
 /** Reply must arrive before this, or the caller gets a TIMEOUT. Longer than the daemon's own. */
 const ANALYZE_TIMEOUT_MS = 90_000;
 
-const pendingAnalyses = new Map<string, (result: ActionResult<{ summary: string }>) => void>();
+/** What the daemon sends back for an attached file: the panel's line, and the run's extract. */
+type FileNotes = { summary: string; digest?: string };
+
+const pendingAnalyses = new Map<string, (result: ActionResult<FileNotes>) => void>();
 
 /**
  * Send a file to the daemon for one-shot summarization and resolve with its summary. The
@@ -88,7 +93,7 @@ export function analyzeFile(file: {
   mime: string;
   size: number;
   content: string;
-}): Promise<ActionResult<{ summary: string }>> {
+}): Promise<ActionResult<FileNotes>> {
   const id = crypto.randomUUID();
   if (!post({ t: 'analyzeFile', id, ...file })) {
     return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
@@ -99,6 +104,33 @@ export function analyzeFile(file: {
       resolve(failure('TIMEOUT', 'The daemon did not return a summary in time.'));
     }, ANALYZE_TIMEOUT_MS);
     pendingAnalyses.set(id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
+/** One short line from one small spawn. Generous enough for a cold start, short enough to give up on. */
+const TITLE_TIMEOUT_MS = 20_000;
+
+const pendingSessionNames = new Map<string, (result: ActionResult<{ title: string }>) => void>();
+
+/**
+ * Ask the daemon to name a conversation. Same correlate-by-id shape as `analyzeFile`, and the same
+ * failure-envelope-rather-than-hang contract: an unnamed session is a cosmetic loss, so nothing here
+ * is allowed to leave a caller waiting.
+ */
+export function nameSession(session: { host?: string; messages: string[] }): Promise<ActionResult<{ title: string }>> {
+  const id = crypto.randomUUID();
+  if (!post({ t: 'nameSession', id, ...session })) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingSessionNames.delete(id);
+      resolve(failure('TIMEOUT', 'The daemon did not return a name in time.'));
+    }, TITLE_TIMEOUT_MS);
+    pendingSessionNames.set(id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
@@ -155,8 +187,9 @@ function skillOp(
   });
 }
 
-export function cancelRun(id: string): void {
-  post({ t: 'cancel', id });
+/** False when there was no open socket to send it on, i.e. nothing received the cancellation. */
+export function cancelRun(id: string): boolean {
+  return post({ t: 'cancel', id });
 }
 
 export function sendDecision(id: string, toolId: string, allow: boolean): void {
@@ -307,7 +340,7 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
         lastChangeAt: Date.now(),
       });
       // The daemon is reachable again; anything that failed to reach it can go now.
-      welcomeListener?.();
+      for (const listener of welcomeListeners) listener();
       return;
 
     case 'describe':
@@ -332,6 +365,12 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
     case 'skillResult': {
       pendingSkillOps.get(frame.id)?.(frame.result);
       pendingSkillOps.delete(frame.id);
+      return;
+    }
+
+    case 'sessionName': {
+      pendingSessionNames.get(frame.id)?.(frame.result);
+      pendingSessionNames.delete(frame.id);
       return;
     }
 

@@ -28,8 +28,14 @@ export interface StoredFileMeta {
   mime: string;
   size: number;
   status: FileStatus;
-  /** Present once the daemon has summarized the file. */
+  /** Present once the daemon has summarized the file. The one line the panel shows. */
   summary?: string;
+  /**
+   * The longer extract of the file's contents, sent along as run context so the agent can answer
+   * questions about an attached file — there is no tool that reads one during a run. Kept in the
+   * index rather than beside the bytes: it is small, and every instruction needs it.
+   */
+  digest?: string;
   /** Present when analysis failed. */
   error?: string;
   addedAt: number;
@@ -102,7 +108,12 @@ export async function analyzeStoredFile(fileId: string): Promise<void> {
     content: bytes.content,
   });
   if (result.ok) {
-    await updateMeta(fileId, { status: 'ready', summary: result.data.summary, error: undefined });
+    await updateMeta(fileId, {
+      status: 'ready',
+      summary: result.data.summary,
+      digest: result.data.digest,
+      error: undefined,
+    });
   } else {
     await updateMeta(fileId, { status: 'error', error: `${result.error.code}: ${result.error.message}` });
   }
