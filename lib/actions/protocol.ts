@@ -6,7 +6,7 @@ export const ACTION_CHANNEL = 'voicelink/action';
 export const BRIDGE_CHANNEL = 'voicelink/bridge';
 
 /** Bumped whenever the socket frames below change shape incompatibly. */
-export const SOCKET_PROTOCOL_VERSION = 5;
+export const SOCKET_PROTOCOL_VERSION = 6;
 
 /** Loopback ports the daemon binds, in order; the extension probes the same list. */
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
@@ -30,7 +30,11 @@ export type BridgeRequest =
   // Push an uploaded skill to the daemon's skills directory, or take it back off. Same shape
   // as `analyzeFile`: the worker owns the socket, so it reads the body from storage itself.
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveSkill'; skillId: string }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string }
+  // Name a saved session. Same shape again: the worker reads the transcript from storage, runs the
+  // daemon round-trip, and writes the title back to the session index — so the name still lands if
+  // the panel that asked for it has since closed.
+  | { channel: typeof BRIDGE_CHANNEL; op: 'nameSession'; sessionId: string };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -54,6 +58,14 @@ export type RunEvent =
   /** The action needs the user's blessing before it runs; answer with a `decision` frame. */
   | { kind: 'approval'; toolId: string; action: string; input: unknown }
   | { kind: 'toolResult'; toolId: string; ok: boolean; summary: string }
+  /**
+   * Which Claude Code session this run's conversation ended up in, so the saved session can be
+   * resumed later. Not a row on the timeline — the panel records it and moves on.
+   *
+   * `null` means the id the extension supplied was refused: Claude Code no longer has that session,
+   * so the stored one is stale and must be dropped rather than retried forever.
+   */
+  | { kind: 'session'; claudeSessionId: string | null }
   | { kind: 'done'; stopReason: string }
   | { kind: 'error'; code: string; message: string };
 
@@ -68,18 +80,50 @@ export type RunEvent =
 export type SocketAuth = { pairingToken: string } | { sessionKey: string };
 
 /**
- * What the extension knows about the tab an instruction was typed against, used to decide
- * which site-exploration skills apply. The URL only: a page controls its own title, and
- * anything that reaches the system prompt has to be something a page cannot write.
+ * A file the user attached in the extension, as the agent gets to hear about it. Metadata and
+ * the notes VoiceLink made when the file was attached — never the bytes, which stay in extension
+ * storage and only move when `page.attachFile` puts them into a form.
+ *
+ * `summary` and `digest` were written by a model reading the file, so they are the file's own
+ * content restated: untrusted, and framed that way in the prompt.
+ */
+export interface AttachedFile {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  status: 'pending' | 'ready' | 'error';
+  summary?: string;
+  /** A longer extract of what is in the file, when one was produced. */
+  digest?: string;
+}
+
+/**
+ * What the extension knows about the instruction beyond its text. Nothing here may be something
+ * a page can write — which is why the tab contributes its URL and not, say, its title.
  */
 export interface RunContext {
-  url: string;
+  /** Absent when the instruction came from a surface with no tab to speak of. */
+  url?: string;
   /**
    * The tab the instruction was typed against. A mapping run pins itself to this, because it is
    * autonomous for minutes and every action would otherwise re-resolve "the active tab" —
    * following the user into whatever they switched to.
    */
   tabId?: number;
+  /**
+   * The files the user has attached. They travel with the instruction because a run has no tool
+   * that can read one: `page.listFiles` names them and `page.attachFile` uploads one, so without
+   * this the agent is told nothing about a file the user just attached and asked about.
+   */
+  files?: AttachedFile[];
+  /**
+   * The Claude Code session this conversation lives in, so a saved session reopened days later
+   * carries on rather than starting over. The extension owns it — it is read back from the session
+   * record in `storage.local`, which is also why it survives a daemon restart, unlike the daemon's
+   * own in-memory copy. Only ever an id the daemon confirmed via a `session` run event.
+   */
+  claudeSessionId?: string;
 }
 
 /**
@@ -122,7 +166,9 @@ export type SocketFrame =
   // answers with a `fileSummary` carrying the same `id`. `content` is base64. This runs
   // outside the agent conversation — no skill, no browser tools, no single-run lock.
   | { t: 'analyzeFile'; id: string; name: string; mime: string; size: number; content: string }
-  | { t: 'fileSummary'; id: string; result: ActionResult<{ summary: string }> }
+  // `digest` is the longer extract that later runs are given as context; `summary` is the line
+  // the panel shows. Absent digest just means the summarizer only produced the short form.
+  | { t: 'fileSummary'; id: string; result: ActionResult<{ summary: string; digest?: string }> }
   // An uploaded skill, on its way to the daemon's skills directory. Structured fields rather
   // than raw markdown: the daemon composes the front matter itself, so an upload can never
   // write a field it was not offered. Both answer with `skillResult` on the same `id`.
@@ -138,7 +184,12 @@ export type SocketFrame =
   // `exactHost` narrows `acme.com` to the exact host mapped. The domain list itself is never
   // sent: a caller-supplied array is a way to make a map fire on someone else's site.
   | { t: 'activateSiteMap'; id: string; stagingId: string; exactHost?: boolean }
-  | { t: 'discardSiteMap'; id: string; stagingId: string };
+  | { t: 'discardSiteMap'; id: string; stagingId: string }
+  // Name a saved conversation, answered with `sessionName` on the same `id`. `messages` carries the
+  // user's own words only — an assistant turn restates whatever page it was reading, so putting one
+  // here would let a site choose the name of a session in the user's own history.
+  | { t: 'nameSession'; id: string; host?: string; messages: string[] }
+  | { t: 'sessionName'; id: string; result: ActionResult<{ title: string }> };
 
 /** Where an uploaded skill landed on the daemon's disk. */
 export interface SavedSkill {
@@ -161,6 +212,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'deleteSiteMap',
   'activateSiteMap',
   'discardSiteMap',
+  'nameSession',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;
