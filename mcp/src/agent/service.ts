@@ -4,6 +4,7 @@ import {
   success,
   type ActionResult,
   type AttachedFile,
+  type SavedRecording,
   type ExtensionRequest,
   type RunContext,
   type RunEvent,
@@ -169,7 +170,10 @@ export class AgentSession {
         built = prepared.built;
         instructionText = prepared.instruction;
       } else {
-        built = buildSystemPrompt(routed.base, routed.overlays, { attachments: filesBlock(context?.files) });
+        built = buildSystemPrompt(routed.base, routed.overlays, {
+          attachments: filesBlock(context?.files),
+          recordings: recordingsBlock(context?.recordings),
+        });
       }
     } catch (error) {
       this.active = null;
@@ -377,6 +381,40 @@ function filesBlock(files: AttachedFile[] | undefined): string | undefined {
     sections.push(`(${dropped} more attached file(s) did not fit here — page_listFiles still lists them.)`);
   }
   return sections.join('\n\n');
+}
+
+const MAX_RECORDINGS_BLOCK = 4 * 1024;
+
+function recordingsBlock(recordings: SavedRecording[] | undefined): string | undefined {
+  if (!recordings?.length) return undefined;
+  const lines: string[] = [];
+  let used = 0;
+  let dropped = 0;
+
+  for (const recording of recordings) {
+    const minutes = Math.max(1, Math.round(recording.durationMs / 60_000));
+    const parts = [
+      `- ${flatten(recording.name)} (id: ${flatten(recording.id)})`,
+      `  on ${flatten(recording.host)} · ${recording.steps ?? 0} steps · about ${minutes} min`,
+    ];
+    if (recording.goal) parts.push(`  Goal: ${flatten(recording.goal)}`);
+    if (!recording.capturedValues) parts.push('  Typed values were not captured; every value is a {{placeholder}}.');
+
+    const section = parts.join('\n');
+    if (used + section.length > MAX_RECORDINGS_BLOCK) {
+      dropped++;
+      continue;
+    }
+    used += section.length;
+    lines.push(section);
+  }
+
+  if (!lines.length) return undefined;
+  if (dropped) {
+    log(`recording context is full; left out ${dropped} recording(s)`);
+    lines.push(`(${dropped} more recording(s) did not fit here — page_listRecordings still lists them.)`);
+  }
+  return lines.join('\n');
 }
 
 const flatten = (text: string) => text.replace(/\s+/g, ' ').trim();

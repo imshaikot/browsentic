@@ -3,6 +3,7 @@ import { clickElement } from '@/lib/actions/page/click-element';
 import { navigate } from '@/lib/actions/page/navigate';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
+import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/events';
 
 export interface Rule {
   id: string;
@@ -167,6 +168,21 @@ export const RULES: readonly Rule[] = [
       const dom = KEYS[key!];
       return dom ? built({ key: dom } satisfies PressKeyInput, `Press ${key}`) : null;
     },
+  },
+  {
+    id: 'recording.start',
+    action: START_RECORDING_ACTION,
+    certainty: 0.95,
+    pattern:
+      /^(?:start\s+record(?:ing)?(?:\s+(?:my|this|the))?(?:\s+(?:browsing|browser))?(?:\s+session)?|record(?:ing)?(?:\s+(?:my|this|the))?(?:\s+(?:browsing|browser))?\s+session)$/,
+    build: () => built({ captureValues: false }, 'Start recording this session'),
+  },
+  {
+    id: 'recording.stop',
+    action: STOP_RECORDING_ACTION,
+    certainty: 0.95,
+    pattern: /^(?:stop|end|finish)\s+(?:the\s+)?recording$/,
+    build: () => built({}, 'Stop recording'),
   },
   {
     id: 'click.text',

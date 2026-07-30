@@ -1,8 +1,11 @@
 import { browser, type Browser } from 'wxt/browser';
-import type { AttachedFile, RunContext, RunEvent } from '@/lib/actions/protocol';
+import type { AttachedFile, RunContext, RunEvent, SavedRecording } from '@/lib/actions/protocol';
+import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { tryFastPath } from './fast-path';
 import { listMeta } from './file-store';
+import { currentRecording, onRecordingState, startActiveTabRecording, stopRecording } from './recorder';
+import { asSavedRecording, listRecordings } from './recording-store';
 import { recordGeneratedSkill } from './skill-store';
 import {
   activateSiteMap,
@@ -30,13 +33,16 @@ export type RunCommand =
   | { op: 'decision'; toolId: string; allow: boolean }
   | { op: 'reset' }
   | { op: 'activateMap'; stagingId: string; exactHost?: boolean }
-  | { op: 'discardMap'; stagingId: string };
+  | { op: 'discardMap'; stagingId: string }
+  | { op: 'startRecording'; captureValues: boolean }
+  | { op: 'stopRecording' };
 
 export type RunMessage =
   | { op: 'event'; runId: string; event: RunEvent }
   | { op: 'active'; runId: string | null }
   | { op: 'mapDraft'; draft: SiteMapDraft }
-  | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string };
+  | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string }
+  | { op: 'recording'; state: RecordingState | null };
 
 const ports = new Set<Browser.runtime.Port>();
 let activeRunId: string | null = null;
@@ -61,12 +67,24 @@ export function serveRunPorts(): void {
     if (activeRunId) endRun('The connection to the daemon dropped, so that run is over.');
   });
 
+  onRecordingState((state) => {
+    if (state?.warning) {
+      broadcast({
+        op: 'event',
+        runId: LOCAL_RUN,
+        event: { kind: 'error', code: 'RECORDING_LIMIT', message: state.warning },
+      });
+    }
+    broadcast({ op: 'recording', state });
+  });
+
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== RUN_PORT) return;
     ports.add(port);
     clearTimeout(unwatchedTimer);
     post(port, { op: 'active', runId: activeRunId });
     if (pendingDraft) post(port, { op: 'mapDraft', draft: pendingDraft });
+    void currentRecording().then((state) => post(port, { op: 'recording', state }));
 
     port.onMessage.addListener((message) => handle(message as RunCommand));
     port.onDisconnect.addListener(() => {
@@ -127,10 +145,26 @@ function handle(command: RunCommand): void {
       });
       return;
     }
+    case 'startRecording':
+      void beginRecording(command.captureValues);
+      return;
+    case 'stopRecording':
+      void stopRecording('user');
+      return;
     case 'reset':
       resetConversation();
       return;
   }
+}
+
+async function beginRecording(captureValues: boolean): Promise<void> {
+  const result = await startActiveTabRecording(captureValues);
+  if (result.ok) return;
+  broadcast({
+    op: 'event',
+    runId: LOCAL_RUN,
+    event: { kind: 'error', code: result.error.code, message: result.error.message },
+  });
 }
 
 async function instruct(text: string, context?: RunContext): Promise<void> {
@@ -141,7 +175,11 @@ async function instruct(text: string, context?: RunContext): Promise<void> {
       return;
     }
 
-    const runId = sendInstruction(text, { ...context, files: await attachedFiles() });
+    const runId = sendInstruction(text, {
+      ...context,
+      files: await attachedFiles(),
+      recordings: await attachedRecordings(),
+    });
     if (!runId) {
       broadcast({
         op: 'event',
@@ -205,6 +243,19 @@ async function attachedFiles(): Promise<AttachedFile[]> {
       summary: file.summary,
       digest: file.digest?.slice(0, MAX_DIGEST_CHARS),
     }));
+  } catch {
+    return [];
+  }
+}
+
+const MAX_CONTEXT_RECORDINGS = 8;
+
+async function attachedRecordings(): Promise<SavedRecording[]> {
+  try {
+    return (await listRecordings())
+      .filter((recording) => recording.status === 'ready')
+      .slice(0, MAX_CONTEXT_RECORDINGS)
+      .map(asSavedRecording);
   } catch {
     return [];
   }

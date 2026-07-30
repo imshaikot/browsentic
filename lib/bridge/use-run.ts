@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
 import { BRIDGE_CHANNEL, type RunEvent } from '@/lib/actions/protocol';
+import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
 import { isNaming, listSessions, putSession, readTranscript, titleDueAt, type SessionFields } from './session-store';
@@ -37,6 +38,9 @@ export interface Run {
   mapSite: () => void;
   activateMap: (exactHost?: boolean) => void;
   discardMap: () => void;
+  recording: RecordingState | null;
+  startRecording: (captureValues: boolean) => void;
+  stopRecording: () => void;
 }
 
 type SessionState = SessionFields;
@@ -50,6 +54,7 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
   const [items, setItems] = useState<RunItem[]>([]);
   const [running, setRunning] = useState(false);
   const [draft, setDraft] = useState<SiteMapDraft | null>(null);
+  const [recording, setRecording] = useState<RecordingState | null>(null);
   const port = useRef<Browser.runtime.Port | null>(null);
 
   const session = useRef<SessionState>(freshSession());
@@ -91,7 +96,8 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
               { kind: 'notice', id: nextId(), tone: 'error', text: runMessage.message! },
             ]);
           }
-        } else {
+        } else if (runMessage.op === 'recording') setRecording(runMessage.state);
+        else {
           if (runMessage.event.kind === 'session') {
             session.current.claudeSessionId = runMessage.event.claudeSessionId ?? undefined;
           }
@@ -246,6 +252,16 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
     discardMap: useCallback(() => {
       if (draft) post({ op: 'discardMap', stagingId: draft.stagingId });
     }, [draft, post]),
+    recording,
+    startRecording: useCallback(
+      (captureValues: boolean) => {
+        post({ op: 'startRecording', captureValues });
+      },
+      [post],
+    ),
+    stopRecording: useCallback(() => {
+      post({ op: 'stopRecording' });
+    }, [post]),
     cancel: useCallback(() => {
       if (!post({ op: 'cancel' })) lost('Lost the connection to the extension, so this run is no longer being watched.');
     }, [post, lost]),

@@ -4,16 +4,21 @@ import { invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
 import { listFiles } from '@/lib/actions/page/list-files';
+import { listRecordings } from '@/lib/actions/page/list-recordings';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
+import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
+import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 
 const LOAD_TIMEOUT_MS = 10_000;
 
 export async function invokeForHarness(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
   if (action === listFiles.name) return listStoredFiles(input);
+  if (action === listRecordings.name) return listStoredRecordings(input);
+  if (action === readRecording.name) return readStoredRecording(input);
 
   const tab = tabId == null ? (await browser.tabs.query({ active: true, currentWindow: true }))[0] : await pinnedTab(tabId);
   if (tab?.id == null) {
@@ -42,6 +47,59 @@ async function listStoredFiles(input: unknown): Promise<ActionResult> {
     .filter((f) => !needle || f.name.toLowerCase().includes(needle))
     .map(({ id, name, mime, size, status, summary, addedAt }) => ({ id, name, mime, size, status, summary, addedAt }));
   return success({ files });
+}
+
+async function listStoredRecordings(input: unknown): Promise<ActionResult> {
+  const filters = input as { host?: unknown; nameContains?: unknown } | undefined;
+  const host = typeof filters?.host === 'string' ? filters.host.toLowerCase() : null;
+  const needle = typeof filters?.nameContains === 'string' ? filters.nameContains.toLowerCase() : null;
+  const recordings = (await listStoredMeta())
+    .filter((r) => !host || r.host.toLowerCase() === host)
+    .filter((r) => !needle || `${r.name} ${r.goal ?? ''}`.toLowerCase().includes(needle))
+    .map(({ id, name, host: on, status, goal, summary, steps, capturedValues, durationMs, createdAt }) => ({
+      id,
+      name,
+      host: on,
+      status,
+      goal,
+      summary,
+      steps,
+      capturedValues,
+      durationMs,
+      createdAt,
+    }));
+  return success({ recordings });
+}
+
+async function readStoredRecording(input: unknown): Promise<ActionResult> {
+  const id = (input as { recordingId?: unknown } | undefined)?.recordingId;
+  if (typeof id !== 'string' || !id) {
+    return failure('INVALID_INPUT', 'Provide the "recordingId" of a recording from page.listRecordings.');
+  }
+  const meta = (await listStoredMeta()).find((r) => r.id === id);
+  if (!meta) return failure('RECORDING_NOT_FOUND', `No recording with id "${id}".`);
+  const body = await readRecordingBody(id);
+  if (!body?.workflow) {
+    return failure(
+      'RECORDING_NOT_READY',
+      meta.status === 'error'
+        ? `That recording could not be turned into steps: ${meta.error ?? 'unknown error'}`
+        : 'That recording is still being turned into steps — try again shortly.',
+    );
+  }
+  return success({
+    id: meta.id,
+    name: meta.name,
+    host: meta.host,
+    startUrl: meta.startUrl,
+    capturedValues: meta.capturedValues,
+    durationMs: meta.durationMs,
+    goal: body.workflow.goal,
+    summary: body.workflow.summary,
+    variables: body.workflow.variables,
+    caveats: body.workflow.caveats,
+    steps: body.workflow.steps,
+  });
 }
 
 async function attachStoredFile(tabId: number, input: unknown): Promise<ActionResult> {

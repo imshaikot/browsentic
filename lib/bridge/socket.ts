@@ -6,6 +6,8 @@ import {
   failure,
   parseFrame,
   type ActionResult,
+  type RecordingAnalysis,
+  type RecordingPayload,
   type RunContext,
   type RunEvent,
   type SavedSkill,
@@ -80,6 +82,27 @@ export function analyzeFile(file: {
       resolve(failure('TIMEOUT', 'The daemon did not return a summary in time.'));
     }, ANALYZE_TIMEOUT_MS);
     pendingAnalyses.set(id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
+const RECORDING_TIMEOUT_MS = 120_000;
+
+const pendingRecordings = new Map<string, (result: ActionResult<RecordingAnalysis>) => void>();
+
+export function analyzeRecording(recording: RecordingPayload): Promise<ActionResult<RecordingAnalysis>> {
+  const id = crypto.randomUUID();
+  if (!post({ t: 'analyzeRecording', id, recording })) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingRecordings.delete(id);
+      resolve(failure('TIMEOUT', 'The daemon did not return a workflow in time.'));
+    }, RECORDING_TIMEOUT_MS);
+    pendingRecordings.set(id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
@@ -320,6 +343,12 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
     case 'sessionName': {
       pendingSessionNames.get(frame.id)?.(frame.result);
       pendingSessionNames.delete(frame.id);
+      return;
+    }
+
+    case 'recordingWorkflow': {
+      pendingRecordings.get(frame.id)?.(frame.result);
+      pendingRecordings.delete(frame.id);
       return;
     }
 

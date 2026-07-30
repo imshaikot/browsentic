@@ -5,11 +5,13 @@ import { invokeForHarness } from '@/lib/bridge/invoke';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
+import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
+import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
 import { serveRunPorts } from '@/lib/bridge/run-port';
 import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, onWelcome, pairDaemon } from '@/lib/bridge/socket';
 
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isBridgeRequest(message)) return;
     if (message.op === 'describe') {
       sendResponse(success(describeActions()));
@@ -41,6 +43,22 @@ export default defineBackground(() => {
       sendResponse(success(true));
       return;
     }
+    if (message.op === 'recordEvents' && Array.isArray(message.events)) {
+      void appendEvents(sender.tab?.id, message.events);
+      sendResponse(success(true));
+      return;
+    }
+    if (message.op === 'recordingState') {
+      recordingStateFor(sender.tab?.id)
+        .then((state) => sendResponse(success(state)))
+        .catch(() => sendResponse(success({ recording: false, captureValues: false })));
+      return true;
+    }
+    if (message.op === 'analyzeRecording' && typeof message.recordingId === 'string') {
+      void analyzeStoredRecording(message.recordingId);
+      sendResponse(success(true));
+      return;
+    }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
         .then((result) =>
@@ -58,7 +76,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"pair"|"disconnect"}',
       ),
     );
     return;
@@ -72,9 +90,13 @@ export default defineBackground(() => {
     });
   });
 
+  serveRecorder();
   serveRunPorts();
 
-  onWelcome(() => void resyncSkills());
+  onWelcome(() => {
+    void resyncSkills();
+    void resumePendingAnalyses();
+  });
 
   void connectDaemon();
   browser.runtime.onStartup.addListener(() => void connectDaemon());

@@ -1,11 +1,13 @@
 import type { ToolDescriptor } from './manifest';
+import type { RecordedEvent } from '@/lib/recordings/events';
+import type { RecordingWorkflow } from '@/lib/recordings/workflow';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 
 export const ACTION_CHANNEL = 'voicelink/action';
 export const BRIDGE_CHANNEL = 'voicelink/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 6;
+export const SOCKET_PROTOCOL_VERSION = 7;
 
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
 
@@ -23,7 +25,10 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeFile'; fileId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveSkill'; skillId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'nameSession'; sessionId: string };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'nameSession'; sessionId: string }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'recordEvents'; events: RecordedEvent[] }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'recordingState' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeRecording'; recordingId: string };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -51,10 +56,31 @@ export interface AttachedFile {
   digest?: string;
 }
 
+export interface SavedRecording {
+  id: string;
+  name: string;
+  host: string;
+  goal?: string;
+  steps?: number;
+  capturedValues: boolean;
+  durationMs: number;
+}
+
+export interface RecordingPayload {
+  id: string;
+  name: string;
+  host: string;
+  startUrl: string;
+  captureValues: boolean;
+  durationMs: number;
+  events: RecordedEvent[];
+}
+
 export interface RunContext {
   url?: string;
   tabId?: number;
   files?: AttachedFile[];
+  recordings?: SavedRecording[];
   claudeSessionId?: string;
 }
 
@@ -95,7 +121,14 @@ export type SocketFrame =
   | { t: 'activateSiteMap'; id: string; stagingId: string; exactHost?: boolean }
   | { t: 'discardSiteMap'; id: string; stagingId: string }
   | { t: 'nameSession'; id: string; host?: string; messages: string[] }
-  | { t: 'sessionName'; id: string; result: ActionResult<{ title: string }> };
+  | { t: 'sessionName'; id: string; result: ActionResult<{ title: string }> }
+  | { t: 'analyzeRecording'; id: string; recording: RecordingPayload }
+  | { t: 'recordingWorkflow'; id: string; result: ActionResult<RecordingAnalysis> };
+
+export interface RecordingAnalysis {
+  workflow: RecordingWorkflow;
+  warnings: string[];
+}
 
 export interface SavedSkill {
   name: string;
@@ -115,6 +148,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'activateSiteMap',
   'discardSiteMap',
   'nameSession',
+  'analyzeRecording',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

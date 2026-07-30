@@ -10,8 +10,10 @@ import { getPageInfo } from './page/get-page-info';
 import { highlightElement } from './page/highlight-element';
 import { hoverElement } from './page/hover-element';
 import { listFiles } from './page/list-files';
+import { listRecordings } from './page/list-recordings';
 import { navigate } from './page/navigate';
 import { pressKey } from './page/press-key';
+import { readRecording } from './page/read-recording';
 import { screenshot } from './page/screenshot';
 import { scrollTo } from './page/scroll-to';
 import { selectOption } from './page/select-option';
@@ -39,6 +41,8 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       screenshot,
       listFiles,
       attachFile,
+      listRecordings,
+      readRecording,
     ] as AnyAction[]
   ).map((action) => [action.name, action]),
 );

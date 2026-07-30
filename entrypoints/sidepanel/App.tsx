@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { AudioLines, Bot, BookOpen, FileText, FileUp, History, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
+import { AudioLines, Bot, BookOpen, Circle, FileText, FileUp, History, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
+import { RecordingBar } from '@/components/recording-bar';
+import { RecordingPanel } from '@/components/recording-panel';
 import { RunTimeline } from '@/components/run-timeline';
 import { SessionList } from '@/components/session-list';
 import { SiteMapReview } from '@/components/site-map-review';
@@ -13,11 +15,13 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { putFile, removeFile, type StoredFileMeta } from '@/lib/bridge/file-store';
+import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
+import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
 import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
@@ -37,7 +41,9 @@ export default function App() {
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [recordingsOpen, setRecordingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const recordings = useStoredRecordings();
 
   const connected = daemon?.connected ?? false;
 
@@ -59,6 +65,12 @@ export default function App() {
   function openSession(sessionId: string) {
     setHistoryOpen(false);
     void run.restore(sessionId);
+  }
+
+  function replayRecording(recording: StoredRecordingMeta) {
+    setRecordingsOpen(false);
+    setHistoryOpen(false);
+    run.send(`Replay my recording "${recording.name}" (id ${recording.id}).`);
   }
 
   function focusComposer(event: MouseEvent<HTMLDivElement>) {
@@ -177,8 +189,21 @@ export default function App() {
             {attachError}
           </p>
         )}
+        {run.recording && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
         {run.draft && (
           <SiteMapReview draft={run.draft} onActivate={run.activateMap} onDiscard={run.discardMap} />
+        )}
+        {recordingsOpen && (
+          <RecordingPanel
+            tabUrl={tabUrl}
+            recordings={recordings}
+            recording={run.recording}
+            busy={run.running}
+            onStart={run.startRecording}
+            onStop={run.stopRecording}
+            onReplay={replayRecording}
+            onRemove={(id) => void removeRecording(id)}
+          />
         )}
         {skillsOpen && (
           <SkillsPanel
@@ -247,6 +272,20 @@ export default function App() {
               onClick={() => setSkillsOpen(!skillsOpen)}
             >
               <BookOpen />
+            </Button>
+            <Button
+              variant={recordingsOpen ? 'default' : 'ghost'}
+              size="icon"
+              className="size-8"
+              aria-label={recordingsOpen ? 'Hide recordings' : 'Record this session'}
+              onClick={() => setRecordingsOpen(!recordingsOpen)}
+            >
+              <Circle
+                className={cn(
+                  run.recording && 'animate-pulse fill-red-500 text-red-500',
+                  !run.recording && !recordingsOpen && 'text-red-500',
+                )}
+              />
             </Button>
             <Button
               variant={voiceEnabled && !voice.error ? 'default' : 'ghost'}

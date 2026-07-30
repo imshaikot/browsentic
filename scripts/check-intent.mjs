@@ -47,6 +47,17 @@ const CASES = [
   ['click on next', 'act:click.text'],
   ['click terms and conditions', 'act:click.text', { target: { text: 'terms and conditions' } }],
 
+  ['record my browsing session', 'act:recording.start', { captureValues: false }],
+  ['record this session', 'act:recording.start'],
+  ['start recording', 'act:recording.start'],
+  ['stop recording', 'act:recording.stop'],
+  ['end the recording', 'act:recording.stop'],
+
+  ['record a video of this page', 'escalate:no-match'],
+  ['stop recording and then email it to me', 'escalate:multi-step'],
+  ['how do i record a session', 'escalate:question'],
+  ['click record', 'act:click.text', { target: { text: 'record' } }],
+
   ['what is on this page', 'escalate:question'],
   ['summarize this article', 'escalate:question'],
   ['is there a login button?', 'escalate:question'],
