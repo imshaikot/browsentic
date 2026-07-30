@@ -1,21 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { AudioLines, Bot, BookOpen, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { AudioLines, Bot, BookOpen, FileText, FileUp, History, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
 import { RunTimeline } from '@/components/run-timeline';
+import { SessionList } from '@/components/session-list';
 import { SiteMapReview } from '@/components/site-map-review';
 import { SkillsPanel } from '@/components/skills-panel';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { putFile, removeFile, type StoredFileMeta } from '@/lib/bridge/file-store';
+import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
+import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
 import { cn } from '@/lib/utils';
@@ -25,14 +28,18 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export default function App() {
   const daemon = useDaemonState();
-  const run = useRun();
+  // The panel is the surface that owns a conversation, so it is the one that saves it.
+  const run = useRun({ persist: true });
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const files = useStoredFiles();
+  const sessions = useStoredSessions();
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
   const [skillsOpen, setSkillsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const connected = daemon?.connected ?? false;
 
@@ -49,7 +56,25 @@ export default function App() {
 
   function handleSend() {
     if (run.running || !connected) return;
+    // Sending while the history is open would leave the composer talking to a view that is not the
+    // conversation it is writing into.
+    setHistoryOpen(false);
     voice.submitNow();
+  }
+
+  function openSession(sessionId: string) {
+    setHistoryOpen(false);
+    void run.restore(sessionId);
+  }
+
+  /**
+   * Clicking the composer's padding lands in the input, the way it would if this were one control
+   * rather than a box with a textarea in it — but not when the click was meant for a button
+   * sitting inside that box. The textarea is focusable on its own, so this adds no keyboard path.
+   */
+  function focusComposer(event: MouseEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest('button, textarea')) return;
+    composerRef.current?.focus();
   }
 
   async function attachPageContext() {
@@ -130,13 +155,29 @@ export default function App() {
             {status}
           </p>
         </div>
-        <Button variant="ghost" size="icon" aria-label="Clear conversation" onClick={run.clear}>
+        <Button
+          variant={historyOpen ? 'default' : 'ghost'}
+          size="icon"
+          aria-label={historyOpen ? 'Back to the conversation' : 'Saved conversations'}
+          onClick={() => setHistoryOpen(!historyOpen)}
+        >
+          <History />
+        </Button>
+        <Button variant="ghost" size="icon" aria-label="Start a new conversation" onClick={run.clear}>
           <RotateCcw />
         </Button>
       </header>
 
       <ScrollArea className="min-h-0 flex-1">
-        {run.items.length === 0 ? (
+        {historyOpen ? (
+          <SessionList
+            sessions={sessions}
+            currentId={run.sessionId}
+            busy={run.running}
+            onOpen={openSession}
+            onRemove={(id) => void removeSession(id)}
+          />
+        ) : run.items.length === 0 ? (
           <Greeting connected={connected} voiceOn={voiceEnabled && voice.supported} />
         ) : (
           <RunTimeline items={run.items} onDecide={run.decide} />
@@ -167,8 +208,22 @@ export default function App() {
         <FilesList files={files} onRemove={(id) => void removeFile(id)} />
         <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} connected={connected} />
 
-        <div className="flex items-end gap-2">
+        {/*
+          One composer, not an input beside a toolbar: the container carries the border and the
+          focus ring, the textarea inside it is transparent and full width, and the buttons sit on
+          their own row within the same box. `has-[textarea:focus]` rather than `focus-within`, so
+          tabbing to one of those buttons doesn't ring the whole thing.
+        */}
+        <div
+          onClick={focusComposer}
+          className={cn(
+            'flex flex-col rounded-xl border border-input shadow-xs transition-[color,box-shadow] dark:bg-input/30',
+            'has-[textarea:focus]:border-ring has-[textarea:focus]:ring-[3px] has-[textarea:focus]:ring-ring/50',
+            connected && 'cursor-text',
+          )}
+        >
           <Textarea
+            ref={composerRef}
             value={voice.input}
             onChange={(e) => voice.setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -179,12 +234,19 @@ export default function App() {
             }}
             placeholder={connected ? 'Speak, or type what to do on this page…' : 'Pair the browser to get started'}
             disabled={!connected}
-            className="max-h-32 min-h-10 flex-1 resize-none"
+            rows={2}
+            // The container owns the frame now, so every part of it is turned off here. `text-sm`
+            // is not only smaller: the base is `text-base md:text-sm`, and this panel is never wide
+            // enough for `md`, so the input was rendering at 16px while every message that came out
+            // of it rendered at 14px. `min-h-16` is the resting height, ~3 lines at this size.
+            className="max-h-48 min-h-16 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
-          <div className="flex gap-1">
+
+          <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
             <Button
               variant="ghost"
               size="icon"
+              className="size-8"
               aria-label="Attach page context"
               onClick={attachPageContext}
               disabled={!connected}
@@ -194,6 +256,7 @@ export default function App() {
             <Button
               variant="ghost"
               size="icon"
+              className="size-8"
               aria-label="Attach a file"
               onClick={() => fileInputRef.current?.click()}
               disabled={!connected}
@@ -203,6 +266,7 @@ export default function App() {
             <Button
               variant={skillsOpen ? 'default' : 'ghost'}
               size="icon"
+              className="size-8"
               aria-label={skillsOpen ? 'Hide skills' : 'Show skills'}
               onClick={() => setSkillsOpen(!skillsOpen)}
             >
@@ -215,7 +279,7 @@ export default function App() {
               title={voice.supported ? undefined : 'Voice input is not available in this browser'}
               onClick={toggleVoice}
               disabled={!voice.supported}
-              className={cn(voiceEnabled && voice.listening && 'relative')}
+              className={cn('size-8', voiceEnabled && voice.listening && 'relative')}
             >
               {voiceEnabled && voice.listening && (
                 <span className="absolute inset-0 animate-ping rounded-md bg-primary/30" />
@@ -223,12 +287,19 @@ export default function App() {
               {voiceEnabled && !voice.error ? <Mic /> : <MicOff />}
             </Button>
             {run.running ? (
-              <Button size="icon" variant="destructive" aria-label="Stop the agent" onClick={run.cancel}>
+              <Button
+                size="icon"
+                variant="destructive"
+                className="ml-auto size-8"
+                aria-label="Stop the agent"
+                onClick={run.cancel}
+              >
                 <Square />
               </Button>
             ) : (
               <Button
                 size="icon"
+                className="ml-auto size-8"
                 aria-label="Send message"
                 onClick={handleSend}
                 disabled={!voice.input.trim() || !connected}
@@ -375,7 +446,7 @@ function Greeting({ connected, voiceOn }: { connected: boolean; voiceOn: boolean
         <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
           <Bot className="size-4" />
         </div>
-        <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm">
+        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm wrap-anywhere">
           {connected ? (
             <>
               Hi, I&apos;m VoiceLink.{' '}
