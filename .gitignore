@@ -45,16 +45,18 @@ mcp/lib/
 # keys, the auth store, logs) and never inside the repo — this is a belt-and-braces guard
 # for anyone who points HOME or a config override at the working tree. `/voicelink/` is the
 # user-facing half of the same story: screenshots, and skills uploaded from the extension.
-# Root-anchored: unanchored, it would also swallow the committed .claude/skills/voicelink/.
+# Root-anchored so it stays scoped to the repo root rather than matching at any depth.
 .voicelink/
 /voicelink/
 auth.json
 daemon.json
 daemon.log
 
-# Local Claude Code state (project skills under .claude/skills/ ARE committed)
-.claude/settings.local.json
-.claude/*.local.json
+# Claude Code state and guidance. Both are local-only: the skills under .claude/skills/ and
+# the architecture notes in CLAUDE.md were committed until now, so `git log -- CLAUDE.md`
+# still has the history if it is ever wanted back.
+.claude/
+CLAUDE.md
 
 # Editors
 .vscode/

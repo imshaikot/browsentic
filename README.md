@@ -264,8 +264,10 @@ Built with [WXT](https://wxt.dev), React 19, TypeScript, Tailwind CSS v4,
 ## Contributing
 
 Issues and pull requests are welcome. Adding a page capability is a single file plus one line in
-the registry, which publishes it as an MCP tool at the same time. Architecture notes and the
-conventions that are load bearing at runtime live in [CLAUDE.md](CLAUDE.md).
+the registry, which publishes it as an MCP tool at the same time. Four conventions in an action
+module are load bearing at runtime rather than at compile time: touch `document`/`window` only
+inside `execute()`, keep underscores out of action names, `.describe()` every input field, and
+validate with `ActionError` inside `execute()` rather than zod `.refine()`/`.transform()`.
 
 Before opening a pull request, run `yarn compile`, `yarn intent:check` and `yarn mcp:manifest`.
 
