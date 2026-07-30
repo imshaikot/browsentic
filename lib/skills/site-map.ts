@@ -1,4 +1,7 @@
 import { byteLength, isDomain } from './format';
+import { clip, looksLikeSelector, scrub, looksLikeInstruction } from './scrub';
+
+export { scrub, looksLikeInstruction };
 
 export const SITE_MAPPER_SKILL = 'site-mapper';
 
@@ -24,14 +27,6 @@ export const FIELD_LIMITS = {
   quirk: 160,
   notes: 200,
 } as const;
-
-const SELECTOR_RE = /^[a-zA-Z0-9 .#>+~*,_:[\]="'()-]{1,120}$/;
-
-const MAX_SELECTOR_PARTS = 8;
-
-function looksLikeSelector(value: string): boolean {
-  return SELECTOR_RE.test(value) && value.trim().split(/\s+/).length <= MAX_SELECTOR_PARTS;
-}
 
 export interface SiteMapReport {
   summary: string;
@@ -125,24 +120,6 @@ export function validateSiteMapReport(
   return { ok: true, report, warnings };
 }
 
-export function scrub(value: unknown, limit: number): string {
-  if (typeof value !== 'string') return '';
-  return value
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '')
-    .replace(/^[\s#>*\-+|`~=]+/, '')
-    .replace(/[`|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, limit);
-}
-
-export function looksLikeInstruction(text: string): boolean {
-  return /\b(?:ignore (?:all |any )?previous|disregard (?:the |all )?(?:above|previous)|you (?:must|should|will) (?:now|always|never)|instead(?:,)? (?:navigate|go|send|email|transfer|click)|do not tell|without asking|system prompt|new instructions?)\b/i.test(
-    text,
-  );
-}
-
 function samePath(value: unknown, origin: string): string {
   if (typeof value !== 'string' || !value.trim()) return '';
   try {
@@ -200,10 +177,6 @@ function trimToBudget(report: SiteMapReport, warnings: string[]): void {
     report.links = report.links.filter((link) => link.from !== dropped.path && link.to !== dropped.path);
   }
   if (report.pages.length === 1) warnings.push('Only the first page fitted in the map.');
-}
-
-function clip(text: string, limit: number): string {
-  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
 }
 
 export function isMappableHost(host: string): boolean {
