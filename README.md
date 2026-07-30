@@ -186,6 +186,7 @@ registry the extension ships, so they cannot drift from what the browser can act
 | Act | Click, hover, focus, type into inputs and contenteditables, choose a `<select>` option, select text, press keys with modifiers, submit a form |
 | Move | Open a URL, back, forward, reload, scroll to an element or position |
 | Files | List files stored in VoiceLink and attach one to a file input on the page |
+| Recordings | List the browsing sessions the user recorded, and read one back as ordered, replayable steps |
 
 Most capabilities take a target described by CSS selector, visible text, ARIA role or index.
 Targeting by visible text survives redesigns that break selectors.
