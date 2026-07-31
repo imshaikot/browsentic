@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { clickElement } from '@/lib/actions/page/click-element';
 import { navigate } from '@/lib/actions/page/navigate';
+import { openTab } from '@/lib/actions/page/open-tab';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
 import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/events';
@@ -21,6 +22,7 @@ export interface Built {
 }
 
 type NavigateInput = z.input<typeof navigate.input>;
+type OpenTabInput = z.input<typeof openTab.input>;
 type ScrollInput = z.input<typeof scrollTo.input>;
 type ClickInput = z.input<typeof clickElement.input>;
 type PressKeyInput = z.input<typeof pressKey.input>;
@@ -105,6 +107,21 @@ export const RULES: readonly Rule[] = [
     certainty: 0.97,
     pattern: /^(?:reload|refresh)(?:\s+(?:the|this)\s+page)?$/,
     build: () => nav({ action: 'reload' }, 'Reload the page'),
+  },
+  {
+    id: 'tab.open',
+    action: openTab.name,
+    certainty: 0.95,
+    pattern:
+      /^(?:go\s+to|goto|open|visit|navigate\s+to|take\s+me\s+to|load|pull\s+up)\s+(?:the\s+)?(?<dest>\S+(?:\s+\S+)?)\s+in\s+(?:an?\s+)?(?:new|another|separate)\s+tab$/,
+    build: ({ dest }) => {
+      const site = SITES[dest!];
+      if (site) return openIn({ url: `https://${site}` }, `Open ${site} in a new tab`, 1);
+      const url = toUrl(dest!);
+      return url
+        ? openIn({ url }, `Open ${dest} in a new tab`, /^https?:\/\//.test(dest!) ? 1 : 0.97)
+        : null;
+    },
   },
   {
     id: 'navigate.url',
@@ -209,6 +226,8 @@ type ScrollDirection = NonNullable<ScrollInput['direction']>;
 const built = (input: unknown, label: string, confidence = 1): Built => ({ input, label, confidence });
 
 const nav = (input: NavigateInput, label: string, confidence = 1): Built => built(input, label, confidence);
+
+const openIn = (input: OpenTabInput, label: string, confidence = 1): Built => built(input, label, confidence);
 
 const scroll = (input: ScrollInput, label: string, confidence = 1): Built => built(input, label, confidence);
 

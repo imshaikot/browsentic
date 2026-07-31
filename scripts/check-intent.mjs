@@ -27,6 +27,18 @@ const CASES = [
   ['google best noise cancelling headphones', 'act:navigate.search'],
   ['search the web for tide times', 'act:navigate.search'],
 
+  ['open github.com in a new tab', 'act:tab.open', { url: 'https://github.com' }],
+  ['open gmail in a new tab', 'act:tab.open', { url: 'https://mail.google.com' }],
+  ['take me to hacker news in another tab', 'act:tab.open', { url: 'https://news.ycombinator.com' }],
+  ['visit https://example.com/docs in a separate tab', 'act:tab.open', { url: 'https://example.com/docs' }],
+  ['open localhost:3000 in a new tab', 'act:tab.open', { url: 'http://localhost:3000' }],
+
+  ['open a new tab', 'escalate:no-match'],
+  ['open the settings menu in a new tab', 'escalate:no-match'],
+  ['close this tab', 'escalate:no-match'],
+  ['switch to my gmail tab', 'escalate:no-match'],
+  ['click the new tab button', 'act:click.text', { target: { text: 'new tab', role: 'button' } }],
+
   ['scroll down', 'act:scroll.direction', { direction: 'down' }],
   ['scroll down a bit', 'act:scroll.direction'],
   ['can you scroll down?', 'act:scroll.direction'],

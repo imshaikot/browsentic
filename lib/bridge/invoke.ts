@@ -3,22 +3,25 @@ import { z } from 'zod';
 import { invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
+import { closeTab } from '@/lib/actions/page/close-tab';
 import { listFiles } from '@/lib/actions/page/list-files';
 import { listRecordings } from '@/lib/actions/page/list-recordings';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
+import { openTab } from '@/lib/actions/page/open-tab';
 import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
+import { switchTab } from '@/lib/actions/page/switch-tab';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
-
-const LOAD_TIMEOUT_MS = 10_000;
+import { closeOpenTab, openNewTab, switchToTab, watchForLoad } from '@/lib/bridge/tabs';
 
 export async function invokeForHarness(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
   if (action === listFiles.name) return listStoredFiles(input);
   if (action === listRecordings.name) return listStoredRecordings(input);
   if (action === readRecording.name) return readStoredRecording(input);
+  if (action === openTab.name) return openNewTab(input);
 
   const tab = tabId == null ? (await browser.tabs.query({ active: true, currentWindow: true }))[0] : await pinnedTab(tabId);
   if (tab?.id == null) {
@@ -27,6 +30,8 @@ export async function invokeForHarness(action: string, input?: unknown, tabId?: 
       : failure('MAPPING_TAB_CHANGED', 'The tab this run started in has been closed.');
   }
   if (action === navigate.name) return navigateTab(tab.id, input);
+  if (action === switchTab.name) return switchToTab({ id: tab.id, windowId: tab.windowId }, input);
+  if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   return invokeInTab(tab.id, action, input);
@@ -170,22 +175,4 @@ async function navigateViaTabsApi(tabId: number, input: unknown): Promise<Action
       ? { navigatedTo: plan.href, loaded: completed }
       : { performed: plan.action, loaded: completed },
   );
-}
-
-function watchForLoad(tabId: number) {
-  let settle!: (loaded: boolean) => void;
-  const settled = new Promise<boolean>((resolve) => {
-    settle = resolve;
-  });
-  const finish = (loaded: boolean) => {
-    browser.tabs.onUpdated.removeListener(listener);
-    clearTimeout(timer);
-    settle(loaded);
-  };
-  const listener = (updatedTabId: number, changeInfo: { status?: string }) => {
-    if (updatedTabId === tabId && changeInfo.status === 'complete') finish(true);
-  };
-  const timer = setTimeout(() => finish(false), LOAD_TIMEOUT_MS);
-  browser.tabs.onUpdated.addListener(listener);
-  return { settled, cancel: () => finish(false) };
 }

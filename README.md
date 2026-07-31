@@ -13,7 +13,7 @@ It runs on **your own [Claude Code](https://claude.com/claude-code) login**. The
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 19 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
+- **Real page control.** 22 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
 - **Site maps.** Point Browsentic at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
 - **Recordings.** Do a repetitive job once yourself and Browsentic keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
@@ -192,6 +192,7 @@ bolt on the timeline. Everything else goes to the agent with the text untouched.
 | --- | --- |
 | back, forward, reload | "is there a login button?" |
 | open github.com, open localhost:3000 | "open the settings menu" |
+| open github.com in a new tab | "close this tab", "switch to my gmail tab" |
 | google something, search the web for something | "search for wireless headphones" |
 | scroll up, down, top, bottom, page down | "scroll down and tell me what it says" |
 | press enter, hit escape, press arrow down | "click sign in and then fill in my email" |
@@ -209,7 +210,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Claude Code now has 19 page tools plus `browsentic_status`, and three read only resources that
+Claude Code now has 22 page tools plus `browsentic_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -219,7 +220,7 @@ registry the extension ships, so they cannot drift from what the browser can act
 | --- | --- |
 | Read | Structured page snapshot with a layout diagram and stable selectors, rendered text or HTML, wait for an element to appear or vanish, screenshot the tab or one element |
 | Act | Click, hover, focus, type into inputs and contenteditables, choose a `<select>` option, select text, press keys with modifiers, submit a form |
-| Move | Open a URL, back, forward, reload, scroll to an element or position |
+| Move | Open a URL, back, forward, reload, scroll to an element or position, open a URL in a new tab, list and switch between open tabs, close one |
 | Files | List files stored in Browsentic and attach one to a file input on the page |
 | Recordings | List the browsing sessions the user recorded, and read one back as ordered, replayable steps |
 
@@ -239,6 +240,12 @@ Optional, at `~/.browsentic/config.json`:
   "siteMap": { "research": true, "allowClicks": false, "maxPages": 15 }
 }
 ```
+
+`requireApproval` lists the actions an agent run has to ask you about first. It defaults to form
+submission, which is the one effect that reaches someone other than you. Add any other action name
+to it — `"page.closeTab"` if you would rather approve each tab the agent closes, for instance. The
+cost of a longer list is a longer list: a prompt you see on every other tool call is a prompt you
+stop reading.
 
 Useful commands:
 
