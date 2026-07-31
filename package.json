@@ -20,6 +20,7 @@
     "mcp:unlink": "npm rm -g @voicelink/mcp",
     "mcp:manifest": "yarn --cwd mcp build && node mcp/dist/cli.js tools",
     "intent:check": "node scripts/check-intent.mjs",
+    "security:check": "node scripts/check-security.mjs",
     "icons": "node scripts/generate-icons.mjs",
     "postinstall": "wxt prepare"
   },
