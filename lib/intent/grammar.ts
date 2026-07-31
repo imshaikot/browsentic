@@ -51,9 +51,9 @@ const SITES: Record<string, string> = {
   claude: 'claude.ai',
 };
 
+const SUBMITTING_KEYS = new Set(['enter', 'return']);
+
 const KEYS: Record<string, string> = {
-  enter: 'Enter',
-  return: 'Enter',
   escape: 'Escape',
   esc: 'Escape',
   tab: 'Tab',
@@ -192,6 +192,7 @@ export const RULES: readonly Rule[] = [
     build: ({ label, role }) => {
       const text = slot(label!);
       if (!text) return null;
+      if (!role && SUBMITTING_KEYS.has(text.value.toLowerCase())) return null;
       const target = role ? { text: text.value, role } : { text: text.value };
       return {
         input: { target } satisfies ClickInput,

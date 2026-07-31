@@ -36,7 +36,10 @@ const CASES = [
   ['page down', 'act:scroll.page', { direction: 'down' }],
   ['scroll to the reviews', 'act:scroll.element', { target: { text: 'reviews' } }],
 
-  ['press enter', 'act:key.press', { key: 'Enter' }],
+  ['press enter', 'escalate:no-match'],
+  ['hit return', 'escalate:no-match'],
+  ['click enter', 'escalate:no-match'],
+  ['click enter button', 'act:click.text', { target: { text: 'enter', role: 'button' } }],
   ['hit escape', 'act:key.press', { key: 'Escape' }],
   ['press the tab key', 'act:key.press', { key: 'Tab' }],
   ['press arrow down', 'act:key.press', { key: 'ArrowDown' }],
