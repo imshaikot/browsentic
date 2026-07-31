@@ -1,6 +1,6 @@
 # Browsentic
 
-> Talk to your browser. Browsentic turns a spoken or typed instruction into real actions on the tab in front of you: clicking, filling, reading, navigating.
+> Reimagine browsing as agentic. Browsentic hands your real, logged-in browser to the AI agent you already run — instruct it by voice, by typing, or by showing it once — and it turns that into real actions on the tab in front of you: clicking, filling, reading, navigating.
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4)
@@ -308,7 +308,8 @@ module are load bearing at runtime rather than at compile time: touch `document`
 inside `execute()`, keep underscores out of action names, `.describe()` every input field, and
 validate with `ActionError` inside `execute()` rather than zod `.refine()`/`.transform()`.
 
-Before opening a pull request, run `yarn compile`, `yarn intent:check` and `yarn mcp:manifest`.
+Before opening a pull request, run `yarn compile`, `yarn compile:mcp`, `yarn intent:check`,
+`yarn security:check` and `yarn mcp:manifest`.
 
 ## License
 
