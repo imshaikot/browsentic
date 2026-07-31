@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { defineAction } from '../core';
 import { cssPath, resolveTarget, targetSchema } from './dom';
 
+const MAX_EXTRACT_CHARS = 200_000;
+
 export const extractText = defineAction({
   name: 'page.extractText',
   description: 'Read the rendered text or raw HTML of an element or the whole page.',
@@ -12,6 +14,7 @@ export const extractText = defineAction({
       .number()
       .int()
       .positive()
+      .max(MAX_EXTRACT_CHARS)
       .default(20000)
       .describe('Truncate the result to this many characters'),
   }),
@@ -20,8 +23,8 @@ export const extractText = defineAction({
     const full =
       format === 'text' ? element.innerText.replace(/\n{3,}/g, '\n\n').trim() : element.outerHTML;
     return {
-      content: full.slice(0, maxLength),
-      truncated: full.length > maxLength,
+      content: full.slice(0, Math.min(maxLength, MAX_EXTRACT_CHARS)),
+      truncated: full.length > Math.min(maxLength, MAX_EXTRACT_CHARS),
       length: full.length,
       source: cssPath(element),
     };
