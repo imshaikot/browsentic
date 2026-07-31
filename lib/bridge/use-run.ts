@@ -3,6 +3,7 @@ import { browser, type Browser } from 'wxt/browser';
 import { BRIDGE_CHANNEL, type RunEvent } from '@/lib/actions/protocol';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
+import { redactInput } from './redact';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
 import { isNaming, listSessions, putSession, readTranscript, titleDueAt, type SessionFields } from './session-store';
 
@@ -22,7 +23,7 @@ export type RunItem =
       summary?: string;
       ok?: boolean;
       awaiting?: boolean;
-      source?: 'local';
+      source?: 'local' | 'external';
     };
 
 export interface Run {
@@ -314,7 +315,13 @@ function reduce(items: RunItem[], event: RunEvent): RunItem[] {
     case 'tool':
       return [
         ...items,
-        { kind: 'tool', id: event.toolId, action: event.action, input: event.input, source: event.source },
+        {
+          kind: 'tool',
+          id: event.toolId,
+          action: event.action,
+          input: redactInput(event.action, event.input),
+          source: event.source,
+        },
       ];
 
     case 'approval':
