@@ -9,7 +9,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const CASES = [
   ['back', 'act:history.back', { action: 'back' }],
   ['go back', 'act:history.back'],
-  ['Hey VoiceLink, could you go back please?', 'act:history.back'],
+  ['Hey Browsentic, could you go back please?', 'act:history.back'],
   ['back a page', 'act:history.back'],
   ['go forward', 'act:history.forward', { action: 'forward' }],
   ['reload', 'act:history.reload', { action: 'reload' }],
@@ -89,12 +89,12 @@ const CASES = [
   ['log into my account', 'escalate:no-match'],
   ['buy it now', 'escalate:no-match'],
   ['', 'escalate:no-match'],
-  ['hey voicelink', 'escalate:no-match'],
+  ['hey browsentic', 'escalate:no-match'],
 
   ['@shopping go to amazon.com', 'escalate:skill-prefix'],
 ];
 
-const outfile = join(root, 'node_modules/.cache/voicelink/intent-check.mjs');
+const outfile = join(root, 'node_modules/.cache/browsentic/intent-check.mjs');
 await mkdir(dirname(outfile), { recursive: true });
 await build({
   entryPoints: [join(root, 'lib/intent/index.ts')],

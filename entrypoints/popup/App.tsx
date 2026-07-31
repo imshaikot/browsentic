@@ -67,7 +67,7 @@ export default function App() {
           <AudioLines className="size-4" />
         </div>
         <div className="flex-1">
-          <h1 className="text-sm leading-none font-semibold">VoiceLink</h1>
+          <h1 className="text-sm leading-none font-semibold">Browsentic</h1>
           <p className="mt-1 text-xs text-muted-foreground">AI voice assistant</p>
         </div>
         <Badge variant="secondary">
@@ -110,7 +110,7 @@ export default function App() {
             value={voice.input}
             onChange={(event) => voice.setInput(event.target.value)}
             placeholder="What should I do?"
-            aria-label="Instruction for VoiceLink"
+            aria-label="Instruction for Browsentic"
             className="h-8 text-xs"
             disabled={!connected}
           />

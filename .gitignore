@@ -41,13 +41,13 @@ mcp/lib/
 *.p12
 *.keystore
 
-# Runtime state written by the daemon. It normally lives in ~/.voicelink (pairing session
+# Runtime state written by the daemon. It normally lives in ~/.browsentic (pairing session
 # keys, the auth store, logs) and never inside the repo — this is a belt-and-braces guard
-# for anyone who points HOME or a config override at the working tree. `/voicelink/` is the
+# for anyone who points HOME or a config override at the working tree. `/browsentic/` is the
 # user-facing half of the same story: screenshots, and skills uploaded from the extension.
 # Root-anchored so it stays scoped to the repo root rather than matching at any depth.
-.voicelink/
-/voicelink/
+.browsentic/
+/browsentic/
 auth.json
 daemon.json
 daemon.log

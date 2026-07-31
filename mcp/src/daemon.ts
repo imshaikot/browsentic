@@ -169,13 +169,13 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       let issuedKey: string | undefined;
       if (auth && 'pairingToken' in auth) {
         if (!consumePairing(auth.pairingToken)) {
-          return reject('That pairing code is wrong or expired. Run "voicelink-mcp pair" for a new one.', true);
+          return reject('That pairing code is wrong or expired. Run "browsentic-mcp pair" for a new one.', true);
         }
         issuedKey = createSession(origin, hello.extensionVersion).key;
         log(`paired ${origin} (extension ${hello.extensionVersion})`);
       } else if (auth && 'sessionKey' in auth) {
         if (!validateSession(auth.sessionKey, origin)) {
-          return reject('This browser is no longer paired. Run "voicelink-mcp pair" to pair again.', false);
+          return reject('This browser is no longer paired. Run "browsentic-mcp pair" to pair again.', false);
         }
       } else {
         return reject('No pairing token or session key supplied.', false);
@@ -373,7 +373,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (!link?.isOpen) {
       return failure(
         'EXTENSION_OFFLINE',
-        'The VoiceLink extension is not connected — open your browser with the extension loaded, then retry',
+        'The Browsentic extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
     return persistScreenshot(action, input, await link.invoke(action, input, opts?.tabId), opts?.saveTo);
@@ -459,6 +459,6 @@ function listen(http: Server): Promise<number> {
 }
 
 function refuseUpgrade(socket: Duplex, reason: string): void {
-  socket.write(`HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\nX-VoiceLink-Reason: ${reason}\r\n\r\n`);
+  socket.write(`HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\nX-Browsentic-Reason: ${reason}\r\n\r\n`);
   socket.destroy();
 }

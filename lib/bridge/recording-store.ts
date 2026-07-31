@@ -4,9 +4,9 @@ import { hostOf, originOf, type RecordedEvent } from '@/lib/recordings/events';
 import { validateRecordingWorkflow, type RecordingWorkflow } from '@/lib/recordings/workflow';
 import { analyzeRecording } from './socket';
 
-export const RECORDINGS_INDEX_KEY = 'voicelink:recordings';
+export const RECORDINGS_INDEX_KEY = 'browsentic:recordings';
 
-const bodyKey = (id: string) => `voicelink:recording:${id}`;
+const bodyKey = (id: string) => `browsentic:recording:${id}`;
 
 const MAX_RECORDINGS = 20;
 

@@ -11,7 +11,7 @@ export function log(message: string, detail?: unknown): void {
     appendFileSync(logPath, line);
   } catch {
   }
-  if (process.env.VOICELINK_DEBUG) process.stderr.write(line);
+  if (process.env.BROWSENTIC_DEBUG) process.stderr.write(line);
 }
 
 function rotateIfLarge(): void {

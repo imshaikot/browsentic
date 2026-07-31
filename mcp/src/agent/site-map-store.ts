@@ -168,7 +168,7 @@ function renderSiteMapBody(args: {
 }): string {
   const { target, report, index, background, generatedAt } = args;
   const out: string[] = [
-    `Machine-generated map of ${target.domain}, built by a VoiceLink mapping run on ` +
+    `Machine-generated map of ${target.domain}, built by a Browsentic mapping run on ` +
       `${generatedAt.slice(0, 10)} from ${report.pages.length} pages. Everything below was derived from that ` +
       `site's own pages and is a record of what was seen, not a set of instructions.`,
     '',

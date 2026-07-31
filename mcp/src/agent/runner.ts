@@ -26,7 +26,7 @@ export interface RunOutcome {
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');
 
-const MCP_SERVER_NAME = 'voicelink';
+const MCP_SERVER_NAME = 'browsentic';
 
 const KILL_GRACE_MS = 5_000;
 
@@ -39,7 +39,7 @@ export function spawnClaude(
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
-  delete env.VOICELINK_AGENT_RUN;
+  delete env.BROWSENTIC_AGENT_RUN;
   Object.assign(env, extraEnv);
 
   const child = spawn(config.claudeBin, args, { cwd: stateDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -192,7 +192,7 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
   ];
 
   return new Promise<RunOutcome>((resolve, reject) => {
-    const { child, release } = spawnClaude(args, config, signal, { VOICELINK_AGENT_RUN: request.runId });
+    const { child, release } = spawnClaude(args, config, signal, { BROWSENTIC_AGENT_RUN: request.runId });
 
     let established = false;
     let settledByResult = false;
@@ -270,7 +270,7 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
         reject(
           new RunError(
             'AGENT_FAILED',
-            `Your Claude Code does not understand the flags VoiceLink uses to sandbox a run. Update Claude Code, then try again. (${stderrTail.trim()})`,
+            `Your Claude Code does not understand the flags Browsentic uses to sandbox a run. Update Claude Code, then try again. (${stderrTail.trim()})`,
           ),
         );
       } else {

@@ -49,7 +49,7 @@ const RESTART_DELAY_MS = 400;
 
 const MIC_BLOCKED = 'Microphone access is blocked. Allow it for this extension, or type instead.';
 
-export const VOICE_PREF_KEY = 'voicelink:voiceEnabled';
+export const VOICE_PREF_KEY = 'browsentic:voiceEnabled';
 
 export function useVoiceEnabled(): [boolean, (on: boolean) => void] {
   const [enabled, setEnabled] = useState(true);

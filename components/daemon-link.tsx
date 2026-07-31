@@ -69,7 +69,7 @@ export function DaemonLink() {
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="Pairing code"
-            aria-label="Pairing code from voicelink-mcp pair"
+            aria-label="Pairing code from browsentic-mcp pair"
             className="h-8 font-mono text-xs uppercase"
             autoComplete="off"
             spellCheck={false}
@@ -83,7 +83,7 @@ export function DaemonLink() {
       {error && <p className="text-xs text-destructive">{error}</p>}
       {!paired && !error && (
         <p className="text-xs text-muted-foreground">
-          Run <code className="font-mono">voicelink-mcp pair</code> for a code.
+          Run <code className="font-mono">browsentic-mcp pair</code> for a code.
         </p>
       )}
     </div>

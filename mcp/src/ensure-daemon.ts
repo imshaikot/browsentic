@@ -15,7 +15,7 @@ export async function ensureDaemon(): Promise<Lockfile> {
   log('no daemon reachable; spawning one');
   const daemonMain = join(dirname(fileURLToPath(import.meta.url)), 'daemon-main.js');
   const env: NodeJS.ProcessEnv = { ...process.env };
-  delete env.VOICELINK_AGENT_RUN;
+  delete env.BROWSENTIC_AGENT_RUN;
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
 
@@ -32,7 +32,7 @@ export async function ensureDaemon(): Promise<Lockfile> {
     const started = await probeExisting();
     if (started) return started;
   }
-  throw new Error(`The VoiceLink daemon did not come up within ${SPAWN_TIMEOUT_MS}ms — see the log with "voicelink-mcp logs"`);
+  throw new Error(`The Browsentic daemon did not come up within ${SPAWN_TIMEOUT_MS}ms — see the log with "browsentic-mcp logs"`);
 }
 
 export async function probeExisting(): Promise<Lockfile | null> {

@@ -24,7 +24,7 @@ export async function tryFastPath(text: string, emit: (event: RunEvent) => void)
 
   if (!result.ok) {
     if (isRecordingAction(action)) return true;
-    console.debug(`[voicelink] fast path ${ruleId} (${score}) failed, escalating:`, result.error.code);
+    console.debug(`[browsentic] fast path ${ruleId} (${score}) failed, escalating:`, result.error.code);
     return false;
   }
   return true;

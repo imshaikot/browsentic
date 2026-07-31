@@ -12,25 +12,25 @@ import { RemoteBridge } from './remote-bridge';
 import { createMcpServer } from './server';
 import pkg from '../package.json';
 
-const USAGE = `voicelink-mcp ${pkg.version} — MCP access to your browser via the VoiceLink extension
+const USAGE = `browsentic-mcp ${pkg.version} — MCP access to your browser via the Browsentic extension
 
-  voicelink-mcp              serve MCP over stdio (what an MCP client runs)
-  voicelink-mcp pair         issue a one-time code to type into the extension
-  voicelink-mcp sessions     list paired browsers
-  voicelink-mcp revoke [origin]   unpair one browser, or all of them
-  voicelink-mcp tools        print the bundled tool manifest (no browser needed)
-  voicelink-mcp skills       list the skills the agent can route to, and where they came from
-  voicelink-mcp status       show daemon and extension connection state
-  voicelink-mcp stop         stop the background daemon
-  voicelink-mcp logs         print the daemon log
-  voicelink-mcp token        print the control token (for MCP clients, not the browser)
-  voicelink-mcp --version    print the version
+  browsentic-mcp              serve MCP over stdio (what an MCP client runs)
+  browsentic-mcp pair         issue a one-time code to type into the extension
+  browsentic-mcp sessions     list paired browsers
+  browsentic-mcp revoke [origin]   unpair one browser, or all of them
+  browsentic-mcp tools        print the bundled tool manifest (no browser needed)
+  browsentic-mcp skills       list the skills the agent can route to, and where they came from
+  browsentic-mcp status       show daemon and extension connection state
+  browsentic-mcp stop         stop the background daemon
+  browsentic-mcp logs         print the daemon log
+  browsentic-mcp token        print the control token (for MCP clients, not the browser)
+  browsentic-mcp --version    print the version
 
 The extension connects to nothing until you pair it:
-  1. run "voicelink-mcp pair"
-  2. open the VoiceLink popup, paste the code, press Connect
+  1. run "browsentic-mcp pair"
+  2. open the Browsentic popup, paste the code, press Connect
 
-Register with Claude Code:  claude mcp add voicelink -- npx -y @voicelink/mcp
+Register with Claude Code:  claude mcp add browsentic -- npx -y @browsentic/mcp
 `;
 
 const [command] = process.argv.slice(2);
@@ -82,8 +82,8 @@ switch (command) {
 
 async function serve(): Promise<void> {
   const lock = await ensureDaemon();
-  const bridge = await RemoteBridge.connect(lock.port, lock.token, process.env.VOICELINK_AGENT_RUN);
-  const server = createMcpServer(bridge, pkg.version, { agentRun: !!process.env.VOICELINK_AGENT_RUN });
+  const bridge = await RemoteBridge.connect(lock.port, lock.token, process.env.BROWSENTIC_AGENT_RUN);
+  const server = createMcpServer(bridge, pkg.version, { agentRun: !!process.env.BROWSENTIC_AGENT_RUN });
   await server.connect(new StdioServerTransport());
   log(`stdio MCP server attached to daemon on port ${lock.port}`);
 
@@ -144,7 +144,7 @@ async function showStatus(): Promise<void> {
   console.log(
     `paired:    ${status.pairedBrowsers || 'none'}${status.pairingPending ? ' (a pairing code is outstanding)' : ''}`,
   );
-  if (!status.pairedBrowsers) console.log('\nRun "voicelink-mcp pair" to connect your browser.');
+  if (!status.pairedBrowsers) console.log('\nRun "browsentic-mcp pair" to connect your browser.');
 }
 
 function stop(): void {
@@ -180,7 +180,7 @@ async function pair(): Promise<void> {
   const minutes = Math.round((expiresAt - Date.now()) / 60_000);
   const grouped = `${code.slice(0, 4)}-${code.slice(4)}`;
   console.log(`\n  Pairing code:  ${grouped}\n`);
-  console.log(`  Open the VoiceLink popup, paste it, and press Connect.`);
+  console.log(`  Open the Browsentic popup, paste it, and press Connect.`);
   console.log(`  Expires in ${minutes} minutes and works once.\n`);
 }
 
@@ -189,7 +189,7 @@ async function showSessions(): Promise<void> {
   const sessions = await bridge.sessions();
   await bridge.close();
   if (!sessions.length) {
-    return console.log('No paired browsers. Run "voicelink-mcp pair" to add one.');
+    return console.log('No paired browsers. Run "browsentic-mcp pair" to add one.');
   }
   for (const session of sessions) {
     console.log(`${session.connected ? '●' : '○'} ${session.origin}`);
@@ -202,7 +202,7 @@ async function revoke(origin?: string): Promise<void> {
   const revoked = await bridge.revoke(origin);
   await bridge.close();
   if (!revoked) return console.log(origin ? `No session for ${origin}.` : 'Nothing to revoke.');
-  console.log(`Revoked ${revoked} session(s). Pair again with "voicelink-mcp pair".`);
+  console.log(`Revoked ${revoked} session(s). Pair again with "browsentic-mcp pair".`);
 }
 
 async function connect(): Promise<RemoteBridge> {

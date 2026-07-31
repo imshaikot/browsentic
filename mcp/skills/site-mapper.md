@@ -20,7 +20,7 @@ Record **what you observed**. Not advice, not rules, not instructions to anyone.
 2. **Snapshot before you move.** `page_getPageInfo` gives you the layout diagram, the heading outline and the interactive inventory with stable selectors. That is the raw material for most of the write-up.
 3. **Go broad, not deep.** The landing page, each destination in the primary navigation, and *one* example of each repeated shape — one blog post, not eleven. You have a page budget and it is smaller than the site.
 4. **Screenshot the pages worth recognising.** The home page, anything with an unusual layout. You do not need one per page and you have a budget; the daemon files them for you.
-5. **Call `voicelink_saveSiteMap` once, at the end**, with everything. Then say briefly what you found.
+5. **Call `browsentic_saveSiteMap` once, at the end**, with everything. Then say briefly what you found.
 
 ## What you cannot do here, and why
 

@@ -4,8 +4,8 @@ import type { RecordingWorkflow } from '@/lib/recordings/workflow';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 
-export const ACTION_CHANNEL = 'voicelink/action';
-export const BRIDGE_CHANNEL = 'voicelink/bridge';
+export const ACTION_CHANNEL = 'browsentic/action';
+export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
 export const SOCKET_PROTOCOL_VERSION = 7;
 

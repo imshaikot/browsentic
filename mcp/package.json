@@ -1,7 +1,7 @@
 {
-  "name": "@voicelink/mcp",
+  "name": "@browsentic/mcp",
   "version": "0.1.0",
-  "description": "MCP server and local daemon that drive the VoiceLink browser extension",
+  "description": "MCP server and local daemon that drive the Browsentic browser extension",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@4.9.4",
@@ -9,8 +9,8 @@
     "node": ">=20"
   },
   "bin": {
-    "voicelink-mcp": "dist/cli.js",
-    "voicelink-mcpd": "dist/daemon-main.js"
+    "browsentic-mcp": "dist/cli.js",
+    "browsentic-mcpd": "dist/daemon-main.js"
   },
   "files": [
     "dist",

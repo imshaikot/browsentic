@@ -19,9 +19,9 @@ import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { invokeForHarness } from './invoke';
 
-export const DAEMON_STATE_KEY = 'voicelink/daemon';
-export const RECONNECT_ALARM = 'voicelink/reconnect';
-const SESSION_KEY_STORE = 'voicelink/sessionKey';
+export const DAEMON_STATE_KEY = 'browsentic/daemon';
+export const RECONNECT_ALARM = 'browsentic/reconnect';
+const SESSION_KEY_STORE = 'browsentic/sessionKey';
 
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 30_000;
@@ -74,7 +74,7 @@ export function analyzeFile(file: {
 }): Promise<ActionResult<FileNotes>> {
   const id = crypto.randomUUID();
   if (!post({ t: 'analyzeFile', id, ...file })) {
-    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -95,7 +95,7 @@ const pendingRecordings = new Map<string, (result: ActionResult<RecordingAnalysi
 export function analyzeRecording(recording: RecordingPayload): Promise<ActionResult<RecordingAnalysis>> {
   const id = crypto.randomUUID();
   if (!post({ t: 'analyzeRecording', id, recording })) {
-    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -116,7 +116,7 @@ const pendingSessionNames = new Map<string, (result: ActionResult<{ title: strin
 export function nameSession(session: { host?: string; messages: string[] }): Promise<ActionResult<{ title: string }>> {
   const id = crypto.randomUUID();
   if (!post({ t: 'nameSession', id, ...session })) {
-    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -161,7 +161,7 @@ function skillOp(
   >,
 ): Promise<ActionResult<SavedSkill>> {
   if (!post(frame)) {
-    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No VoiceLink daemon is attached — pair the browser first.'));
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -206,7 +206,7 @@ export async function connectDaemon(): Promise<void> {
 
 export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; error?: string }> {
   const code = pairingToken.replace(/[\s-]/g, '').toUpperCase();
-  if (!code) return { ok: false, error: 'Enter the pairing code from "voicelink-mcp pair".' };
+  if (!code) return { ok: false, error: 'Enter the pairing code from "browsentic-mcp pair".' };
 
   disconnectSocket();
   clearTimeout(reconnectTimer);
@@ -214,7 +214,7 @@ export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; e
   return new Promise((resolve) => {
     pairingResult = resolve;
     dial({ pairingToken: code }, 0);
-    setTimeout(() => settlePairing({ ok: false, error: 'No VoiceLink daemon is running. Start one with "voicelink-mcp pair".' }), 8_000);
+    setTimeout(() => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic-mcp pair".' }), 8_000);
   });
 }
 
@@ -247,7 +247,7 @@ function disconnectSocket(): void {
 
 function dial(auth: SocketAuth, portIndex: number): void {
   if (portIndex >= DAEMON_PORTS.length) {
-    settlePairing({ ok: false, error: 'No VoiceLink daemon is running.' });
+    settlePairing({ ok: false, error: 'No Browsentic daemon is running.' });
     if ('sessionKey' in auth) scheduleRetry(auth);
     return;
   }

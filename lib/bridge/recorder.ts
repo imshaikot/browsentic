@@ -16,9 +16,9 @@ import {
   type StoredRecordingMeta,
 } from './recording-store';
 
-const ACTIVE_KEY = 'voicelink/recording';
-export const WARN_ALARM = 'voicelink/recording-warn';
-export const STOP_ALARM = 'voicelink/recording-stop';
+const ACTIVE_KEY = 'browsentic/recording';
+export const WARN_ALARM = 'browsentic/recording-warn';
+export const STOP_ALARM = 'browsentic/recording-stop';
 
 export type StopReason = 'user' | 'timeout' | 'tab-closed';
 

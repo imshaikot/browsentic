@@ -19,7 +19,7 @@ export function RecordingList({
     return (
       <p className="px-1 py-1 text-[11px] leading-relaxed text-muted-foreground">
         No recordings yet. Press Record above to capture what you do on a site — the clicks, the fields you fill, the
-        pages you move through — and VoiceLink turns it into steps the assistant can repeat later. A recording runs for
+        pages you move through — and Browsentic turns it into steps the assistant can repeat later. A recording runs for
         at most 15 minutes.
       </p>
     );

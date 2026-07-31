@@ -195,7 +195,7 @@ Constraint: the result must stay import-free enough to load in a worker and bare
 ### 2f. `invokeForRun` — a guard chain → an ordered interceptor list
 
 [service.ts:73-121](mcp/src/agent/service.ts#L73-L121) interleaves five concerns in one
-procedure: emit `tool`, intercept `voicelink.saveSiteMap`, apply the mapping gate, apply the
+procedure: emit `tool`, intercept `browsentic.saveSiteMap`, apply the mapping gate, apply the
 approval gate, invoke, emit `toolResult`. The gate *order* is load-bearing and documented
 (mapping runs deliberately bypass approval) but currently only legible by reading the
 fall-through.

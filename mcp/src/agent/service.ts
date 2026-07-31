@@ -363,8 +363,8 @@ function filesBlock(files: AttachedFile[] | undefined): string | undefined {
   for (const file of files) {
     const lines = [`## ${flatten(file.name)} (${file.mime || 'unknown type'}, ${Math.ceil(file.size / 1024)} KB)`, ''];
     lines.push(`File id for page_attachFile: ${flatten(file.id)}`);
-    if (file.status === 'pending') lines.push('', 'VoiceLink is still reading this file; no notes yet.');
-    else if (file.status === 'error') lines.push('', 'VoiceLink could not read this file, so there are no notes on it.');
+    if (file.status === 'pending') lines.push('', 'Browsentic is still reading this file; no notes yet.');
+    else if (file.status === 'error') lines.push('', 'Browsentic could not read this file, so there are no notes on it.');
     if (file.summary) lines.push('', `Summary: ${flatten(file.summary)}`);
     if (file.digest) lines.push('', 'Notes from reading the file:', '', file.digest.trim());
 
@@ -445,7 +445,7 @@ function fetchedBlock(origin: string, index: SiteIndex): string {
 function mappingBrief(host: string, settings: { maxPages: number; maxScreenshots: number }): string {
   return (
     `Map ${host}. Visit up to ${settings.maxPages} pages and take up to ${settings.maxScreenshots} screenshots, ` +
-    `then call voicelink_saveSiteMap once with everything you found. Prefer breadth over depth: the landing page, ` +
+    `then call browsentic_saveSiteMap once with everything you found. Prefer breadth over depth: the landing page, ` +
     `the main navigation destinations, and one example of each repeated page shape. Record what you observed, ` +
     `not advice — a future assistant will read this to find its way around, and anything that reads like an ` +
     `instruction will be shown to the user as suspicious.`

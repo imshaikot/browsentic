@@ -2,9 +2,9 @@ import { browser } from 'wxt/browser';
 import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import { deleteSiteMap, deleteSkill, saveSkill } from './socket';
 
-export const SKILLS_INDEX_KEY = 'voicelink:skills';
+export const SKILLS_INDEX_KEY = 'browsentic:skills';
 
-const skillBodyKey = (id: string) => `voicelink:skill:${id}`;
+const skillBodyKey = (id: string) => `browsentic:skill:${id}`;
 
 export type SkillSyncStatus = 'pending' | 'saved' | 'error';
 

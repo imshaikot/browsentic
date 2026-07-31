@@ -25,7 +25,7 @@ import {
   sendInstruction,
 } from './socket';
 
-export const RUN_PORT = 'voicelink/run';
+export const RUN_PORT = 'browsentic/run';
 
 const LOCAL_RUN = 'local';
 
@@ -195,7 +195,7 @@ async function instruct(text: string, context?: RunContext): Promise<void> {
           kind: 'error',
           code: 'EXTENSION_OFFLINE',
           message:
-            'No VoiceLink daemon is attached, so only quick browser commands work. Pair the browser to do more.',
+            'No Browsentic daemon is attached, so only quick browser commands work. Pair the browser to do more.',
         },
       });
     }
@@ -209,7 +209,7 @@ async function handledLocally(text: string): Promise<boolean> {
   try {
     return await tryFastPath(text, (event) => broadcast({ op: 'event', runId: LOCAL_RUN, event }));
   } catch (error) {
-    console.warn('[voicelink] fast path threw, escalating:', error);
+    console.warn('[browsentic] fast path threw, escalating:', error);
     return false;
   }
 }

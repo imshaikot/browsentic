@@ -16,19 +16,19 @@ const SCREENSHOT_TOOL = 'page_screenshot';
 
 const RESOURCES = [
   {
-    uri: 'voicelink://page/current',
+    uri: 'browsentic://page/current',
     name: 'Active page snapshot',
     description: 'Full page.getPageInfo snapshot of the active tab: metadata, layout tree, headings, interactive inventory.',
     mimeType: 'application/json',
   },
   {
-    uri: 'voicelink://page/diagram',
+    uri: 'browsentic://page/diagram',
     name: 'Active page layout diagram',
     description: 'Text diagram of the active tab’s landmark regions — the cheapest useful view of a page.',
     mimeType: 'text/plain',
   },
   {
-    uri: 'voicelink://page/text',
+    uri: 'browsentic://page/text',
     name: 'Active page text',
     description: 'Rendered text of the active tab.',
     mimeType: 'text/plain',
@@ -107,12 +107,12 @@ const SAVE_SITE_MAP_TOOL = {
 
 export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean } = {}): Server {
   const server = new Server(
-    { name: 'voicelink', version },
+    { name: 'browsentic', version },
     {
       capabilities: { tools: { listChanged: true }, resources: {} },
       instructions:
-        'Controls the user’s browser through the VoiceLink extension. Tools act on the active tab. ' +
-        'Start with page_getPageInfo (or the voicelink://page/diagram resource) to learn what is on the page and ' +
+        'Controls the user’s browser through the Browsentic extension. Tools act on the active tab. ' +
+        'Start with page_getPageInfo (or the browsentic://page/diagram resource) to learn what is on the page and ' +
         'get stable selectors, then target elements by selector or visible text.',
     },
   );
@@ -130,7 +130,7 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
         {
           name: STATUS_TOOL,
           description:
-            'Report whether the VoiceLink browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
+            'Report whether the Browsentic browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
           inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
         },
         ...(opts.agentRun ? [SAVE_SITE_MAP_TOOL] : []),
@@ -151,12 +151,12 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     const resource = RESOURCES.find((candidate) => candidate.uri === uri);
     if (!resource) throw new Error(`Unknown resource: ${uri}`);
 
-    if (uri === 'voicelink://page/text') {
+    if (uri === 'browsentic://page/text') {
       const result = await bridge.invoke('page.extractText', { format: 'text' });
       return text(uri, resource.mimeType, unwrap(result, (data) => String((data as { content: string }).content)));
     }
-    const result = await bridge.invoke('page.getPageInfo', { maxPerKind: uri === 'voicelink://page/diagram' ? 1 : 30 });
-    if (uri === 'voicelink://page/diagram') {
+    const result = await bridge.invoke('page.getPageInfo', { maxPerKind: uri === 'browsentic://page/diagram' ? 1 : 30 });
+    if (uri === 'browsentic://page/diagram') {
       return text(uri, resource.mimeType, unwrap(result, (data) => String((data as PageInfo).layout.diagram)));
     }
     return text(uri, resource.mimeType, unwrap(result, (data) => JSON.stringify(data, null, 2)));
@@ -180,7 +180,7 @@ async function status(bridge: Bridge) {
   if (!base.connected) {
     return {
       ok: true as const,
-      data: { ...base, activeTab: null, hint: 'Open your browser with the VoiceLink extension loaded.' },
+      data: { ...base, activeTab: null, hint: 'Open your browser with the Browsentic extension loaded.' },
     };
   }
   const page = await bridge.invoke('page.getPageInfo', { maxPerKind: 1 });

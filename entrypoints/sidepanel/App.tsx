@@ -136,7 +136,7 @@ export default function App() {
           <AudioLines className="size-4" />
         </div>
         <div className="flex-1">
-          <h1 className="text-sm leading-none font-semibold">VoiceLink</h1>
+          <h1 className="text-sm leading-none font-semibold">Browsentic</h1>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               className={cn(
@@ -358,7 +358,7 @@ function VoiceStatus({
         <span className="relative flex-1 overflow-hidden rounded-full bg-primary/20">
           <span
             className="block h-1 rounded-full bg-primary"
-            style={{ animation: `voicelink-countdown ${voice.autoSendMs}ms linear forwards` }}
+            style={{ animation: `browsentic-countdown ${voice.autoSendMs}ms linear forwards` }}
           />
         </span>
         <span className="shrink-0">Sending…</span>
@@ -461,14 +461,14 @@ function Greeting({ connected, voiceOn }: { connected: boolean; voiceOn: boolean
         <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm wrap-anywhere">
           {connected ? (
             <>
-              Hi, I&apos;m VoiceLink.{' '}
+              Hi, I&apos;m Browsentic.{' '}
               {voiceOn ? 'Just talk' : 'Tell me'} what to do on this page — read it, fill something in, click through a
               flow — and you&apos;ll see every action I take as I take it.
             </>
           ) : (
             <>
-              This browser isn&apos;t paired yet. Run <code className="font-mono text-xs">voicelink-mcp pair</code> and
-              enter the code in the VoiceLink popup.
+              This browser isn&apos;t paired yet. Run <code className="font-mono text-xs">browsentic-mcp pair</code> and
+              enter the code in the Browsentic popup.
             </>
           )}
         </div>

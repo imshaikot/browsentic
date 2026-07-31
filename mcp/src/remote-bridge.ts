@@ -35,19 +35,19 @@ export class RemoteBridge implements Bridge {
   async invoke(action: string, input?: unknown): Promise<ActionResult> {
     const reply = await this.request({ id: randomUUID(), op: 'invoke', action, input, runId: this.runId });
     if (reply && 'result' in reply) return reply.result;
-    return failure('DAEMON_UNREACHABLE', 'The VoiceLink daemon did not respond');
+    return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not respond');
   }
 
   async status(): Promise<BridgeStatus> {
     const reply = await this.request({ id: randomUUID(), op: 'status' });
     if (reply && 'status' in reply) return reply.status;
-    throw new Error('The VoiceLink daemon did not respond to a status request');
+    throw new Error('The Browsentic daemon did not respond to a status request');
   }
 
   async pair(): Promise<{ code: string; expiresAt: number }> {
     const reply = await this.request({ id: randomUUID(), op: 'pair' });
     if (reply && 'code' in reply) return reply;
-    throw new Error('The VoiceLink daemon did not issue a pairing code');
+    throw new Error('The Browsentic daemon did not issue a pairing code');
   }
 
   async sessions(): Promise<SessionSummary[]> {

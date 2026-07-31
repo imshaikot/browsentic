@@ -4,9 +4,9 @@ import { exposeRecorder } from '@/lib/recordings/host';
 export default defineContentScript({
   matches: ['*://*/*'],
   main() {
-    const world = globalThis as { __voicelinkActions?: boolean };
-    if (world.__voicelinkActions) return;
-    world.__voicelinkActions = true;
+    const world = globalThis as { __browsenticActions?: boolean };
+    if (world.__browsenticActions) return;
+    world.__browsenticActions = true;
     exposeActions();
     exposeRecorder();
   },

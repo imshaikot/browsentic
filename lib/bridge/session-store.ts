@@ -2,9 +2,9 @@ import { browser } from 'wxt/browser';
 import type { RunItem } from './use-run';
 import { nameSession } from './socket';
 
-export const SESSIONS_INDEX_KEY = 'voicelink:sessions';
+export const SESSIONS_INDEX_KEY = 'browsentic:sessions';
 
-const transcriptKey = (id: string) => `voicelink:session:${id}`;
+const transcriptKey = (id: string) => `browsentic:session:${id}`;
 
 const MAX_SESSIONS = 50;
 

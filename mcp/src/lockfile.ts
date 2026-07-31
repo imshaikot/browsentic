@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const stateDir = process.env.VOICELINK_HOME ?? join(homedir(), '.voicelink');
+export const stateDir = process.env.BROWSENTIC_HOME ?? join(homedir(), '.browsentic');
 export const lockfilePath = join(stateDir, 'daemon.json');
 export const logPath = join(stateDir, 'daemon.log');
 

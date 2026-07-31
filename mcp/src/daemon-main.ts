@@ -7,7 +7,7 @@ const daemon = await startDaemon({
   idleExit: !process.argv.includes('--no-idle-exit'),
 }).catch((error) => {
   log('daemon failed to start', error);
-  process.stderr.write(`voicelink-mcpd: ${error instanceof Error ? error.message : error}\n`);
+  process.stderr.write(`browsentic-mcpd: ${error instanceof Error ? error.message : error}\n`);
   process.exit(1);
 });
 

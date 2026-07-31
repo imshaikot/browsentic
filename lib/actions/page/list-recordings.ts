@@ -4,7 +4,7 @@ import { ActionError, defineAction } from '../core';
 export const listRecordings = defineAction({
   name: 'page.listRecordings',
   description:
-    'List the browsing sessions the user recorded in VoiceLink, with the goal and step count of each. Use page.readRecording to open one.',
+    'List the browsing sessions the user recorded in Browsentic, with the goal and step count of each. Use page.readRecording to open one.',
   input: z.object({
     host: z
       .string()
@@ -17,7 +17,7 @@ export const listRecordings = defineAction({
   }),
   execute() {
     throw new ActionError(
-      'page.listRecordings is resolved by the VoiceLink extension, not in the page',
+      'page.listRecordings is resolved by the Browsentic extension, not in the page',
       'UNSUPPORTED',
     );
   },

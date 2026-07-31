@@ -1,4 +1,4 @@
-export const RESERVED_PREFIX = 'voicelink.';
+export const RESERVED_PREFIX = 'browsentic.';
 
 export const SAVE_SITE_MAP_ACTION = `${RESERVED_PREFIX}saveSiteMap` as const;
 export const START_RECORDING_ACTION = `${RESERVED_PREFIX}startRecording` as const;

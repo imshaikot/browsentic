@@ -4,7 +4,7 @@ import { describeElement, resolveTarget, targetSchema } from './dom';
 
 export const attachFile = defineAction({
   name: 'page.attachFile',
-  description: 'Attach a stored VoiceLink file (by id, from page.listFiles) to a file input on the page.',
+  description: 'Attach a stored Browsentic file (by id, from page.listFiles) to a file input on the page.',
   input: z.object({
     fileId: z.string().describe('Id of a stored file, taken from page.listFiles.'),
     target: targetSchema.describe('The file input (<input type="file">) to attach the file to.'),

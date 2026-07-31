@@ -92,7 +92,7 @@ function gateNavigate(run: MapRun, input: unknown): Gate {
   if (run.pagesVisited.size >= run.settings.maxPages && !run.pagesVisited.has(url.pathname)) {
     return deny(
       'MAPPING_BUDGET',
-      `This run has already visited ${run.settings.maxPages} pages, which is its limit. Write up what you have with voicelink_saveSiteMap.`,
+      `This run has already visited ${run.settings.maxPages} pages, which is its limit. Write up what you have with browsentic_saveSiteMap.`,
     );
   }
   return { allow: true };

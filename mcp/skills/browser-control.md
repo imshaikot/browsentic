@@ -44,7 +44,7 @@ Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` bef
 
 `page_screenshot` captures the tab as an image. By default it captures the **full scroll view** and hands the picture back to you to look at — reach for it when you need to *see* layout or rendering that the text inventory can't convey. Narrow it when asked: `{ fullPage: false }` for just the current viewport, or `{ target: { text: "Pricing" } }` to capture a single element or block.
 
-It writes a file **only when you ask it to.** When the user wants to **save, keep, download, or store** a screenshot, pass `save: true` — the image is written under `~/voicelink/screenshot/` and the result reports the exact path, which you should relay back. Pass `filename` when the user names one; otherwise it is auto-named. Without `save: true` nothing touches the disk, so never tell the user you saved a screenshot unless you actually set `save: true` and got a path back.
+It writes a file **only when you ask it to.** When the user wants to **save, keep, download, or store** a screenshot, pass `save: true` — the image is written under `~/browsentic/screenshot/` and the result reports the exact path, which you should relay back. Pass `filename` when the user names one; otherwise it is auto-named. Without `save: true` nothing touches the disk, so never tell the user you saved a screenshot unless you actually set `save: true` and got a path back.
 
 ## 7. Multi-step tasks
 

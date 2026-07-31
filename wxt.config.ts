@@ -8,8 +8,8 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: 'VoiceLink',
-    description: 'Talk to an AI assistant about any page — voice-first AI in your browser.',
+    name: 'Browsentic',
+    description: 'Reimagine browsing as agentic — driven by the AI agent you already run, in your own logged-in browser.',
     permissions: ['storage', 'unlimitedStorage', 'activeTab', 'sidePanel', 'alarms', 'scripting'],
     host_permissions: ['*://*/*'],
   },

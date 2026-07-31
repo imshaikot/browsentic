@@ -35,7 +35,7 @@ const userDir = join(stateDir, 'skills');
 export function uploadedSkillsDir(): string {
   const configured = readAgentConfig().skillsDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
-  return join(homedir(), 'voicelink', 'skills');
+  return join(homedir(), 'browsentic', 'skills');
 }
 
 function expandHome(p: string): string {

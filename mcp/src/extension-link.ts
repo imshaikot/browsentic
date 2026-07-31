@@ -77,7 +77,7 @@ export class ExtensionLink {
 
   private request(frame: SocketFrame & { id: string }, timeoutMs: number): Promise<ActionResult> {
     if (!this.isOpen) {
-      return Promise.resolve(failure('EXTENSION_OFFLINE', 'The VoiceLink extension is not connected'));
+      return Promise.resolve(failure('EXTENSION_OFFLINE', 'The Browsentic extension is not connected'));
     }
     return new Promise((resolve) => {
       const timer = setTimeout(() => {

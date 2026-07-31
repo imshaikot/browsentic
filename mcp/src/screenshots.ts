@@ -30,7 +30,7 @@ function containedSkillDir(dir: string): string {
 function resolveDir(): string {
   const configured = readAgentConfig().screenshotDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
-  return join(homedir(), 'voicelink', 'screenshot');
+  return join(homedir(), 'browsentic', 'screenshot');
 }
 
 function expandHome(p: string): string {

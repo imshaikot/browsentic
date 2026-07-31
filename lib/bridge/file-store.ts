@@ -1,9 +1,9 @@
 import { browser } from 'wxt/browser';
 import { analyzeFile } from './socket';
 
-export const FILES_INDEX_KEY = 'voicelink:files';
+export const FILES_INDEX_KEY = 'browsentic:files';
 
-const fileBytesKey = (id: string) => `voicelink:file:${id}`;
+const fileBytesKey = (id: string) => `browsentic:file:${id}`;
 
 export type FileStatus = 'pending' | 'ready' | 'error';
 

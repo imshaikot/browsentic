@@ -7,7 +7,7 @@ export interface Utterance {
 const SPOKEN_TLD = /\b([a-z0-9][a-z0-9-]*)\s+dot\s+(com|net|org|io|dev|co|ai|app|edu|gov|me|uk|xyz)\b/g;
 
 const OPENER =
-  /^(?:hey|hi|ok|okay|yo|um|uh|please|voicelink|assistant|can you|could you|would you|will you|i want you to|i would like you to|id like you to|lets|just|now|go ahead and)\s+/;
+  /^(?:hey|hi|ok|okay|yo|um|uh|please|browsentic|assistant|can you|could you|would you|will you|i want you to|i would like you to|id like you to|lets|just|now|go ahead and)\s+/;
 
 const TRAILER =
   /\s+(?:please|thanks|thank you|for me|now|a bit|a little|a lot|some more|more|slightly|real quick|quickly)$/;

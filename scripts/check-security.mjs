@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const cache = join(root, 'node_modules/.cache/voicelink-security');
+const cache = join(root, 'node_modules/.cache/browsentic-security');
 
 async function bundle(entry, name) {
   const outfile = join(cache, `${name}.mjs`);

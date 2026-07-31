@@ -12,7 +12,7 @@ export const readRecording = defineAction({
   }),
   execute() {
     throw new ActionError(
-      'page.readRecording is resolved by the VoiceLink extension, not in the page',
+      'page.readRecording is resolved by the Browsentic extension, not in the page',
       'UNSUPPORTED',
     );
   },

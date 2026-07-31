@@ -3,7 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const listFiles = defineAction({
   name: 'page.listFiles',
-  description: 'List the files the user has stored in VoiceLink, with their AI-generated summaries.',
+  description: 'List the files the user has stored in Browsentic, with their AI-generated summaries.',
   input: z.object({
     nameContains: z
       .string()
@@ -11,6 +11,6 @@ export const listFiles = defineAction({
       .describe('Only return files whose name contains this text (case-insensitive).'),
   }),
   execute() {
-    throw new ActionError('page.listFiles is resolved by the VoiceLink extension, not in the page', 'UNSUPPORTED');
+    throw new ActionError('page.listFiles is resolved by the Browsentic extension, not in the page', 'UNSUPPORTED');
   },
 });

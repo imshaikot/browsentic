@@ -5,7 +5,7 @@ import { documentBounds, resolveTarget, targetSchema } from './dom';
 export const screenshot = defineAction({
   name: 'page.screenshot',
   description:
-    'Capture the tab as a PNG/JPEG image — the full scroll view, the current viewport, or a single targeted element. Optionally save it under ~/voicelink/screenshot/.',
+    'Capture the tab as a PNG/JPEG image — the full scroll view, the current viewport, or a single targeted element. Optionally save it under ~/browsentic/screenshot/.',
   input: z.object({
     target: targetSchema
       .optional()
@@ -34,7 +34,7 @@ export const screenshot = defineAction({
     save: z
       .boolean()
       .default(false)
-      .describe('Save the image to ~/voicelink/screenshot/ (written by the local VoiceLink daemon).'),
+      .describe('Save the image to ~/browsentic/screenshot/ (written by the local Browsentic daemon).'),
     filename: z
       .string()
       .optional()

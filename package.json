@@ -1,7 +1,7 @@
 {
-  "name": "voicelink",
+  "name": "browsentic",
   "version": "0.1.0",
-  "description": "VoiceLink — an AI voice assistant Chrome extension",
+  "description": "Browsentic — agentic browsing driven by the AI agent you already run",
   "private": true,
   "type": "module",
   "packageManager": "yarn@4.17.1",
@@ -17,7 +17,7 @@
     "mcp:build": "yarn --cwd mcp build",
     "mcp:dev": "yarn --cwd mcp dev",
     "mcp:link": "cd mcp && npm link",
-    "mcp:unlink": "npm rm -g @voicelink/mcp",
+    "mcp:unlink": "npm rm -g @browsentic/mcp",
     "mcp:manifest": "yarn --cwd mcp build && node mcp/dist/cli.js tools",
     "intent:check": "node scripts/check-intent.mjs",
     "security:check": "node scripts/check-security.mjs",
