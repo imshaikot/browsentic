@@ -1366,6 +1366,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"browsentic@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "browsentic@workspace:."
+  dependencies:
+    "@radix-ui/react-scroll-area": "npm:^1.2.16"
+    "@radix-ui/react-slot": "npm:^1.3.1"
+    "@tailwindcss/vite": "npm:^4.3.3"
+    "@types/react": "npm:^19.2.17"
+    "@types/react-dom": "npm:^19.2.3"
+    "@wxt-dev/module-react": "npm:^1.2.2"
+    class-variance-authority: "npm:^0.7.1"
+    clsx: "npm:^2.1.1"
+    lucide-react: "npm:^1.26.0"
+    react: "npm:^19.2.8"
+    react-dom: "npm:^19.2.8"
+    tailwind-merge: "npm:^3.6.0"
+    tailwindcss: "npm:^4.3.3"
+    tw-animate-css: "npm:^1.4.0"
+    typescript: "npm:^7.0.2"
+    wxt: "npm:^0.20.27"
+    zod: "npm:^4.4.3"
+  languageName: unknown
+  linkType: soft
+
 "buffer-equal-constant-time@npm:^1.0.1":
   version: 1.0.1
   resolution: "buffer-equal-constant-time@npm:1.0.1"
@@ -4522,30 +4546,6 @@ __metadata:
   checksum: 10c0/3231e24dd4394d0bc8b4f0f5d6d6a2eda8737e5053042892b4163564456a03d67f953c4c7498621f9517eebc30a492ea136c728a767a122eb84bf6d7cf60e1e6
   languageName: node
   linkType: hard
-
-"voicelink@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "voicelink@workspace:."
-  dependencies:
-    "@radix-ui/react-scroll-area": "npm:^1.2.16"
-    "@radix-ui/react-slot": "npm:^1.3.1"
-    "@tailwindcss/vite": "npm:^4.3.3"
-    "@types/react": "npm:^19.2.17"
-    "@types/react-dom": "npm:^19.2.3"
-    "@wxt-dev/module-react": "npm:^1.2.2"
-    class-variance-authority: "npm:^0.7.1"
-    clsx: "npm:^2.1.1"
-    lucide-react: "npm:^1.26.0"
-    react: "npm:^19.2.8"
-    react-dom: "npm:^19.2.8"
-    tailwind-merge: "npm:^3.6.0"
-    tailwindcss: "npm:^4.3.3"
-    tw-animate-css: "npm:^1.4.0"
-    typescript: "npm:^7.0.2"
-    wxt: "npm:^0.20.27"
-    zod: "npm:^4.4.3"
-  languageName: unknown
-  linkType: soft
 
 "watchpack@npm:2.4.4":
   version: 2.4.4

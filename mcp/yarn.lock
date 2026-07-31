@@ -5,6 +5,23 @@ __metadata:
   version: 10
   cacheKey: 10c0
 
+"@browsentic/mcp@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@browsentic/mcp@workspace:."
+  dependencies:
+    "@modelcontextprotocol/sdk": "npm:^1.29.0"
+    "@types/node": "npm:^26.1.1"
+    "@types/ws": "npm:^8.18.1"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^7.0.2"
+    ws: "npm:^8.21.1"
+    zod: "npm:^4.4.3"
+  bin:
+    browsentic-mcp: dist/cli.js
+    browsentic-mcpd: dist/daemon-main.js
+  languageName: unknown
+  linkType: soft
+
 "@esbuild/aix-ppc64@npm:0.27.7":
   version: 0.27.7
   resolution: "@esbuild/aix-ppc64@npm:0.27.7"
@@ -611,23 +628,6 @@ __metadata:
   conditions: os=win32 & cpu=x64
   languageName: node
   linkType: hard
-
-"@voicelink/mcp@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "@voicelink/mcp@workspace:."
-  dependencies:
-    "@modelcontextprotocol/sdk": "npm:^1.29.0"
-    "@types/node": "npm:^26.1.1"
-    "@types/ws": "npm:^8.18.1"
-    tsup: "npm:^8.5.1"
-    typescript: "npm:^7.0.2"
-    ws: "npm:^8.21.1"
-    zod: "npm:^4.4.3"
-  bin:
-    voicelink-mcp: dist/cli.js
-    voicelink-mcpd: dist/daemon-main.js
-  languageName: unknown
-  linkType: soft
 
 "abbrev@npm:^5.0.0":
   version: 5.0.0
