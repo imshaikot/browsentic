@@ -1,4 +1,4 @@
-import { AlertTriangle, Bot, Check, Info, User, Wrench, X, Zap } from 'lucide-react';
+import { AlertTriangle, Bot, Check, Info, Terminal, User, Wrench, X, Zap } from 'lucide-react';
 
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,9 @@ function ToolRow({
         <span className="shrink-0 font-mono text-muted-foreground">{item.action.replace(/^page\./, '')}</span>
         {item.source === 'local' && (
           <Zap className="size-3 shrink-0 text-amber-500" aria-label="Handled in the browser" />
+        )}
+        {item.source === 'external' && (
+          <Terminal className="size-3 shrink-0 text-sky-500" aria-label="Run by a connected MCP client" />
         )}
         {item.summary && (
           <span className={cn('min-w-0 truncate', item.ok === false ? 'text-destructive' : 'text-muted-foreground')}>

@@ -1,8 +1,16 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { DAEMON_PORTS, SOCKET_PROTOCOL_VERSION, failure, parseFrame, type ActionResult } from '@/lib/actions/protocol';
+import {
+  DAEMON_PORTS,
+  EXTERNAL_RUN_ID,
+  SOCKET_PROTOCOL_VERSION,
+  failure,
+  parseFrame,
+  type ActionResult,
+  type RunEvent,
+} from '@/lib/actions/protocol';
 import { hashManifest } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
 import { saveScreenshot } from './screenshots';
@@ -73,6 +81,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   let link: ExtensionLink | null = null;
   let agent: AgentSession | null = null;
   const controls = new Set<WebSocket>();
+  let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -272,6 +281,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function acceptControl(ws: WebSocket): void {
+    const client = `c${++controlSeq}`;
     controls.add(ws);
     scheduleIdleExit();
     ws.on('message', async (raw) => {
@@ -284,10 +294,17 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', tools });
       if (request.op === 'status') return send(ws, { id: request.id, op: 'status', status: statusNow() });
       if (request.op === 'invoke') {
-        const result = request.runId
-          ? ((await agent?.invokeForRun(request.runId, request.action, request.input)) ??
-            failure('RUN_INACTIVE', 'This agent run is no longer active'))
-          : await invoke(request.action, request.input);
+        let result: ActionResult;
+        if (request.runId) {
+          result =
+            (await agent?.invokeForRun(request.runId, request.action, request.input)) ??
+            failure('RUN_INACTIVE', 'This agent run is no longer active');
+          if (!result.ok && result.error.code === 'RUN_INACTIVE') {
+            log(`control ${client} invoked ${request.action} for inactive run ${request.runId}`);
+          }
+        } else {
+          result = await invokeExternal(request.action, request.input, client);
+        }
         return send(ws, { id: request.id, op: 'invoke', result });
       }
       if (request.op === 'pair') {
@@ -359,6 +376,24 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       );
     }
     return persistScreenshot(action, input, await link.invoke(action, input, opts?.tabId), opts?.saveTo);
+  }
+
+  async function invokeExternal(action: string, input: unknown, client: string): Promise<ActionResult> {
+    const target = link;
+    const toolId = randomUUID();
+    const tell = (event: RunEvent) => {
+      if (target?.isOpen) target.send({ t: 'run', id: EXTERNAL_RUN_ID, event });
+    };
+    tell({ kind: 'tool', toolId, action, input, source: 'external' });
+    const result = await invoke(action, input);
+    log(`external ${client} → ${action} ${result.ok ? 'ok' : result.error.code}`);
+    tell({
+      kind: 'toolResult',
+      toolId,
+      ok: result.ok,
+      summary: result.ok ? 'ok' : `${result.error.code}: ${result.error.message}`,
+    });
+    return result;
   }
 
   function scheduleIdleExit(): void {

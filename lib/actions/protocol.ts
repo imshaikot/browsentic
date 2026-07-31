@@ -9,6 +9,8 @@ export const BRIDGE_CHANNEL = 'voicelink/bridge';
 
 export const SOCKET_PROTOCOL_VERSION = 7;
 
+export const EXTERNAL_RUN_ID = 'external';
+
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
 
 export interface ActionInvocation {
@@ -37,7 +39,7 @@ export type ActionResult<T = unknown> =
 export type RunEvent =
   | { kind: 'started'; skill: string; overlays?: string[] }
   | { kind: 'text'; delta: string }
-  | { kind: 'tool'; toolId: string; action: string; input: unknown; source?: 'local' }
+  | { kind: 'tool'; toolId: string; action: string; input: unknown; source?: 'local' | 'external' }
   | { kind: 'approval'; toolId: string; action: string; input: unknown }
   | { kind: 'toolResult'; toolId: string; ok: boolean; summary: string }
   | { kind: 'session'; claudeSessionId: string | null }

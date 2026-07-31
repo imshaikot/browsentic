@@ -1,5 +1,11 @@
 import { browser, type Browser } from 'wxt/browser';
-import type { AttachedFile, RunContext, RunEvent, SavedRecording } from '@/lib/actions/protocol';
+import {
+  EXTERNAL_RUN_ID,
+  type AttachedFile,
+  type RunContext,
+  type RunEvent,
+  type SavedRecording,
+} from '@/lib/actions/protocol';
 import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { tryFastPath } from './fast-path';
@@ -53,6 +59,7 @@ let pendingDraft: SiteMapDraft | null = null;
 
 export function serveRunPorts(): void {
   onRunEvent((runId, event) => {
+    if (runId === EXTERNAL_RUN_ID) return broadcast({ op: 'event', runId, event });
     const ends = event.kind === 'done' || event.kind === 'error';
     if (ends && (activeRunId === null || activeRunId === runId)) setActiveRun(null);
     broadcast({ op: 'event', runId, event });
