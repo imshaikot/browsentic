@@ -14,10 +14,15 @@ export async function ensureDaemon(): Promise<Lockfile> {
 
   log('no daemon reachable; spawning one');
   const daemonMain = join(dirname(fileURLToPath(import.meta.url)), 'daemon-main.js');
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  delete env.VOICELINK_AGENT_RUN;
+  delete env.CLAUDECODE;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+
   const child = spawn(process.execPath, [daemonMain], {
     detached: true,
     stdio: 'ignore',
-    env: process.env,
+    env,
   });
   child.unref();
 

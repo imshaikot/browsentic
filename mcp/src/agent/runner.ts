@@ -34,9 +34,11 @@ export function spawnClaude(
   signal: AbortSignal,
   extraEnv?: Record<string, string>,
 ) {
-  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
+  const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
+  delete env.VOICELINK_AGENT_RUN;
+  Object.assign(env, extraEnv);
 
   const child = spawn(config.claudeBin, args, { cwd: stateDir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const kill = () => {
@@ -49,7 +51,40 @@ export function spawnClaude(
   return { child, release: () => signal.removeEventListener('abort', kill) };
 }
 
-const ONE_SHOT_DENIED = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep', 'Read', 'WebFetch', 'WebSearch', 'Task'];
+const BUILTIN_DENIED = [
+  'Bash',
+  'Edit',
+  'Write',
+  'NotebookEdit',
+  'Glob',
+  'Grep',
+  'Read',
+  'Task',
+  'Monitor',
+  'Workflow',
+  'Skill',
+  'ToolSearch',
+  'SendMessage',
+  'TaskOutput',
+  'TaskStop',
+  'TodoWrite',
+  'ReportFindings',
+  'CronCreate',
+  'CronDelete',
+  'CronList',
+  'ScheduleWakeup',
+  'RemoteTrigger',
+  'PushNotification',
+  'DesignSync',
+  'EnterWorktree',
+  'ExitWorktree',
+];
+
+const WEB_TOOLS = ['WebSearch', 'WebFetch'];
+
+const ONE_SHOT_DENIED = [...BUILTIN_DENIED, ...WEB_TOOLS];
+
+const OLD_CLAUDE = /unknown option|unrecognized option/i;
 
 export function runClaudeJson(
   prompt: string,
@@ -62,6 +97,11 @@ export function runClaudeJson(
     prompt,
     '--output-format',
     'json',
+    '--mcp-config',
+    '{"mcpServers":{}}',
+    '--strict-mcp-config',
+    '--tools',
+    ...(allowedTools.length ? allowedTools : ['']),
     ...(allowedTools.length ? ['--allowedTools', ...allowedTools] : []),
     '--disallowedTools',
     ...ONE_SHOT_DENIED.filter((tool) => !allowedTools.includes(tool)),
@@ -134,19 +174,14 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
     '--mcp-config',
     JSON.stringify({ mcpServers: { voicelink: { command: process.execPath, args: [cliPath] } } }),
     '--strict-mcp-config',
+    '--tools',
+    ...(request.research ? WEB_TOOLS : ['']),
     '--allowedTools',
     'mcp__voicelink',
-    ...(request.research ? ['WebSearch', 'WebFetch'] : []),
+    ...(request.research ? WEB_TOOLS : []),
     '--disallowedTools',
-    'Bash',
-    'Edit',
-    'Write',
-    'NotebookEdit',
-    'Read',
-    'Glob',
-    'Grep',
-    ...(request.research ? [] : ['WebFetch', 'WebSearch']),
-    'Task',
+    ...BUILTIN_DENIED,
+    ...(request.research ? [] : WEB_TOOLS),
     '--append-system-prompt',
     request.systemPrompt,
     ...(request.resume ? ['--resume', request.sessionId] : ['--session-id', request.sessionId]),
@@ -178,7 +213,10 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
         case 'system':
           if (message.subtype === 'init') {
             established = true;
-            log(`agent run ${request.runId}: claude session ${message.session_id} up`);
+            const builtins = (message.tools ?? []).filter((tool) => !tool.startsWith('mcp__'));
+            log(
+              `agent run ${request.runId}: claude session ${message.session_id} up, built-ins: ${builtins.join(', ') || 'none'}`,
+            );
           }
           return;
 
@@ -226,7 +264,14 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
       release();
       if (settledByResult) return;
       if (signal.aborted) reject(new RunError('CANCELLED', 'Run cancelled.'));
-      else {
+      else if (OLD_CLAUDE.test(stderrTail)) {
+        reject(
+          new RunError(
+            'AGENT_FAILED',
+            `Your Claude Code does not understand the flags VoiceLink uses to sandbox a run. Update Claude Code, then try again. (${stderrTail.trim()})`,
+          ),
+        );
+      } else {
         reject(
           new RunError(
             'AGENT_FAILED',
@@ -239,7 +284,7 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
 }
 
 type StreamLine =
-  | { type: 'system'; subtype?: string; session_id?: string }
+  | { type: 'system'; subtype?: string; session_id?: string; tools?: string[] }
   | {
       type: 'stream_event';
       parent_tool_use_id?: string | null;
