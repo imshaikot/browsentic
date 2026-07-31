@@ -26,6 +26,8 @@ export interface RunOutcome {
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');
 
+const MCP_SERVER_NAME = 'voicelink';
+
 const KILL_GRACE_MS = 5_000;
 
 export function spawnClaude(
@@ -172,12 +174,12 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
     '--include-partial-messages',
     '--verbose',
     '--mcp-config',
-    JSON.stringify({ mcpServers: { voicelink: { command: process.execPath, args: [cliPath] } } }),
+    JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { command: process.execPath, args: [cliPath] } } }),
     '--strict-mcp-config',
     '--tools',
     ...(request.research ? WEB_TOOLS : ['']),
     '--allowedTools',
-    'mcp__voicelink',
+    `mcp__${MCP_SERVER_NAME}`,
     ...(request.research ? WEB_TOOLS : []),
     '--disallowedTools',
     ...BUILTIN_DENIED,

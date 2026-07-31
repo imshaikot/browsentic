@@ -9,6 +9,7 @@ import {
   type RunContext,
   type RunEvent,
 } from '@/lib/actions/protocol';
+import { READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import { log } from '../log';
 import { readAgentConfig, siteMapSettings, type AgentConfig } from './config';
@@ -254,7 +255,7 @@ export class AgentSession {
     const staging = prepareStaging();
 
     const toolId = randomUUID();
-    emit({ kind: 'tool', toolId, action: 'voicelink.readSitemap', input: { origin: target.target.origin } });
+    emit({ kind: 'tool', toolId, action: READ_SITEMAP_ACTION, input: { origin: target.target.origin } });
     let index: SiteIndex;
     try {
       index = await fetchSiteIndex(target.target.origin, run.abort.signal);

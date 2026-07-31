@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
+import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { join } from 'node:path';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
@@ -96,7 +97,7 @@ async function serve(): Promise<void> {
 
 function printTools(): void {
   const actions = describeActions();
-  assertToolNamesRoundTrip(actions.map((action) => action.name));
+  assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
   console.log(
     JSON.stringify(
       actions.map((action) => ({ ...action, name: toolNameFor(action.name), action: action.name })),

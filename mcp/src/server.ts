@@ -6,11 +6,12 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ActionResult } from '@/lib/actions/protocol';
+import { RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
 import { actionNameFor, assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import type { Bridge } from './control';
 import { log } from './log';
 
-const STATUS_TOOL = 'voicelink_status';
+const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
 const SCREENSHOT_TOOL = 'page_screenshot';
 
 const RESOURCES = [
@@ -35,7 +36,7 @@ const RESOURCES = [
 ] as const;
 
 const SAVE_SITE_MAP_TOOL = {
-  name: 'voicelink_saveSiteMap',
+  name: toolNameFor(SAVE_SITE_MAP_ACTION),
   description:
     'Write up a finished site map. Call this exactly once, at the end of a mapping run. The map is staged for the user to review before it takes effect — it does not apply immediately.',
   inputSchema: {
@@ -118,7 +119,7 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const actions = await bridge.describe();
-    assertToolNamesRoundTrip(actions.map((action) => action.name));
+    assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
     return {
       tools: [
         ...actions.map((action) => ({

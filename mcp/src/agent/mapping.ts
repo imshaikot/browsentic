@@ -1,4 +1,5 @@
 import { failure, type ActionResult } from '@/lib/actions/protocol';
+import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { SAVE_SITE_MAP_ACTION } from '@/lib/skills/site-map';
 import { log } from '../log';
 import type { SiteMapSettings } from './config';
@@ -38,7 +39,7 @@ const deny = (code: string, message: string): Gate => ({ allow: false, result: f
 
 export function gateMappingInvoke(run: MapRun, action: string, input: unknown): Gate {
   if (action === SAVE_SITE_MAP_ACTION) return { allow: true };
-  if (action.startsWith('voicelink.')) {
+  if (action.startsWith(RESERVED_PREFIX)) {
     return deny('UNKNOWN_ACTION', `Unknown action "${action}".`);
   }
 

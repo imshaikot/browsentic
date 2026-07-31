@@ -13,6 +13,7 @@ import {
 } from '@/lib/actions/protocol';
 import { hashManifest } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
+import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { saveScreenshot } from './screenshots';
 import {
   consumePairing,
@@ -366,7 +367,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     input?: unknown,
     opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
   ) {
-    if (action.startsWith('voicelink.')) {
+    if (action.startsWith(RESERVED_PREFIX)) {
       return failure('UNKNOWN_ACTION', `Unknown action "${action}".`);
     }
     if (!link?.isOpen) {

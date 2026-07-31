@@ -3,6 +3,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import {
   MAX_EVENTS,
   MAX_RECORDING_MS,
+  RECORD_CHANNEL,
   WARN_AT_MS,
   hostOf,
   type RecordedEvent,
@@ -105,7 +106,7 @@ export async function startRecording(opts: {
   await writeActive(active);
   await browser.alarms.create(WARN_ALARM, { when: active.startedAt + WARN_AT_MS });
   await browser.alarms.create(STOP_ALARM, { when: active.startedAt + MAX_RECORDING_MS });
-  await browser.tabs.sendMessage(opts.tabId, { channel: 'voicelink/record', op: 'begin' }).catch(() => undefined);
+  await browser.tabs.sendMessage(opts.tabId, { channel: RECORD_CHANNEL, op: 'begin' }).catch(() => undefined);
 
   const state = stateOf(active);
   listener?.(state);
@@ -137,7 +138,7 @@ export async function stopRecording(reason: StopReason): Promise<ActionResult<{ 
   await writeActive(null);
   if (reason !== 'tab-closed') {
     await browser.tabs
-      .sendMessage(active.tabId, { channel: 'voicelink/record', op: 'end' })
+      .sendMessage(active.tabId, { channel: RECORD_CHANNEL, op: 'end' })
       .catch(() => undefined);
   }
   listener?.(null);

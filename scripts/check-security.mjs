@@ -27,6 +27,7 @@ async function bundle(entry, name) {
 const sitemap = await bundle('mcp/src/agent/sitemap.ts', 'sitemap');
 const effects = await bundle('mcp/src/agent/effects.ts', 'effects');
 const redact = await bundle('lib/bridge/redact.ts', 'redact');
+const reserved = await bundle('lib/actions/reserved.ts', 'reserved');
 
 let failed = 0;
 let ran = 0;
@@ -84,6 +85,12 @@ for (const [action, input, want] of SUBMITS) check(`submitsForm(${action})`, eff
 
 check('needsApproval fillInput+pressEnter', effects.needsApproval(['page.submitForm'], 'page.fillInput', { pressEnter: true }), true);
 check('needsApproval disabled when list empty', effects.needsApproval([], 'page.fillInput', { pressEnter: true }), false);
+
+check('reserved prefix ends with a dot', reserved.RESERVED_PREFIX.endsWith('.'), true);
+check('reserved prefix has no underscore', reserved.RESERVED_PREFIX.includes('_'), false);
+for (const name of reserved.RESERVED_ACTIONS) {
+  check(`${name} carries the reserved prefix`, name.startsWith(reserved.RESERVED_PREFIX), true);
+}
 
 const r = redact.redactInput;
 check('fillInput value redacted', r('page.fillInput', { value: 'hunter2' }).value, '[redacted]');

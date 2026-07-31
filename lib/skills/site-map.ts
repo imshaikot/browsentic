@@ -5,7 +5,7 @@ export { scrub, looksLikeInstruction };
 
 export const SITE_MAPPER_SKILL = 'site-mapper';
 
-export const SAVE_SITE_MAP_ACTION = 'voicelink.saveSiteMap';
+export { SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
 
 export const MAX_MAP_BODY_BYTES = 16 * 1024;
 export const MAX_MAP_PAGES = 24;

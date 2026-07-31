@@ -1,5 +1,6 @@
-export const START_RECORDING_ACTION = 'voicelink.startRecording';
-export const STOP_RECORDING_ACTION = 'voicelink.stopRecording';
+export { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/actions/reserved';
+
+export const RECORD_CHANNEL = 'voicelink/record';
 
 export const MAX_EVENTS = 2000;
 export const MAX_RECORDING_MS = 15 * 60_000;

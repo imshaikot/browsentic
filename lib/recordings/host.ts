@@ -1,9 +1,9 @@
 import { browser } from 'wxt/browser';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
 import { startCapture } from './capture';
-import type { RecordedEvent } from './events';
+import { RECORD_CHANNEL, type RecordedEvent } from './events';
 
-export const RECORD_CHANNEL = 'voicelink/record';
+export { RECORD_CHANNEL };
 
 interface RecordCommand {
   channel: typeof RECORD_CHANNEL;
