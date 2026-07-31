@@ -66,13 +66,12 @@ export function startCapture({ captureValues, send }: CaptureOptions): () => voi
     };
   };
 
-  const valueFor = (el: Editable, field: string, key: string): string => {
-    const raw =
-      el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-        ? el.value
-        : (el.textContent ?? '');
+  const rawOf = (el: Editable): string =>
+    el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.value : (el.textContent ?? '');
+
+  const valueFor = (el: HTMLElement, field: string, key: string, raw: string): string => {
     const sensitive = isSensitiveField({
-      type: el instanceof HTMLInputElement ? el.type : 'text',
+      type: el instanceof HTMLInputElement ? el.type : el.tagName.toLowerCase(),
       name: el.getAttribute('name') ?? '',
       id: el.id,
       autocomplete: el.getAttribute('autocomplete') ?? '',
@@ -102,7 +101,7 @@ export function startCapture({ captureValues, send }: CaptureOptions): () => voi
       target,
       field: field.slice(0, MAX_TEXT_CHARS),
       inputKind,
-      value: valueFor(el, field, target.selector),
+      value: valueFor(el, field, target.selector, rawOf(el)),
       url: location.href,
     });
   };
@@ -123,12 +122,16 @@ export function startCapture({ captureValues, send }: CaptureOptions): () => voi
     const el = event.target;
     if (el instanceof HTMLSelectElement) {
       const option = el.selectedOptions[0];
+      const target = targetFor(el);
+      const field = target.text || el.getAttribute('name') || el.id || 'field';
+      const value = valueFor(el, field, target.selector, el.value);
+      const withheld = value.startsWith('{{');
       push({
         t: Date.now(),
         kind: 'select',
-        target: targetFor(el),
-        value: el.value.slice(0, MAX_VALUE_CHARS),
-        label: option?.text.trim().slice(0, MAX_TEXT_CHARS) || undefined,
+        target,
+        value,
+        label: withheld ? undefined : option?.text.trim().slice(0, MAX_TEXT_CHARS) || undefined,
         url: location.href,
       });
       return;
