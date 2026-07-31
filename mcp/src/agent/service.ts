@@ -12,6 +12,7 @@ import {
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import { log } from '../log';
 import { readAgentConfig, siteMapSettings, type AgentConfig } from './config';
+import { needsApproval } from './effects';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { buildSystemPrompt } from './prompt';
 import { RunError, runInstruction } from './runner';
@@ -102,7 +103,7 @@ export class AgentSession {
       return result;
     }
 
-    if (run.config.requireApproval.includes(action)) {
+    if (needsApproval(run.config.requireApproval, action, input)) {
       emit({ kind: 'approval', toolId, action, input });
       if (!(await this.awaitDecision(run, toolId))) {
         emit({ kind: 'toolResult', toolId, ok: false, summary: 'declined by the user' });
@@ -461,9 +462,11 @@ function summarize(input: unknown, result: ActionResult): string {
     return clip(`image ${shot.width ?? '?'}×${shot.height ?? '?'}${saved}`);
   }
 
+  const submits = (result.data as { submits?: unknown } | null)?.submits === true ? ' — submits a form' : '';
+
   const target = (input as { target?: { text?: string; selector?: string } } | undefined)?.target;
-  if (target?.text) return clip(`“${target.text}”`);
-  if (target?.selector) return clip(target.selector);
+  if (target?.text) return clip(`“${target.text}”${submits}`);
+  if (target?.selector) return clip(`${target.selector}${submits}`);
 
   const data = result.data as Record<string, unknown> | null;
   for (const key of ['navigatedTo', 'navigatingTo', 'url', 'performed', 'value']) {

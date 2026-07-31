@@ -16,12 +16,16 @@ export const clickElement = defineAction({
       el.focus({ preventScroll: true });
     } catch {
     }
+    const submits =
+      !!el.closest('form') &&
+      ((el instanceof HTMLButtonElement && el.type === 'submit') ||
+        (el instanceof HTMLInputElement && (el.type === 'submit' || el.type === 'image')));
     const init = { bubbles: true, cancelable: true, composed: true };
     el.dispatchEvent(new PointerEvent('pointerdown', init));
     el.dispatchEvent(new MouseEvent('mousedown', init));
     el.dispatchEvent(new PointerEvent('pointerup', init));
     el.dispatchEvent(new MouseEvent('mouseup', init));
     el.click();
-    return describeElement(el);
+    return { ...describeElement(el), submits };
   },
 });
