@@ -5,7 +5,7 @@ import { documentBounds, resolveTarget, targetSchema } from './dom';
 export const screenshot = defineAction({
   name: 'page.screenshot',
   description:
-    'Capture the tab as a PNG/JPEG image — the full scroll view, the current viewport, or a single targeted element. Optionally save it under ~/browsentic/screenshot/.',
+    'Capture the tab as a PNG/JPEG image — the full scroll view, the current viewport, or a single targeted element. The image is saved under ~/browsentic/screenshot/ and the result reports the path as savedTo; pass save: false to capture without writing a file.',
   input: z.object({
     target: targetSchema
       .optional()
@@ -33,8 +33,10 @@ export const screenshot = defineAction({
       .describe('Downscale the result so its longest side is at most this many pixels.'),
     save: z
       .boolean()
-      .default(false)
-      .describe('Save the image to ~/browsentic/screenshot/ (written by the local Browsentic daemon).'),
+      .default(true)
+      .describe(
+        'Write the image to ~/browsentic/screenshot/ (done by the local Browsentic daemon, which adds savedTo to the result). Set false to capture without touching the disk.',
+      ),
     filename: z
       .string()
       .optional()

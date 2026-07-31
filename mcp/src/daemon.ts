@@ -58,7 +58,7 @@ function persistScreenshot(
   if (action !== 'page.screenshot' || !result.ok) return result;
   const args = (input ?? {}) as { save?: unknown; filename?: unknown };
   const data = result.data as { dataUrl?: unknown } | null;
-  if ((args.save !== true && !saveTo) || typeof data?.dataUrl !== 'string') return result;
+  if ((args.save === false && !saveTo) || typeof data?.dataUrl !== 'string') return result;
   try {
     const savedTo = saveScreenshot(data.dataUrl, {
       dir: saveTo?.dir,

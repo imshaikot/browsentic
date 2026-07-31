@@ -113,7 +113,9 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
       instructions:
         'Controls the user’s browser through the Browsentic extension. Tools act on the active tab. ' +
         'Start with page_getPageInfo (or the browsentic://page/diagram resource) to learn what is on the page and ' +
-        'get stable selectors, then target elements by selector or visible text.',
+        'get stable selectors, then target elements by selector or visible text. ' +
+        'page_screenshot saves every capture to disk unless you pass save: false, and reports the file as savedTo. ' +
+        'Always show the user the screenshot itself — read savedTo back so the image renders — and include that path in your reply.',
     },
   );
 
@@ -212,7 +214,9 @@ function renderScreenshot(result: ActionResult) {
   const notes = [
     `Captured ${data.width}×${data.height} ${data.format ?? 'image'}.`,
     data.truncated ? 'The page was taller than the capture limit, so the bottom is cut off.' : '',
-    data.savedTo ? `Saved to ${data.savedTo}.` : '',
+    data.savedTo
+      ? `Saved to ${data.savedTo}. Show this screenshot to the user: read that path so the image renders, and include the path in your reply.`
+      : '',
     data.saveError ? `Requested save failed: ${data.saveError}.` : '',
   ]
     .filter(Boolean)
