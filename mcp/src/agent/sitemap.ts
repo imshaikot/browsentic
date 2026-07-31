@@ -1,5 +1,7 @@
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
 import { gunzipSync } from 'node:zlib';
 import { log } from '../log';
 
@@ -104,21 +106,21 @@ interface Seed {
   hostname: string;
   port: string;
   address: string;
-  loopback: boolean;
+  family: 4 | 6;
 }
 
 async function pinOrigin(origin: string): Promise<Seed> {
   const url = new URL(origin);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error(`unsupported scheme ${url.protocol}`);
   const address = await resolveOnce(url.hostname);
-  const loopback = isPrivateAddress(address);
+  if (isPrivateAddress(address)) throw new Error(`${url.hostname} resolves to the private address ${address}`);
   return {
     origin: url.origin,
     protocol: url.protocol,
     hostname: url.hostname.toLowerCase(),
     port: url.port,
     address,
-    loopback,
+    family: isIP(address) === 6 ? 6 : 4,
   };
 }
 
@@ -128,7 +130,15 @@ async function resolveOnce(hostname: string): Promise<string> {
   return address;
 }
 
-async function get(
+function pinnedLookup(address: string, family: 4 | 6): LookupFunction {
+  return ((_hostname, options, callback) => {
+    const all = typeof options === 'object' && options !== null && (options as { all?: boolean }).all === true;
+    if (all) (callback as unknown as (e: null, a: { address: string; family: number }[]) => void)(null, [{ address, family }]);
+    else (callback as unknown as (e: null, a: string, f: number) => void)(null, address, family);
+  }) as LookupFunction;
+}
+
+export async function get(
   target: string,
   seed: Seed,
   budget: { bytes: number; documents: number },
@@ -142,69 +152,119 @@ async function get(
   }
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (!(await allowed(url, seed))) {
-      log(`sitemap: refused ${url.href} (not the mapped origin, or a private address)`);
+    if (!allowed(url, seed)) {
+      log(`sitemap: refused ${url.href} (not the mapped origin)`);
       return null;
     }
-    const timer = new AbortController();
-    const abort = () => timer.abort();
-    signal.addEventListener('abort', abort, { once: true });
-    const deadline = setTimeout(abort, REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetch(url, {
-        redirect: 'manual',
-        signal: timer.signal,
-        headers: { accept: 'text/plain,application/xml,text/xml,*/*' },
-      });
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (!location || hop === MAX_REDIRECTS) return null;
-        url = new URL(location, url);
-        continue;
+    const hopResult = await send(url, seed, budget, signal);
+    if (!hopResult) return null;
+    if (hopResult.status >= 300 && hopResult.status < 400) {
+      if (!hopResult.location || hop === MAX_REDIRECTS) return null;
+      try {
+        url = new URL(hopResult.location, url);
+      } catch {
+        return null;
       }
-      if (!response.ok || !response.body) return null;
-      budget.documents++;
-      const bytes = await readCapped(response.body, budget);
-      return decode(bytes, url);
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(deadline);
-      signal.removeEventListener('abort', abort);
+      continue;
     }
+    if (!hopResult.body) return null;
+    return decode(hopResult.body, url);
   }
   return null;
 }
 
-async function allowed(url: URL, seed: Seed): Promise<boolean> {
+export function allowed(url: URL, seed: Seed): boolean {
   if (url.protocol !== seed.protocol) return false;
   if (url.hostname.toLowerCase() !== seed.hostname) return false;
-  if (url.port !== seed.port) return false;
-  const address = await resolveOnce(url.hostname).catch(() => '');
-  if (!address || address !== seed.address) return false;
-  return seed.loopback || !isPrivateAddress(address);
+  return url.port === seed.port;
 }
 
-async function readCapped(body: ReadableStream<Uint8Array>, budget: { bytes: number }): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  const reader = body.getReader();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      budget.bytes += value.byteLength;
-      if (size > MAX_DOC_BYTES || budget.bytes > MAX_TOTAL_BYTES) {
-        await reader.cancel().catch(() => {});
-        break;
-      }
-      chunks.push(Buffer.from(value));
+interface Hop {
+  status: number;
+  location: string | null;
+  body: Buffer | null;
+}
+
+function send(
+  url: URL,
+  seed: Seed,
+  budget: { bytes: number; documents: number },
+  signal: AbortSignal,
+): Promise<Hop | null> {
+  return new Promise<Hop | null>((resolve) => {
+    const call = url.protocol === 'https:' ? httpsRequest : httpRequest;
+    let settled = false;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+
+    const finish = (value: Hop | null) => {
+      if (settled) return;
+      settled = true;
+      if (deadline) clearTimeout(deadline);
+      signal.removeEventListener('abort', onAbort);
+      resolve(value);
+    };
+
+    const req = call(url, {
+      method: 'GET',
+      lookup: pinnedLookup(seed.address, seed.family),
+      headers: {
+        accept: 'text/plain,application/xml,text/xml,*/*',
+        'accept-encoding': 'identity',
+      },
+    });
+
+    function onAbort() {
+      req.destroy();
+      finish(null);
     }
-  } finally {
-    reader.releaseLock();
-  }
-  return Buffer.concat(chunks);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    deadline = setTimeout(onAbort, REQUEST_TIMEOUT_MS);
+
+    req.on('error', () => finish(null));
+
+    req.on('response', (res: IncomingMessage) => {
+      const status = res.statusCode ?? 0;
+      if (status >= 300 && status < 400) {
+        const raw = res.headers.location;
+        res.destroy();
+        return finish({ status, location: typeof raw === 'string' ? raw : null, body: null });
+      }
+      if (status < 200 || status >= 300) {
+        res.destroy();
+        return finish(null);
+      }
+      budget.documents++;
+      readCapped(res, budget).then((body) => finish({ status, location: null, body }));
+    });
+
+    req.end();
+  });
+}
+
+function readCapped(res: IncomingMessage, budget: { bytes: number }): Promise<Buffer> {
+  return new Promise<Buffer>((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let done = false;
+    const settle = () => {
+      if (done) return;
+      done = true;
+      resolve(Buffer.concat(chunks));
+    };
+    res.on('data', (chunk: Buffer) => {
+      size += chunk.byteLength;
+      budget.bytes += chunk.byteLength;
+      if (size > MAX_DOC_BYTES || budget.bytes > MAX_TOTAL_BYTES) {
+        res.destroy();
+        return settle();
+      }
+      chunks.push(chunk);
+    });
+    res.on('end', settle);
+    res.on('aborted', settle);
+    res.on('error', settle);
+  });
 }
 
 function decode(bytes: Buffer, url: URL): string {
@@ -281,14 +341,58 @@ function placeholder(segment: string): string {
   return '{slug}';
 }
 
+function expandV6(address: string): number[] | null {
+  const bare = address.split('%')[0].toLowerCase();
+  const [head, tail, ...rest] = bare.split('::');
+  if (rest.length) return null;
+
+  const toGroups = (part: string): number[] | null => {
+    if (!part) return [];
+    const out: number[] = [];
+    for (const piece of part.split(':')) {
+      if (piece.includes('.')) {
+        const quad = piece.split('.').map(Number);
+        if (quad.length !== 4 || quad.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+        out.push((quad[0] << 8) | quad[1], (quad[2] << 8) | quad[3]);
+        continue;
+      }
+      if (!/^[0-9a-f]{1,4}$/.test(piece)) return null;
+      out.push(parseInt(piece, 16));
+    }
+    return out;
+  };
+
+  const left = toGroups(head);
+  const right = tail === undefined ? [] : toGroups(tail);
+  if (!left || !right) return null;
+  if (tail === undefined) return left.length === 8 ? left : null;
+  const fill = 8 - left.length - right.length;
+  if (fill < 0) return null;
+  return [...left, ...new Array<number>(fill).fill(0), ...right];
+}
+
+function v4From(hi: number, lo: number): string {
+  return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+}
+
 export function isPrivateAddress(address: string): boolean {
   if (isIP(address) === 6) {
-    const lower = address.toLowerCase();
-    if (lower === '::1' || lower === '::') return true;
-    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
-    if (lower.startsWith('fe80')) return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(lower);
-    return mapped ? isPrivateAddress(mapped[1]) : false;
+    const g = expandV6(address);
+    if (!g) return true;
+    if (g.every((part) => part === 0)) return true;
+    if (g.slice(0, 7).every((part) => part === 0) && g[7] === 1) return true;
+    if ((g[0] & 0xfe00) === 0xfc00) return true;
+    if ((g[0] & 0xffc0) === 0xfe80) return true;
+    if ((g[0] & 0xffc0) === 0xfec0) return true;
+    if ((g[0] & 0xff00) === 0xff00) return true;
+    if (g[0] === 0x2002) return isPrivateAddress(v4From(g[1], g[2]));
+    if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0) {
+      return isPrivateAddress(v4From(g[6], g[7]));
+    }
+    if (g.slice(0, 5).every((part) => part === 0) && (g[5] === 0xffff || g[5] === 0)) {
+      return isPrivateAddress(v4From(g[6], g[7]));
+    }
+    return false;
   }
   const parts = address.split('.').map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
@@ -298,5 +402,7 @@ export function isPrivateAddress(address: string): boolean {
   if (a === 192 && b === 168) return true;
   if (a === 169 && b === 254) return true;
   if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 192 && b === 0) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
   return a >= 224;
 }
