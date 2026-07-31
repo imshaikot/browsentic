@@ -36,6 +36,6 @@ export const fillInput = defineAction({
       el.dispatchEvent(new KeyboardEvent('keyup', enter));
       if (notPrevented && !(el instanceof HTMLTextAreaElement)) el.closest('form')?.requestSubmit();
     }
-    return { element: describeElement(el), value: next };
+    return { element: describeElement(el), length: next.length, appended: !clear };
   },
 });
