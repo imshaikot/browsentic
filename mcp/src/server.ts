@@ -185,16 +185,36 @@ async function status(bridge: Bridge) {
       data: { ...base, activeTab: null, hint: 'Open your browser with the Browsentic extension loaded.' },
     };
   }
+  const monitors = await activeMonitors(bridge);
   const page = await bridge.invoke('page.getPageInfo', { maxPerKind: 1 });
-  if (page.ok) return { ok: true as const, data: { ...base, activeTab: (page.data as PageInfo).document } };
+  if (page.ok) {
+    return { ok: true as const, data: { ...base, activeTab: (page.data as PageInfo).document, ...monitors } };
+  }
   return {
     ok: true as const,
     data: {
       ...base,
       activeTab: null,
+      ...monitors,
       hint: `Cannot read the active tab (${page.error.code}). Use page_navigate to open an http(s) page first.`,
     },
   };
+}
+
+interface MonitorSummary {
+  monitorId: string;
+  label?: string;
+  host: string;
+  phase: string;
+  percent?: number;
+}
+
+async function activeMonitors(bridge: Bridge): Promise<{ monitors: MonitorSummary[] } | undefined> {
+  const result = await bridge.invoke('page.monitorStatus', {});
+  if (!result.ok) return undefined;
+  const monitors = (result.data as { monitors?: MonitorSummary[] } | null)?.monitors;
+  if (!monitors?.length) return undefined;
+  return { monitors: monitors.map(({ monitorId, label, host, phase, percent }) => ({ monitorId, label, host, phase, percent })) };
 }
 
 function renderScreenshot(result: ActionResult) {
