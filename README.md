@@ -13,7 +13,7 @@ It runs on **your own [Claude Code](https://claude.com/claude-code) login**. The
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 22 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
+- **Real page control.** 23 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
 - **Site maps.** Point Browsentic at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
 - **Recordings.** Do a repetitive job once yourself and Browsentic keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
@@ -210,7 +210,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Claude Code now has 22 page tools plus `browsentic_status`, and three read only resources that
+Claude Code now has 23 page tools plus `browsentic_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -219,7 +219,7 @@ registry the extension ships, so they cannot drift from what the browser can act
 | Category | Capabilities |
 | --- | --- |
 | Read | Structured page snapshot with a layout diagram and stable selectors, rendered text or HTML, wait for an element to appear or vanish, screenshot the tab or one element |
-| Act | Click, hover, focus, type into inputs and contenteditables, choose a `<select>` option, select text, press keys with modifiers, submit a form |
+| Act | Click, hover, focus, type into inputs and contenteditables, stream text in keystroke by keystroke at a human pace, choose a `<select>` option, select text, press keys with modifiers, submit a form |
 | Move | Open a URL, back, forward, reload, scroll to an element or position, open a URL in a new tab, list and switch between open tabs, close one |
 | Files | List files stored in Browsentic and attach one to a file input on the page |
 | Recordings | List the browsing sessions the user recorded, and read one back as ordered, replayable steps |
