@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
+import { awaitMonitor } from '@/lib/actions/page/await-monitor';
+import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { failure, type ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
+import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
 
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -33,7 +36,10 @@ export class RemoteBridge implements Bridge {
   }
 
   async invoke(action: string, input?: unknown): Promise<ActionResult> {
-    const reply = await this.request({ id: randomUUID(), op: 'invoke', action, input, runId: this.runId });
+    const reply = await this.request(
+      { id: randomUUID(), op: 'invoke', action, input, runId: this.runId },
+      invokeTimeoutFor(action, input),
+    );
     if (reply && 'result' in reply) return reply.result;
     return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not respond');
   }
@@ -68,13 +74,13 @@ export class RemoteBridge implements Bridge {
     this.socket.close(1000, 'client exiting');
   }
 
-  private request(request: ControlRequest): Promise<ControlMessage | null> {
+  private request(request: ControlRequest, timeoutMs = REQUEST_TIMEOUT_MS): Promise<ControlMessage | null> {
     if (this.socket.readyState !== WebSocket.OPEN) return Promise.resolve(null);
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
         resolve(null);
-      }, REQUEST_TIMEOUT_MS);
+      }, timeoutMs);
       this.pending.set(request.id, (message) => {
         clearTimeout(timer);
         resolve(message);
@@ -99,4 +105,12 @@ export class RemoteBridge implements Bridge {
     this.pending.delete(message.id);
     settle(message);
   }
+}
+
+function invokeTimeoutFor(action: string, input?: unknown): number {
+  if (action === startMonitor.name) return REQUEST_TIMEOUT_MS;
+  const declared = (input as { timeoutMs?: unknown } | undefined)?.timeoutMs;
+  if (typeof declared === 'number' && declared > 0) return declared + 10_000;
+  if (action === awaitMonitor.name) return AWAIT_DEFAULT_TIMEOUT_MS + 10_000;
+  return REQUEST_TIMEOUT_MS;
 }

@@ -9,7 +9,10 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
+import { awaitMonitor } from '@/lib/actions/page/await-monitor';
+import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { typeText, typingDurationMs } from '@/lib/actions/page/type-text';
+import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
 import { log } from './log';
 
 const PING_INTERVAL_MS = 20_000;
@@ -124,6 +127,13 @@ const SCREENSHOT_TIMEOUT_MS = 120_000;
 function timeoutFor(action: string, input: unknown): number {
   if (action === 'page.screenshot') return SCREENSHOT_TIMEOUT_MS;
   if (action === typeText.name) return typingDurationMs(input) + DEFAULT_TIMEOUT_MS;
+  if (action === startMonitor.name) return DEFAULT_TIMEOUT_MS;
+  if (action === awaitMonitor.name) return (declaredTimeout(input) ?? AWAIT_DEFAULT_TIMEOUT_MS) + 5_000;
+  const declared = declaredTimeout(input);
+  return declared != null ? declared + 5_000 : DEFAULT_TIMEOUT_MS;
+}
+
+function declaredTimeout(input: unknown): number | null {
   const declared = (input as { timeoutMs?: unknown } | undefined)?.timeoutMs;
-  return typeof declared === 'number' && declared > 0 ? declared + 5_000 : DEFAULT_TIMEOUT_MS;
+  return typeof declared === 'number' && declared > 0 ? declared : null;
 }
