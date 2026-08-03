@@ -6,6 +6,7 @@ import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
 import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
+import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
 import { serveRunPorts } from '@/lib/bridge/run-port';
 import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, onWelcome, pairDaemon } from '@/lib/bridge/socket';
@@ -59,6 +60,17 @@ export default defineBackground(() => {
       sendResponse(success(true));
       return;
     }
+    if (message.op === 'monitorSample' && typeof message.monitorId === 'string') {
+      void ingestSample(sender.tab?.id, message.monitorId, message.sample);
+      sendResponse(success(true));
+      return;
+    }
+    if (message.op === 'monitorState') {
+      monitorsForTab(sender.tab?.id)
+        .then(sendResponse)
+        .catch(() => sendResponse(success({ monitors: [] })));
+      return true;
+    }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
         .then((result) =>
@@ -76,7 +88,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"pair"|"disconnect"}',
       ),
     );
     return;
@@ -91,6 +103,7 @@ export default defineBackground(() => {
   });
 
   serveRecorder();
+  serveMonitor();
   serveRunPorts();
 
   onWelcome(() => {
