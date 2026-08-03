@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
+import { screenshot } from '@/lib/actions/page/screenshot';
 import { BRIDGE_CHANNEL, type RunEvent } from '@/lib/actions/protocol';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
 import { redactInput } from './redact';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
+import type { ScreenshotPreview } from './screenshot-preview';
 import { isNaming, listSessions, putSession, readTranscript, titleDueAt, type SessionFields } from './session-store';
 
 const RECONNECT_MS = 1_000;
@@ -24,6 +26,7 @@ export type RunItem =
       ok?: boolean;
       awaiting?: boolean;
       source?: 'local' | 'external';
+      preview?: ScreenshotPreview;
     };
 
 export interface Run {
@@ -98,7 +101,9 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
             ]);
           }
         } else if (runMessage.op === 'recording') setRecording(runMessage.state);
-        else {
+        else if (runMessage.op === 'preview') {
+          setItems((previous) => attachPreview(previous, runMessage.preview));
+        } else {
           if (runMessage.event.kind === 'session') {
             session.current.claudeSessionId = runMessage.event.claudeSessionId ?? undefined;
           }
@@ -341,6 +346,18 @@ function reduce(items: RunItem[], event: RunEvent): RunItem[] {
     case 'error':
       return [...items, { kind: 'notice', id: nextId(), tone: 'error', text: `${event.code}: ${event.message}` }];
   }
+}
+
+function attachPreview(items: RunItem[], preview: ScreenshotPreview): RunItem[] {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item.kind === 'tool' && item.action === screenshot.name && !item.preview) {
+      const next = [...items];
+      next[i] = { ...item, preview };
+      return next;
+    }
+  }
+  return items;
 }
 
 function patchTool(items: RunItem[], toolId: string, patch: Partial<Extract<RunItem, { kind: 'tool' }>>): RunItem[] {

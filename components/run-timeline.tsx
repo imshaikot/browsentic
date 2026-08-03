@@ -2,6 +2,7 @@ import { AlertTriangle, Bot, Check, Info, Terminal, User, Wrench, X, Zap } from 
 
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
+import { openScreenshot } from '@/lib/bridge/screenshot-preview';
 import type { RunItem } from '@/lib/bridge/use-run';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +81,23 @@ function ToolRow({
           </span>
         )}
       </div>
+
+      {item.preview && (
+        <button
+          type="button"
+          onClick={() => void openScreenshot(item.preview!)}
+          title={`Open the ${item.preview.full ? 'full-size' : 'captured'} screenshot in a new tab`}
+          className="group max-w-[85%] overflow-hidden rounded-lg border bg-muted/40 transition hover:border-primary/60 hover:opacity-90"
+        >
+          <img
+            src={item.preview.thumbnail}
+            alt={`Screenshot, ${item.preview.width}×${item.preview.height}`}
+            width={item.preview.width}
+            height={item.preview.height}
+            className="block h-auto w-full"
+          />
+        </button>
+      )}
 
       {item.awaiting && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2">

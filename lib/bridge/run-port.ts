@@ -12,6 +12,7 @@ import { tryFastPath } from './fast-path';
 import { listMeta } from './file-store';
 import { currentRecording, onRecordingState, startActiveTabRecording, stopRecording } from './recorder';
 import { asSavedRecording, listRecordings } from './recording-store';
+import { onScreenshotPreview, type ScreenshotPreview } from './screenshot-preview';
 import { recordGeneratedSkill } from './skill-store';
 import {
   activateSiteMap,
@@ -48,7 +49,8 @@ export type RunMessage =
   | { op: 'active'; runId: string | null }
   | { op: 'mapDraft'; draft: SiteMapDraft }
   | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string }
-  | { op: 'recording'; state: RecordingState | null };
+  | { op: 'recording'; state: RecordingState | null }
+  | { op: 'preview'; preview: ScreenshotPreview };
 
 const ports = new Set<Browser.runtime.Port>();
 let activeRunId: string | null = null;
@@ -64,6 +66,8 @@ export function serveRunPorts(): void {
     if (ends && (activeRunId === null || activeRunId === runId)) setActiveRun(null);
     broadcast({ op: 'event', runId, event });
   });
+
+  onScreenshotPreview((preview) => broadcast({ op: 'preview', preview }));
 
   onSiteMapDraft((_runId, draft) => {
     pendingDraft = draft;

@@ -49,7 +49,7 @@ export type SessionFields = Omit<StoredSessionMeta, 'title' | 'titledAtTurn' | '
 
 export async function putSession(fields: SessionFields, items: RunItem[]): Promise<void> {
   if (!items.length) return;
-  const transcript: StoredSessionTranscript = { id: fields.id, items: items.slice(-MAX_ITEMS) };
+  const transcript: StoredSessionTranscript = { id: fields.id, items: items.slice(-MAX_ITEMS).map(withoutPreview) };
   await browser.storage.local.set({ [transcriptKey(fields.id)]: transcript });
 
   const list = await listSessions();
@@ -58,6 +58,12 @@ export async function putSession(fields: SessionFields, items: RunItem[]): Promi
   const dropped = kept.slice(MAX_SESSIONS);
   if (dropped.length) await browser.storage.local.remove(dropped.map((s) => transcriptKey(s.id)));
   await writeIndex(kept.slice(0, MAX_SESSIONS));
+}
+
+function withoutPreview(item: RunItem): RunItem {
+  if (item.kind !== 'tool' || !item.preview) return item;
+  const { preview: _preview, ...rest } = item;
+  return rest;
 }
 
 export async function readTranscript(id: string): Promise<StoredSessionTranscript | null> {

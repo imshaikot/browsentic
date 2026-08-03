@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { publishScreenshot } from './screenshot-preview';
 
 interface CapturePlan {
   mode: 'fullPage' | 'viewport' | 'element';
@@ -29,7 +30,9 @@ export async function screenshotTab(
   const plan = planned.data as CapturePlan;
 
   try {
-    return success(await capture(tab, plan));
+    const { thumbnail, ...data } = await capture(tab, plan);
+    await publishScreenshot({ ...data, thumbnail }).catch(() => {});
+    return success(data);
   } catch (error) {
     if (error instanceof ActionError) return failure(error.code, error.message);
     return failure('CAPTURE_FAILED', error instanceof Error ? error.message : String(error));
@@ -44,7 +47,14 @@ export async function screenshotTab(
 async function capture(
   tab: { id: number; windowId?: number },
   plan: CapturePlan,
-): Promise<{ format: string; width: number; height: number; dataUrl: string; truncated?: boolean }> {
+): Promise<{
+  format: string;
+  width: number;
+  height: number;
+  dataUrl: string;
+  truncated?: boolean;
+  thumbnail: string;
+}> {
   const { viewport, format, quality, maxLongSide } = plan;
   const region = { ...plan.region };
 
@@ -110,7 +120,22 @@ async function capture(
   }
 
   if (!out) throw new ActionError('Nothing was captured', 'CAPTURE_FAILED');
-  return encode(out, format, quality, truncated);
+  return { ...(await encode(out, format, quality, truncated)), thumbnail: await thumbnail(out) };
+}
+
+const THUMB_MAX_SIDE = 640;
+const THUMB_QUALITY = 0.6;
+
+async function thumbnail(source: OffscreenCanvas): Promise<string> {
+  const scale = Math.min(1, THUMB_MAX_SIDE / Math.max(source.width, source.height, 1));
+  const small = new OffscreenCanvas(
+    Math.max(1, Math.round(source.width * scale)),
+    Math.max(1, Math.round(source.height * scale)),
+  );
+  const ctx = small.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(source, 0, 0, small.width, small.height);
+  return blobToDataUrl(await small.convertToBlob({ type: 'image/jpeg', quality: THUMB_QUALITY }), 'image/jpeg');
 }
 
 async function encode(
