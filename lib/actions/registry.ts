@@ -22,6 +22,7 @@ import { selectOption } from './page/select-option';
 import { selectText } from './page/select-text';
 import { submitForm } from './page/submit-form';
 import { switchTab } from './page/switch-tab';
+import { typeText } from './page/type-text';
 import { waitForElement } from './page/wait-for-element';
 
 export const actions: ReadonlyMap<string, AnyAction> = new Map(
@@ -33,6 +34,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       hoverElement,
       focusInput,
       fillInput,
+      typeText,
       selectOption,
       selectText,
       extractText,
