@@ -1,4 +1,5 @@
 import type { ToolDescriptor } from './manifest';
+import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
 import type { SkillDraft } from '@/lib/skills/format';
@@ -30,7 +31,9 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'nameSession'; sessionId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'recordEvents'; events: RecordedEvent[] }
   | { channel: typeof BRIDGE_CHANNEL; op: 'recordingState' }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeRecording'; recordingId: string };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeRecording'; recordingId: string }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'monitorSample'; monitorId: string; sample: MonitorSample }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'monitorState' };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }

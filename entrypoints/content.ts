@@ -1,4 +1,5 @@
 import { exposeActions } from '@/lib/actions/host';
+import { exposeMonitor } from '@/lib/monitor/watch';
 import { exposeRecorder } from '@/lib/recordings/host';
 
 export default defineContentScript({
@@ -9,5 +10,6 @@ export default defineContentScript({
     world.__browsenticActions = true;
     exposeActions();
     exposeRecorder();
+    exposeMonitor();
   },
 });
