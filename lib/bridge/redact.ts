@@ -26,9 +26,15 @@ function redactValue(key: string, value: unknown, depth: number): unknown {
   return null;
 }
 
+const TYPED_FIELD: Record<string, string> = {
+  'page.fillInput': 'value',
+  'page.typeText': 'text',
+};
+
 export function redactInput(action: string, input: unknown): unknown {
   if (!input || typeof input !== 'object') return redactValue('', input, 0);
   const redacted = redactValue('', input, 0) as Record<string, unknown>;
-  if (action === 'page.fillInput' && 'value' in redacted) redacted.value = REDACTED;
+  const typed = TYPED_FIELD[action];
+  if (typed && typed in redacted) redacted[typed] = REDACTED;
   return redacted;
 }
