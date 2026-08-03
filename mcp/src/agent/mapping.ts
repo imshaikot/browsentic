@@ -27,6 +27,8 @@ const READ_ONLY_ACTIONS = new Set([
   'page.waitForElement',
   'page.hoverElement',
   'page.highlightElement',
+  'page.findProgress',
+  'page.monitorStatus',
 ]);
 
 const CLICK_ACTION = 'page.clickElement';
