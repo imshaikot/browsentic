@@ -13,7 +13,7 @@ It runs on **your own [Claude Code](https://claude.com/claude-code) login**. The
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 23 page capabilities covering reading, clicking, typing, form submission, navigation and screenshots.
+- **Real page control.** 28 page capabilities covering reading, clicking, typing, form submission, navigation, screenshots and background progress monitoring.
 - **Site maps.** Point Browsentic at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
 - **Recordings.** Do a repetitive job once yourself and Browsentic keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
@@ -210,7 +210,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Claude Code now has 23 page tools plus `browsentic_status`, and three read only resources that
+Claude Code now has 28 page tools plus `browsentic_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -223,6 +223,7 @@ registry the extension ships, so they cannot drift from what the browser can act
 | Move | Open a URL, back, forward, reload, scroll to an element or position, open a URL in a new tab, list and switch between open tabs, close one |
 | Files | List files stored in Browsentic and attach one to a file input on the page |
 | Recordings | List the browsing sessions the user recorded, and read one back as ordered, replayable steps |
+| Monitor | Find progress signals on a page, then watch one tab in the background until an upload, build or deploy completes — the tab is pinned, percent and ETA are tracked, the user is notified, and an MCP client can long-poll for completion |
 
 Most capabilities take a target described by CSS selector, visible text, ARIA role or index.
 Targeting by visible text survives redesigns that break selectors.
