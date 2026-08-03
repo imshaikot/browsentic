@@ -73,6 +73,15 @@ const CASES = [
   ['how do i record a session', 'escalate:question'],
   ['click record', 'act:click.text', { target: { text: 'record' } }],
 
+  ['stop monitoring', 'act:monitor.stop', {}],
+  ['stop watching', 'act:monitor.stop'],
+  ['stop watching the upload', 'act:monitor.stop'],
+  ['cancel the monitor', 'act:monitor.stop'],
+  ['stop the recording', 'act:recording.stop'],
+  ['tell me when the upload finishes', 'escalate:question'],
+  ['watch this build', 'escalate:no-match'],
+  ['monitor the pipeline until it completes', 'escalate:no-match'],
+
   ['what is on this page', 'escalate:question'],
   ['summarize this article', 'escalate:question'],
   ['is there a login button?', 'escalate:question'],

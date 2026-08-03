@@ -4,6 +4,7 @@ import { navigate } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
+import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/events';
 
 export interface Rule {
@@ -200,6 +201,14 @@ export const RULES: readonly Rule[] = [
     certainty: 0.95,
     pattern: /^(?:stop|end|finish)\s+(?:the\s+)?recording$/,
     build: () => built({}, 'Stop recording'),
+  },
+  {
+    id: 'monitor.stop',
+    action: stopMonitor.name,
+    certainty: 0.95,
+    pattern:
+      /^(?:stop|end|quit|cancel)\s+(?:the\s+)?(?:monitor(?:ing)?|watching)(?:\s+(?:the|this|that)\s+\S{1,20})?$/,
+    build: () => built({}, 'Stop monitoring'),
   },
   {
     id: 'click.text',
