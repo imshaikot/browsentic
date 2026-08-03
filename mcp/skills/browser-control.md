@@ -42,7 +42,9 @@ Two habits. **Tidy up after yourself** — if you opened a tab only to read some
 
 ## 5. Typing and forms
 
-`page_fillInput` writes through the native setter and fires the events frameworks listen for, so React and Vue inputs update properly. Set `submit: true` on it, or call `page_pressKey` with Enter, when the form expects a keystroke rather than a button.
+`page_fillInput` writes through the native setter and fires the events frameworks listen for, so React and Vue inputs update properly. Set `pressEnter: true` on it, or call `page_pressKey` with Enter, when the form expects a keystroke rather than a button.
+
+`page_typeText` is the slow twin: it streams the text in one character at a time, with a real key event per character and pauses that vary the way a person's do. Reach for it when the typing itself has to look real — a demo or a recording the user will watch — or when a field only reacts to per-keystroke events, like a search box that filters as you type or an editor that never sees a value set in one shot. `speed` picks the pace (`"slow"`, `"natural"`, `"fast"`, `"instant"`), `charDelayMs` overrides it outright, and `jitter: 0` types in a flat machine rhythm. It costs real time — a sentence at `"natural"` runs into the tens of seconds, and long text at `"slow"` is refused rather than left to hang — so `page_fillInput` stays the default when you only need the value in the field.
 
 `page_submitForm` runs the browser's own validation. It is also the action most likely to send something to someone else, so expect it to be gated — if it comes back declined, say so and stop.
 
