@@ -5,6 +5,7 @@ import { browser } from 'wxt/browser';
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
+import { MonitorBar } from '@/components/monitor-bar';
 import { RecordingBar } from '@/components/recording-bar';
 import { RecordingPanel } from '@/components/recording-panel';
 import { RunTimeline } from '@/components/run-timeline';
@@ -190,6 +191,9 @@ export default function App() {
           </p>
         )}
         {run.recording && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
+        {run.monitors.map((monitor) => (
+          <MonitorBar key={monitor.monitorId} state={monitor} onStop={() => run.stopMonitor(monitor.monitorId)} />
+        ))}
         {run.draft && (
           <SiteMapReview draft={run.draft} onActivate={run.activateMap} onDiscard={run.discardMap} />
         )}

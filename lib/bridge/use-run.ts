@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
 import { screenshot } from '@/lib/actions/page/screenshot';
 import { BRIDGE_CHANNEL, type RunEvent } from '@/lib/actions/protocol';
+import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
 import { redactInput } from './redact';
@@ -45,6 +46,8 @@ export interface Run {
   recording: RecordingState | null;
   startRecording: (captureValues: boolean) => void;
   stopRecording: () => void;
+  monitors: MonitorState[];
+  stopMonitor: (monitorId: string) => void;
 }
 
 type SessionState = SessionFields;
@@ -59,6 +62,7 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
   const [running, setRunning] = useState(false);
   const [draft, setDraft] = useState<SiteMapDraft | null>(null);
   const [recording, setRecording] = useState<RecordingState | null>(null);
+  const [monitors, setMonitors] = useState<MonitorState[]>([]);
   const port = useRef<Browser.runtime.Port | null>(null);
 
   const session = useRef<SessionState>(freshSession());
@@ -101,7 +105,19 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
             ]);
           }
         } else if (runMessage.op === 'recording') setRecording(runMessage.state);
-        else if (runMessage.op === 'preview') {
+        else if (runMessage.op === 'monitor') {
+          const state = runMessage.state;
+          if (state.phase === 'watching') {
+            setMonitors((previous) => {
+              const others = previous.filter((m) => m.monitorId !== state.monitorId);
+              return [...others, state];
+            });
+          } else {
+            setMonitors((previous) => previous.filter((m) => m.monitorId !== state.monitorId));
+            const notice = monitorNotice(state);
+            setItems((previous) => [...previous, { kind: 'notice', id: nextId(), ...notice }]);
+          }
+        } else if (runMessage.op === 'preview') {
           setItems((previous) => attachPreview(previous, runMessage.preview));
         } else {
           if (runMessage.event.kind === 'session') {
@@ -268,6 +284,13 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
     stopRecording: useCallback(() => {
       post({ op: 'stopRecording' });
     }, [post]),
+    monitors,
+    stopMonitor: useCallback(
+      (monitorId: string) => {
+        post({ op: 'stopMonitor', monitorId });
+      },
+      [post],
+    ),
     cancel: useCallback(() => {
       if (!post({ op: 'cancel' })) lost('Lost the connection to the extension, so this run is no longer being watched.');
     }, [post, lost]),
@@ -281,6 +304,28 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
     clear,
     restore,
   };
+}
+
+function monitorNotice(state: MonitorState): { tone: 'info' | 'error'; text: string } {
+  const name = state.label ?? state.host;
+  const elapsed = clock(state.elapsedMs);
+  switch (state.phase) {
+    case 'done':
+      return { tone: 'info', text: `Monitor “${name}” finished after ${elapsed}.` };
+    case 'stopped':
+      return { tone: 'info', text: `Monitor “${name}” stopped.` };
+    case 'timeout':
+      return { tone: 'error', text: `Monitor “${name}” gave up after ${elapsed} without completing.` };
+    case 'tab-closed':
+      return { tone: 'error', text: `Monitor “${name}” ended — the tab was closed.` };
+    default:
+      return { tone: 'error', text: `Monitor “${name}” ended — ${state.message ?? 'the tab left the watched site.'}` };
+  }
+}
+
+function clock(ms: number): string {
+  const total = Math.floor(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
 function hostOf(url: string): string | null {

@@ -6,10 +6,18 @@ import {
   type RunEvent,
   type SavedRecording,
 } from '@/lib/actions/protocol';
+import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { tryFastPath } from './fast-path';
 import { listMeta } from './file-store';
+import {
+  acknowledgeCompleted,
+  activeMonitorStates,
+  completedMonitorStates,
+  onMonitorState,
+  stopTabMonitor,
+} from './monitor';
 import { currentRecording, onRecordingState, startActiveTabRecording, stopRecording } from './recorder';
 import { asSavedRecording, listRecordings } from './recording-store';
 import { onScreenshotPreview, type ScreenshotPreview } from './screenshot-preview';
@@ -42,7 +50,8 @@ export type RunCommand =
   | { op: 'activateMap'; stagingId: string; exactHost?: boolean }
   | { op: 'discardMap'; stagingId: string }
   | { op: 'startRecording'; captureValues: boolean }
-  | { op: 'stopRecording' };
+  | { op: 'stopRecording' }
+  | { op: 'stopMonitor'; monitorId: string };
 
 export type RunMessage =
   | { op: 'event'; runId: string; event: RunEvent }
@@ -50,7 +59,8 @@ export type RunMessage =
   | { op: 'mapDraft'; draft: SiteMapDraft }
   | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string }
   | { op: 'recording'; state: RecordingState | null }
-  | { op: 'preview'; preview: ScreenshotPreview };
+  | { op: 'preview'; preview: ScreenshotPreview }
+  | { op: 'monitor'; state: MonitorState };
 
 const ports = new Set<Browser.runtime.Port>();
 let activeRunId: string | null = null;
@@ -68,6 +78,11 @@ export function serveRunPorts(): void {
   });
 
   onScreenshotPreview((preview) => broadcast({ op: 'preview', preview }));
+
+  onMonitorState((state) => {
+    broadcast({ op: 'monitor', state });
+    if (state.phase !== 'watching' && ports.size > 0) void acknowledgeCompleted(state.monitorId);
+  });
 
   onSiteMapDraft((_runId, draft) => {
     pendingDraft = draft;
@@ -96,6 +111,14 @@ export function serveRunPorts(): void {
     post(port, { op: 'active', runId: activeRunId });
     if (pendingDraft) post(port, { op: 'mapDraft', draft: pendingDraft });
     void currentRecording().then((state) => post(port, { op: 'recording', state }));
+    void activeMonitorStates().then((states) => {
+      for (const state of states) post(port, { op: 'monitor', state });
+    });
+    void completedMonitorStates().then((states) => {
+      if (!states.length) return;
+      for (const state of states) post(port, { op: 'monitor', state });
+      void acknowledgeCompleted();
+    });
 
     port.onMessage.addListener((message) => handle(message as RunCommand));
     port.onDisconnect.addListener(() => {
@@ -161,6 +184,9 @@ function handle(command: RunCommand): void {
       return;
     case 'stopRecording':
       void stopRecording('user');
+      return;
+    case 'stopMonitor':
+      void stopTabMonitor(command.monitorId);
       return;
     case 'reset':
       resetConversation();
