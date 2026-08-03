@@ -3,16 +3,21 @@ import { z } from 'zod';
 import { invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
+import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { closeTab } from '@/lib/actions/page/close-tab';
 import { listFiles } from '@/lib/actions/page/list-files';
 import { listRecordings } from '@/lib/actions/page/list-recordings';
+import { monitorStatus } from '@/lib/actions/page/monitor-status';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
 import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
+import { startMonitor } from '@/lib/actions/page/start-monitor';
+import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { switchTab } from '@/lib/actions/page/switch-tab';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
+import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad } from '@/lib/bridge/tabs';
@@ -22,6 +27,10 @@ export async function invokeForHarness(action: string, input?: unknown, tabId?: 
   if (action === listRecordings.name) return listStoredRecordings(input);
   if (action === readRecording.name) return readStoredRecording(input);
   if (action === openTab.name) return openNewTab(input);
+  if (action === startMonitor.name) return beginMonitor(input, tabId);
+  if (action === monitorStatus.name) return statusOfMonitors(input);
+  if (action === stopMonitor.name) return stopRequestedMonitor(input);
+  if (action === awaitMonitor.name) return awaitRequestedMonitor(input);
 
   const tab = tabId == null ? (await browser.tabs.query({ active: true, currentWindow: true }))[0] : await pinnedTab(tabId);
   if (tab?.id == null) {
@@ -43,6 +52,30 @@ async function pinnedTab(tabId: number) {
   } catch {
     return undefined;
   }
+}
+
+async function beginMonitor(input: unknown, tabId?: number): Promise<ActionResult> {
+  const parsed = startMonitor.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return startTabMonitor(parsed.data, tabId);
+}
+
+async function statusOfMonitors(input: unknown): Promise<ActionResult> {
+  const parsed = monitorStatus.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return monitorStatusFor(parsed.data.monitorId);
+}
+
+async function stopRequestedMonitor(input: unknown): Promise<ActionResult> {
+  const parsed = stopMonitor.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return stopTabMonitor(parsed.data.monitorId);
+}
+
+async function awaitRequestedMonitor(input: unknown): Promise<ActionResult> {
+  const parsed = awaitMonitor.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return awaitMonitorDone(parsed.data.monitorId, parsed.data.timeoutMs);
 }
 
 async function listStoredFiles(input: unknown): Promise<ActionResult> {
