@@ -6,6 +6,7 @@
   "type": "module",
   "packageManager": "yarn@4.17.1",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",

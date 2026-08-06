@@ -42,22 +42,23 @@ connections. One daemon owns the browser link, so several MCP clients can share 
 ## Quick start
 
 ```sh
-git clone https://github.com/your-org/browsentic.git
+git clone https://github.com/imshaikot/browsentic.git
 cd browsentic
-yarn install
-yarn build
+node scripts/setup.mjs
 ```
+
+That installs and builds both halves — the extension and the daemon, which is a separate package
+with its own dependencies. It needs nothing on your `PATH` but Node; the pinned Yarn release comes
+from the repository. Once installed, `yarn setup` re-runs the same thing.
 
 Load the extension: open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**
 and select `dist/chrome-mv3`.
 
-Then install the daemon and pair your browser:
+Then put the daemon on your `PATH` and pair your browser:
 
 ```sh
-yarn mcp:install     # the daemon is a separate package with its own dependencies
-yarn mcp:build
-yarn mcp:link        # puts `browsentic-mcp` on your PATH
-browsentic-mcp pair   # prints a single use code, valid for 10 minutes
+yarn mcp:link        # writes to the global npm prefix, so it stays a separate step
+browsentic-mcp pair  # prints a single use code, valid for 10 minutes
 ```
 
 Open the Browsentic popup, paste the code and press **Connect**. The daemon issues a long lived
@@ -286,6 +287,7 @@ as data, never as instructions.
 ## Development
 
 ```sh
+yarn setup            # install and build both projects from scratch
 yarn dev              # build, launch a throwaway Chrome profile, hot reload
 yarn dev:firefox
 yarn build            # production build
