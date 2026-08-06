@@ -20,6 +20,14 @@ It runs on **your own [Claude Code](https://claude.com/claude-code) login**. The
 - **Works as an MCP server.** Claude Code or any other MCP client can drive your real, logged in browser through the same local daemon.
 - **Off by default.** A fresh install connects to nothing until you redeem a one time pairing code.
 
+## Documentation
+
+This README is the short version. The long ones live in [`docs/`](docs/):
+
+- [Installation](docs/installation.md) — prerequisites, setup, configuration, limitations, troubleshooting, and driving Browsentic from a non-Claude agent
+- [Features](docs/features.md) — every capability and when to reach for it
+- [Architecture](docs/architecture.md) — how an instruction becomes a click, end to end
+
 ## How it works
 
 ```
