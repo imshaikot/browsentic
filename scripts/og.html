@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        width: 1200px; height: 630px; overflow: hidden;
+        background: oklch(0.152 0.016 52);
+        color: oklch(0.958 0.012 70);
+        font-family: "Inter Tight", system-ui, sans-serif;
+        position: relative;
+      }
+      .glow { position: absolute; border-radius: 999px; filter: blur(120px); }
+      .g1 { width: 620px; height: 620px; top: -260px; left: -80px; background: oklch(0.735 0.168 42); opacity: 0.22; }
+      .g2 { width: 560px; height: 560px; top: -200px; right: -100px; background: oklch(0.83 0.13 195); opacity: 0.20; }
+      .g3 { width: 480px; height: 480px; bottom: -280px; left: 40%; background: oklch(0.7 0.21 335); opacity: 0.12; }
+      .dots {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(circle at 1px 1px, oklch(0.98 0.01 60 / 10%) 1px, transparent 0);
+        background-size: 30px 30px;
+        -webkit-mask-image: radial-gradient(ellipse 78% 70% at 46% 40%, #000 40%, transparent 100%);
+      }
+      .wrap { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 84px; }
+      .brandrow { display: flex; align-items: center; gap: 16px; }
+      .brandrow span { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+      h1 {
+        margin-top: 40px; font-size: 82px; line-height: 1.0; font-weight: 600;
+        letter-spacing: -0.035em; max-width: 900px;
+      }
+      .accent {
+        background: linear-gradient(100deg, oklch(0.958 0.012 70) 4%, oklch(0.84 0.15 85) 44%, oklch(0.735 0.168 42) 96%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      p { margin-top: 28px; font-size: 27px; line-height: 1.45; color: oklch(0.735 0.018 60); max-width: 830px; }
+      .chips { margin-top: 44px; display: flex; gap: 12px; }
+      .chip {
+        font-family: "JetBrains Mono", monospace; font-size: 18px;
+        border: 1px solid oklch(0.98 0.01 60 / 14%); border-radius: 10px;
+        padding: 10px 16px; color: oklch(0.735 0.018 60);
+      }
+      .chip.on { color: oklch(0.83 0.13 195); border-color: oklch(0.83 0.13 195 / 40%); }
+      .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+        background: linear-gradient(90deg, oklch(0.83 0.13 195), oklch(0.735 0.168 42)); }
+    </style>
+  </head>
+  <body>
+    <div class="glow g1"></div>
+    <div class="glow g2"></div>
+    <div class="glow g3"></div>
+    <div class="dots"></div>
+
+    <div class="wrap">
+      <div class="brandrow">
+        <svg width="46" height="46" viewBox="0 0 32 32" fill="none" style="color: oklch(0.83 0.13 195)">
+          <rect x="2.25" y="4.25" width="27.5" height="23.5" rx="6" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"/>
+          <path d="M2.5 10.5h27" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.25"/>
+          <circle cx="6.4" cy="7.4" r="1" fill="currentColor" fill-opacity="0.5"/>
+          <circle cx="9.8" cy="7.4" r="1" fill="currentColor" fill-opacity="0.35"/>
+          <path d="M9 22.2c2.4 0 2.4-6.4 6.9-6.4s4.6 6.4 7 6.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <circle cx="9" cy="22.2" r="2.35" fill="oklch(0.152 0.016 52)" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="15.9" cy="15.8" r="2.55" fill="currentColor"/>
+          <circle cx="22.9" cy="22.2" r="2.35" fill="oklch(0.152 0.016 52)" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+        <span>Browsentic</span>
+      </div>
+
+      <h1>Reimagine browsing<br />as <span class="accent">agentic</span></h1>
+
+      <p>
+        Hand your real, logged-in browser to the AI agent you already run —
+        it clicks, fills, reads and navigates the tab in front of you.
+      </p>
+
+      <div class="chips">
+        <div class="chip on">28 page tools</div>
+        <div class="chip">site maps</div>
+        <div class="chip">recordings</div>
+        <div class="chip">MCP server</div>
+        <div class="chip">MIT</div>
+      </div>
+    </div>
+    <div class="rule"></div>
+  </body>
+</html>

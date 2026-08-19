@@ -1,0 +1,87 @@
+# Builds the landing page and publishes it to GitHub Pages.
+#
+# This file exists ONLY on the orphan `website` branch. `main` has no copy of it,
+# no website source, and no Pages job — the two branches share no history at all.
+#
+# Pages is turned on by the build itself (configure-pages `enablement`), so the
+# repository setting never has to be touched by hand. There is no `gh-pages`
+# branch: the built site is uploaded as an artifact and served from it, so no
+# compiled asset is ever committed anywhere.
+
+name: Deploy landing page
+
+on:
+  push:
+    branches: [website]
+  pull_request:
+    branches: [website]
+  workflow_dispatch:
+
+# Allow the deploy step to mint an OIDC token for Pages; nothing else.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. In-flight runs finish rather than being cancelled, so a
+# queued push never lands a half-published site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to build from anywhere but the website branch
+        # Belt and braces: if this workflow is ever copied onto another branch,
+        # it stops here instead of publishing something unexpected.
+        run: |
+          if [ "${{ github.ref_name }}" != "website" ]; then
+            echo "::error::This workflow only builds the 'website' branch (got '${{ github.ref_name }}')."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run compile
+
+      - name: Build
+        run: npm run build
+        env:
+          # Served from https://imshaikot.github.io/browsentic/. Change to "/" if
+          # you move the site to a custom domain at the apex.
+          BASE_PATH: /browsentic/
+
+      - name: Verify the build produced a page
+        run: test -s dist/index.html
+
+      # enablement turns Pages on via the API when it is not already on, and
+      # points it at Actions — this is what removes the manual settings step.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    # Pull requests build and type check, but only a push to `website` publishes.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
