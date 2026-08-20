@@ -508,7 +508,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   async function invoke(
     action: string,
     input?: unknown,
-    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
+    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string },
   ) {
     if (action.startsWith(RESERVED_PREFIX)) {
       return failure('UNKNOWN_ACTION', `Unknown action "${action}".`);
@@ -519,7 +519,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         'The Browsentic extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
-    return persistScreenshot(action, input, await link.invoke(action, input, opts?.tabId), opts?.saveTo);
+    const result = await link.invoke(action, input, { tabId: opts?.tabId, runId: opts?.runId });
+    return persistScreenshot(action, input, result, opts?.saveTo);
   }
 
   async function invokeExternal(action: string, input: unknown, client: string): Promise<ActionResult> {

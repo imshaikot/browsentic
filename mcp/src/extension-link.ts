@@ -54,8 +54,9 @@ export class ExtensionLink {
     return !this.closed && this.socket.readyState === this.socket.OPEN;
   }
 
-  invoke(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
-    return this.request({ t: 'invoke', id: randomUUID(), action, input, tabId }, timeoutFor(action, input));
+  invoke(action: string, input?: unknown, opts?: { tabId?: number; runId?: string }): Promise<ActionResult> {
+    const frame = { t: 'invoke' as const, id: randomUUID(), action, input, ...opts };
+    return this.request(frame, timeoutFor(action, input));
   }
 
   async describe(): Promise<ToolDescriptor[] | null> {
