@@ -1,4 +1,6 @@
 import { invokeInTab } from '@/lib/actions/client';
+import { dragElement } from '@/lib/actions/page/drag-element';
+import { APPROACH_STEPS, pathBetween, type Point } from '@/lib/actions/page/pointer';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { success, type ActionResult } from '@/lib/actions/protocol';
 import { send, settle, withDebugger, type DebuggerSession } from './cdp';
@@ -7,12 +9,6 @@ const MODIFIER_BIT: Record<string, number> = { alt: 1, ctrl: 2, meta: 4, shift: 
 const BUTTON_BIT: Record<string, number> = { left: 1, right: 2, middle: 4 };
 
 const MOVE_INTERVAL_MS = 12;
-const MAX_DRIFT_PX = 6;
-
-export interface Point {
-  x: number;
-  y: number;
-}
 
 export interface ClickPlan {
   point: Point;
@@ -25,8 +21,20 @@ export interface ClickPlan {
   holdMs: number;
 }
 
+export interface DragPlan {
+  approach: Point;
+  grip: Point;
+  drop: Point;
+  steps: number;
+  holdMs: number;
+  settleMs: number;
+}
+
 const FIREFOX_HINT =
   'A trusted click needs Chrome’s debugger, which Firefox does not expose — use page.clickElement instead.';
+
+const FIREFOX_DRAG_HINT =
+  'A trusted drag needs Chrome’s debugger, which Firefox does not expose — drop "trusted" to drag with synthetic events instead.';
 
 export function trustedClickInTab(tabId: number, input: unknown): Promise<ActionResult> {
   return withDebugger(tabId, FIREFOX_HINT, async (session) => {
@@ -37,20 +45,12 @@ export function trustedClickInTab(tabId: number, input: unknown): Promise<Action
   });
 }
 
-const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
-
-function pathBetween(from: Point, to: Point, steps: number): Point[] {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const span = Math.hypot(dx, dy) || 1;
-  const drift = Math.min(MAX_DRIFT_PX, span / 8);
-  return Array.from({ length: steps }, (_, index) => {
-    const progress = easeOut((index + 1) / steps);
-    const wobble = Math.sin(progress * Math.PI) * drift * (index % 2 ? -1 : 1);
-    return {
-      x: Math.round(from.x + dx * progress - (dy / span) * wobble),
-      y: Math.round(from.y + dy * progress + (dx / span) * wobble),
-    };
+export function dragInTab(tabId: number, input: unknown): Promise<ActionResult> {
+  return withDebugger(tabId, FIREFOX_DRAG_HINT, async (session) => {
+    const planned = await invokeInTab(tabId, dragElement.name, input);
+    if (!planned.ok) return planned;
+    await dispatchDrag(session, planned.data as DragPlan);
+    return success({ ...(planned.data as object), trusted: true });
   });
 }
 
@@ -73,4 +73,26 @@ export async function dispatchClick(session: DebuggerSession, plan: ClickPlan): 
     await settle(holdMs);
     await dispatch({ ...base, ...point, type: 'mouseReleased', button, buttons: 0, clickCount: count });
   }
+}
+
+export async function dispatchDrag(session: DebuggerSession, plan: DragPlan): Promise<void> {
+  const { approach, grip, drop, steps, holdMs, settleMs } = plan;
+  const base = { modifiers: 0, pointerType: 'mouse' };
+  const dispatch = (params: Record<string, unknown>) => send(session, 'Input.dispatchMouseEvent', params);
+  const moveTo = (at: Point, buttons: number) =>
+    dispatch({ ...base, ...at, type: 'mouseMoved', button: buttons ? 'left' : 'none', buttons });
+
+  for (const at of pathBetween(approach, grip, APPROACH_STEPS)) {
+    await settle(MOVE_INTERVAL_MS);
+    await moveTo(at, 0);
+  }
+  await dispatch({ ...base, ...grip, type: 'mousePressed', button: 'left', buttons: 1, clickCount: 1 });
+  await settle(holdMs);
+
+  for (const at of pathBetween(grip, drop, steps)) {
+    await settle(MOVE_INTERVAL_MS);
+    await moveTo(at, 1);
+  }
+  await settle(settleMs);
+  await dispatch({ ...base, ...drop, type: 'mouseReleased', button: 'left', buttons: 0, clickCount: 1 });
 }

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { CAPTCHA_VENDORS, type CaptchaVendor } from '@/lib/actions/page/captcha-vendors';
+import type { Point } from '@/lib/actions/page/pointer';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { frameSessions, send, settle, withDebugger, type DebuggerSession, type FrameSession } from './cdp';
-import { dispatchClick, type ClickPlan, type Point } from './trusted-input';
+import { dispatchClick, type ClickPlan } from './trusted-input';
 
 type CaptchaState = 'idle' | 'pending' | 'solved' | 'needsHuman' | 'invisible';
 
