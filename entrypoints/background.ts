@@ -9,7 +9,7 @@ import { nameStoredSession } from '@/lib/bridge/session-store';
 import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
-import { serveRunPorts } from '@/lib/bridge/run-port';
+import { serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
 import { openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
@@ -150,6 +150,7 @@ export default defineBackground(() => {
   serveRecorder();
   serveMonitor();
   serveRunPorts();
+  serveTabSessions();
 
   onWelcome(() => {
     void resyncSkills();

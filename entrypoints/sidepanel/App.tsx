@@ -38,7 +38,7 @@ const PINNED_SLACK_PX = 56;
 
 export default function App() {
   const daemon = useDaemonState();
-  const run = useRun({ persist: true });
+  const run = useRun();
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const files = useStoredFiles();
   const sessions = useStoredSessions();
@@ -157,7 +157,8 @@ export default function App() {
     setVoiceEnabled(false);
   }
 
-  const offChatRun = run.running && tab !== 'chat';
+  const runningCount = run.sessions.filter((session) => session.runId).length;
+  const offChatRun = runningCount > 0 && tab !== 'chat';
   const hasBanners = offChatRun || !!run.recording || run.monitors.length > 0 || !!run.draft;
 
   return (
@@ -202,7 +203,9 @@ export default function App() {
               className="enters mb-2 flex w-full items-center gap-2 rounded-xl border border-brand/35 bg-brand/8 px-2.5 py-2 text-left transition-colors hover:bg-brand/12"
             >
               <span className="glow-dot size-1.5 shrink-0 animate-pulse rounded-full bg-brand text-brand" />
-              <span className="flex-1 text-xs text-ink">A run is in progress</span>
+              <span className="flex-1 text-xs text-ink">
+                {runningCount === 1 ? 'A run is in progress' : `${runningCount} runs are in progress`}
+              </span>
               <span className="shrink-0 font-mono text-[10px] tracking-[0.12em] text-brand uppercase">Watch</span>
             </button>
           )}
@@ -231,7 +234,7 @@ export default function App() {
           ) : tab === 'history' ? (
             <SessionList
               sessions={sessions}
-              currentId={run.sessionId}
+              currentId={run.sessionId ?? undefined}
               busy={run.running}
               onOpen={openSession}
               onRemove={(id) => void removeSession(id)}
