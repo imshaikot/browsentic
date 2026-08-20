@@ -1,15 +1,48 @@
-import { useMemo, type ReactNode } from 'react';
+import { memo, useMemo, useRef, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-export function Markdown({ text, className }: { text: string; className?: string }) {
-  const blocks = useMemo(() => parseBlocks(text), [text]);
+/*
+ * `streaming` marks the reply that is still arriving: every word mounts with a
+ * blur-in and a caret trails the last block. The marker stays on as `done`
+ * afterwards so the words still in flight when the run ends finish settling
+ * rather than snapping. A reply read back from a transcript never gets it.
+ *
+ * Blocks are memoized on their own shape, so a delta only re-renders the block
+ * it lands in.
+ */
+export function Markdown({
+  text,
+  streaming,
+  className,
+}: {
+  text: string;
+  streaming?: boolean;
+  className?: string;
+}) {
+  const arrivedLive = useRef(false);
+  if (streaming) arrivedLive.current = true;
+
+  const blocks = useMemo(
+    () => parseBlocks(text).map((block) => ({ block, sig: JSON.stringify(block) })),
+    [text],
+  );
   return (
-    <div className={cn('flex min-w-0 flex-col gap-2', className)}>
-      {blocks.map((block, index) => renderBlock(block, String(index)))}
+    <div
+      data-stream={streaming ? 'live' : arrivedLive.current ? 'done' : undefined}
+      className={cn('flex min-w-0 flex-col gap-2', className)}
+    >
+      {blocks.map(({ block, sig }, index) => (
+        <MemoBlock key={index} block={block} sig={sig} />
+      ))}
     </div>
   );
 }
+
+const MemoBlock = memo(
+  ({ block }: { block: Block; sig: string }) => renderBlock(block, '0'),
+  (before, after) => before.sig === after.sig,
+);
 
 type Align = 'left' | 'center' | 'right';
 
@@ -213,7 +246,7 @@ function leading(line: string): number {
 
 const dedent = (line: string, by: number) => line.replace(/^[ \t]+/, (ws) => ws.replace(/\t/g, '  ').slice(by));
 
-const CHIP = 'rounded bg-black/8 px-1 py-px font-mono text-[0.85em] dark:bg-white/12';
+const CHIP = 'rounded bg-surface px-1 py-px font-mono text-[0.85em] text-ink';
 
 function renderBlock(block: Block, key: string): ReactNode {
   switch (block.kind) {
@@ -237,7 +270,7 @@ function renderBlock(block: Block, key: string): ReactNode {
       return (
         <pre
           key={key}
-          className="max-w-full overflow-x-auto rounded-md bg-black/8 p-2 text-xs whitespace-pre dark:bg-white/12"
+          className="max-w-full overflow-x-auto rounded-lg border border-line bg-ground/70 p-2 text-xs whitespace-pre"
         >
           <code className="font-mono">{block.text}</code>
         </pre>
@@ -264,7 +297,7 @@ function renderBlock(block: Block, key: string): ReactNode {
       return (
         <blockquote
           key={key}
-          className="flex flex-col gap-2 border-l-2 border-black/15 pl-2.5 opacity-80 dark:border-white/20"
+          className="flex flex-col gap-2 border-l-2 border-brand/40 pl-2.5 text-ink-dim"
         >
           {block.blocks.map((inner, index) => renderBlock(inner, String(index)))}
         </blockquote>
@@ -279,7 +312,7 @@ function renderBlock(block: Block, key: string): ReactNode {
                 {block.head.map((cell, index) => (
                   <th
                     key={index}
-                    className={cn('border-b border-black/15 px-1.5 py-1 font-semibold dark:border-white/20', ALIGN[block.align[index] ?? 'left'])}
+                    className={cn('border-b border-line-strong px-1.5 py-1 font-semibold', ALIGN[block.align[index] ?? 'left'])}
                   >
                     {renderInline(cell)}
                   </th>
@@ -292,7 +325,7 @@ function renderBlock(block: Block, key: string): ReactNode {
                   {row.map((cell, index) => (
                     <td
                       key={index}
-                      className={cn('border-b border-black/8 px-1.5 py-1 align-top dark:border-white/10', ALIGN[block.align[index] ?? 'left'])}
+                      className={cn('border-b border-line px-1.5 py-1 align-top', ALIGN[block.align[index] ?? 'left'])}
                     >
                       {renderInline(cell)}
                     </td>
@@ -305,7 +338,7 @@ function renderBlock(block: Block, key: string): ReactNode {
       );
 
     case 'rule':
-      return <hr key={key} className="border-black/10 dark:border-white/15" />;
+      return <hr key={key} className="border-line" />;
   }
 }
 
@@ -351,13 +384,31 @@ const INLINE: InlineRule[] = [
   { re: /https?:\/\/[^\s<>"'`]*[^\s<>"'`.,;:!?)\]}]/y, linking: true, node: (m, key, depth) => link(m[0], m[0], key, depth) },
 ];
 
+/*
+ * Each word is its own span so a growing reply only ever mounts the words it
+ * just gained — the blur-in animation is mount-only, and settled text never
+ * replays it. Keys come from the start of the run, which never shifts as the
+ * text is appended to.
+ */
+const WORD = /(?<=\s)(?=\S)/;
+
 function renderInline(text: string, depth = 0, inLink = false): ReactNode[] {
   const out: ReactNode[] = [];
   let plain = '';
+  let plainAt = 0;
   let pos = 0;
   const flush = () => {
-    if (plain) out.push(plain);
+    if (plain) {
+      plain.split(WORD).forEach((word, index) => {
+        out.push(
+          <span key={`t${plainAt}.${index}`} className="tok">
+            {word}
+          </span>,
+        );
+      });
+    }
     plain = '';
+    plainAt = pos + 1;
   };
   let closeAt = text.indexOf(')');
 

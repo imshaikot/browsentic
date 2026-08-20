@@ -1,21 +1,26 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
-import { AudioLines, Bot, BookOpen, Circle, FileText, FileUp, History, Loader2, Mic, MicOff, Paperclip, RotateCcw, Send, Square, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowDown, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
+import { Wordmark } from '@/components/brand';
+import { Composer } from '@/components/composer';
+import { ConnectionSheet } from '@/components/connection-sheet';
+import { Greeting } from '@/components/greeting';
 import { MonitorBar } from '@/components/monitor-bar';
+import { PanelNav, type PanelTab } from '@/components/panel-nav';
 import { RecordingBar } from '@/components/recording-bar';
 import { RecordingPanel } from '@/components/recording-panel';
 import { RunTimeline } from '@/components/run-timeline';
 import { SessionList } from '@/components/session-list';
 import { SiteMapReview } from '@/components/site-map-review';
 import { SkillsPanel } from '@/components/skills-panel';
+import { StatusPill, describeStatus } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import { putFile, removeFile, type StoredFileMeta } from '@/lib/bridge/file-store';
+import { putFile, removeFile } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
@@ -24,27 +29,27 @@ import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
 import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
 import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
+import { useStoredSkills } from '@/lib/bridge/use-stored-skills';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
-import { cn } from '@/lib/utils';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const PINNED_SLACK_PX = 56;
 
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun({ persist: true });
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
   const files = useStoredFiles();
   const sessions = useStoredSessions();
+  const recordings = useStoredRecordings();
+  const skills = useStoredSkills();
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
-  const [skillsOpen, setSkillsOpen] = useState(false);
-  const [recordingsOpen, setRecordingsOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const recordings = useStoredRecordings();
+  const [tab, setTab] = useState<PanelTab>('chat');
+  const [connectionOpen, setConnectionOpen] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null);
+  const [pinned, setPinned] = useState(true);
 
   const connected = daemon?.connected ?? false;
 
@@ -53,50 +58,74 @@ export default function App() {
     onSubmit: (text) => run.send(text),
   });
 
+  const status = describeStatus(daemon, { running: run.running, listening: voice.listening });
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [run.items, run.running]);
+    const element = viewport.current;
+    if (!element) return;
+    const onScroll = () => {
+      const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+      setPinned(distance < PINNED_SLACK_PX);
+    };
+    element.addEventListener('scroll', onScroll, { passive: true });
+    return () => element.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!pinned || tab !== 'chat') return;
+    const element = viewport.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [run.items, run.running, pinned, tab]);
+
+  function goToLatest() {
+    const element = viewport.current;
+    if (element) element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+    setPinned(true);
+  }
+
+  function open(next: PanelTab) {
+    setConnectionOpen(false);
+    if (next === tab) return;
+    setTab(next);
+    setPinned(next === 'chat');
+    if (viewport.current) viewport.current.scrollTop = 0;
+  }
 
   function handleSend() {
     if (run.running || !connected) return;
-    setHistoryOpen(false);
+    open('chat');
     voice.submitNow();
   }
 
   function openSession(sessionId: string) {
-    setHistoryOpen(false);
+    open('chat');
     void run.restore(sessionId);
   }
 
   function replayRecording(recording: StoredRecordingMeta) {
-    setRecordingsOpen(false);
-    setHistoryOpen(false);
-    run.send(`Replay my recording "${recording.name}" (id ${recording.id}).`);
+    open('chat');
+    run.send(`Replay my recording “${recording.name}” (id ${recording.id}).`);
   }
 
-  function focusComposer(event: MouseEvent<HTMLDivElement>) {
-    if ((event.target as HTMLElement).closest('button, textarea')) return;
-    composerRef.current?.focus();
+  function mapSite() {
+    open('chat');
+    run.mapSite();
   }
 
   async function attachPageContext() {
     const result = await invokeInActiveTab(getPageInfo, {});
     if (!result.ok) {
-      voice.setInput(`${voice.input}\n[couldn't read this page: ${result.error.message}]\n`);
+      voice.setInput(`${voice.input}\n[couldn’t read this page: ${result.error.message}]\n`);
       return;
     }
     const { document: doc, selection } = result.data;
-    const snippet = selection ? `\nSelection: "${selection}"` : '';
+    const snippet = selection ? `\nSelection: “${selection}”` : '';
     voice.setInput(`${voice.input ? `${voice.input}\n\n` : ''}[Page: ${doc.title} — ${doc.url}${snippet}]\n`);
   }
 
-  async function onPickFile() {
-    const input = fileInputRef.current;
-    const file = input?.files?.[0];
-    if (input) input.value = '';
-    if (!file) return;
+  async function attachFile(file: File) {
     if (file.size > MAX_FILE_BYTES) {
-      setAttachError(`"${file.name}" is larger than ${MAX_FILE_BYTES / 1024 / 1024} MB.`);
+      setAttachError(`“${file.name}” is larger than ${MAX_FILE_BYTES / 1024 / 1024} MB.`);
       return;
     }
     setAttachError(null);
@@ -128,311 +157,132 @@ export default function App() {
     setVoiceEnabled(false);
   }
 
-  const status = run.running ? 'Working…' : voice.listening ? 'Listening…' : connected ? 'Ready' : 'Not connected';
+  const offChatRun = run.running && tab !== 'chat';
+  const hasBanners = offChatRun || !!run.recording || run.monitors.length > 0 || !!run.draft;
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center gap-2.5 border-b px-4 py-3">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-          <AudioLines className="size-4" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-sm leading-none font-semibold">Browsentic</h1>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span
-              className={cn(
-                'size-1.5 shrink-0 rounded-full',
-                run.running
-                  ? 'animate-pulse bg-violet-500'
-                  : voice.listening
-                    ? 'animate-pulse bg-rose-500'
-                    : connected
-                      ? 'bg-emerald-500'
-                      : 'bg-muted-foreground/40',
-              )}
-            />
-            {status}
-          </p>
-        </div>
-        <Button
-          variant={historyOpen ? 'default' : 'ghost'}
-          size="icon"
-          aria-label={historyOpen ? 'Back to the conversation' : 'Saved conversations'}
-          onClick={() => setHistoryOpen(!historyOpen)}
+      <header className="flex shrink-0 items-center gap-2 px-3 py-2.5">
+        <Wordmark className="flex-1" />
+        <StatusPill
+          tone={status.tone}
+          expanded={connectionOpen}
+          onClick={() => setConnectionOpen((open) => !open)}
         >
-          <History />
-        </Button>
-        <Button variant="ghost" size="icon" aria-label="Start a new conversation" onClick={run.clear}>
-          <RotateCcw />
+          {status.label}
+        </StatusPill>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="New chat"
+          aria-label="Start a new conversation"
+          onClick={() => {
+            open('chat');
+            run.clear();
+          }}
+        >
+          <SquarePen className="size-3.5" />
         </Button>
       </header>
 
-      <ScrollArea className="min-h-0 flex-1">
-        {historyOpen ? (
-          <SessionList
-            sessions={sessions}
-            currentId={run.sessionId}
-            busy={run.running}
-            onOpen={openSession}
-            onRemove={(id) => void removeSession(id)}
-          />
-        ) : run.items.length === 0 ? (
-          <Greeting connected={connected} voiceOn={voiceEnabled && voice.supported} />
-        ) : (
-          <RunTimeline items={run.items} onDecide={run.decide} />
-        )}
-        <div ref={bottomRef} className="h-4" />
-      </ScrollArea>
+      {connectionOpen && <ConnectionSheet onClose={() => setConnectionOpen(false)} />}
 
-      <footer className="border-t p-3">
-        {attachError && (
-          <p className="mb-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-600 dark:text-amber-400">
-            {attachError}
-          </p>
-        )}
-        {run.recording && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
-        {run.monitors.map((monitor) => (
-          <MonitorBar key={monitor.monitorId} state={monitor} onStop={() => run.stopMonitor(monitor.monitorId)} />
-        ))}
-        {run.draft && (
-          <SiteMapReview draft={run.draft} onActivate={run.activateMap} onDiscard={run.discardMap} />
-        )}
-        {recordingsOpen && (
-          <RecordingPanel
-            tabUrl={tabUrl}
-            recordings={recordings}
-            recording={run.recording}
-            busy={run.running}
-            onStart={run.startRecording}
-            onStop={run.stopRecording}
-            onReplay={replayRecording}
-            onRemove={(id) => void removeRecording(id)}
-          />
-        )}
-        {skillsOpen && (
-          <SkillsPanel
-            tabUrl={tabUrl}
-            connected={connected}
-            onMapSite={() => {
-              setSkillsOpen(false);
-              run.mapSite();
-            }}
-            mapping={run.running}
-          />
-        )}
-        <FilesList files={files} onRemove={(id) => void removeFile(id)} />
-        <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} connected={connected} />
+      <PanelNav
+        tab={tab}
+        counts={{ history: sessions.length, skills: skills.length, recordings: recordings.length }}
+        onSelect={open}
+      />
 
-        <div
-          onClick={focusComposer}
-          className={cn(
-            'flex flex-col rounded-xl border border-input shadow-xs transition-[color,box-shadow] dark:bg-input/30',
-            'has-[textarea:focus]:border-ring has-[textarea:focus]:ring-[3px] has-[textarea:focus]:ring-ring/50',
-            connected && 'cursor-text',
+      {hasBanners && (
+        <div className="max-h-[45%] shrink-0 overflow-y-auto px-3 pt-2">
+          {offChatRun && (
+            <button
+              type="button"
+              onClick={() => open('chat')}
+              className="enters mb-2 flex w-full items-center gap-2 rounded-xl border border-brand/35 bg-brand/8 px-2.5 py-2 text-left transition-colors hover:bg-brand/12"
+            >
+              <span className="glow-dot size-1.5 shrink-0 animate-pulse rounded-full bg-brand text-brand" />
+              <span className="flex-1 text-xs text-ink">A run is in progress</span>
+              <span className="shrink-0 font-mono text-[10px] tracking-[0.12em] text-brand uppercase">Watch</span>
+            </button>
           )}
-        >
-          <Textarea
-            ref={composerRef}
-            value={voice.input}
-            onChange={(e) => voice.setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder={connected ? 'Speak, or type what to do on this page…' : 'Pair the browser to get started'}
-            disabled={!connected}
-            rows={2}
-            className="max-h-48 min-h-16 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-0 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
-          />
+          {run.recording && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
+          {run.monitors.map((monitor) => (
+            <MonitorBar key={monitor.monitorId} state={monitor} onStop={() => run.stopMonitor(monitor.monitorId)} />
+          ))}
+          {run.draft && <SiteMapReview draft={run.draft} onActivate={run.activateMap} onDiscard={run.discardMap} />}
+        </div>
+      )}
 
-          <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              aria-label="Attach page context"
-              onClick={attachPageContext}
-              disabled={!connected}
-            >
-              <Paperclip />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              aria-label="Attach a file"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!connected}
-            >
-              <FileUp />
-            </Button>
-            <Button
-              variant={skillsOpen ? 'default' : 'ghost'}
-              size="icon"
-              className="size-8"
-              aria-label={skillsOpen ? 'Hide skills' : 'Show skills'}
-              onClick={() => setSkillsOpen(!skillsOpen)}
-            >
-              <BookOpen />
-            </Button>
-            <Button
-              variant={recordingsOpen ? 'default' : 'ghost'}
-              size="icon"
-              className="size-8"
-              aria-label={recordingsOpen ? 'Hide recordings' : 'Record this session'}
-              onClick={() => setRecordingsOpen(!recordingsOpen)}
-            >
-              <Circle
-                className={cn(
-                  run.recording && 'animate-pulse fill-red-500 text-red-500',
-                  !run.recording && !recordingsOpen && 'text-red-500',
-                )}
+      <div className="relative min-h-0 flex-1">
+        <ScrollArea viewportRef={viewport} className="h-full">
+          {tab === 'chat' ? (
+            run.items.length === 0 ? (
+              <Greeting
+                blocker={status.blocker}
+                voiceOn={voiceEnabled && voice.supported}
+                onGo={open}
+                onFix={() => setConnectionOpen(true)}
+                onUse={voice.setInput}
               />
-            </Button>
-            <Button
-              variant={voiceEnabled && !voice.error ? 'default' : 'ghost'}
-              size="icon"
-              aria-label={voiceEnabled ? 'Turn voice off' : 'Turn voice on'}
-              title={voice.supported ? undefined : 'Voice input is not available in this browser'}
-              onClick={toggleVoice}
-              disabled={!voice.supported}
-              className={cn('size-8', voiceEnabled && voice.listening && 'relative')}
-            >
-              {voiceEnabled && voice.listening && (
-                <span className="absolute inset-0 animate-ping rounded-md bg-primary/30" />
-              )}
-              {voiceEnabled && !voice.error ? <Mic /> : <MicOff />}
-            </Button>
-            {run.running ? (
-              <Button
-                size="icon"
-                variant="destructive"
-                className="ml-auto size-8"
-                aria-label="Stop the agent"
-                onClick={run.cancel}
-              >
-                <Square />
-              </Button>
             ) : (
-              <Button
-                size="icon"
-                className="ml-auto size-8"
-                aria-label="Send message"
-                onClick={handleSend}
-                disabled={!voice.input.trim() || !connected}
-              >
-                <Send />
-              </Button>
-            )}
-          </div>
-        </div>
-        <input ref={fileInputRef} type="file" className="hidden" onChange={onPickFile} />
-        <p className="mt-2 text-center text-[10px] text-muted-foreground">
-          {voiceEnabled && voice.supported
-            ? 'Speak and pause to send · Enter to send now · Shift+Enter for a new line'
-            : 'Enter to send · Shift+Enter for a new line'}
-        </p>
-      </footer>
-    </div>
-  );
-}
+              <RunTimeline items={run.items} running={run.running} onDecide={run.decide} />
+            )
+          ) : tab === 'history' ? (
+            <SessionList
+              sessions={sessions}
+              currentId={run.sessionId}
+              busy={run.running}
+              onOpen={openSession}
+              onRemove={(id) => void removeSession(id)}
+            />
+          ) : tab === 'skills' ? (
+            <SkillsPanel tabUrl={tabUrl} connected={connected} onMapSite={mapSite} mapping={run.running} />
+          ) : (
+            <RecordingPanel
+              tabUrl={tabUrl}
+              recordings={recordings}
+              recording={run.recording}
+              busy={run.running}
+              onStart={run.startRecording}
+              onStop={run.stopRecording}
+              onReplay={replayRecording}
+              onRemove={(id) => void removeRecording(id)}
+            />
+          )}
+          <div className="h-3" />
+        </ScrollArea>
 
-function VoiceStatus({
-  voice,
-  voiceEnabled,
-  connected,
-}: {
-  voice: ReturnType<typeof useVoiceComposer>;
-  voiceEnabled: boolean;
-  connected: boolean;
-}) {
-  if (voiceEnabled && voice.error) {
-    return (
-      <p className="mb-2 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-600 dark:text-amber-400">
-        {voice.error}
-      </p>
-    );
-  }
-
-  if (voice.pendingSend) {
-    return (
-      <div className="mb-2 flex items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1.5 text-xs text-primary">
-        <span className="relative flex-1 overflow-hidden rounded-full bg-primary/20">
-          <span
-            className="block h-1 rounded-full bg-primary"
-            style={{ animation: `browsentic-countdown ${voice.autoSendMs}ms linear forwards` }}
-          />
-        </span>
-        <span className="shrink-0">Sending…</span>
-        <button
-          type="button"
-          onClick={voice.cancelPending}
-          className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 hover:bg-primary/15"
-          aria-label="Cancel sending"
-        >
-          <X className="size-3" /> Edit
-        </button>
-      </div>
-    );
-  }
-
-  if (voiceEnabled && voice.listening) {
-    return (
-      <p className="mb-2 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
-        <span className="inline-flex size-1.5 shrink-0 animate-pulse rounded-full bg-rose-500" />
-        {voice.interim ? <span className="truncate italic">{voice.interim}</span> : <span>Listening…</span>}
-      </p>
-    );
-  }
-
-  if (voiceEnabled && connected && !voice.supported) {
-    return (
-      <p className="mb-2 px-1 text-xs text-muted-foreground">Voice input isn&apos;t available in this browser.</p>
-    );
-  }
-
-  return null;
-}
-
-function FilesList({ files, onRemove }: { files: StoredFileMeta[]; onRemove: (id: string) => void }) {
-  if (files.length === 0) return null;
-  return (
-    <div className="mb-2 flex max-h-40 flex-col gap-1.5 overflow-y-auto">
-      {files.map((file) => (
-        <div
-          key={file.id}
-          className="flex items-start gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs"
-        >
-          <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate font-medium">{file.name}</span>
-              <span className="shrink-0 text-[10px] text-muted-foreground">{formatBytes(file.size)}</span>
-            </div>
-            {file.status === 'pending' && (
-              <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" /> Analyzing…
-              </span>
-            )}
-            {file.status === 'ready' && file.summary && (
-              <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{file.summary}</p>
-            )}
-            {file.status === 'error' && (
-              <span className="mt-0.5 block text-[11px] text-destructive">{file.error ?? 'Analysis failed'}</span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => onRemove(file.id)}
-            aria-label={`Remove ${file.name}`}
-            className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        {tab === 'chat' && !pinned && run.items.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="enters absolute bottom-3 left-1/2 -translate-x-1/2 backdrop-blur"
+            onClick={goToLatest}
           >
-            <X className="size-3" />
-          </button>
-        </div>
-      ))}
+            <ArrowDown className="size-3" /> Latest
+          </Button>
+        )}
+      </div>
+
+      {tab === 'chat' && (
+        <footer className="shrink-0 border-t border-line p-3">
+          <Composer
+            voice={voice}
+            voiceEnabled={voiceEnabled}
+            connected={connected}
+            running={run.running}
+            files={files}
+            attachError={attachError}
+            onSend={handleSend}
+            onStop={run.cancel}
+            onToggleVoice={toggleVoice}
+            onAttachPage={() => void attachPageContext()}
+            onAttachFile={(file) => void attachFile(file)}
+            onRemoveFile={(id) => void removeFile(id)}
+          />
+        </footer>
+      )}
     </div>
   );
 }
@@ -447,36 +297,4 @@ function readAsBase64(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'));
     reader.readAsDataURL(file);
   });
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function Greeting({ connected, voiceOn }: { connected: boolean; voiceOn: boolean }) {
-  return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex gap-2">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-          <Bot className="size-4" />
-        </div>
-        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm wrap-anywhere">
-          {connected ? (
-            <>
-              Hi, I&apos;m Browsentic.{' '}
-              {voiceOn ? 'Just talk' : 'Tell me'} what to do on this page — read it, fill something in, click through a
-              flow — and you&apos;ll see every action I take as I take it.
-            </>
-          ) : (
-            <>
-              This browser isn&apos;t paired yet. Run <code className="font-mono text-xs">browsentic-mcp pair</code> and
-              enter the code in the Browsentic popup.
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }

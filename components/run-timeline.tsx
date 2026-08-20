@@ -1,4 +1,29 @@
-import { AlertTriangle, Bot, Check, Info, Terminal, User, Wrench, X, Zap } from 'lucide-react';
+import {
+  Camera,
+  Check,
+  Clapperboard,
+  Compass,
+  CornerDownLeft,
+  ExternalLink,
+  Eye,
+  Highlighter,
+  Hourglass,
+  Info,
+  Keyboard,
+  ListChecks,
+  MousePointerClick,
+  MoveVertical,
+  Paperclip,
+  Radar,
+  Terminal,
+  TextCursorInput,
+  TriangleAlert,
+  Type,
+  Wrench,
+  X,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
@@ -8,51 +33,64 @@ import { cn } from '@/lib/utils';
 
 interface RunTimelineProps {
   items: RunItem[];
-  onDecide: (toolId: string, allow: boolean) => void;
+  running: boolean;
+  onDecide: (toolId: string, allow: boolean, remember?: boolean) => void;
 }
 
-export function RunTimeline({ items, onDecide }: RunTimelineProps) {
+export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
+  const last = items.at(-1);
+  const streaming = running && last?.kind === 'assistant';
+  const awaiting = running && !streaming;
+
   return (
-    <div className="flex min-w-0 flex-col gap-4 p-4">
-      {items.map((item) =>
+    <div className="flex min-w-0 flex-col gap-2.5 p-3">
+      {items.map((item, index) =>
         item.kind === 'tool' ? (
           <ToolRow key={item.id} item={item} onDecide={onDecide} />
         ) : item.kind === 'notice' ? (
           <Notice key={item.id} item={item} />
+        ) : item.kind === 'user' ? (
+          <UserBubble key={item.id} text={item.text} />
         ) : (
-          <Bubble key={item.id} item={item} />
+          <Reply key={item.id} text={item.text} streaming={streaming && index === items.length - 1} />
         ),
       )}
+      {awaiting && <Thinking />}
     </div>
   );
 }
 
-function Bubble({ item }: { item: Extract<RunItem, { kind: 'user' | 'assistant' }> }) {
-  const isAssistant = item.kind === 'assistant';
+function UserBubble({ text }: { text: string }) {
   return (
-    <div className={cn('flex min-w-0 gap-2', !isAssistant && 'flex-row-reverse')}>
-      <div
-        className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-full',
-          isAssistant
-            ? 'bg-gradient-to-br from-violet-500 to-indigo-600 text-white'
-            : 'bg-muted text-muted-foreground',
-        )}
-      >
-        {isAssistant ? <Bot className="size-4" /> : <User className="size-4" />}
+    <div className="enters flex min-w-0 justify-end">
+      <div className="min-w-0 max-w-[88%] rounded-2xl rounded-br-md border border-brand/30 bg-brand/10 px-3 py-2 text-sm whitespace-pre-wrap wrap-anywhere text-ink">
+        {text}
       </div>
-      <div
-        className={cn(
-          'min-w-0 max-w-[85%] rounded-2xl px-3 py-2 text-sm',
-          isAssistant ? 'rounded-tl-sm bg-muted' : 'rounded-tr-sm bg-primary text-primary-foreground',
-        )}
-      >
-        {isAssistant ? (
-          <Markdown text={item.text} />
-        ) : (
-          <span className="whitespace-pre-wrap wrap-anywhere">{item.text}</span>
-        )}
-      </div>
+    </div>
+  );
+}
+
+function Reply({ text, streaming }: { text: string; streaming: boolean }) {
+  return (
+    <div className="enters min-w-0">
+      <Markdown
+        text={text}
+        streaming={streaming}
+        className="panel-card rounded-2xl rounded-tl-md px-3 py-2.5 text-sm leading-relaxed text-ink"
+      />
+    </div>
+  );
+}
+
+function Thinking() {
+  return (
+    <div className="flex items-center gap-2 px-1">
+      <span className="flex items-center gap-1">
+        {[0, 1, 2].map((dot) => (
+          <span key={dot} className="think-dot size-1.5 rounded-full bg-brand" />
+        ))}
+      </span>
+      <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Working</span>
     </div>
   );
 }
@@ -62,24 +100,58 @@ function ToolRow({
   onDecide,
 }: {
   item: Extract<RunItem, { kind: 'tool' }>;
-  onDecide: (toolId: string, allow: boolean) => void;
+  onDecide: (toolId: string, allow: boolean, remember?: boolean) => void;
 }) {
+  const name = item.action.replace(/^page\./, '');
+  const Icon = ICONS[name] ?? Wrench;
+  const pending = item.ok === undefined && !item.awaiting;
+
   return (
-    <div className="ml-9 flex min-w-0 flex-col gap-1.5">
-      <div className="flex min-w-0 items-center gap-2 text-xs">
-        <StatusIcon ok={item.ok} awaiting={item.awaiting} />
-        <span className="shrink-0 font-mono text-muted-foreground">{item.action.replace(/^page\./, '')}</span>
-        {item.source === 'local' && (
-          <Zap className="size-3 shrink-0 text-amber-500" aria-label="Handled in the browser" />
+    <div className="enters flex min-w-0 flex-col gap-1.5">
+      <div
+        className={cn(
+          'relative flex min-w-0 items-start gap-2 overflow-hidden rounded-lg border px-2 py-1.5 transition-colors',
+          item.awaiting
+            ? 'border-ember/45 bg-ember/10'
+            : item.ok === false
+              ? 'border-destructive/40 bg-destructive/8'
+              : 'border-line bg-ground/40',
+          pending && 'sweep',
         )}
-        {item.source === 'external' && (
-          <Terminal className="size-3 shrink-0 text-sky-500" aria-label="Run by a connected MCP client" />
-        )}
-        {item.summary && (
-          <span className={cn('min-w-0 truncate', item.ok === false ? 'text-destructive' : 'text-muted-foreground')}>
-            {item.summary}
-          </span>
-        )}
+      >
+        <Icon
+          className={cn(
+            'mt-0.5 size-3 shrink-0',
+            item.awaiting
+              ? 'text-ember'
+              : item.ok === false
+                ? 'text-destructive'
+                : item.source === 'local'
+                  ? 'text-amber'
+                  : item.source === 'external'
+                    ? 'text-magenta'
+                    : 'text-brand',
+          )}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-mono text-[10px] text-ink">{name}</span>
+            {item.source === 'local' && <Tag tone="amber" icon={Zap} label="local" />}
+            {item.source === 'external' && <Tag tone="magenta" icon={Terminal} label="mcp" />}
+          </div>
+          {item.summary && (
+            <p
+              className={cn(
+                'mt-0.5 truncate text-[10px]',
+                item.ok === false ? 'text-destructive' : 'text-ink-faint',
+              )}
+            >
+              {item.summary}
+            </p>
+          )}
+        </div>
+        {item.ok === true && <Check className="mt-0.5 size-3 shrink-0 text-lime/80" />}
+        {item.ok === false && <X className="mt-0.5 size-3 shrink-0 text-destructive" />}
       </div>
 
       {item.preview && (
@@ -87,25 +159,35 @@ function ToolRow({
           type="button"
           onClick={() => void openScreenshot(item.preview!)}
           title={`Open the ${item.preview.full ? 'full-size' : 'captured'} screenshot in a new tab`}
-          className="group max-w-[85%] overflow-hidden rounded-lg border bg-muted/40 transition hover:border-primary/60 hover:opacity-90"
+          className="group max-w-[88%] overflow-hidden rounded-xl border border-line bg-ground/60 transition-colors hover:border-brand/50"
         >
           <img
             src={item.preview.thumbnail}
             alt={`Screenshot, ${item.preview.width}×${item.preview.height}`}
             width={item.preview.width}
             height={item.preview.height}
-            className="block h-auto w-full"
+            className="block h-auto w-full transition-opacity group-hover:opacity-85"
           />
         </button>
       )}
 
       {item.awaiting && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2">
-          <p className="flex-1 text-xs">Allow this action?</p>
-          <Button size="sm" variant="outline" className="h-7" onClick={() => onDecide(item.id, false)}>
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-ember/45 bg-ember/10 px-2.5 py-2">
+          <p className="flex-1 text-xs text-ink">Allow this action?</p>
+          <Button size="sm" variant="ghost" onClick={() => onDecide(item.id, false)}>
             Deny
           </Button>
-          <Button size="sm" className="h-7" onClick={() => onDecide(item.id, true)}>
+          {item.site && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onDecide(item.id, true, true)}
+              title={`Stop asking for ${name} on ${item.site}. Undo with “browsentic-mcp approvals clear”.`}
+            >
+              Always on {item.site}
+            </Button>
+          )}
+          <Button size="sm" onClick={() => onDecide(item.id, true)}>
             Allow
           </Button>
         </div>
@@ -114,11 +196,18 @@ function ToolRow({
   );
 }
 
-function StatusIcon({ ok, awaiting }: { ok?: boolean; awaiting?: boolean }) {
-  if (awaiting) return <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />;
-  if (ok === true) return <Check className="size-3.5 shrink-0 text-emerald-500" />;
-  if (ok === false) return <X className="size-3.5 shrink-0 text-destructive" />;
-  return <Wrench className="size-3.5 shrink-0 animate-pulse text-muted-foreground" />;
+function Tag({ tone, icon: Icon, label }: { tone: 'amber' | 'magenta'; icon: LucideIcon; label: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px font-mono text-[8px] tracking-[0.1em] uppercase',
+        tone === 'amber' ? 'bg-amber/15 text-amber' : 'bg-magenta/15 text-magenta',
+      )}
+    >
+      <Icon className="size-2" />
+      {label}
+    </span>
+  );
 }
 
 function Notice({ item }: { item: Extract<RunItem, { kind: 'notice' }> }) {
@@ -126,16 +215,48 @@ function Notice({ item }: { item: Extract<RunItem, { kind: 'notice' }> }) {
   return (
     <div
       className={cn(
-        'ml-9 flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs',
-        isError ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground',
+        'enters flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed',
+        isError ? 'border border-destructive/35 bg-destructive/8 text-destructive' : 'text-ink-faint',
       )}
     >
       {isError ? (
-        <AlertTriangle className="mt-px size-3.5 shrink-0" />
+        <TriangleAlert className="mt-px size-3 shrink-0" />
       ) : (
-        <Info className="mt-px size-3.5 shrink-0" />
+        <Info className="mt-px size-3 shrink-0" />
       )}
       <span className="min-w-0 break-words">{item.text}</span>
     </div>
   );
 }
+
+const ICONS: Record<string, LucideIcon> = {
+  getPageInfo: Eye,
+  extractText: Eye,
+  findProgress: Eye,
+  clickElement: MousePointerClick,
+  trustedClick: MousePointerClick,
+  hoverElement: MousePointerClick,
+  fillInput: Type,
+  typeText: Type,
+  focusInput: TextCursorInput,
+  selectText: TextCursorInput,
+  pressKey: Keyboard,
+  submitForm: CornerDownLeft,
+  selectOption: ListChecks,
+  navigate: Compass,
+  openTab: ExternalLink,
+  switchTab: ExternalLink,
+  closeTab: X,
+  screenshot: Camera,
+  scrollTo: MoveVertical,
+  highlightElement: Highlighter,
+  waitForElement: Hourglass,
+  attachFile: Paperclip,
+  listFiles: Paperclip,
+  startMonitor: Radar,
+  stopMonitor: Radar,
+  monitorStatus: Radar,
+  awaitMonitor: Radar,
+  listRecordings: Clapperboard,
+  readRecording: Clapperboard,
+};

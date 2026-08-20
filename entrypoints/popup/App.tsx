@@ -1,41 +1,53 @@
 import { useState } from 'react';
-import { AudioLines, Mic, MicOff, PanelRightOpen, Send, Sparkles } from 'lucide-react';
+import { Mic, MicOff, PanelRightOpen, Send } from 'lucide-react';
 
+import { AgentPicker } from '@/components/agent-picker';
+import { Wordmark } from '@/components/brand';
 import { DaemonLink } from '@/components/daemon-link';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill, describeStatus, type StatusBlocker } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { openSidePanel } from '@/lib/bridge/side-panel';
 import { useRun } from '@/lib/bridge/use-run';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { cn } from '@/lib/utils';
+
+const BLOCKED: Record<StatusBlocker, string> = {
+  unpaired: 'Pair this browser to start',
+  offline: 'The daemon isn’t answering — start browsentic-mcp',
+  agent: 'That agent cannot run — pick another below',
+};
 
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [micOn, setMicOn] = useState(false);
 
-  const connected = daemon?.connected ?? false;
+  const paired = daemon?.paired ?? false;
 
-  async function openSidePanel() {
+  async function revealPanel() {
     const win = await browser.windows.getCurrent();
     if (win.id != null) {
-      await browser.sidePanel.open({ windowId: win.id });
+      await openSidePanel(win.id);
       window.close();
     }
   }
 
   const voice = useVoiceComposer({
-    active: micOn && connected,
+    active: micOn && (daemon?.connected ?? false),
     onSubmit: (text) => {
       setMicOn(false);
       run.send(text);
-      void openSidePanel();
+      void revealPanel();
     },
   });
 
+  const status = describeStatus(daemon, { running: run.running, listening: micOn && voice.listening });
+  const ready = status.ready;
+
   function submit() {
-    if (!connected) return;
+    if (!ready) return;
     voice.submitNow();
   }
 
@@ -48,84 +60,86 @@ export default function App() {
     setMicOn((on) => !on);
   }
 
-  const hint = !connected
-    ? 'Pair this browser to start'
+  const hint = status.blocker
+    ? BLOCKED[status.blocker]
     : voice.error
-      ? voice.error
-      : micOn && voice.listening
-        ? voice.interim || 'Listening… speak, then pause'
-        : run.running
-          ? 'Working — open the side panel to watch'
-          : voice.supported
-            ? 'Tap to talk, or type below'
-            : 'Type your instruction below';
+        ? voice.error
+        : micOn && voice.listening
+          ? voice.interim || 'Listening… speak, then pause'
+          : run.running
+            ? 'Working — open the side panel to watch'
+            : voice.supported
+              ? 'Tap to talk, or type below'
+              : 'Type your instruction below';
 
   return (
-    <div className="flex w-80 flex-col">
-      <header className="flex items-center gap-2.5 border-b px-4 py-3">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
-          <AudioLines className="size-4" />
-        </div>
-        <div className="flex-1">
-          <h1 className="text-sm leading-none font-semibold">Browsentic</h1>
-          <p className="mt-1 text-xs text-muted-foreground">AI voice assistant</p>
-        </div>
-        <Badge variant="secondary">
-          <Sparkles /> Beta
-        </Badge>
+    <div className="flex w-[22rem] flex-col">
+      <header className="flex items-center gap-2 px-4 py-3">
+        <Wordmark className="flex-1" />
+        <StatusPill tone={status.tone}>{status.label}</StatusPill>
       </header>
 
-      <main className="flex flex-col items-center gap-4 px-4 py-6">
-        <button
-          type="button"
-          aria-label={micOn ? 'Stop listening' : 'Start listening'}
-          onClick={toggleMic}
-          disabled={!connected || !voice.supported}
-          className={cn(
-            'relative flex size-20 items-center justify-center rounded-full text-white shadow-lg transition-all outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-            (!connected || !voice.supported) && 'opacity-40',
-            micOn
-              ? 'bg-destructive'
-              : 'bg-gradient-to-br from-violet-500 to-indigo-600 enabled:hover:scale-105',
-          )}
-        >
-          {micOn && voice.listening && (
-            <span className="absolute inset-0 animate-ping rounded-full bg-destructive/40" />
-          )}
-          {micOn ? <MicOff className="size-8" /> : <Mic className="size-8" />}
-        </button>
+      {paired && (
+        <main className="dot-grid flex flex-col items-center gap-4 border-y border-line px-4 py-6">
+          <button
+            type="button"
+            aria-label={micOn ? 'Stop listening' : 'Start listening'}
+            onClick={toggleMic}
+            disabled={!ready || !voice.supported}
+            className={cn(
+              'relative flex size-20 items-center justify-center rounded-full border transition-all outline-none',
+              'focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ground',
+              (!ready || !voice.supported) && 'opacity-40',
+              micOn
+                ? 'border-magenta/60 bg-magenta/15 text-magenta'
+                : 'glow-brand border-brand/50 bg-brand/10 text-brand enabled:hover:scale-105 enabled:hover:bg-brand/20',
+            )}
+          >
+            {micOn && voice.listening && (
+              <span className="absolute inset-0 animate-ping rounded-full bg-magenta/25" />
+            )}
+            {micOn ? <MicOff className="size-8" /> : <Mic className="size-8" />}
+          </button>
 
-        <p className={cn('text-center text-sm', voice.error ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-          {hint}
-        </p>
+          <p
+            className={cn(
+              'min-h-8 text-center text-xs leading-relaxed',
+              voice.error || !status.ready ? 'text-amber' : 'text-ink-dim',
+            )}
+          >
+            {hint}
+          </p>
 
-        <form
-          className="flex w-full gap-1.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
-          <Input
-            value={voice.input}
-            onChange={(event) => voice.setInput(event.target.value)}
-            placeholder="What should I do?"
-            aria-label="Instruction for Browsentic"
-            className="h-8 text-xs"
-            disabled={!connected}
-          />
-          <Button type="submit" size="sm" disabled={!connected || !voice.input.trim()}>
-            <Send />
+          <form
+            className="flex w-full gap-1.5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submit();
+            }}
+          >
+            <Input
+              value={voice.input}
+              onChange={(event) => voice.setInput(event.target.value)}
+              placeholder="What should I do?"
+              aria-label="Instruction for Browsentic"
+              className="h-8 text-xs"
+              disabled={!ready}
+            />
+            <Button type="submit" size="sm" aria-label="Send" disabled={!ready || !voice.input.trim()}>
+              <Send />
+            </Button>
+          </form>
+
+          <Button variant="outline" size="sm" className="w-full" onClick={revealPanel}>
+            <PanelRightOpen /> Open the side panel
           </Button>
-        </form>
-      </main>
+        </main>
+      )}
 
-      <footer className="space-y-2 border-t p-3">
-        <Button variant="outline" className="w-full" onClick={openSidePanel}>
-          <PanelRightOpen /> Open chat side panel
-        </Button>
+      <div className="space-y-4 p-4">
         <DaemonLink />
-      </footer>
+        <AgentPicker />
+      </div>
     </div>
   );
 }

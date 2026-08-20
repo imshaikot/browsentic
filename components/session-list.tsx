@@ -1,4 +1,4 @@
-import { Globe, Loader2, MessageSquare, X } from 'lucide-react';
+import { Globe, Loader2, MessagesSquare, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isNaming, type StoredSessionMeta } from '@/lib/bridge/session-store';
 import { cn } from '@/lib/utils';
@@ -18,16 +18,20 @@ export function SessionList({
 }) {
   if (sessions.length === 0) {
     return (
-      <p className="p-4 text-xs leading-relaxed text-muted-foreground">
-        No saved conversations yet. Every conversation is kept here automatically — the button beside this one closes
-        the current conversation out and starts a fresh one.
-      </p>
+      <div className="p-3">
+        <div className="dot-grid fade-bottom rounded-xl border border-line px-3 py-6 text-center">
+          <MessagesSquare className="mx-auto size-5 text-ink-faint" />
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+            Every conversation lands here on its own. Start one in Chat, and “New chat” in the header closes it out.
+          </p>
+        </div>
+      </div>
     );
   }
   return (
     <div className="flex min-w-0 flex-col gap-1.5 p-3">
       {busy && (
-        <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+        <p className="px-1 pb-1 text-[11px] text-ink-faint">
           Waiting on the current run — stop it to reopen another conversation.
         </p>
       )}
@@ -62,8 +66,8 @@ function SessionRow({
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-md border bg-background/60 px-2.5 py-1.5 text-xs',
-        current && 'border-primary/40 bg-primary/5',
+        'flex items-start gap-2 rounded-xl border px-2.5 py-2 text-xs transition-colors',
+        current ? 'border-brand/35 bg-brand/8' : 'border-line bg-ground/40 hover:border-line-strong',
       )}
     >
       <button
@@ -73,23 +77,19 @@ function SessionRow({
         className="flex min-w-0 flex-1 items-start gap-2 text-left disabled:opacity-50"
         title={session.url}
       >
-        <MessageSquare className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <MessagesSquare className={cn('mt-0.5 size-3.5 shrink-0', current ? 'text-brand' : 'text-ink-faint')} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
-            <span className="truncate font-medium">{label}</span>
-            {current && (
-              <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px]">
-                open
-              </Badge>
-            )}
+            <span className="truncate font-medium text-ink">{label}</span>
+            {current && <Badge>open</Badge>}
           </span>
           {session.host && (
-            <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+            <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-ink-faint">
               <Globe className="size-2.5 shrink-0" />
               <span className="truncate">{session.host}</span>
             </span>
           )}
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
             {isNaming(session) && !session.title ? (
               <>
                 <Loader2 className="size-3 animate-spin" /> Naming…
@@ -106,7 +106,7 @@ function SessionRow({
         type="button"
         onClick={() => onRemove(session.id)}
         aria-label={`Delete ${label}`}
-        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="mt-0.5 shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
       >
         <X className="size-3" />
       </button>

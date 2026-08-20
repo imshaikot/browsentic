@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Square } from 'lucide-react';
+import { Radar, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatEta, type MonitorState } from '@/lib/monitor/events';
 
@@ -9,28 +9,29 @@ export function MonitorBar({ state, onStop }: { state: MonitorState; onStop: () 
   const percent = state.percent != null ? Math.round(state.percent) : null;
 
   return (
-    <div className="mb-2 rounded-md border border-sky-500/40 bg-sky-500/5 p-2.5">
+    <div className="enters mb-2 rounded-xl border border-magenta/35 bg-magenta/8 p-2.5">
       <div className="flex items-center gap-2">
-        <span className="size-2 shrink-0 animate-pulse rounded-full bg-sky-500" />
-        <span className="min-w-0 truncate text-xs font-medium">Watching {state.label ?? state.host}</span>
-        <span className="font-mono text-xs tabular-nums text-muted-foreground">{clock(elapsed)}</span>
-        <span className="flex-1 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
-          {percent != null ? `${percent}%` : ''}
+        <Radar className="size-3.5 shrink-0 animate-pulse text-magenta" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-ink">
+          Watching {state.label ?? state.host}
         </span>
-        <Button
-          size="sm"
-          className="h-6 shrink-0 bg-sky-600 px-2 text-xs text-white shadow-xs hover:bg-sky-700"
-          onClick={onStop}
-        >
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-ink-faint">
+          {clock(elapsed)}
+          {percent != null && ` · ${percent}%`}
+        </span>
+        <Button size="sm" variant="ghost" className="shrink-0 text-magenta hover:text-magenta" onClick={onStop}>
           <Square className="size-3 fill-current" /> Stop
         </Button>
       </div>
       {percent != null && (
-        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sky-500/15">
-          <div className="h-full rounded-full bg-sky-500 transition-[width]" style={{ width: `${percent}%` }} />
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-magenta/15">
+          <div
+            className="glow-dot h-full rounded-full bg-magenta text-magenta transition-[width] duration-500"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       )}
-      <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">{statusLine(state, left)}</p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">{statusLine(state, left)}</p>
     </div>
   );
 }

@@ -17,17 +17,18 @@ export function RecordingList({
 }) {
   if (recordings.length === 0) {
     return (
-      <p className="px-1 py-1 text-[11px] leading-relaxed text-muted-foreground">
-        No recordings yet. Press Record above to capture what you do on a site — the clicks, the fields you fill, the
-        pages you move through — and Browsentic turns it into steps the assistant can repeat later. A recording runs for
-        at most 15 minutes.
-      </p>
+      <div className="dot-grid fade-bottom rounded-xl border border-line px-3 py-6 text-center">
+        <Clapperboard className="mx-auto size-5 text-ink-faint" />
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          No recordings yet. Press Record above and walk through the flow you want repeated.
+        </p>
+      </div>
     );
   }
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       {busy && (
-        <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+        <p className="px-1 pb-1 text-[11px] text-ink-faint">
           Waiting on the current run — stop it to replay a recording.
         </p>
       )}
@@ -59,15 +60,15 @@ function RecordingRow({
   const ready = recording.status === 'ready';
 
   return (
-    <div className="flex items-start gap-2 rounded-md border bg-background/60 px-2.5 py-1.5 text-xs">
-      <Clapperboard className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+    <div className="flex items-start gap-2 rounded-xl border border-line bg-ground/40 px-2.5 py-2 text-xs">
+      <Clapperboard className="mt-0.5 size-3.5 shrink-0 text-ink-faint" />
       <div className="min-w-0 flex-1">
         {editing === null ? (
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-medium">{recording.name}</span>
+            <span className="truncate font-medium text-ink">{recording.name}</span>
             {recording.capturedValues && (
-              <Badge variant="outline" className="h-4 shrink-0 gap-0.5 px-1 text-[10px]">
-                <KeyRound className="size-2.5" /> values
+              <Badge variant="warning">
+                <KeyRound /> values
               </Badge>
             )}
           </div>
@@ -85,7 +86,7 @@ function RecordingRow({
                 }
               }}
               aria-label="Recording name"
-              className="h-6 text-xs"
+              className="h-7 text-xs"
             />
             <button
               type="button"
@@ -94,23 +95,23 @@ function RecordingRow({
                 setEditing(null);
               }}
               aria-label="Save name"
-              className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
             >
               <Check className="size-3" />
             </button>
           </div>
         )}
 
-        <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+        <span className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-ink-faint">
           <Globe className="size-2.5 shrink-0" />
           <span className="truncate">{recording.host}</span>
         </span>
 
         {recording.goal && recording.goal !== recording.name && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{recording.goal}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-dim">{recording.goal}</p>
         )}
 
-        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
           {recording.status === 'analyzing' ? (
             <>
               <Loader2 className="size-3 animate-spin" /> Splitting into steps…
@@ -130,7 +131,7 @@ function RecordingRow({
             type="button"
             onClick={() => onReplay(recording)}
             disabled={busy}
-            className="mt-1 flex items-center gap-1 rounded px-1 py-0.5 text-[11px] text-primary hover:bg-muted disabled:opacity-50"
+            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-brand/12 px-2 py-0.5 text-[11px] text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
           >
             <Play className="size-3" /> Do this again
           </button>
@@ -142,7 +143,7 @@ function RecordingRow({
           type="button"
           onClick={() => setEditing(recording.name)}
           aria-label={`Rename ${recording.name}`}
-          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
         >
           <Pencil className="size-3" />
         </button>
@@ -150,7 +151,7 @@ function RecordingRow({
           type="button"
           onClick={() => onRemove(recording.id)}
           aria-label={`Delete ${recording.name}`}
-          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
         >
           <X className="size-3" />
         </button>

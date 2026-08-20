@@ -26,8 +26,8 @@ export function SkillsPanel({
 }: {
   tabUrl: string;
   connected: boolean;
-  onMapSite?: () => void;
-  mapping?: boolean;
+  onMapSite: () => void;
+  mapping: boolean;
 }) {
   const skills = useStoredSkills();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +36,7 @@ export function SkillsPanel({
   const [error, setError] = useState<string | null>(null);
 
   const host = hostnameOf(tabUrl);
-  const mappable = !!onMapSite && connected && !mapping && /^https?:/.test(tabUrl);
+  const mappable = connected && !mapping && /^https?:/.test(tabUrl);
   const alreadyMapped = skills.some(
     (skill) => skill.origin === 'generated' && hostMatchesDomains(host, skill.domains),
   );
@@ -78,30 +78,28 @@ export function SkillsPanel({
   }
 
   return (
-    <div className="mb-2 rounded-md border bg-muted/30 p-2.5">
-      <div className="mb-2 flex items-center gap-1.5">
-        <BookOpen className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-xs font-medium">Skills</span>
-        {!draft && (
-          <>
-            {onMapSite && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                onClick={onMapSite}
-                disabled={!mappable}
-                title={mappable ? `Map ${host}` : 'Open an http(s) page, with no run in progress'}
-              >
-                <Compass className="size-3" /> {alreadyMapped ? 'Re-map' : 'Map'} {host || 'site'}
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="size-3" /> Upload
-            </Button>
-          </>
-        )}
-      </div>
+    <div className="flex min-w-0 flex-col gap-3 p-3">
+      <p className="text-[11px] leading-relaxed text-ink-dim">
+        Notes about a site — where things are, how its lists load — that join the agent’s instructions only while you
+        are on that site. Let the agent write them for you, or upload your own markdown.
+      </p>
+
+      {!draft && (
+        <div className="grid grid-cols-2 gap-1.5">
+          <Button
+            size="sm"
+            onClick={onMapSite}
+            disabled={!mappable}
+            title={mappable ? `Map ${host}` : 'Open an http(s) page, with no run in progress'}
+          >
+            {mapping ? <Loader2 className="animate-spin" /> : <Compass />}
+            <span className="truncate">{alreadyMapped ? 'Re-map' : 'Map'} this site</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload /> Upload notes
+          </Button>
+        </div>
+      )}
 
       {draft ? (
         <SkillForm
@@ -159,7 +157,8 @@ function SkillForm({
 }) {
   const isSite = draft.category === 'site-exploration';
   return (
-    <div className="flex flex-col gap-2">
+    <div className="panel-card flex flex-col gap-2 rounded-xl p-2.5">
+      <p className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">New skill</p>
       <Input
         value={draft.name}
         onChange={(e) => onChange({ name: e.target.value.toLowerCase() })}
@@ -175,11 +174,11 @@ function SkillForm({
         className="h-8 text-xs"
       />
 
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         <Button
           variant={isSite ? 'outline' : 'default'}
           size="sm"
-          className="h-7 flex-1 text-xs"
+          className="flex-1"
           onClick={() => onChange({ category: 'general' })}
         >
           General
@@ -187,10 +186,10 @@ function SkillForm({
         <Button
           variant={isSite ? 'default' : 'outline'}
           size="sm"
-          className="h-7 flex-1 text-xs"
+          className="flex-1"
           onClick={() => onChange({ category: 'site-exploration' })}
         >
-          <Globe className="size-3" /> Site notes
+          <Globe /> Site notes
         </Button>
       </div>
 
@@ -204,25 +203,23 @@ function SkillForm({
         />
       )}
 
-      <p className="line-clamp-3 rounded bg-background/60 px-2 py-1.5 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="line-clamp-3 rounded-lg border border-line bg-ground/70 px-2 py-1.5 text-[11px] leading-relaxed text-ink-faint">
         {draft.body || 'This file has no instructions in it.'}
       </p>
 
       {error && (
-        <p className="rounded-md bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">{error}</p>
+        <p className="rounded-lg border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">{error}</p>
       )}
 
-      <div className="flex gap-1">
-        <Button variant="ghost" size="sm" className="h-7 flex-1 text-xs" onClick={onCancel}>
+      <div className="flex gap-1.5">
+        <Button variant="ghost" size="sm" className="flex-1" onClick={onCancel}>
           Cancel
         </Button>
-        <Button size="sm" className="h-7 flex-1 text-xs" onClick={onSave} disabled={!connected}>
-          <Check className="size-3" /> Save skill
+        <Button size="sm" className="flex-1" onClick={onSave} disabled={!connected}>
+          <Check /> Save skill
         </Button>
       </div>
-      {!connected && (
-        <p className="text-center text-[10px] text-muted-foreground">Pair the browser to save skills.</p>
-      )}
+      {!connected && <p className="text-center text-[10px] text-ink-faint">Pair the browser to save skills.</p>}
     </div>
   );
 }
@@ -230,15 +227,16 @@ function SkillForm({
 function SkillList({ skills, host }: { skills: StoredSkillMeta[]; host: string }) {
   if (skills.length === 0) {
     return (
-      <p className="px-1 py-1 text-[11px] leading-relaxed text-muted-foreground">
-        Upload a markdown file of notes about a site — where things are, how its lists load — and tag it with that
-        site&apos;s domain. It joins the agent&apos;s instructions whenever you are on that site, and stays out of the
-        way everywhere else.
-      </p>
+      <div className="dot-grid fade-bottom rounded-xl border border-line px-3 py-6 text-center">
+        <BookOpen className="mx-auto size-5 text-ink-faint" />
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+          No skills yet. Mapping a site writes one for you; uploading a markdown file adds your own.
+        </p>
+      </div>
     );
   }
   return (
-    <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto">
+    <div className="flex min-w-0 flex-col gap-1.5">
       {skills.map((skill) => (
         <SkillRow key={skill.id} skill={skill} host={host} />
       ))}
@@ -251,30 +249,27 @@ function SkillRow({ skill, host }: { skill: StoredSkillMeta; host: string }) {
   const generated = skill.origin === 'generated';
   const Icon = generated ? Compass : BookOpen;
   return (
-    <div className="flex items-start gap-2 rounded-md border bg-background/60 px-2.5 py-1.5 text-xs">
-      <Icon className={cn('mt-0.5 size-3.5 shrink-0', activeHere ? 'text-emerald-500' : 'text-muted-foreground')} />
+    <div
+      className={cn(
+        'flex items-start gap-2 rounded-xl border px-2.5 py-2 text-xs',
+        activeHere ? 'border-brand/35 bg-brand/8' : 'border-line bg-ground/40',
+      )}
+    >
+      <Icon className={cn('mt-0.5 size-3.5 shrink-0', activeHere ? 'text-brand' : 'text-ink-faint')} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium">{skill.name}</span>
-          {generated && (
-            <Badge variant="outline" className="h-4 shrink-0 px-1 text-[10px]">
-              mapped
-            </Badge>
-          )}
-          {activeHere && (
-            <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[10px]">
-              on this site
-            </Badge>
-          )}
+          <span className="truncate font-medium text-ink">{skill.name}</span>
+          {generated && <Badge variant="outline">mapped</Badge>}
+          {activeHere && <Badge>on this site</Badge>}
         </div>
         {skill.domains.length > 0 && (
-          <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{skill.domains.join(', ')}</p>
+          <p className="mt-0.5 truncate font-mono text-[10px] text-ink-faint">{skill.domains.join(', ')}</p>
         )}
         {skill.description && (
-          <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{skill.description}</p>
+          <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-dim">{skill.description}</p>
         )}
         {skill.status === 'pending' && (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint">
             <Loader2 className="size-3 animate-spin" /> Saving…
           </span>
         )}
@@ -288,7 +283,7 @@ function SkillRow({ skill, host }: { skill: StoredSkillMeta; host: string }) {
           void browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'removeSkill', skillId: skill.id })
         }
         aria-label={`Remove ${skill.name}`}
-        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="mt-0.5 shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
       >
         <X className="size-3" />
       </button>

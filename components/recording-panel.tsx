@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, Clapperboard, Square } from 'lucide-react';
+import { Circle, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RecordingList } from '@/components/recording-list';
 import type { StoredRecordingMeta } from '@/lib/bridge/recording-store';
@@ -30,54 +30,44 @@ export function RecordingPanel({
   const recordable = !busy && !recording && /^https?:/.test(tabUrl);
 
   return (
-    <div className="mb-2 rounded-md border bg-muted/30 p-2.5">
-      <div className="mb-2 flex items-center gap-1.5">
-        <Clapperboard className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-xs font-medium">Recordings</span>
-        {recordings.length > 0 && (
-          <span className="text-[11px] text-muted-foreground">{recordings.length} saved</span>
-        )}
-      </div>
+    <div className="flex min-w-0 flex-col gap-3 p-3">
+      <p className="text-[11px] leading-relaxed text-ink-dim">
+        Capture what you do on a site — the clicks, the fields you fill, the pages you move through — and the agent can
+        repeat it later. A recording runs for at most 15 minutes.
+      </p>
 
       {recording ? (
-        <Button
-          size="sm"
-          className="mb-2 w-full bg-red-600 text-white shadow-xs hover:bg-red-700"
-          onClick={onStop}
-        >
-          <Square className="size-3 fill-current" /> Stop recording
+        <Button variant="destructive" onClick={onStop}>
+          <Square className="fill-current" /> Stop recording
         </Button>
       ) : (
         <Button
-          size="sm"
-          className="mb-2 w-full bg-red-600 text-white shadow-xs hover:bg-red-700 disabled:bg-muted disabled:text-muted-foreground"
+          variant="destructive"
           onClick={() => onStart(captureValues)}
           disabled={!recordable}
           title={recordable ? `Record what you do on ${host}` : 'Open an http(s) page, with nothing else running'}
         >
-          <Circle className="size-3 fill-current" />
+          <Circle className="fill-current" />
           <span className="truncate">Record {host || 'this page'}</span>
         </Button>
       )}
 
       {!recording && (
-        <label className="mb-2 flex cursor-pointer items-start gap-1.5 px-1 text-[11px] leading-relaxed text-muted-foreground">
+        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-line bg-ground/40 px-2.5 py-2 text-[11px] leading-relaxed text-ink-dim">
           <input
             type="checkbox"
             checked={captureValues}
             onChange={(e) => setCaptureValues(e.target.checked)}
-            className="mt-0.5 size-3 shrink-0 accent-red-500"
+            className="mt-0.5 size-3 shrink-0 accent-destructive"
           />
           <span>
-            Save what I type. Off by default — every field becomes a placeholder the assistant asks you to fill.
-            Passwords and card numbers are never saved either way. Recording stops after 15 minutes.
+            <span className="font-medium text-ink">Save what I type.</span> Off by default — every field becomes a
+            placeholder the agent asks you to fill. Passwords and card numbers are never saved either way.
           </span>
         </label>
       )}
 
-      <div className="max-h-56 overflow-y-auto">
-        <RecordingList recordings={recordings} busy={busy} onReplay={onReplay} onRemove={onRemove} />
-      </div>
+      <RecordingList recordings={recordings} busy={busy} onReplay={onReplay} onRemove={onRemove} />
     </div>
   );
 }
