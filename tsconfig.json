@@ -6,6 +6,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  // `mcp` is a separate Node package with its own tsconfig — `yarn compile:mcp` checks it.
+  // `mcp` is a separate Node package with its own tsconfig — `yarn mcp:compile` checks it.
   "exclude": ["node_modules", "dist", ".wxt/types-check", "mcp"]
 }
