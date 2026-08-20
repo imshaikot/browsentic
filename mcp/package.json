@@ -4,7 +4,7 @@
   "description": "MCP server and local daemon that drive the Browsentic browser extension",
   "type": "module",
   "license": "MIT",
-  "packageManager": "yarn@4.9.4",
+  "packageManager": "yarn@4.17.1",
   "engines": {
     "node": ">=20"
   },
