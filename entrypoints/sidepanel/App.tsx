@@ -15,6 +15,7 @@ import { RecordingBar } from '@/components/recording-bar';
 import { RecordingPanel } from '@/components/recording-panel';
 import { RunTimeline } from '@/components/run-timeline';
 import { SessionList } from '@/components/session-list';
+import { SessionRail } from '@/components/session-rail';
 import { SiteMapReview } from '@/components/site-map-review';
 import { SkillsPanel } from '@/components/skills-panel';
 import { StatusPill, describeStatus } from '@/components/status-pill';
@@ -192,6 +193,16 @@ export default function App() {
         tab={tab}
         counts={{ history: sessions.length, skills: skills.length, recordings: recordings.length }}
         onSelect={open}
+      />
+
+      <SessionRail
+        sessions={run.sessions}
+        activeSessionId={run.sessionId}
+        onFocus={(id) => {
+          open('chat');
+          run.focusSession(id);
+        }}
+        onEnd={run.endSession}
       />
 
       {hasBanners && (
