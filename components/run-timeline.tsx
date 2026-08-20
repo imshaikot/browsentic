@@ -28,7 +28,7 @@ import {
 import { Markdown } from '@/components/markdown';
 import { Button } from '@/components/ui/button';
 import { openScreenshot } from '@/lib/bridge/screenshot-preview';
-import type { RunItem } from '@/lib/bridge/use-run';
+import type { RunItem } from '@/lib/bridge/run-items';
 import { cn } from '@/lib/utils';
 
 interface RunTimelineProps {

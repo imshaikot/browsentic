@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import type { AgentKind } from '@/lib/agents/catalog';
-import type { RunItem } from './use-run';
+import type { RunItem } from './run-items';
 import { nameSession } from './socket';
 
 export const SESSIONS_INDEX_KEY = 'browsentic:sessions';
