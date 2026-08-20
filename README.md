@@ -13,10 +13,11 @@ It runs on **an agent CLI you already have logged in** — [Claude Code](https:/
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 34 page capabilities covering reading, clicking, typing, form submission, navigation, screenshots, captcha handling, theming and accessibility, and background progress monitoring.
+- **Real page control.** 35 page capabilities covering reading, clicking, typing, dragging, form submission, navigation, screenshots, captcha handling, theming and accessibility, and background progress monitoring.
 - **Site maps.** Point Browsentic at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
 - **Recordings.** Do a repetitive job once yourself and Browsentic keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
+- **A conversation per tab.** Several tabs can work at once, each in its own conversation and each staying in its own tab. The side panel follows whichever tab is in front, a collapsible strip lists the ones running, and closing a tab ends its session and files the transcript in History.
 - **Bring your own agent.** The side panel runs on Claude Code, Codex or Antigravity — chosen from the status pill in the side panel or from the popup, either of which tells you which ones are installed and what a missing one needs.
 - **Works as an MCP server.** Claude Code or any other MCP client can drive your real, logged in browser through the same local daemon.
 - **Off by default.** A fresh install connects to nothing until you redeem a one time pairing code.
@@ -224,7 +225,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Claude Code now has 34 page tools plus `browsentic_status`, and three read only resources that
+Claude Code now has 35 page tools plus `browsentic_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -233,7 +234,7 @@ registry the extension ships, so they cannot drift from what the browser can act
 | Category | Capabilities |
 | --- | --- |
 | Read | Structured page snapshot with a layout diagram and stable selectors, rendered text or HTML, wait for an element to appear or vanish, screenshot the tab or one element |
-| Act | Click, hover, focus, type into inputs and contenteditables, stream text in keystroke by keystroke at a human pace, choose a `<select>` option, select text, press keys with modifiers, submit a form, and — for pages that only accept a genuine gesture — click with a real browser-level mouse event |
+| Act | Click, hover, focus, type into inputs and contenteditables, stream text in keystroke by keystroke at a human pace, choose a `<select>` option, select text, press keys with modifiers, submit a form, drag one thing onto another — reordering a list, moving a card between columns, pulling a slider — and, for pages that only accept a genuine gesture, click or drag with a real browser-level mouse event |
 | Captchas | Identify the widget behind a "verify you are human" block, reading through the closed shadow roots and cross-origin frames vendors hide it in, and tick its checkbox with a real click. An image challenge is handed back to you to answer |
 | Move | Open a URL, back, forward, reload, scroll to an element or position, open a URL in a new tab, list and switch between open tabs, close one |
 | Files | List files stored in Browsentic and attach one to a file input on the page |
@@ -280,8 +281,12 @@ browsentic-mcp sessions    # which browsers are paired
 browsentic-mcp revoke      # unpair everything, or one origin
 browsentic-mcp skills      # every skill in scope, and where it came from
 browsentic-mcp logs        # run starts, routed skills, every tool call
+browsentic-mcp restart     # swap the running daemon for a fresh one
 browsentic-mcp stop
 ```
+
+There is no start command: the first CLI or MCP client that needs the daemon spawns it, and it
+lives until you stop it or it sits idle for 30 minutes with nothing attached.
 
 ## Privacy and security
 
@@ -320,16 +325,16 @@ yarn dev              # build, launch a throwaway Chrome profile, hot reload
 yarn dev:firefox
 yarn build            # production build
 yarn zip              # store ready archive
-yarn compile          # type check
-yarn intent:check     # route a fixture table of utterances through the local grammar
+yarn check            # everything a pull request needs: both type checks, both fixture suites
 yarn mcp:build        # rebuild the daemon and MCP server
+yarn mcp:restart      # rebuild, then swap the running daemon for the fresh build
 yarn mcp:manifest     # print the tool manifest, no browser needed
 ```
 
 Explain a single routing decision:
 
 ```sh
-yarn intent:check "take me to the checkout page"
+yarn check:intent "take me to the checkout page"
 ```
 
 Yarn 4 is the package manager and the release is pinned inside the repository, so whichever `yarn`
@@ -346,8 +351,8 @@ module are load bearing at runtime rather than at compile time: touch `document`
 inside `execute()`, keep underscores out of action names, `.describe()` every input field, and
 validate with `ActionError` inside `execute()` rather than zod `.refine()`/`.transform()`.
 
-Before opening a pull request, run `yarn compile`, `yarn compile:mcp`, `yarn intent:check`,
-`yarn security:check` and `yarn mcp:manifest`.
+Before opening a pull request, run `yarn check`. If you touched the action registry, also run
+`yarn mcp:manifest` and keep [docs/tools.md](docs/tools.md) in step with what it prints.
 
 ## License
 

@@ -378,10 +378,10 @@ Then reload the extension at `chrome://extensions` (↻ on the Browsentic card) 
 daemon:
 
 ```sh
-browsentic-mcp stop
+browsentic-mcp restart
 ```
 
-It restarts automatically on the next call. **Rebuild both halves together.** If only one side is
+**Rebuild both halves together.** If only one side is
 rebuilt, `browsentic-mcp status` reports `manifest: DRIFTED` — the daemon falls back to the tools
 the browser actually has and tells your MCP client the list changed, but you should fix the drift
 rather than run on it.
@@ -412,7 +412,7 @@ which live in extension storage.
 | "That pairing code is wrong or expired" | Codes are single-use and last 10 minutes | `browsentic-mcp pair` for a fresh one. A failed attempt does not burn the outstanding code. |
 | "No Browsentic daemon is running" | Nothing on 8765–8767 | `browsentic-mcp status`; check the log with `browsentic-mcp logs` |
 | Tools missing from an MCP session | The server was registered mid-session | Restart the client session — MCP servers load at start |
-| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn mcp:build`, then reload the extension |
+| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn mcp:restart`, then reload the extension |
 | `AGENT_MISSING` | The chosen agent CLI is not on the daemon's `PATH` | `browsentic-mcp agent` to see all three; set `agents.<name>.bin` to an absolute path in `config.json` |
 | `AGENT_NEEDS_PERMISSION` | Antigravity has no rule allowing Browsentic's MCP tools | Press the button in the popup, or run `browsentic-mcp agent setup antigravity` |
 | "does not understand the flags Browsentic uses" | The agent CLI is too old | Update it |
@@ -421,7 +421,7 @@ which live in extension storage.
 | `EXTENSION_OFFLINE` | Browser closed, or not paired | Open the browser; `browsentic-mcp sessions` to check pairing |
 | `TAB_UNREACHABLE` on a normal site | The extension needs reloading | ↻ at `chrome://extensions`; ordinary sites otherwise self-heal |
 | `RUN_IN_PROGRESS` | One instruction at a time | Cancel the running one in the side panel |
-| An action ran but nothing appears in `logs` | It matched the local intent grammar and never reached the daemon | Expected — those carry a ⚡ on the timeline. `yarn intent:check "<what you said>"` explains the routing. |
+| An action ran but nothing appears in `logs` | It matched the local intent grammar and never reached the daemon | Expected — those carry a ⚡ on the timeline. `yarn check:intent "<what you said>"` explains the routing. |
 
 Useful commands:
 
@@ -434,6 +434,7 @@ browsentic-mcp skills      # every skill in scope, and where it came from
 browsentic-mcp tools       # the tool manifest, no browser needed
 browsentic-mcp logs        # run starts, routed skills, every tool call
 browsentic-mcp token       # the control token, for MCP clients
+browsentic-mcp restart     # swap the running daemon for a fresh one
 browsentic-mcp stop
 ```
 
@@ -449,15 +450,23 @@ yarn dev:firefox
 yarn build            # production build
 yarn zip              # store-ready archive
 yarn compile          # type check the extension
-yarn compile:mcp      # type check the daemon
+yarn mcp:compile      # type check the daemon
 yarn mcp:dev          # rebuild the daemon on change
+yarn mcp:restart      # rebuild, then swap the running daemon for the fresh build
 yarn mcp:manifest     # print the tool manifest, no browser needed
-yarn intent:check     # route a fixture table of utterances through the local grammar
-yarn security:check
+yarn check:intent     # route a fixture table of utterances through the local grammar
+yarn check:security
 ```
 
-Before opening a pull request, run `yarn compile`, `yarn compile:mcp`, `yarn intent:check`,
-`yarn security:check` and `yarn mcp:manifest`.
+The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
+until `browsentic-mcp stop` or 30 idle minutes with nothing attached. The flip side is that a
+rebuild alone changes nothing while a daemon is running — it keeps the old code in memory. That is
+what `yarn mcp:restart` is for: it rebuilds, stops the stale daemon and brings up the fresh build.
+The extension cannot spawn the daemon; it only reconnects to one.
+
+Before opening a pull request, run `yarn check` — it chains both type checks with both fixture
+suites. If you touched the action registry, also run `yarn mcp:manifest` and keep
+[tools.md](tools.md) in step with what it prints.
 
 See [architecture.md](architecture.md) for how the pieces fit together, and
 [features.md](features.md) for what they do.
