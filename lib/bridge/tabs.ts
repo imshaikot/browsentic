@@ -31,7 +31,7 @@ interface TabInfo {
   status?: string;
 }
 
-export async function openNewTab(input: unknown): Promise<ActionResult> {
+export async function openNewTab(input: unknown, anchor?: TabRef): Promise<ActionResult> {
   const parsed = openTab.input.safeParse(input ?? {});
   if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
   const { url, active } = parsed.data;
@@ -43,7 +43,9 @@ export async function openNewTab(input: unknown): Promise<ActionResult> {
     );
   }
 
-  const current = (await browser.tabs.query({ active: true, currentWindow: true }))[0] as TabInfo | undefined;
+  const current = (anchor
+    ? await browser.tabs.get(anchor.id).catch(() => undefined)
+    : (await browser.tabs.query({ active: true, currentWindow: true }))[0]) as TabInfo | undefined;
   const base = current?.url && isPageUrl(current.url) ? current.url : undefined;
 
   let href: string;

@@ -5,6 +5,7 @@ import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { closeTab } from '@/lib/actions/page/close-tab';
+import { dragElement } from '@/lib/actions/page/drag-element';
 import { findCaptcha } from '@/lib/actions/page/find-captcha';
 import { listFiles } from '@/lib/actions/page/list-files';
 import { listRecordings } from '@/lib/actions/page/list-recordings';
@@ -24,34 +25,50 @@ import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
-import { trustedClickInTab } from '@/lib/bridge/trusted-input';
-import { closeOpenTab, openNewTab, switchToTab, watchForLoad } from '@/lib/bridge/tabs';
+import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
+import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
+import { adoptSubtab, sessionForRun, sessionForTab, setCurrentTab, type TabSession } from '@/lib/bridge/tab-sessions';
 
-export async function invokeForHarness(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
+export async function invokeForHarness(
+  action: string,
+  input?: unknown,
+  tabId?: number,
+  runId?: string,
+): Promise<ActionResult> {
   if (action === listFiles.name) return listStoredFiles(input);
   if (action === listRecordings.name) return listStoredRecordings(input);
   if (action === readRecording.name) return readStoredRecording(input);
-  if (action === openTab.name) return openNewTab(input);
-  if (action === startMonitor.name) return beginMonitor(input, tabId);
+
+  const owner = runId ? await sessionForRun(runId) : null;
+  if (action === openTab.name) return openSessionTab(input, owner);
+  if (action === startMonitor.name) return beginMonitor(input, tabId ?? owner?.currentTabId);
   if (action === monitorStatus.name) return statusOfMonitors(input);
   if (action === stopMonitor.name) return stopRequestedMonitor(input);
   if (action === awaitMonitor.name) return awaitRequestedMonitor(input);
 
-  const tab = tabId == null ? (await browser.tabs.query({ active: true, currentWindow: true }))[0] : await pinnedTab(tabId);
+  const tab = await resolveTab(tabId, owner);
   if (tab?.id == null) {
+    if (owner) {
+      return failure('SESSION_TAB_CLOSED', 'The tab this conversation was working in has been closed.');
+    }
     return tabId == null
       ? failure('NO_ACTIVE_TAB', 'No active tab to control')
       : failure('MAPPING_TAB_CHANGED', 'The tab this run started in has been closed.');
   }
   if (action === navigate.name) return navigateTab(tab.id, input);
-  if (action === switchTab.name) return switchToTab({ id: tab.id, windowId: tab.windowId }, input);
+  if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
-  if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input);
+  if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input, runId);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   if (action === trustedClick.name) return trustedClickInTab(tab.id, input);
+  if (action === dragElement.name && isTrustedDrag(input)) return dragInTab(tab.id, input);
   if (action === findCaptcha.name) return findCaptchaInTab(tab.id);
   if (action === solveCaptcha.name) return solveCaptchaInTab(tab.id, input);
   return invokeInTab(tab.id, action, input);
+}
+
+function isTrustedDrag(input: unknown): boolean {
+  return (input as { trusted?: unknown } | undefined)?.trusted === true;
 }
 
 async function pinnedTab(tabId: number) {
@@ -60,6 +77,48 @@ async function pinnedTab(tabId: number) {
   } catch {
     return undefined;
   }
+}
+
+async function resolveTab(tabId: number | undefined, owner: TabSession | null) {
+  if (owner) return (await pinnedTab(owner.currentTabId)) ?? (await pinnedTab(owner.mainTabId));
+  if (tabId != null) return pinnedTab(tabId);
+  return (await browser.tabs.query({ active: true, currentWindow: true }))[0];
+}
+
+async function openSessionTab(input: unknown, owner: TabSession | null): Promise<ActionResult> {
+  if (!owner) return openNewTab(input);
+  const anchor = (await pinnedTab(owner.currentTabId)) ?? (await pinnedTab(owner.mainTabId));
+  const result = await openNewTab(input, anchor?.id != null ? { id: anchor.id, windowId: anchor.windowId } : undefined);
+  if (!result.ok) return result;
+  const opened = (result.data as { tabId?: unknown; activeTabId?: unknown }).tabId;
+  if (typeof opened === 'number') {
+    await adoptSubtab(owner.sessionId, opened, (result.data as { activeTabId?: unknown }).activeTabId === opened);
+  }
+  return result;
+}
+
+async function switchSessionTab(current: TabRef, input: unknown, owner: TabSession | null): Promise<ActionResult> {
+  if (!owner) return switchToTab(current, input);
+
+  const wanted = (input ?? {}) as { tabId?: unknown };
+  if (typeof wanted.tabId === 'number' && !owner.tabIds.includes(wanted.tabId)) {
+    const other = await sessionForTab(wanted.tabId);
+    if (other) {
+      return failure(
+        'TAB_IN_USE',
+        `Another Browsentic conversation is working in tab ${wanted.tabId}. Leave it alone, or ask the user to end that session first.`,
+      );
+    }
+  }
+
+  const result = await switchToTab(current, input);
+  if (!result.ok) return result;
+  const landed = (result.data as { activeTabId?: unknown }).activeTabId;
+  if (typeof landed !== 'number' || landed === current.id) return result;
+
+  if (owner.tabIds.includes(landed)) await setCurrentTab(owner.sessionId, landed);
+  else if (!(await sessionForTab(landed))) await adoptSubtab(owner.sessionId, landed, true);
+  return result;
 }
 
 async function beginMonitor(input: unknown, tabId?: number): Promise<ActionResult> {

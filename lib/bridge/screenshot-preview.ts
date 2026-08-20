@@ -14,7 +14,7 @@ const bodyKey = (id: string) => `browsentic:shot:${id}`;
 const MAX_KEPT = 2;
 const MAX_FULL_CHARS = 4_000_000;
 
-type Listener = (preview: ScreenshotPreview) => void;
+type Listener = (preview: ScreenshotPreview, runId?: string) => void;
 
 const listeners = new Set<Listener>();
 
@@ -24,6 +24,7 @@ export function onScreenshotPreview(listener: Listener): void {
 
 export async function publishScreenshot(
   image: { dataUrl: string; thumbnail: string; width: number; height: number },
+  runId?: string,
 ): Promise<void> {
   if (!image.thumbnail) return;
   const previewId = crypto.randomUUID();
@@ -35,7 +36,7 @@ export async function publishScreenshot(
     height: image.height,
     full,
   };
-  for (const listener of listeners) listener(preview);
+  for (const listener of listeners) listener(preview, runId);
 }
 
 export async function readFullImage(previewId: string): Promise<string | null> {

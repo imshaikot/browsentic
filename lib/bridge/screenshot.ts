@@ -24,6 +24,7 @@ const MAX_CANVAS_AREA = MAX_CANVAS_SIDE * MAX_CANVAS_SIDE;
 export async function screenshotTab(
   tab: { id: number; windowId?: number },
   input?: unknown,
+  runId?: string,
 ): Promise<ActionResult> {
   const planned = await invokeInTab(tab.id, 'page.screenshot', input);
   if (!planned.ok) return planned;
@@ -31,7 +32,7 @@ export async function screenshotTab(
 
   try {
     const shot = await capture(tab, plan);
-    void publishCapture(shot);
+    void publishCapture(shot, runId);
     return success(shot);
   } catch (error) {
     if (error instanceof ActionError) return failure(error.code, error.message);
@@ -52,9 +53,9 @@ interface Shot {
   truncated?: boolean;
 }
 
-async function publishCapture(shot: Shot): Promise<void> {
+async function publishCapture(shot: Shot, runId?: string): Promise<void> {
   try {
-    await publishScreenshot({ ...shot, thumbnail: await thumbnailOf(shot.dataUrl) });
+    await publishScreenshot({ ...shot, thumbnail: await thumbnailOf(shot.dataUrl) }, runId);
   } catch {}
 }
 

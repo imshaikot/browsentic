@@ -4,7 +4,11 @@ import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/
 import { invokeForHarness } from './invoke';
 import { startActiveTabRecording, stopRecording } from './recorder';
 
-export async function tryFastPath(text: string, emit: (event: RunEvent) => void): Promise<boolean> {
+export async function tryFastPath(
+  text: string,
+  emit: (event: RunEvent) => void,
+  tabId?: number,
+): Promise<boolean> {
   const routing = routeIntent(text);
   if (routing.decision !== 'act') return false;
 
@@ -13,7 +17,7 @@ export async function tryFastPath(text: string, emit: (event: RunEvent) => void)
   emit({ kind: 'tool', toolId, action, input, source: 'local' });
 
   const startedAt = Date.now();
-  const result = await run(action, input);
+  const result = await run(action, input, tabId);
   const elapsed = Date.now() - startedAt;
   emit({
     kind: 'toolResult',
@@ -30,13 +34,13 @@ export async function tryFastPath(text: string, emit: (event: RunEvent) => void)
   return true;
 }
 
-async function run(action: string, input: unknown): Promise<ActionResult> {
+async function run(action: string, input: unknown, tabId?: number): Promise<ActionResult> {
   if (action === START_RECORDING_ACTION) {
     const captureValues = (input as { captureValues?: unknown } | undefined)?.captureValues === true;
     return startActiveTabRecording(captureValues);
   }
   if (action === STOP_RECORDING_ACTION) return stopRecording('user');
-  return invokeForHarness(action, input);
+  return invokeForHarness(action, input, tabId);
 }
 
 function isRecordingAction(action: string): boolean {
