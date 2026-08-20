@@ -11,10 +11,9 @@ import {
 } from '@/lib/actions/protocol';
 import { originOf } from '@/lib/recordings/events';
 import { REPLAYABLE_ACTIONS, validateRecordingWorkflow } from '@/lib/recordings/workflow';
-import { stateDir } from '../lockfile';
 import { log } from '../log';
 import type { AgentConfig } from './config';
-import { RunError, runClaudeJson } from './runner';
+import { RunError, runAgentJson, taskDir } from './runner';
 
 type AnalyzeRecordingFrame = Extract<SocketFrame, { t: 'analyzeRecording' }>;
 
@@ -22,8 +21,6 @@ const ANALYZE_TIMEOUT_MS = 110_000;
 const MAX_TRACE_BYTES = 4 * 1024 * 1024;
 
 const OPEN = '=== WORKFLOW ===';
-
-const tmpDir = join(stateDir, 'tmp');
 
 export async function analyzeRecording(
   req: AnalyzeRecordingFrame,
@@ -37,7 +34,8 @@ export async function analyzeRecording(
     return failure('RECORDING_TOO_LARGE', 'The recorded trace is too large to summarize.');
   }
 
-  mkdirSync(tmpDir, { recursive: true });
+  const tmpDir = taskDir(config);
+  mkdirSync(tmpDir, { recursive: true, mode: 0o700 });
   const path = join(tmpDir, `${randomUUID()}-recording.json`);
   writeFileSync(path, trace, { mode: 0o600 });
 
@@ -45,13 +43,13 @@ export async function analyzeRecording(
   const timer = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT_MS);
   log(`analyzing recording ${recording.name} (${recording.events.length} events on ${recording.host})`);
   try {
-    const output = await runClaudeJson(promptFor(path, recording), config, controller.signal, {
-      allowedTools: ['Read'],
+    const output = await runAgentJson(promptFor(path, recording), config, controller.signal, {
+      reads: true,
       timedOut: 'Splitting the recording into steps took too long.',
-      empty: 'Claude Code returned an empty workflow.',
+      empty: 'The agent returned an empty workflow.',
     });
     const parsed = parse(output);
-    if (!parsed) return failure('AGENT_FAILED', 'Claude Code did not return a usable workflow object.');
+    if (!parsed) return failure('AGENT_FAILED', 'The agent did not return a usable workflow object.');
 
     const checked = validateRecordingWorkflow(parsed, { origin: originOf(recording.startUrl) });
     if (!checked.ok) return failure('INVALID_WORKFLOW', checked.message);

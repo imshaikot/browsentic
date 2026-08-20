@@ -2,17 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { failure, success, type ActionResult, type SocketFrame } from '@/lib/actions/protocol';
-import { stateDir } from '../lockfile';
 import { log } from '../log';
 import type { AgentConfig } from './config';
-import { RunError, runClaudeJson } from './runner';
+import { RunError, runAgentJson, taskDir } from './runner';
 
 type AnalyzeFileFrame = Extract<SocketFrame, { t: 'analyzeFile' }>;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const SUMMARIZE_TIMEOUT_MS = 60_000;
-
-const tmpDir = join(stateDir, 'tmp');
 
 export async function summarizeFile(
   req: AnalyzeFileFrame,
@@ -24,18 +21,19 @@ export async function summarizeFile(
     return failure('FILE_TOO_LARGE', `Files over ${Math.round(MAX_BYTES / 1024 / 1024)} MB are not summarized.`);
   }
 
-  mkdirSync(tmpDir, { recursive: true });
+  const tmpDir = taskDir(config);
+  mkdirSync(tmpDir, { recursive: true, mode: 0o700 });
   const path = join(tmpDir, `${randomUUID()}-${safeName(req.name)}`);
-  writeFileSync(path, bytes);
+  writeFileSync(path, bytes, { mode: 0o600 });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SUMMARIZE_TIMEOUT_MS);
   log(`summarizing ${req.name} (${bytes.length} bytes, ${req.mime || 'unknown type'})`);
   try {
-    const output = await runClaudeJson(promptFor(path, req), config, controller.signal, {
-      allowedTools: ['Read'],
+    const output = await runAgentJson(promptFor(path, req), config, controller.signal, {
+      reads: true,
       timedOut: 'Summarizing the file took too long.',
-      empty: 'Claude Code returned an empty summary.',
+      empty: 'The agent returned an empty summary.',
     });
     const { summary, digest } = split(output);
     log(`summarized ${req.name}${digest ? ` (+${digest.length} chars of notes)` : ''}`);

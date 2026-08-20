@@ -28,7 +28,10 @@ const READ_ONLY_ACTIONS = new Set([
   'page.hoverElement',
   'page.highlightElement',
   'page.findProgress',
+  'page.findCaptcha',
   'page.monitorStatus',
+  'page.readTheme',
+  'page.auditContrast',
 ]);
 
 const CLICK_ACTION = 'page.clickElement';

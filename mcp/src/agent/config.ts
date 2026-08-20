@@ -1,12 +1,23 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, type AgentKind } from '@/lib/agents/catalog';
+import type { GuardrailConfig } from '../guardrails';
 import { stateDir } from '../lockfile';
 
-export interface AgentConfig {
-  claudeBin: string;
+export interface AgentSettings {
+  /** Binary name or absolute path. Defaults to the agent's own command name. */
+  bin: string;
   model?: string;
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  effort?: string;
+}
+
+export interface AgentConfig {
+  /** Which CLI the daemon spawns for side-panel runs and background tasks. */
+  agent: AgentKind;
+  agents: Record<AgentKind, AgentSettings>;
   requireApproval: string[];
+  /** Overrides for the declared guardrail policy. See mcp/src/guardrails/policy.ts. */
+  guardrails?: GuardrailConfig;
   screenshotDir?: string;
   skillsDir?: string;
   siteMap?: {
@@ -50,21 +61,74 @@ function clamp(value: unknown, { fallback, max }: { fallback: number; max: numbe
 
 export const configPath = join(stateDir, 'config.json');
 
-const DEFAULTS: AgentConfig = {
-  claudeBin: 'claude',
-  model: 'claude-sonnet-5',
-  requireApproval: ['page.submitForm'],
+const DEFAULT_MODEL: Partial<Record<AgentKind, string>> = {
+  claude: 'claude-sonnet-5',
 };
 
-export function readAgentConfig(): AgentConfig {
-  let stored: Partial<AgentConfig> = {};
+const DEFAULT_APPROVALS = ['page.submitForm'];
+
+interface StoredConfig extends Record<string, unknown> {
+  agent?: unknown;
+  agents?: Record<string, { bin?: unknown; model?: unknown; effort?: unknown } | undefined>;
+  requireApproval?: unknown;
+  /** Pre-0.2 layout: one Claude Code runner, configured at the top level. */
+  claudeBin?: unknown;
+  model?: unknown;
+  effort?: unknown;
+}
+
+function readStored(): StoredConfig {
   try {
-    stored = JSON.parse(readFileSync(configPath, 'utf8')) as Partial<AgentConfig>;
+    const parsed = JSON.parse(readFileSync(configPath, 'utf8')) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as StoredConfig) : {};
   } catch {
+    return {};
   }
+}
+
+export function readAgentConfig(): AgentConfig {
+  const stored = readStored();
+  const agents = {} as Record<AgentKind, AgentSettings>;
+  for (const kind of AGENT_KINDS) agents[kind] = settingsFor(stored, kind);
+
   return {
-    ...DEFAULTS,
-    ...stored,
-    requireApproval: Array.isArray(stored.requireApproval) ? stored.requireApproval : DEFAULTS.requireApproval,
+    ...(stored as Partial<AgentConfig>),
+    agent: isAgentKind(stored.agent) ? stored.agent : DEFAULT_AGENT,
+    agents,
+    requireApproval: Array.isArray(stored.requireApproval)
+      ? (stored.requireApproval as string[])
+      : DEFAULT_APPROVALS,
   };
+}
+
+function settingsFor(stored: StoredConfig, kind: AgentKind): AgentSettings {
+  const scoped = stored.agents?.[kind] ?? {};
+  const legacy = kind === 'claude' ? { bin: stored.claudeBin, model: stored.model, effort: stored.effort } : {};
+  return {
+    bin: text(scoped.bin) ?? text(legacy.bin) ?? AGENTS[kind].bin,
+    model: text(scoped.model) ?? text(legacy.model) ?? DEFAULT_MODEL[kind],
+    effort: text(scoped.effort) ?? text(legacy.effort),
+  };
+}
+
+const text = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+export interface ActiveAgent extends AgentSettings {
+  kind: AgentKind;
+}
+
+export function activeAgent(config: AgentConfig): ActiveAgent {
+  return { kind: config.agent, ...config.agents[config.agent] };
+}
+
+/** Switches the agent the daemon spawns, leaving every other key in config.json untouched. */
+export function writeActiveAgent(kind: AgentKind): void {
+  const stored = readStored();
+  write({ ...stored, agent: kind });
+}
+
+function write(config: StoredConfig): void {
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
 }

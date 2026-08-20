@@ -1,7 +1,7 @@
 import { failure, success, type ActionResult, type SocketFrame } from '@/lib/actions/protocol';
 import { log } from '../log';
 import type { AgentConfig } from './config';
-import { RunError, runClaudeJson } from './runner';
+import { RunError, runAgentJson } from './runner';
 
 type NameSessionFrame = Extract<SocketFrame, { t: 'nameSession' }>;
 
@@ -25,12 +25,12 @@ export async function nameSession(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), NAME_TIMEOUT_MS);
   try {
-    const output = await runClaudeJson(promptFor(messages, req.host), config, controller.signal, {
+    const output = await runAgentJson(promptFor(messages, req.host), config, controller.signal, {
       timedOut: 'Naming the conversation took too long.',
-      empty: 'Claude Code returned an empty name.',
+      empty: 'The agent returned an empty name.',
     });
     const title = clamp(output);
-    if (!title) return failure('AGENT_FAILED', 'Claude Code returned an empty name.');
+    if (!title) return failure('AGENT_FAILED', 'The agent returned an empty name.');
     log(`named session: ${title}`);
     return success({ title });
   } catch (error) {

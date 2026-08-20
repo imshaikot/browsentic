@@ -1,4 +1,4 @@
-import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stateDir } from './lockfile';
@@ -53,12 +53,15 @@ export function createPairing(): { code: string; expiresAt: number } {
   return { code, expiresAt };
 }
 
-export function consumePairing(offered: string): boolean {
+export function pendingPairings(): string[] {
+  return read()
+    .pairings.filter((pairing) => pairing.expiresAt > Date.now())
+    .map((pairing) => pairing.code);
+}
+
+export function consumePairing(code: string): void {
   const auth = read();
-  const normalized = offered.replace(/[\s-]/g, '').toUpperCase();
-  const match = auth.pairings.find((pairing) => equals(pairing.code, normalized));
-  write({ ...auth, pairings: auth.pairings.filter((pairing) => pairing !== match) });
-  return !!match && match.expiresAt > Date.now();
+  write({ ...auth, pairings: auth.pairings.filter((pairing) => pairing.code !== code) });
 }
 
 export function hasPendingPairing(): boolean {
@@ -80,15 +83,16 @@ export function createSession(origin: string, extensionVersion: string): Session
   return session;
 }
 
-export function validateSession(offeredKey: string, origin: string): Session | null {
+export function sessionFor(origin: string): Session | null {
+  return read().sessions.find((candidate) => candidate.origin === origin) ?? null;
+}
+
+export function touchSession(origin: string): void {
   const auth = read();
-  const session = auth.sessions.find(
-    (candidate) => candidate.origin === origin && equals(candidate.key, offeredKey),
-  );
-  if (!session) return null;
+  const session = auth.sessions.find((candidate) => candidate.origin === origin);
+  if (!session) return;
   session.lastSeenAt = new Date().toISOString();
   write(auth);
-  return session;
 }
 
 export function listSessions(): Session[] {
@@ -104,10 +108,4 @@ export function revokeSessions(predicate: (session: Session) => boolean): number
 
 export function clearAuth(): void {
   rmSync(authPath, { force: true });
-}
-
-function equals(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
 }
