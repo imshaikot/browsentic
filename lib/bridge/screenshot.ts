@@ -30,9 +30,9 @@ export async function screenshotTab(
   const plan = planned.data as CapturePlan;
 
   try {
-    const { thumbnail, ...data } = await capture(tab, plan);
-    await publishScreenshot({ ...data, thumbnail }).catch(() => {});
-    return success(data);
+    const shot = await capture(tab, plan);
+    void publishCapture(shot);
+    return success(shot);
   } catch (error) {
     if (error instanceof ActionError) return failure(error.code, error.message);
     return failure('CAPTURE_FAILED', error instanceof Error ? error.message : String(error));
@@ -44,17 +44,21 @@ export async function screenshotTab(
   }
 }
 
-async function capture(
-  tab: { id: number; windowId?: number },
-  plan: CapturePlan,
-): Promise<{
+interface Shot {
   format: string;
   width: number;
   height: number;
   dataUrl: string;
   truncated?: boolean;
-  thumbnail: string;
-}> {
+}
+
+async function publishCapture(shot: Shot): Promise<void> {
+  try {
+    await publishScreenshot({ ...shot, thumbnail: await thumbnailOf(shot.dataUrl) });
+  } catch {}
+}
+
+async function capture(tab: { id: number; windowId?: number }, plan: CapturePlan): Promise<Shot> {
   const { viewport, format, quality, maxLongSide } = plan;
   const region = { ...plan.region };
 
@@ -73,12 +77,14 @@ async function capture(
   const xs = tileStarts(region.x, region.w, viewport.w);
   const ys = tileStarts(region.y, region.h, viewport.h);
 
+  const singleTile = xs.length === 1 && ys.length === 1 && plan.mode === 'viewport';
+
   let ctx: OffscreenCanvasRenderingContext2D | null = null;
   let out: OffscreenCanvas | null = null;
   let scale = 1;
   let outScale = 1;
+  let lastCaptureAt = 0;
 
-  let first = true;
   for (const y of ys) {
     for (const x of xs) {
       const scrolled = await invokeInTab(tab.id, 'page.scrollTo', {
@@ -88,15 +94,24 @@ async function capture(
       if (!scrolled.ok) throw new ActionError(scrolled.error.message, scrolled.error.code);
       const at = scrolled.data as { scrollX: number; scrollY: number };
 
-      if (!first) await delay(CAPTURE_INTERVAL_MS);
-      first = false;
+      const sinceLast = Date.now() - lastCaptureAt;
+      if (lastCaptureAt && sinceLast < CAPTURE_INTERVAL_MS) await delay(CAPTURE_INTERVAL_MS - sinceLast);
 
-      const bitmap = await captureViewport(tab.windowId, format, quality);
+      const shot = await captureViewport(tab.windowId, format, quality);
+      lastCaptureAt = Date.now();
+      const bitmap = shot.bitmap;
 
       if (!out) {
         const capScale = bitmap.width / viewport.w || plan.dpr || 1;
         outScale = fitScale(region.w * capScale, region.h * capScale, maxLongSide);
         scale = capScale * outScale;
+
+        if (singleTile && outScale === 1) {
+          const { width, height } = bitmap;
+          bitmap.close();
+          return { format, width, height, dataUrl: shot.dataUrl, ...(truncated ? { truncated } : {}) };
+        }
+
         out = new OffscreenCanvas(
           Math.max(1, Math.round(region.w * scale)),
           Math.max(1, Math.round(region.h * scale)),
@@ -120,33 +135,40 @@ async function capture(
   }
 
   if (!out) throw new ActionError('Nothing was captured', 'CAPTURE_FAILED');
-  return { ...(await encode(out, format, quality, truncated)), thumbnail: await thumbnail(out) };
+  return encode(out, format, quality, truncated);
 }
 
 const THUMB_MAX_SIDE = 640;
 const THUMB_QUALITY = 0.6;
 
-async function thumbnail(source: OffscreenCanvas): Promise<string> {
+async function thumbnailOf(dataUrl: string): Promise<string> {
+  const source = await createImageBitmap(await (await fetch(dataUrl)).blob());
   const scale = Math.min(1, THUMB_MAX_SIDE / Math.max(source.width, source.height, 1));
   const small = new OffscreenCanvas(
     Math.max(1, Math.round(source.width * scale)),
     Math.max(1, Math.round(source.height * scale)),
   );
   const ctx = small.getContext('2d');
-  if (!ctx) return '';
+  if (!ctx) {
+    source.close();
+    return '';
+  }
   ctx.drawImage(source, 0, 0, small.width, small.height);
+  source.close();
   return blobToDataUrl(await small.convertToBlob({ type: 'image/jpeg', quality: THUMB_QUALITY }), 'image/jpeg');
 }
+
+const DEFAULT_JPEG_QUALITY = 80;
 
 async function encode(
   canvas: OffscreenCanvas,
   format: 'png' | 'jpeg',
   quality: number | undefined,
   truncated: boolean,
-): Promise<{ format: string; width: number; height: number; dataUrl: string; truncated?: boolean }> {
+): Promise<Shot> {
   const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
   const blob = await canvas.convertToBlob(
-    format === 'jpeg' ? { type: mime, quality: (quality ?? 90) / 100 } : { type: mime },
+    format === 'jpeg' ? { type: mime, quality: (quality ?? DEFAULT_JPEG_QUALITY) / 100 } : { type: mime },
   );
   const dataUrl = await blobToDataUrl(blob, mime);
   return { format, width: canvas.width, height: canvas.height, dataUrl, ...(truncated ? { truncated } : {}) };
@@ -163,14 +185,15 @@ async function captureViewport(
   windowId: number | undefined,
   format: 'png' | 'jpeg',
   quality: number | undefined,
-): Promise<ImageBitmap> {
+): Promise<{ dataUrl: string; bitmap: ImageBitmap }> {
+  const grade = format === 'jpeg' ? (quality ?? DEFAULT_JPEG_QUALITY) : undefined;
   for (let attempt = 0; ; attempt++) {
     try {
       const dataUrl =
         windowId == null
-          ? await browser.tabs.captureVisibleTab({ format, quality })
-          : await browser.tabs.captureVisibleTab(windowId, { format, quality });
-      return createImageBitmap(await (await fetch(dataUrl)).blob());
+          ? await browser.tabs.captureVisibleTab({ format, quality: grade })
+          : await browser.tabs.captureVisibleTab(windowId, { format, quality: grade });
+      return { dataUrl, bitmap: await createImageBitmap(await (await fetch(dataUrl)).blob()) };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (attempt < 2 && /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/i.test(message)) {

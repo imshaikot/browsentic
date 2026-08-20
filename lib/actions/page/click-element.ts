@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineAction } from '../core';
-import { describeElement, resolveTarget, targetSchema } from './dom';
+import { describeElement, resolveTarget, submitsOnClick, targetSchema } from './dom';
 
 export const clickElement = defineAction({
   name: 'page.clickElement',
@@ -16,10 +16,7 @@ export const clickElement = defineAction({
       el.focus({ preventScroll: true });
     } catch {
     }
-    const submits =
-      !!el.closest('form') &&
-      ((el instanceof HTMLButtonElement && el.type === 'submit') ||
-        (el instanceof HTMLInputElement && (el.type === 'submit' || el.type === 'image')));
+    const submits = submitsOnClick(el);
     const init = { bubbles: true, cancelable: true, composed: true };
     el.dispatchEvent(new PointerEvent('pointerdown', init));
     el.dispatchEvent(new MouseEvent('mousedown', init));

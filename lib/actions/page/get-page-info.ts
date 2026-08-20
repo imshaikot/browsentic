@@ -1,12 +1,19 @@
 import { z } from 'zod';
 import { defineAction } from '../core';
-import { accessibleText, cssPath, describeElement, documentBounds, isVisible } from './dom';
+import { accessibleText, cssPath, describeElement, documentBounds, isExposed } from './dom';
+
+interface Tally {
+  links: number;
+  buttons: number;
+  fields: number;
+}
 
 interface Region {
   role: string;
   label?: string;
   selector: string;
   bounds: { x: number; y: number; width: number; height: number };
+  contains: Tally;
   children: Region[];
 }
 
@@ -36,7 +43,7 @@ const LANDMARK_ROLES = new Set([
 export const getPageInfo = defineAction({
   name: 'page.getPageInfo',
   description:
-    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements.',
+    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in.',
   input: z.object({
     maxPerKind: z
       .number()
@@ -46,7 +53,9 @@ export const getPageInfo = defineAction({
       .describe('Cap on links, buttons, fields, and forms listed per kind'),
   }),
   execute({ maxPerKind }) {
-    const regions = layoutTree();
+    const { regions, owners } = layoutTree();
+    const found = collect();
+    tally(found, owners);
     return {
       document: {
         url: location.href,
@@ -66,13 +75,13 @@ export const getPageInfo = defineAction({
       selection: getSelection()?.toString().slice(0, 500) || undefined,
       layout: { regions, diagram: renderDiagram(regions) },
       outline: [...document.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')]
-        .filter(isVisible)
+        .filter(isExposed)
         .slice(0, 60)
         .map((heading) => ({
           level: Number(heading.tagName[1]),
           text: accessibleText(heading).slice(0, 120),
         })),
-      interactive: inventory(maxPerKind),
+      interactive: inventory(found, owners, maxPerKind),
     };
   },
 });
@@ -93,29 +102,42 @@ function regionLabel(el: HTMLElement): string | undefined {
   return heading?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 60) || undefined;
 }
 
-function layoutTree(): Region[] {
+function layoutTree(): { regions: Region[]; owners: Map<HTMLElement, Region> } {
   const candidates = [
     ...document.querySelectorAll<HTMLElement>('header,nav,main,aside,footer,form,section,dialog,[role]'),
   ]
-    .filter((el) => regionRole(el) && isVisible(el))
+    .filter((el) => regionRole(el) && isExposed(el))
     .slice(0, 40);
 
-  const roots: Region[] = [];
-  const known = new Map<HTMLElement, Region>();
+  const regions: Region[] = [];
+  const owners = new Map<HTMLElement, Region>();
   for (const el of candidates) {
     const region: Region = {
       role: regionRole(el)!,
       label: regionLabel(el),
       selector: cssPath(el),
       bounds: documentBounds(el),
+      contains: { links: 0, buttons: 0, fields: 0 },
       children: [],
     };
-    known.set(el, region);
+    owners.set(el, region);
     let ancestor = el.parentElement;
-    while (ancestor && !known.has(ancestor)) ancestor = ancestor.parentElement;
-    (ancestor ? known.get(ancestor)!.children : roots).push(region);
+    while (ancestor && !owners.has(ancestor)) ancestor = ancestor.parentElement;
+    (ancestor ? owners.get(ancestor)!.children : regions).push(region);
   }
-  return roots;
+  return { regions, owners };
+}
+
+function regionName(region: Region): string {
+  return region.label ? `${region.role} “${region.label}”` : region.role;
+}
+
+function ownerOf(el: HTMLElement, owners: Map<HTMLElement, Region>): Region | undefined {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const region = owners.get(node);
+    if (region) return region;
+  }
+  return undefined;
 }
 
 function renderDiagram(regions: Region[]): string {
@@ -126,9 +148,13 @@ function renderDiagram(regions: Region[]): string {
   const walk = (nodes: Region[], indent: string) => {
     nodes.forEach((region, i) => {
       const last = i === nodes.length - 1;
-      const { role, label, bounds } = region;
+      const { bounds, contains } = region;
+      const counts = (['links', 'buttons', 'fields'] as const)
+        .filter((kind) => contains[kind] > 0)
+        .map((kind) => ` · ${contains[kind]} ${kind}`)
+        .join('');
       lines.push(
-        `${indent}${last ? '└' : '├'} ${role}${label ? ` “${label}”` : ''} · ${bounds.width}×${bounds.height} @ (${bounds.x},${bounds.y})`,
+        `${indent}${last ? '└' : '├'} ${regionName(region)} · ${bounds.width}×${bounds.height} @ (${bounds.x},${bounds.y})${counts}`,
       );
       walk(region.children, indent + (last ? '  ' : '│ '));
     });
@@ -137,32 +163,63 @@ function renderDiagram(regions: Region[]): string {
   return lines.join('\n');
 }
 
-function inventory(cap: number) {
-  const visible = (selector: string) =>
-    [...document.querySelectorAll<HTMLElement>(selector)].filter(isVisible);
+function collect() {
+  const exposed = <T extends HTMLElement>(selector: string) =>
+    [...document.querySelectorAll<T>(selector)].filter(isExposed);
   return {
-    links: visible('a[href]')
-      .slice(0, cap)
-      .map((link) => ({
-        text: accessibleText(link).slice(0, 80),
-        href: (link as HTMLAnchorElement).href,
-        selector: cssPath(link),
-      })),
-    buttons: visible('button,[role="button"],input[type="button"],input[type="submit"]')
-      .slice(0, cap)
-      .map(describeElement),
-    fields: visible('input:not([type="hidden"]):not([type="button"]):not([type="submit"]),select,textarea')
-      .slice(0, cap)
-      .map((field) => ({
-        ...describeElement(field),
-        kind: field instanceof HTMLInputElement ? field.type : field.tagName.toLowerCase(),
-      })),
-    forms: visible('form')
-      .slice(0, cap)
-      .map((form) => ({
-        selector: cssPath(form),
-        action: form.getAttribute('action') || undefined,
-        method: (form.getAttribute('method') || 'get').toLowerCase(),
-      })),
+    links: exposed<HTMLAnchorElement>('a[href]'),
+    buttons: exposed('button,[role="button"],input[type="button"],input[type="submit"]'),
+    fields: exposed('input:not([type="hidden"]):not([type="button"]):not([type="submit"]),select,textarea'),
+    forms: exposed<HTMLFormElement>('form'),
+  };
+}
+
+function tally(found: ReturnType<typeof collect>, owners: Map<HTMLElement, Region>) {
+  for (const kind of ['links', 'buttons', 'fields'] as const) {
+    for (const el of found[kind]) {
+      for (let node = el.parentElement; node; node = node.parentElement) {
+        const owner = owners.get(node);
+        if (owner) owner.contains[kind] += 1;
+      }
+    }
+  }
+}
+
+function inventory(
+  found: ReturnType<typeof collect>,
+  owners: Map<HTMLElement, Region>,
+  cap: number,
+) {
+  const regionFor = (el: HTMLElement) => {
+    const owner = ownerOf(el, owners);
+    return owner && regionName(owner);
+  };
+  return {
+    links: found.links.slice(0, cap).map((link) => ({
+      ...describeElement(link),
+      href: link.href,
+      region: regionFor(link),
+    })),
+    buttons: found.buttons.slice(0, cap).map((button) => ({
+      ...describeElement(button),
+      region: regionFor(button),
+    })),
+    fields: found.fields.slice(0, cap).map((field) => ({
+      ...describeElement(field),
+      kind: field instanceof HTMLInputElement ? field.type : field.tagName.toLowerCase(),
+      region: regionFor(field),
+    })),
+    forms: found.forms.slice(0, cap).map((form) => ({
+      selector: cssPath(form),
+      action: form.getAttribute('action') || undefined,
+      method: (form.getAttribute('method') || 'get').toLowerCase(),
+      region: regionFor(form),
+    })),
+    counts: {
+      links: found.links.length,
+      buttons: found.buttons.length,
+      fields: found.fields.length,
+      forms: found.forms.length,
+    },
   };
 }

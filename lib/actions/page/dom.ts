@@ -23,11 +23,55 @@ const ROLE_TAGS: Record<string, string[]> = {
   heading: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
 };
 
+const ROLE_BY_INPUT_TYPE: Record<string, string> = {
+  button: 'button',
+  submit: 'button',
+  reset: 'button',
+  image: 'button',
+  file: 'button',
+  checkbox: 'checkbox',
+  radio: 'radio',
+  range: 'slider',
+  number: 'spinbutton',
+  search: 'searchbox',
+};
+
+const ROLE_BY_TAG: Record<string, string> = {
+  button: 'button',
+  select: 'combobox',
+  textarea: 'textbox',
+  summary: 'button',
+  option: 'option',
+  h1: 'heading',
+  h2: 'heading',
+  h3: 'heading',
+  h4: 'heading',
+  h5: 'heading',
+  h6: 'heading',
+  nav: 'navigation',
+  main: 'main',
+  header: 'banner',
+  footer: 'contentinfo',
+  aside: 'complementary',
+  form: 'form',
+  dialog: 'dialog',
+};
+
+const VALUELESS_INPUT = new Set(['button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file']);
+
+export function computedRole(el: Element): string | undefined {
+  const explicit = el.getAttribute('role')?.trim().split(/\s+/)[0];
+  if (explicit) return explicit.toLowerCase();
+  if (el instanceof HTMLInputElement) return ROLE_BY_INPUT_TYPE[el.type] ?? 'textbox';
+  if (el instanceof HTMLAnchorElement) return el.getAttribute('href') === null ? undefined : 'link';
+  return ROLE_BY_TAG[el.tagName.toLowerCase()];
+}
+
 function matchesRole(el: Element, role: string): boolean {
   const wanted = role.toLowerCase();
   const tag = el.tagName.toLowerCase();
   if (tag === wanted) return true;
-  if (el.getAttribute('role')?.toLowerCase() === wanted) return true;
+  if (computedRole(el) === wanted) return true;
   return ROLE_TAGS[wanted]?.includes(tag) ?? false;
 }
 
@@ -86,6 +130,60 @@ export function isVisible(el: Element): boolean {
   return style.visibility !== 'hidden' && style.display !== 'none';
 }
 
+export function isExposed(el: Element): boolean {
+  return isVisible(el) && !el.closest('[aria-hidden="true"],[inert]');
+}
+
+function ariaFlag(el: Element, name: string): boolean | undefined {
+  const value = el.getAttribute(name);
+  return value === 'true' ? true : value === 'false' ? false : undefined;
+}
+
+export interface ElementState {
+  disabled?: boolean;
+  checked?: boolean;
+  expanded?: boolean;
+  selected?: boolean;
+  current?: string;
+  required?: boolean;
+  invalid?: boolean;
+  filled?: boolean;
+  value?: string;
+}
+
+export function elementState(el: Element): ElementState | undefined {
+  const state: ElementState = {};
+  if (el.matches(':disabled') || ariaFlag(el, 'aria-disabled')) state.disabled = true;
+
+  const checked =
+    el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')
+      ? el.checked
+      : ariaFlag(el, 'aria-checked');
+  if (checked !== undefined) state.checked = checked;
+
+  const expanded = ariaFlag(el, 'aria-expanded');
+  if (expanded !== undefined) state.expanded = expanded;
+
+  const selected = el instanceof HTMLOptionElement ? el.selected : ariaFlag(el, 'aria-selected');
+  if (selected !== undefined) state.selected = selected;
+
+  const current = el.getAttribute('aria-current');
+  if (current && current !== 'false') state.current = current;
+
+  if (el.matches(':required') || ariaFlag(el, 'aria-required')) state.required = true;
+  if (ariaFlag(el, 'aria-invalid')) state.invalid = true;
+
+  if (el instanceof HTMLSelectElement) {
+    state.value = el.selectedOptions[0]?.text.replace(/\s+/g, ' ').trim().slice(0, 60) || undefined;
+  } else if (el instanceof HTMLTextAreaElement) {
+    state.filled = el.value.length > 0;
+  } else if (el instanceof HTMLInputElement && !VALUELESS_INPUT.has(el.type)) {
+    state.filled = el.value.length > 0;
+  }
+
+  return Object.values(state).some((value) => value !== undefined) ? state : undefined;
+}
+
 export function cssPath(el: Element): string {
   const path: string[] = [];
   for (let node: Element | null = el; node && node !== document.documentElement; node = node.parentElement) {
@@ -116,8 +214,16 @@ export function describeElement(el: Element) {
   const text = accessibleText(el).slice(0, 80);
   return {
     tag: el.tagName.toLowerCase(),
+    role: computedRole(el),
     selector: cssPath(el),
     text: text || undefined,
+    state: elementState(el),
     bounds: documentBounds(el),
   };
+}
+
+export function submitsOnClick(el: Element): boolean {
+  if (!el.closest('form')) return false;
+  if (el instanceof HTMLButtonElement) return el.type === 'submit';
+  return el instanceof HTMLInputElement && (el.type === 'submit' || el.type === 'image');
 }

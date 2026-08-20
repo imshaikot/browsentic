@@ -9,7 +9,13 @@ export const extractText = defineAction({
   description: 'Read the rendered text or raw HTML of an element or the whole page.',
   input: z.object({
     target: targetSchema.optional().describe('Element to read; defaults to the whole page'),
-    format: z.enum(['text', 'html']).default('text').describe('Plain rendered text or raw HTML'),
+    format: z
+      .enum(['text', 'html'])
+      .default('text')
+      .describe(
+        'Plain rendered text, or raw HTML. HTML is denied by default — it carries comments and hidden nodes ' +
+          'the reader never sees — and needs "raw-html-read": "allow" in the guardrail config.',
+      ),
     maxLength: z
       .number()
       .int()

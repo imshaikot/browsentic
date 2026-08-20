@@ -5,37 +5,43 @@ import { documentBounds, resolveTarget, targetSchema } from './dom';
 export const screenshot = defineAction({
   name: 'page.screenshot',
   description:
-    'Capture the tab as a PNG/JPEG image — the full scroll view, the current viewport, or a single targeted element. The image is saved under ~/browsentic/screenshot/ and the result reports the path as savedTo; pass save: false to capture without writing a file.',
+    'Capture the tab as a JPEG/PNG image — the current viewport by default, or the full scroll view, or a single targeted element. The viewport capture is the fast one: it is a single grab that returns in well under a second. fullPage: true has to scroll the page in viewport-sized steps and wait out the browser’s capture rate limit between each, so it costs a second or more per screenful — ask for it only when you need what is below the fold. Nothing is written to disk unless you pass save: true — the image comes back in the result either way, so a capture you take to look at the page for yourself leaves no file behind.',
   input: z.object({
     target: targetSchema
       .optional()
       .describe('Capture only this element’s box (a specific block). When set, fullPage is ignored.'),
     fullPage: z
       .boolean()
-      .default(true)
-      .describe('With no target: true captures the entire scroll view, false only the current viewport.'),
+      .default(false)
+      .describe(
+        'With no target: false (the default) captures only the current viewport and is much faster; true captures the entire scroll view by tiling, which costs roughly a second per screenful.',
+      ),
     format: z
       .enum(['png', 'jpeg'])
-      .default('png')
-      .describe('Image format. PNG is lossless; JPEG is smaller with slight artifacts and no transparency.'),
+      .default('jpeg')
+      .describe(
+        'Image format. JPEG (the default) is far smaller and quicker to encode; PNG is lossless and keeps transparency, at several times the size and time.',
+      ),
     quality: z
       .number()
       .int()
       .min(1)
       .max(100)
       .optional()
-      .describe('JPEG quality, 1–100. Only valid when format is "jpeg".'),
+      .describe('JPEG quality, 1–100, defaulting to 80. Only valid when format is "jpeg".'),
     maxLongSide: z
       .number()
       .int()
       .positive()
-      .default(4000)
-      .describe('Downscale the result so its longest side is at most this many pixels.'),
+      .default(1600)
+      .describe(
+        'Downscale the result so its longest side is at most this many pixels. The default is sized for reading a page, not for pixel-level inspection — raise it when fine detail matters.',
+      ),
     save: z
       .boolean()
-      .default(true)
+      .default(false)
       .describe(
-        'Write the image to ~/browsentic/screenshot/ (done by the local Browsentic daemon, which adds savedTo to the result). Set false to capture without touching the disk.',
+        'Write the image to ~/browsentic/screenshot/ and report the path as savedTo. Off by default: a capture you take to see the page for yourself is handed to you in the result and should leave nothing behind. Set true only when the user asked for a picture they can keep.',
       ),
     filename: z
       .string()

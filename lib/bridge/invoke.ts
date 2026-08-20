@@ -5,6 +5,7 @@ import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { closeTab } from '@/lib/actions/page/close-tab';
+import { findCaptcha } from '@/lib/actions/page/find-captcha';
 import { listFiles } from '@/lib/actions/page/list-files';
 import { listRecordings } from '@/lib/actions/page/list-recordings';
 import { monitorStatus } from '@/lib/actions/page/monitor-status';
@@ -12,14 +13,18 @@ import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/p
 import { openTab } from '@/lib/actions/page/open-tab';
 import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
+import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { switchTab } from '@/lib/actions/page/switch-tab';
+import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
+import { trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad } from '@/lib/bridge/tabs';
 
 export async function invokeForHarness(action: string, input?: unknown, tabId?: number): Promise<ActionResult> {
@@ -43,6 +48,9 @@ export async function invokeForHarness(action: string, input?: unknown, tabId?: 
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
+  if (action === trustedClick.name) return trustedClickInTab(tab.id, input);
+  if (action === findCaptcha.name) return findCaptchaInTab(tab.id);
+  if (action === solveCaptcha.name) return solveCaptchaInTab(tab.id, input);
   return invokeInTab(tab.id, action, input);
 }
 
