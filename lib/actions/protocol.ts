@@ -1,4 +1,5 @@
 import type { ToolDescriptor } from './manifest';
+import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
@@ -8,7 +9,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 7;
+export const SOCKET_PROTOCOL_VERSION = 10;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -33,7 +34,10 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'recordingState' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeRecording'; recordingId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'monitorSample'; monitorId: string; sample: MonitorSample }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'monitorState' };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'monitorState' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'agentState'; refresh?: boolean }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'setAgent'; agent: AgentKind }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -43,13 +47,14 @@ export type RunEvent =
   | { kind: 'started'; skill: string; overlays?: string[] }
   | { kind: 'text'; delta: string }
   | { kind: 'tool'; toolId: string; action: string; input: unknown; source?: 'local' | 'external' }
-  | { kind: 'approval'; toolId: string; action: string; input: unknown }
+  | { kind: 'approval'; toolId: string; action: string; input: unknown; site?: string }
   | { kind: 'toolResult'; toolId: string; ok: boolean; summary: string }
-  | { kind: 'session'; claudeSessionId: string | null }
+  | { kind: 'session'; agent: AgentKind; agentSessionId: string | null }
   | { kind: 'done'; stopReason: string }
   | { kind: 'error'; code: string; message: string };
 
-export type SocketAuth = { pairingToken: string } | { sessionKey: string };
+/** Which secret the extension is about to prove it holds. The secret itself never crosses the wire. */
+export type SocketAuth = { kind: 'pair' } | { kind: 'session' };
 
 export interface AttachedFile {
   id: string;
@@ -86,7 +91,9 @@ export interface RunContext {
   tabId?: number;
   files?: AttachedFile[];
   recordings?: SavedRecording[];
-  claudeSessionId?: string;
+  /** The agent that issued `agentSessionId`; a different agent cannot resume it. */
+  agent?: AgentKind;
+  agentSessionId?: string;
 }
 
 export type SocketFrame =
@@ -96,13 +103,18 @@ export type SocketFrame =
       extensionVersion: string;
       manifestHash: string;
       auth: SocketAuth;
+      nonce: string;
     }
+  | { t: 'challenge'; nonce: string }
+  | { t: 'prove'; proof: string }
   | {
       t: 'welcome';
       daemonVersion: string;
       manifestHash: string;
       manifestInSync: boolean;
-      sessionKey?: string;
+      /** Proves the daemon holds the same secret, so a port squatter cannot pose as one. */
+      proof: string;
+      sealedSessionKey?: string;
     }
   | { t: 'unauthorized'; reason: string; retryable: boolean }
   | { t: 'describe'; id: string }
@@ -113,7 +125,7 @@ export type SocketFrame =
   | { t: 'pong'; id: string }
   | { t: 'instruct'; id: string; text: string; context?: RunContext }
   | { t: 'cancel'; id: string }
-  | { t: 'decision'; id: string; toolId: string; allow: boolean }
+  | { t: 'decision'; id: string; toolId: string; allow: boolean; remember?: boolean }
   | { t: 'reset' }
   | { t: 'run'; id: string; event: RunEvent }
   | { t: 'analyzeFile'; id: string; name: string; mime: string; size: number; content: string }
@@ -128,7 +140,11 @@ export type SocketFrame =
   | { t: 'nameSession'; id: string; host?: string; messages: string[] }
   | { t: 'sessionName'; id: string; result: ActionResult<{ title: string }> }
   | { t: 'analyzeRecording'; id: string; recording: RecordingPayload }
-  | { t: 'recordingWorkflow'; id: string; result: ActionResult<RecordingAnalysis> };
+  | { t: 'recordingWorkflow'; id: string; result: ActionResult<RecordingAnalysis> }
+  | { t: 'agentState'; id: string; refresh?: boolean }
+  | { t: 'setAgent'; id: string; agent: AgentKind }
+  | { t: 'grantAgent'; id: string; agent: AgentKind }
+  | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> };
 
 export interface RecordingAnalysis {
   workflow: RecordingWorkflow;
@@ -154,6 +170,9 @@ export const EXTENSION_REQUEST_FRAMES = [
   'discardSiteMap',
   'nameSession',
   'analyzeRecording',
+  'agentState',
+  'setAgent',
+  'grantAgent',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

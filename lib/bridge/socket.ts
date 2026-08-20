@@ -1,6 +1,16 @@
 import { browser } from 'wxt/browser';
 import { hashManifest } from '@/lib/actions/manifest';
 import {
+  clientProof,
+  isNonce,
+  newNonce,
+  openSessionKey,
+  pairingSecret,
+  sameProof,
+  serverProof,
+  type Transcript,
+} from '@/lib/actions/handshake';
+import {
   DAEMON_PORTS,
   SOCKET_PROTOCOL_VERSION,
   failure,
@@ -11,10 +21,10 @@ import {
   type RunContext,
   type RunEvent,
   type SavedSkill,
-  type SocketAuth,
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import { describeActions } from '@/lib/actions/registry';
+import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { invokeForHarness } from './invoke';
@@ -25,6 +35,30 @@ const SESSION_KEY_STORE = 'browsentic/sessionKey';
 
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 30_000;
+const HANDSHAKE_TIMEOUT_MS = 5_000;
+const PAIRING_TIMEOUT_MS = 20_000;
+
+/** The secret itself stays here; only a proof derived from it ever reaches the socket. */
+interface Credential {
+  kind: 'pair' | 'session';
+  secret: string;
+}
+
+interface Refusal {
+  reason: string;
+  retryable: boolean;
+}
+
+interface Attempt {
+  credential: Credential;
+  port: number;
+  hello: { extensionVersion: string; manifestHash: string; nonce: string };
+  serverNonce?: string;
+  secret?: string;
+  done(): void;
+  /** Abandon this port and try the next one, because the peer never proved it is the daemon. */
+  walk(refusal?: Refusal): void;
+}
 
 export interface DaemonState {
   connected: boolean;
@@ -32,6 +66,8 @@ export interface DaemonState {
   port?: number;
   daemonVersion?: string;
   manifestInSync?: boolean;
+  /** Which agent CLI the daemon runs, and what each one's state is. Pushed on connect. */
+  agent?: AgentState;
   error?: string;
   lastChangeAt: number;
 }
@@ -175,12 +211,46 @@ function skillOp(
   });
 }
 
+const AGENT_TIMEOUT_MS = 20_000;
+
+const pendingAgentOps = new Map<string, (result: ActionResult<AgentState>) => void>();
+
+export function readAgentState(refresh = false): Promise<ActionResult<AgentState>> {
+  return agentOp({ t: 'agentState', id: crypto.randomUUID(), refresh });
+}
+
+export function chooseAgent(agent: AgentKind): Promise<ActionResult<AgentState>> {
+  return agentOp({ t: 'setAgent', id: crypto.randomUUID(), agent });
+}
+
+export function setUpAgent(agent: AgentKind): Promise<ActionResult<AgentState>> {
+  return agentOp({ t: 'grantAgent', id: crypto.randomUUID(), agent });
+}
+
+function agentOp(
+  frame: Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'grantAgent' }>,
+): Promise<ActionResult<AgentState>> {
+  if (!post(frame)) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingAgentOps.delete(frame.id);
+      resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
+    }, AGENT_TIMEOUT_MS);
+    pendingAgentOps.set(frame.id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
 export function cancelRun(id: string): boolean {
   return post({ t: 'cancel', id });
 }
 
-export function sendDecision(id: string, toolId: string, allow: boolean): void {
-  post({ t: 'decision', id, toolId, allow });
+export function sendDecision(id: string, toolId: string, allow: boolean, remember?: boolean): void {
+  post({ t: 'decision', id, toolId, allow, remember });
 }
 
 export function resetConversation(): void {
@@ -197,11 +267,15 @@ export async function connectDaemon(): Promise<void> {
   if (isLive()) return;
   const sessionKey = await storedSessionKey();
   if (!sessionKey) {
-    await setState({ connected: false, paired: false, lastChangeAt: Date.now() });
+    await setState({ connected: false, paired: false, error: undefined, lastChangeAt: Date.now() });
     return;
   }
+  // A daemon that proved itself and still refused this key will refuse it again. Wait for the user
+  // to pair rather than discarding a credential on the word of a peer that never proved anything.
+  const state = await readState();
+  if (state && !state.paired && state.error) return;
   clearTimeout(reconnectTimer);
-  dial({ sessionKey }, 0);
+  dial({ kind: 'session', secret: sessionKey }, 0);
 }
 
 export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; error?: string }> {
@@ -213,8 +287,11 @@ export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; e
   attempts = 0;
   return new Promise((resolve) => {
     pairingResult = resolve;
-    dial({ pairingToken: code }, 0);
-    setTimeout(() => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic-mcp pair".' }), 8_000);
+    dial({ kind: 'pair', secret: code }, 0);
+    setTimeout(
+      () => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic-mcp pair".' }),
+      PAIRING_TIMEOUT_MS,
+    );
   });
 }
 
@@ -222,7 +299,7 @@ export async function disconnectDaemon(): Promise<void> {
   clearTimeout(reconnectTimer);
   disconnectSocket();
   await browser.storage.local.remove(SESSION_KEY_STORE);
-  await setState({ connected: false, paired: false, lastChangeAt: Date.now() });
+  await setState({ connected: false, paired: false, error: undefined, agent: undefined, lastChangeAt: Date.now() });
 }
 
 let pairingResult: ((result: { ok: boolean; error?: string }) => void) | null = null;
@@ -239,81 +316,151 @@ function isLive(): boolean {
 function disconnectSocket(): void {
   const closing = socket;
   socket = null;
+  if (!closing) return;
+  closing.onopen = null;
+  closing.onmessage = null;
+  closing.onclose = null;
   try {
-    closing?.close(1000, 'client disconnecting');
+    closing.close(1000, 'client disconnecting');
   } catch {
   }
 }
 
-function dial(auth: SocketAuth, portIndex: number): void {
-  if (portIndex >= DAEMON_PORTS.length) {
-    settlePairing({ ok: false, error: 'No Browsentic daemon is running.' });
-    if ('sessionKey' in auth) scheduleRetry(auth);
-    return;
-  }
+function dial(credential: Credential, portIndex: number, carried?: Refusal): void {
+  if (portIndex >= DAEMON_PORTS.length) return giveUp(credential, carried);
 
   const port = DAEMON_PORTS[portIndex];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/extension`);
   socket = ws;
-  let opened = false;
+  let settled = false;
+  let welcomed = false;
+  let refusal = carried;
+
+  const attempt: Attempt = {
+    credential,
+    port,
+    hello: {
+      extensionVersion: browser.runtime.getManifest().version,
+      manifestHash: hashManifest(describeActions()),
+      nonce: newNonce(),
+    },
+    done() {
+      settled = true;
+      welcomed = true;
+      clearTimeout(handshakeTimer);
+    },
+    walk(why) {
+      if (settled) return;
+      settled = true;
+      refusal = why ?? carried;
+      clearTimeout(handshakeTimer);
+      try {
+        ws.close(1000, 'unproven daemon');
+      } catch {
+      }
+    },
+  };
+
+  const handshakeTimer = setTimeout(() => attempt.walk(), HANDSHAKE_TIMEOUT_MS);
 
   ws.onopen = () => {
-    opened = true;
-    attempts = 0;
     send(ws, {
       t: 'hello',
       protocolVersion: SOCKET_PROTOCOL_VERSION,
-      extensionVersion: browser.runtime.getManifest().version,
-      manifestHash: hashManifest(describeActions()),
-      auth,
+      extensionVersion: attempt.hello.extensionVersion,
+      manifestHash: attempt.hello.manifestHash,
+      auth: { kind: credential.kind },
+      nonce: attempt.hello.nonce,
     });
   };
 
   ws.onmessage = (event) => {
-    void handle(ws, String(event.data), port, auth);
+    void handle(ws, String(event.data), attempt);
   };
 
   ws.onclose = () => {
+    clearTimeout(handshakeTimer);
     if (socket === ws) socket = null;
-    if (!opened) return dial(auth, portIndex + 1);
-    void setState({ connected: false, paired: true, lastChangeAt: Date.now() });
-    if ('sessionKey' in auth) scheduleRetry(auth);
+    // Nothing on this port ever proved itself — a squatter, a stale daemon, an empty port — so the
+    // walk continues instead of pinning the extension to whoever answered first.
+    if (!welcomed) return dial(credential, portIndex + 1, refusal);
+    void setState({ connected: false, paired: true, error: undefined, lastChangeAt: Date.now() });
+    if (credential.kind === 'session') scheduleRetry(credential);
   };
 }
 
-async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth): Promise<void> {
+function giveUp(credential: Credential, refusal?: Refusal): void {
+  if (refusal && !refusal.retryable) {
+    settlePairing({ ok: false, error: refusal.reason });
+    void setState({ connected: false, paired: false, error: refusal.reason, lastChangeAt: Date.now() });
+    return;
+  }
+  settlePairing({ ok: false, error: refusal?.reason ?? 'No Browsentic daemon is running.' });
+  if (credential.kind === 'session') scheduleRetry(credential);
+}
+
+function transcriptOf(attempt: Attempt): Transcript {
+  return {
+    protocolVersion: SOCKET_PROTOCOL_VERSION,
+    extensionVersion: attempt.hello.extensionVersion,
+    manifestHash: attempt.hello.manifestHash,
+    clientNonce: attempt.hello.nonce,
+    serverNonce: attempt.serverNonce ?? '',
+  };
+}
+
+async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<void> {
   const frame = parseFrame(raw);
   if (!frame) return;
   switch (frame.t) {
     case 'ping':
       return send(ws, { t: 'pong', id: frame.id });
 
-    case 'unauthorized': {
-      if (!frame.retryable) await browser.storage.local.remove(SESSION_KEY_STORE);
-      clearTimeout(reconnectTimer);
-      settlePairing({ ok: false, error: frame.reason });
-      await setState({
-        connected: false,
-        paired: frame.retryable && !('pairingToken' in auth),
-        error: frame.reason,
-        lastChangeAt: Date.now(),
-      });
-      return;
+    case 'challenge': {
+      if (!isNonce(frame.nonce) || attempt.serverNonce) return attempt.walk();
+      attempt.serverNonce = frame.nonce;
+      const transcript = transcriptOf(attempt);
+      attempt.secret =
+        attempt.credential.kind === 'pair'
+          ? await pairingSecret(attempt.credential.secret, transcript)
+          : attempt.credential.secret;
+      return send(ws, { t: 'prove', proof: await clientProof(attempt.secret, transcript) });
     }
 
-    case 'welcome':
-      if (frame.sessionKey) await browser.storage.local.set({ [SESSION_KEY_STORE]: frame.sessionKey });
+    // Nothing has proved itself yet, so this is a claim, not a verdict: note it and try the next port.
+    case 'unauthorized':
+      return attempt.walk({ reason: frame.reason, retryable: frame.retryable !== false });
+
+    case 'welcome': {
+      const secret = attempt.secret;
+      if (!secret) return attempt.walk();
+      const transcript = transcriptOf(attempt);
+      const sealed = frame.sealedSessionKey ?? '';
+      if (!sameProof(frame.proof, await serverProof(secret, transcript, frame))) {
+        return attempt.walk({
+          reason: `Whatever is listening on port ${attempt.port} could not prove it is the Browsentic daemon.`,
+          retryable: true,
+        });
+      }
+      const sessionKey = sealed ? await openSessionKey(secret, transcript, sealed) : null;
+      if (!sessionKey && (sealed || attempt.credential.kind === 'pair')) return attempt.walk();
+
+      attempt.done();
+      attempts = 0;
+      if (sessionKey) await browser.storage.local.set({ [SESSION_KEY_STORE]: sessionKey });
       settlePairing({ ok: true });
       await setState({
         connected: true,
         paired: true,
-        port,
+        port: attempt.port,
         daemonVersion: frame.daemonVersion,
         manifestInSync: frame.manifestInSync,
+        error: undefined,
         lastChangeAt: Date.now(),
       });
       for (const listener of welcomeListeners) listener();
       return;
+    }
 
     case 'describe':
       return send(ws, { t: 'manifest', id: frame.id, tools: describeActions() });
@@ -352,6 +499,13 @@ async function handle(ws: WebSocket, raw: string, port: number, auth: SocketAuth
       return;
     }
 
+    case 'agentInfo': {
+      pendingAgentOps.get(frame.id)?.(frame.result);
+      pendingAgentOps.delete(frame.id);
+      if (frame.result.ok) await setState({ agent: frame.result.data, lastChangeAt: Date.now() });
+      return;
+    }
+
     case 'siteMapDraft':
       return draftListener?.(frame.id, frame.draft);
 
@@ -364,15 +518,21 @@ function send(ws: WebSocket, frame: SocketFrame): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
 }
 
-function scheduleRetry(auth: SocketAuth): void {
+function scheduleRetry(credential: Credential): void {
   const backoff = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** attempts++);
   const delay = backoff * (0.5 + Math.random() / 2);
   clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => dial(auth, 0), delay);
+  reconnectTimer = setTimeout(() => dial(credential, 0), delay);
 }
 
-function setState(state: DaemonState): Promise<void> {
-  return browser.storage.session.set({ [DAEMON_STATE_KEY]: state });
+async function readState(): Promise<DaemonState | undefined> {
+  const stored = await browser.storage.session.get(DAEMON_STATE_KEY);
+  return stored[DAEMON_STATE_KEY] as DaemonState | undefined;
+}
+
+async function setState(patch: Partial<DaemonState> & { lastChangeAt: number }): Promise<void> {
+  const current = (await readState()) ?? { connected: false, paired: false, lastChangeAt: 0 };
+  await browser.storage.session.set({ [DAEMON_STATE_KEY]: { ...current, ...patch } });
 }
 
 async function storedSessionKey(): Promise<string | null> {
