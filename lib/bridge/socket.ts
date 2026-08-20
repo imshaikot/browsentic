@@ -253,8 +253,8 @@ export function sendDecision(id: string, toolId: string, allow: boolean, remembe
   post({ t: 'decision', id, toolId, allow, remember });
 }
 
-export function resetConversation(): void {
-  post({ t: 'reset' });
+export function resetConversation(sessionId?: string): void {
+  post({ t: 'reset', sessionId });
 }
 
 function post(frame: SocketFrame): boolean {
@@ -469,7 +469,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       return send(ws, {
         t: 'result',
         id: frame.id,
-        result: await invokeForHarness(frame.action, frame.input, frame.tabId),
+        result: await invokeForHarness(frame.action, frame.input, frame.tabId, frame.runId),
       });
 
     case 'run':
