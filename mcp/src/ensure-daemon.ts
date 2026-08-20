@@ -37,22 +37,30 @@ export async function ensureDaemon(): Promise<Lockfile> {
 
 export async function probeExisting(): Promise<Lockfile | null> {
   const lock = readLockfile();
-  if (lock && isRunning(lock.pid) && (await isHealthy(lock.port))) return lock;
+  if (lock && isRunning(lock.pid) && (await healthyPid(lock.port)) === lock.pid) return lock;
 
+  // The control token is minted per daemon, so a daemon found on another port is only reachable
+  // through the lockfile it wrote itself — which its pid identifies.
   for (const port of DAEMON_PORTS) {
-    if (port !== lock?.port && (await isHealthy(port)) && lock) return { ...lock, port };
+    if (port === lock?.port) continue;
+    const pid = await healthyPid(port);
+    if (pid === null) continue;
+    const current = readLockfile();
+    if (current?.pid === pid) return current;
   }
   return null;
 }
 
-async function isHealthy(port: number): Promise<boolean> {
+async function healthyPid(port: number): Promise<number | null> {
   try {
     const response = await fetch(`http://127.0.0.1:${port}/health`, {
       signal: AbortSignal.timeout(1_000),
     });
-    return response.ok;
+    if (!response.ok) return null;
+    const health = (await response.json()) as { pid?: unknown };
+    return typeof health.pid === 'number' ? health.pid : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

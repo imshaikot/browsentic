@@ -8,7 +8,9 @@ import {
 import type { ActionResult } from '@/lib/actions/protocol';
 import { RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
 import { actionNameFor, assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
+import { readAgentConfig } from './agent/config';
 import type { Bridge } from './control';
+import { IMAGE_NOTE, fence, fenceTag, policyFrom, shouldFence } from './guardrails';
 import { log } from './log';
 
 const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
@@ -106,6 +108,12 @@ const SAVE_SITE_MAP_TOOL = {
 };
 
 export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean } = {}): Server {
+  // Page text is marked as data on the way out, for every client — the system prompt
+  // that says so only reaches Browsentic's own runs. The tag is per-process so a page
+  // cannot author a closing marker.
+  const policy = policyFrom(readAgentConfig().guardrails);
+  const tag = fenceTag();
+
   const server = new Server(
     { name: 'browsentic', version },
     {
@@ -114,8 +122,9 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
         'Controls the user’s browser through the Browsentic extension. Tools act on the active tab. ' +
         'Start with page_getPageInfo (or the browsentic://page/diagram resource) to learn what is on the page and ' +
         'get stable selectors, then target elements by selector or visible text. ' +
-        'page_screenshot saves every capture to disk unless you pass save: false, and reports the file as savedTo. ' +
-        'Always show the user the screenshot itself — read savedTo back so the image renders — and include that path in your reply.',
+        'page_screenshot hands the image back to you in the result and writes nothing to disk, so captures you take to see ' +
+        'the page for yourself leave no files behind. Pass save: true only when the user asked for a picture they can keep; ' +
+        'then read the returned savedTo path back so the image renders, and include that path in your reply.',
     },
   );
 
@@ -142,8 +151,10 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
 
   server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     if (params.name === STATUS_TOOL) return render(await status(bridge));
-    const result = await bridge.invoke(actionNameFor(params.name), params.arguments ?? {});
-    return params.name === SCREENSHOT_TOOL ? renderScreenshot(result) : render(result);
+    const action = actionNameFor(params.name);
+    const result = await bridge.invoke(action, params.arguments ?? {});
+    if (params.name === SCREENSHOT_TOOL) return renderScreenshot(result);
+    return render(result, shouldFence(action, policy) ? tag : undefined);
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: [...RESOURCES] }));
@@ -153,15 +164,19 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     const resource = RESOURCES.find((candidate) => candidate.uri === uri);
     if (!resource) throw new Error(`Unknown resource: ${uri}`);
 
+    // Resources are read straight into the client's context, so they are fenced the
+    // same way tool results are.
+    const wrap = (body: string) => (policy.fence.enabled ? fence(body, tag) : body);
+
     if (uri === 'browsentic://page/text') {
       const result = await bridge.invoke('page.extractText', { format: 'text' });
-      return text(uri, resource.mimeType, unwrap(result, (data) => String((data as { content: string }).content)));
+      return text(uri, resource.mimeType, wrap(unwrap(result, (data) => String((data as { content: string }).content))));
     }
     const result = await bridge.invoke('page.getPageInfo', { maxPerKind: uri === 'browsentic://page/diagram' ? 1 : 30 });
     if (uri === 'browsentic://page/diagram') {
-      return text(uri, resource.mimeType, unwrap(result, (data) => String((data as PageInfo).layout.diagram)));
+      return text(uri, resource.mimeType, wrap(unwrap(result, (data) => String((data as PageInfo).layout.diagram))));
     }
-    return text(uri, resource.mimeType, unwrap(result, (data) => JSON.stringify(data, null, 2)));
+    return text(uri, resource.mimeType, wrap(unwrap(result, (data) => JSON.stringify(data, null, 2))));
   });
 
   bridge.onManifestChanged(() => {
@@ -187,16 +202,20 @@ async function status(bridge: Bridge) {
   }
   const monitors = await activeMonitors(bridge);
   const page = await bridge.invoke('page.getPageInfo', { maxPerKind: 1 });
-  if (page.ok) {
-    return { ok: true as const, data: { ...base, activeTab: (page.data as PageInfo).document, ...monitors } };
-  }
+  const hints = [
+    base.manifestInSync
+      ? ''
+      : 'The extension is running an older build than the daemon, so your tool list came from the extension and is stale — capabilities that exist in this repository may be missing entirely. You cannot fix this yourself: tell the user to run `yarn build && yarn mcp:build` and then press Reload on Browsentic at chrome://extensions. Do not improvise around a tool you think should exist.',
+    page.ok ? '' : `Cannot read the active tab (${page.error.code}). Use page_navigate to open an http(s) page first.`,
+  ].filter(Boolean);
+
   return {
     ok: true as const,
     data: {
       ...base,
-      activeTab: null,
+      activeTab: page.ok ? (page.data as PageInfo).document : null,
       ...monitors,
-      hint: `Cannot read the active tab (${page.error.code}). Use page_navigate to open an http(s) page first.`,
+      ...(hints.length ? { hint: hints.join(' ') } : {}),
     },
   };
 }
@@ -232,6 +251,7 @@ function renderScreenshot(result: ActionResult) {
 
   const [mimeType, base64] = splitDataUrl(data.dataUrl);
   const notes = [
+    IMAGE_NOTE,
     `Captured ${data.width}×${data.height} ${data.format ?? 'image'}.`,
     data.truncated ? 'The page was taller than the capture limit, so the bottom is cut off.' : '',
     data.savedTo
@@ -255,9 +275,14 @@ function splitDataUrl(dataUrl: string): [mimeType: string, base64: string] {
   return match ? [match[1], match[2]] : ['image/png', ''];
 }
 
-function render(result: ActionResult) {
+/**
+ * `fenceWith` marks the payload as untrusted page data. Failures are left bare: they
+ * are daemon-authored and the run preamble teaches the agent to read `CODE: message`.
+ */
+function render(result: ActionResult, fenceWith?: string) {
   if (result.ok) {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }] };
+    const body = JSON.stringify(result.data, null, 2);
+    return { content: [{ type: 'text' as const, text: fenceWith ? fence(body, fenceWith) : body }] };
   }
   return {
     isError: true,

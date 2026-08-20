@@ -1,5 +1,6 @@
 import type { ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
+import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 
 export interface BridgeStatus {
   connected: boolean;
@@ -26,7 +27,8 @@ export type ControlRequest =
   | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string }
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
-  | { id: string; op: 'revoke'; origin?: string };
+  | { id: string; op: 'revoke'; origin?: string }
+  | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[] }
@@ -35,6 +37,7 @@ export type ControlMessage =
   | { id: string; op: 'pair'; code: string; expiresAt: number }
   | { id: string; op: 'sessions'; sessions: SessionSummary[] }
   | { id: string; op: 'revoke'; revoked: number }
+  | { id: string; op: 'agent'; state: AgentState }
   | { event: 'manifest-changed' };
 
 export interface Bridge {

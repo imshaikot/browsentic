@@ -10,13 +10,27 @@ import {
   type RunEvent,
 } from '@/lib/actions/protocol';
 import { READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
+import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
+import {
+  blocked,
+  decide,
+  declined,
+  describe as describeDecision,
+  normalizeHost,
+  policyFrom,
+  scopeFor,
+  summary as summarizeDecision,
+  type Policy,
+  type Scope,
+} from '../guardrails';
 import { log } from '../log';
+import { isGranted, rememberGrant } from './approvals';
 import { readAgentConfig, siteMapSettings, type AgentConfig } from './config';
-import { needsApproval } from './effects';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { buildSystemPrompt } from './prompt';
 import { RunError, runInstruction } from './runner';
+import { agentState } from './runners';
 import {
   discardStaging,
   mapTargetFor,
@@ -42,13 +56,23 @@ export interface AgentSessionDeps {
 interface ActiveRun {
   id: string;
   config: AgentConfig;
+  policy: Policy;
+  scope: Scope;
   abort: AbortController;
-  pending: Map<string, (allow: boolean) => void>;
+  pending: Map<string, (answer: Decision) => void>;
+  /** Host of the tab this run started on — what "this site" means on an approval card. */
+  site?: string;
   map?: MapRun;
 }
 
+interface Decision {
+  allow: boolean;
+  remember?: boolean;
+}
+
 export class AgentSession {
-  private claudeSession: string | null = null;
+  /** The conversation the current agent is holding open. Switching agents drops it. */
+  private held: { agent: AgentKind; sessionId: string } | null = null;
   private active: ActiveRun | null = null;
 
   constructor(private readonly deps: AgentSessionDeps) {}
@@ -62,10 +86,10 @@ export class AgentSession {
         this.cancel(request.id);
         return;
       case 'decision':
-        this.active?.pending.get(request.toolId)?.(request.allow);
+        this.active?.pending.get(request.toolId)?.({ allow: request.allow, remember: request.remember });
         return;
       case 'reset':
-        this.claudeSession = null;
+        this.held = null;
         log('agent conversation reset');
         return;
     }
@@ -104,15 +128,21 @@ export class AgentSession {
       return result;
     }
 
-    if (needsApproval(run.config.requireApproval, action, input)) {
-      emit({ kind: 'approval', toolId, action, input });
-      if (!(await this.awaitDecision(run, toolId))) {
+    const decision = decide({ action, input, caller: 'agent', scope: run.scope }, run.policy);
+    if (decision.effect === 'deny') {
+      log(`agent run ${runId} blocked ${action}: ${describeDecision(decision)}`);
+      emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
+      return blocked(decision);
+    }
+    if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site))) {
+      emit({ kind: 'approval', toolId, action, input, site: run.site });
+      const answer = await this.awaitDecision(run, toolId);
+      if (!answer.allow) {
+        log(`agent run ${runId} declined ${action}: ${describeDecision(decision)}`);
         emit({ kind: 'toolResult', toolId, ok: false, summary: 'declined by the user' });
-        return failure(
-          'DECLINED',
-          'The user declined this action. Do not retry it and do not try to achieve the same effect another way. Tell the user it was declined and stop.',
-        );
+        return declined();
       }
+      if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
     }
 
     const result = await this.deps.invoke(action, input);
@@ -123,7 +153,7 @@ export class AgentSession {
 
   dispose(): void {
     if (this.active) this.cancel(this.active.id);
-    this.claudeSession = null;
+    this.held = null;
   }
 
   private async start(runId: string, instruction: string, context?: RunContext): Promise<void> {
@@ -160,8 +190,37 @@ export class AgentSession {
     }
 
     const overlayNames = routed.overlays.map((overlay) => overlay.name);
-    const run: ActiveRun = { id: runId, config, abort: new AbortController(), pending: new Map() };
+    const policy = policyFrom(config.guardrails, config.requireApproval);
+    const scope = scopeFor({
+      url: context?.url,
+      tabId: context?.tabId,
+      instruction: text,
+      extraHosts: config.guardrails?.hosts,
+      pinTab: true,
+    });
+    const run: ActiveRun = {
+      id: runId,
+      config,
+      policy,
+      scope,
+      site: siteOf(context?.url),
+      abort: new AbortController(),
+      pending: new Map(),
+    };
     this.active = run;
+
+    // Claim the slot before probing, so a second instruction still meets RUN_IN_PROGRESS.
+    const runner = activeRunner(await agentState(config));
+    if (!runner?.ready) {
+      const problem = runner?.problem;
+      if (this.active === run) this.active = null;
+      log(`agent run ${runId} refused: ${AGENTS[config.agent].label} is not ready`);
+      return emit({
+        kind: 'error',
+        code: problem?.code ?? 'AGENT_MISSING',
+        message: `${AGENTS[config.agent].label} cannot run. ${problem?.message ?? 'It is not available.'}${problem?.fix ? ` ${problem.fix}` : ''}`,
+      });
+    }
 
     let built: { prompt: string; dropped: string[] };
     let instructionText = routed.text;
@@ -196,10 +255,9 @@ export class AgentSession {
     );
     emit({ kind: 'started', skill: routed.base.name, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
 
-    const supplied = mapping ? null : validSessionId(context?.claudeSessionId);
-    const known = supplied ?? this.claudeSession;
-    const resume = !mapping && known !== null;
-    const sessionId = mapping ? randomUUID() : (known ?? randomUUID());
+    const held = this.held?.agent === config.agent ? this.held.sessionId : null;
+    const supplied = mapping ? null : sessionFrom(context, config.agent);
+    const resuming = mapping ? null : (supplied ?? held);
     const budget = run.map ? setTimeout(() => run.abort.abort(), run.map.settings.timeoutMs) : undefined;
 
     try {
@@ -209,15 +267,15 @@ export class AgentSession {
         systemPrompt: built.prompt,
         research: run.map ? run.map.settings.research : false,
         config: run.config,
-        sessionId,
-        resume,
+        sessionId: resuming,
         signal: run.abort.signal,
         emit,
       });
-      if (outcome.established) this.claudeSession = sessionId;
       if (!mapping) {
-        if (outcome.established) emit({ kind: 'session', claudeSessionId: sessionId });
-        else if (supplied) emit({ kind: 'session', claudeSessionId: null });
+        this.held = outcome.sessionId ? { agent: config.agent, sessionId: outcome.sessionId } : null;
+        if (outcome.sessionId !== resuming) {
+          emit({ kind: 'session', agent: config.agent, agentSessionId: outcome.sessionId });
+        }
       }
       log(`agent run ${runId} finished (${outcome.stopReason})`);
       emit({ kind: 'done', stopReason: outcome.stopReason });
@@ -328,23 +386,32 @@ export class AgentSession {
       return;
     }
     const cancelled = this.active;
-    for (const [, settle] of cancelled.pending) settle(false);
+    for (const [, settle] of cancelled.pending) settle({ allow: false });
     cancelled.pending.clear();
     cancelled.abort.abort();
     this.active = null;
     log(`agent run ${runId} cancelled`);
   }
 
-  private awaitDecision(run: ActiveRun, toolId: string): Promise<boolean> {
-    if (run.abort.signal.aborted) return Promise.resolve(false);
+  private awaitDecision(run: ActiveRun, toolId: string): Promise<Decision> {
+    if (run.abort.signal.aborted) return Promise.resolve({ allow: false });
     return new Promise((resolve) => {
-      const settle = (allow: boolean) => {
+      const settle = (answer: Decision) => {
         run.pending.delete(toolId);
-        resolve(allow);
+        resolve(answer);
       };
       run.pending.set(toolId, settle);
-      run.abort.signal.addEventListener('abort', () => settle(false), { once: true });
+      run.abort.signal.addEventListener('abort', () => settle({ allow: false }), { once: true });
     });
+  }
+}
+
+function siteOf(url?: string): string | undefined {
+  if (!url) return undefined;
+  try {
+    return normalizeHost(new URL(url).hostname) ?? undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -421,10 +488,13 @@ function recordingsBlock(recordings: SavedRecording[] | undefined): string | und
 
 const flatten = (text: string) => text.replace(/\s+/g, ' ').trim();
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Agents name their own sessions: UUIDs, thread ids, conversation ids. Accept any tame token. */
+const SESSION_ID = /^[A-Za-z0-9._:-]{6,200}$/;
 
-function validSessionId(id: string | undefined): string | null {
-  return typeof id === 'string' && UUID.test(id) ? id : null;
+function sessionFrom(context: RunContext | undefined, agent: AgentKind): string | null {
+  if (context?.agent !== agent) return null;
+  const id = context.agentSessionId;
+  return typeof id === 'string' && SESSION_ID.test(id) ? id : null;
 }
 
 function fetchedBlock(origin: string, index: SiteIndex): string {

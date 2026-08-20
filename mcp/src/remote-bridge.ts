@@ -4,6 +4,7 @@ import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { failure, type ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
+import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
 
@@ -59,6 +60,12 @@ export class RemoteBridge implements Bridge {
   async sessions(): Promise<SessionSummary[]> {
     const reply = await this.request({ id: randomUUID(), op: 'sessions' });
     return reply && 'sessions' in reply ? reply.sessions : [];
+  }
+
+  async agent(change?: { set?: AgentKind; grant?: AgentKind }): Promise<AgentState> {
+    const reply = await this.request({ id: randomUUID(), op: 'agent', ...change });
+    if (reply && 'state' in reply) return reply.state;
+    throw new Error('The Browsentic daemon did not answer about its agent');
   }
 
   async revoke(origin?: string): Promise<number> {

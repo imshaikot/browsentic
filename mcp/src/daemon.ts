@@ -8,36 +8,64 @@ import {
   SOCKET_PROTOCOL_VERSION,
   failure,
   parseFrame,
+  success,
   type ActionResult,
   type RunEvent,
+  type SocketFrame,
 } from '@/lib/actions/protocol';
 import { hashManifest } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
+import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
 import { saveScreenshot } from './screenshots';
+import {
+  clientProof,
+  isNonce,
+  newNonce,
+  pairingSecret,
+  sameProof,
+  sealSessionKey,
+  serverProof,
+  type Transcript,
+} from '@/lib/actions/handshake';
 import {
   consumePairing,
   createPairing,
   createSession,
   hasPendingPairing,
   listSessions,
+  pendingPairings,
   revokeSessions,
-  validateSession,
+  sessionFor,
+  touchSession,
 } from './auth-store';
 import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
-import { readAgentConfig } from './agent/config';
+import { readAgentConfig, writeActiveAgent } from './agent/config';
+import { agentState, grantRunner } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { commitStaging, discardStaging } from './agent/site-map-store';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
+import {
+  ANYWHERE,
+  blocked,
+  decide,
+  describe as describeDecision,
+  policyFrom,
+  summary as summarizeDecision,
+} from './guardrails';
 import { log } from './log';
 import { readLockfile, writeLockfile, clearLockfile, type Lockfile } from './lockfile';
 
+type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'grantAgent' }>;
+
 const IDLE_EXIT_MS = 30 * 60 * 1000;
+const HANDSHAKE_TIMEOUT_MS = 10_000;
 const EXTENSION_ORIGIN = /^(chrome|moz|safari-web)-extension:\/\//;
+const LOOPBACK_HOST = /^(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?$/i;
 
 export interface DaemonOptions {
   version: string;
@@ -58,7 +86,7 @@ function persistScreenshot(
   if (action !== 'page.screenshot' || !result.ok) return result;
   const args = (input ?? {}) as { save?: unknown; filename?: unknown };
   const data = result.data as { dataUrl?: unknown } | null;
-  if ((args.save === false && !saveTo) || typeof data?.dataUrl !== 'string') return result;
+  if ((args.save !== true && !saveTo) || typeof data?.dataUrl !== 'string') return result;
   try {
     const savedTo = saveScreenshot(data.dataUrl, {
       dir: saveTo?.dir,
@@ -86,16 +114,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const manifestListeners = new Set<() => void>();
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const previous = readLockfile();
   const lock: Lockfile = {
     pid: process.pid,
     port: 0,
-    token: previous?.token ?? randomBytes(24).toString('base64url'),
+    // Fresh per daemon, so a token that leaked once does not stay valid for every future daemon.
+    token: randomBytes(24).toString('base64url'),
     protocolVersion: SOCKET_PROTOCOL_VERSION,
     daemonVersion: version,
   };
 
   const http = createServer((req, res) => {
+    if (!fromLoopback(req)) {
+      res.writeHead(403).end();
+      return;
+    }
     if (req.url?.startsWith('/health')) {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true, pid: process.pid, version, connected: !!link?.isOpen }));
@@ -121,6 +153,10 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   scheduleIdleExit();
 
   function authorize(req: IncomingMessage): 'extension' | 'control' | null {
+    if (!fromLoopback(req)) {
+      log(`rejected host ${req.headers.host}`);
+      return null;
+    }
     const origin = req.headers.origin;
     if (origin && EXTENSION_ORIGIN.test(origin)) return 'extension';
     if (origin) {
@@ -142,6 +178,13 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function acceptExtension(ws: WebSocket, req: IncomingMessage): void {
+    void greet(ws, req).catch((error) => {
+      log('extension handshake failed', error);
+      ws.close(1011, 'handshake failed');
+    });
+  }
+
+  async function greet(ws: WebSocket, req: IncomingMessage): Promise<void> {
     const reject = (reason: string, retryable: boolean) => {
       log(`rejected extension: ${reason}`);
       try {
@@ -151,114 +194,185 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       ws.close(4401, 'unauthorized');
     };
 
-    ws.once('message', async (raw) => {
-      const hello = parseFrame(String(raw));
-      if (hello?.t !== 'hello') {
-        log('extension sent no hello frame; closing');
-        ws.close(1002, 'expected hello');
-        return;
-      }
-      if (hello.protocolVersion !== SOCKET_PROTOCOL_VERSION) {
-        log(`extension protocol v${hello.protocolVersion} != daemon v${SOCKET_PROTOCOL_VERSION}; closing`);
-        ws.close(1002, `protocol version mismatch: daemon speaks v${SOCKET_PROTOCOL_VERSION}`);
-        return;
-      }
+    const hello = await nextFrame(ws);
+    if (hello?.t !== 'hello') {
+      log('extension sent no hello frame; closing');
+      ws.close(1002, 'expected hello');
+      return;
+    }
+    if (hello.protocolVersion !== SOCKET_PROTOCOL_VERSION) {
+      log(`extension protocol v${hello.protocolVersion} != daemon v${SOCKET_PROTOCOL_VERSION}; closing`);
+      ws.close(1002, `protocol version mismatch: daemon speaks v${SOCKET_PROTOCOL_VERSION}`);
+      return;
+    }
+    if (!isNonce(hello.nonce)) {
+      log('extension hello carried no nonce; closing');
+      ws.close(1002, 'expected a nonce');
+      return;
+    }
 
-      const origin = req.headers.origin!;
-      const auth = hello.auth;
-      let issuedKey: string | undefined;
-      if (auth && 'pairingToken' in auth) {
-        if (!consumePairing(auth.pairingToken)) {
-          return reject('That pairing code is wrong or expired. Run "browsentic-mcp pair" for a new one.', true);
-        }
-        issuedKey = createSession(origin, hello.extensionVersion).key;
-        log(`paired ${origin} (extension ${hello.extensionVersion})`);
-      } else if (auth && 'sessionKey' in auth) {
-        if (!validateSession(auth.sessionKey, origin)) {
-          return reject('This browser is no longer paired. Run "browsentic-mcp pair" to pair again.', false);
-        }
-      } else {
-        return reject('No pairing token or session key supplied.', false);
-      }
+    const transcript: Transcript = {
+      protocolVersion: SOCKET_PROTOCOL_VERSION,
+      extensionVersion: hello.extensionVersion,
+      manifestHash: hello.manifestHash,
+      clientNonce: hello.nonce,
+      serverNonce: newNonce(),
+    };
+    ws.send(JSON.stringify({ t: 'challenge', nonce: transcript.serverNonce }));
 
-      link?.close('superseded by a newer connection');
-      agent?.dispose();
-      manifestInSync = hello.manifestHash === bundledHash;
-      const accepted = new ExtensionLink(
-        ws,
-        { ...hello, origin },
-        (closing) => {
-          if (link !== closing) return;
-          link = null;
-          agent?.dispose();
-          agent = null;
-          log('extension disconnected');
-          scheduleIdleExit();
-        },
-        (request, source) => {
-          if (request.t === 'analyzeFile') {
-            void summarizeFile(request, readAgentConfig())
-              .then((result) => source.send({ t: 'fileSummary', id: request.id, result }))
-              .catch((error) =>
-                source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
-              );
-            return;
-          }
-          if (request.t === 'nameSession') {
-            void nameSession(request, readAgentConfig())
-              .then((result) => source.send({ t: 'sessionName', id: request.id, result }))
-              .catch((error) =>
-                source.send({ t: 'sessionName', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
-              );
-            return;
-          }
-          if (request.t === 'analyzeRecording') {
-            void analyzeRecording(request, readAgentConfig())
-              .then((result) => source.send({ t: 'recordingWorkflow', id: request.id, result }))
-              .catch((error) =>
-                source.send({
-                  t: 'recordingWorkflow',
-                  id: request.id,
-                  result: failure('AGENT_FAILED', String(error)),
-                }),
-              );
-            return;
-          }
-          if (request.t === 'saveSkill') {
-            return source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
-          }
-          if (request.t === 'deleteSkill') {
-            return source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
-          }
-          if (request.t === 'deleteSiteMap') {
-            return source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
-          }
-          if (request.t === 'activateSiteMap') {
-            const result = commitStaging(request.stagingId, request.exactHost === true);
-            return source.send({
-              t: 'skillResult',
-              id: request.id,
-              result: result.ok ? { ok: true, data: { name: result.data.name, path: result.data.path } } : result,
-            });
-          }
-          if (request.t === 'discardSiteMap') {
-            return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
-          }
-          session(source).handle(request);
-        },
-      );
-      link = accepted;
-      log(`extension ${hello.extensionVersion} connected from ${origin} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
-      accepted.send({
-        t: 'welcome',
-        daemonVersion: version,
-        manifestHash: bundledHash,
-        manifestInSync,
-        sessionKey: issuedKey,
-      });
-      scheduleIdleExit();
-      if (!manifestInSync) await adoptExtensionManifest(accepted);
-    });
+    const proven = await nextFrame(ws);
+    if (proven?.t !== 'prove') {
+      log('extension sent no proof; closing');
+      ws.close(1002, 'expected a proof');
+      return;
+    }
+
+    const origin = req.headers.origin!;
+    let secret: string;
+    let sealedSessionKey: string | undefined;
+    if (hello.auth?.kind === 'pair') {
+      const matched = await matchPairing(proven.proof, transcript);
+      if (!matched) {
+        return reject('That pairing code is wrong or expired. Run "browsentic-mcp pair" for a new one.', true);
+      }
+      consumePairing(matched.code);
+      secret = matched.secret;
+      const session = createSession(origin, hello.extensionVersion);
+      sealedSessionKey = await sealSessionKey(secret, transcript, session.key);
+      log(`paired ${origin} (extension ${hello.extensionVersion})`);
+    } else if (hello.auth?.kind === 'session') {
+      const session = sessionFor(origin);
+      if (!session || !sameProof(proven.proof, await clientProof(session.key, transcript))) {
+        return reject('This browser is no longer paired. Run "browsentic-mcp pair" to pair again.', false);
+      }
+      touchSession(origin);
+      secret = session.key;
+    } else {
+      return reject('That hello named no credential to prove.', false);
+    }
+
+    await settle(ws, hello, origin, transcript, secret, sealedSessionKey);
+  }
+
+  async function matchPairing(
+    proof: unknown,
+    transcript: Transcript,
+  ): Promise<{ code: string; secret: string } | null> {
+    for (const code of pendingPairings()) {
+      const secret = await pairingSecret(code, transcript);
+      if (sameProof(proof, await clientProof(secret, transcript))) return { code, secret };
+    }
+    return null;
+  }
+
+  async function settle(
+    ws: WebSocket,
+    hello: Extract<SocketFrame, { t: 'hello' }>,
+    origin: string,
+    transcript: Transcript,
+    secret: string,
+    sealedSessionKey?: string,
+  ): Promise<void> {
+    link?.close('superseded by a newer connection');
+    agent?.dispose();
+    manifestInSync = hello.manifestHash === bundledHash;
+    const accepted = new ExtensionLink(
+      ws,
+      { ...hello, origin },
+      (closing) => {
+        if (link !== closing) return;
+        link = null;
+        agent?.dispose();
+        agent = null;
+        log('extension disconnected');
+        scheduleIdleExit();
+      },
+      (request, source) => {
+        if (request.t === 'analyzeFile') {
+          void summarizeFile(request, readAgentConfig())
+            .then((result) => source.send({ t: 'fileSummary', id: request.id, result }))
+            .catch((error) =>
+              source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
+            );
+          return;
+        }
+        if (request.t === 'nameSession') {
+          void nameSession(request, readAgentConfig())
+            .then((result) => source.send({ t: 'sessionName', id: request.id, result }))
+            .catch((error) =>
+              source.send({ t: 'sessionName', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
+            );
+          return;
+        }
+        if (request.t === 'analyzeRecording') {
+          void analyzeRecording(request, readAgentConfig())
+            .then((result) => source.send({ t: 'recordingWorkflow', id: request.id, result }))
+            .catch((error) =>
+              source.send({
+                t: 'recordingWorkflow',
+                id: request.id,
+                result: failure('AGENT_FAILED', String(error)),
+              }),
+            );
+          return;
+        }
+        if (request.t === 'agentState' || request.t === 'setAgent' || request.t === 'grantAgent') {
+          void settleAgent(request).then((state) =>
+            source.send({ t: 'agentInfo', id: request.id, result: state }),
+          );
+          return;
+        }
+        if (request.t === 'saveSkill') {
+          return source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
+        }
+        if (request.t === 'deleteSkill') {
+          return source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
+        }
+        if (request.t === 'deleteSiteMap') {
+          return source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
+        }
+        if (request.t === 'activateSiteMap') {
+          const result = commitStaging(request.stagingId, request.exactHost === true);
+          return source.send({
+            t: 'skillResult',
+            id: request.id,
+            result: result.ok ? { ok: true, data: { name: result.data.name, path: result.data.path } } : result,
+          });
+        }
+        if (request.t === 'discardSiteMap') {
+          return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
+        }
+        session(source).handle(request);
+      },
+    );
+    link = accepted;
+    log(`extension ${hello.extensionVersion} connected from ${origin} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
+    const welcome = { daemonVersion: version, manifestHash: bundledHash, manifestInSync, sealedSessionKey };
+    accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
+    scheduleIdleExit();
+    void pushAgentState(accepted);
+    if (manifestInSync) restoreBundledManifest();
+    else await adoptExtensionManifest(accepted);
+  }
+
+  async function settleAgent(request: AgentFrame): Promise<ActionResult<AgentState>> {
+    if (request.t !== 'agentState' && !isAgentKind(request.agent)) {
+      return failure('INVALID_INPUT', `"${String(request.agent)}" is not an agent Browsentic knows.`);
+    }
+    if (request.t === 'setAgent') {
+      writeActiveAgent(request.agent);
+      // The held conversation belongs to the agent that just left; the next turn starts fresh.
+      agent?.handle({ t: 'reset' });
+      log(`agent set to ${AGENTS[request.agent].label}`);
+    }
+    if (request.t === 'grantAgent') await grantRunner(request.agent);
+    const refresh = request.t !== 'agentState' || request.refresh === true;
+    return success(await agentState(readAgentConfig(), { refresh }));
+  }
+
+  async function pushAgentState(target: ExtensionLink): Promise<void> {
+    const state = await agentState(readAgentConfig());
+    if (target.isOpen) target.send({ t: 'agentInfo', id: '', result: success(state) });
   }
 
   function session(source: ExtensionLink): AgentSession {
@@ -277,6 +391,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     }
     tools = reported;
     log(`adopted ${reported.length} tools from the extension (bundled list was ${bundled.length})`);
+    announceManifest();
+  }
+
+  // An adopted list outlives the connection that justified it, so a reloaded extension that
+  // agrees with us again would otherwise keep being served the drifted list until the daemon
+  // restarts — the recovery direction of "the newer side wins".
+  function restoreBundledManifest(): void {
+    if (tools === bundled) return;
+    tools = bundled;
+    log(`extension back in sync; serving the bundled ${bundled.length} tools again`);
+    announceManifest();
+  }
+
+  function announceManifest(): void {
     for (const listener of manifestListeners) listener();
     broadcast({ event: 'manifest-changed' });
   }
@@ -315,6 +443,21 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       }
       if (request.op === 'sessions') {
         return send(ws, { id: request.id, op: 'sessions', sessions: sessionSummaries() });
+      }
+      if (request.op === 'agent') {
+        const changed = request.set ?? request.grant;
+        if (changed && !isAgentKind(changed)) {
+          return send(ws, { id: request.id, op: 'agent', state: await agentState(readAgentConfig()) });
+        }
+        if (request.set) {
+          writeActiveAgent(request.set);
+          agent?.handle({ t: 'reset' });
+          log(`control ${client} set the agent to ${AGENTS[request.set].label}`);
+        }
+        if (request.grant) await grantRunner(request.grant);
+        const state = await agentState(readAgentConfig(), { refresh: !!changed });
+        if (changed && link?.isOpen) void pushAgentState(link);
+        return send(ws, { id: request.id, op: 'agent', state });
       }
       if (request.op === 'revoke') {
         const target = request.origin;
@@ -386,6 +529,23 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       if (target?.isOpen) target.send({ t: 'run', id: EXTERNAL_RUN_ID, event });
     };
     tell({ kind: 'tool', toolId, action, input, source: 'external' });
+
+    // An external MCP client has no run and no approval channel, so it is unscoped and
+    // its confirms resolve through the policy's `unattended` setting.
+    const config = readAgentConfig();
+    const decision = decide(
+      { action, input, caller: 'external', scope: ANYWHERE },
+      policyFrom(config.guardrails, config.requireApproval),
+    );
+    if (decision.effect === 'deny') {
+      log(`external ${client} → ${action} blocked: ${describeDecision(decision)}`);
+      tell({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
+      return blocked(decision);
+    }
+    if (decision.matched.length) {
+      log(`external ${client} → ${action} waived: ${describeDecision(decision)}`);
+    }
+
     const result = await invoke(action, input);
     log(`external ${client} → ${action} ${result.ok ? 'ok' : result.error.code}`);
     tell({
@@ -455,6 +615,27 @@ function listen(http: Server): Promise<number> {
       http.listen(port, '127.0.0.1');
     };
     attempt();
+  });
+}
+
+/**
+ * A page rebound to 127.0.0.1 by its own DNS still arrives with the attacker's `Host`, so this is
+ * the second lock on the door the `Origin` check already guards.
+ */
+function fromLoopback(req: IncomingMessage): boolean {
+  return LOOPBACK_HOST.test(req.headers.host ?? '');
+}
+
+function nextFrame(ws: WebSocket): Promise<SocketFrame | null> {
+  return new Promise((resolve) => {
+    const settle = (frame: SocketFrame | null) => {
+      clearTimeout(timer);
+      ws.off('message', onMessage);
+      resolve(frame);
+    };
+    const onMessage = (raw: unknown) => settle(parseFrame(String(raw)));
+    const timer = setTimeout(() => settle(null), HANDSHAKE_TIMEOUT_MS);
+    ws.once('message', onMessage);
   });
 }
 
