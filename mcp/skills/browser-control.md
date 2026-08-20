@@ -54,13 +54,38 @@ Two habits. **Tidy up after yourself** — if you opened a tab only to read some
 
 `page_submitForm` runs the browser's own validation. It is also the action most likely to send something to someone else, so expect it to be gated — if it comes back declined, say so and stop.
 
-## 6. When something is not there
+## 6. Dragging
+
+`page_dragElement` moves one thing onto another — reordering a list, pulling a card into another
+column, dragging a slider handle to a value. Give it `from` and `to` targets the same way you give
+`page_clickElement` a target. Both ends have to be on screen at the same moment, because nothing
+auto-scrolls mid-drag; if the drop target is off screen, scroll first so both are visible.
+
+The web has two unrelated drag mechanisms and the tool picks between them for you by reading the
+element you grabbed. You only need to care when a drag appears to do nothing. Read the result: it
+tells you the `mechanism` it chose and `landedOn`, the selector actually under the pointer when it
+released. For a native drag it also returns `accepted` — whether anything along the path behaved
+like a real drop zone. `accepted: false` and nothing moved is the signal to retry with the other
+`mode` (`"pointer"` or `"native"`). If the page ignores synthetic events entirely, `trusted: true`
+sends real browser-level events, with the same debugging bar and Chrome-only limits as
+`page_trustedClick` — and it cannot drive HTML5 drag-and-drop, so it is pointer mode only.
+
+Lists that reflow as the pointer passes over them can land a slot out, because the drop point is
+measured before the drag starts. Raise `steps` and `settleMs`, then **re-snapshot to confirm the
+order actually changed** — a drag is exactly the kind of action that reports success while leaving
+the page as it was.
+
+Some drag-and-drop widgets are also keyboard operable: focus the handle, then Space to lift, arrows
+to move, Space to drop with `page_pressKey`. That path is more reliable than any simulated drag when
+the page supports it.
+
+## 7. When something is not there
 
 `TARGET_NOT_FOUND` almost always means the page moved on without you: a menu closed, content loaded late, a modal opened over what you wanted. Re-snapshot rather than retrying the same target. If an element needs to appear first, `page_waitForElement` is cheaper and more reliable than clicking and hoping.
 
 Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` before it exists in the DOM.
 
-## 7. Screenshots
+## 8. Screenshots
 
 `page_screenshot` captures the tab as an image and hands the picture back to you to look at — reach for it when you need to *see* layout or rendering that the text inventory can't convey. By default it captures the **current viewport** as a JPEG, which is a single fast grab. `{ fullPage: true }` captures the entire scroll view instead, and it is genuinely expensive: the browser only allows two captures a second, so a tall page is tiled and costs about a second per screenful. Ask for it when you need what is below the fold, not by reflex. `{ target: { text: "Pricing" } }` captures a single element or block, and `{ format: "png" }` gets you lossless pixels when detail matters more than speed.
 
@@ -68,6 +93,6 @@ Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` bef
 
 Pass `save: true` when the user asked for a picture they can keep. Then the result carries `savedTo`, and you must **relay that path**: the side panel renders your reply as text and turns images into links, so the path is the only way they can open it. Pass `filename` when they name one. If the result carries `saveError` instead, the capture worked but the write did not — say so rather than naming a file that is not there.
 
-## 8. Multi-step tasks
+## 9. Multi-step tasks
 
 Do the whole task, not the first step of it. If the user says "search for X and open the first result", that is a fill, a submit, a wait, a snapshot, and a click — finish all of it, then report once at the end. Stop early only when you are blocked on something the user must decide.
