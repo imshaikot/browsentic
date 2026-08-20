@@ -1,6 +1,6 @@
 {
   "name": "browsentic",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Browsentic — agentic browsing driven by the AI agent you already run",
   "private": true,
   "type": "module",
