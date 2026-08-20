@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Terminal } from 'lucide-react'
-import { MODES } from '@/data/content'
+import { MODES, SECTIONS } from '@/data/content'
 import { Reveal, Section, SectionHeading } from '@/components/primitives'
 import { cn } from '@/lib/utils'
 
@@ -11,16 +11,12 @@ export function Teach() {
 
   return (
     <Section id="teach">
-      <SectionHeading
-        kicker="Teach it"
-        title="It gets better at your sites, not just better in general"
-        lede="Three ways to close the gap between a capable agent and one that already knows its way around: let it map a site once, show it a job once, or let the browser answer the easy things itself."
-      />
+      <SectionHeading {...SECTIONS.teach} />
 
       <Reveal delay={0.1}>
         <div
           role="tablist"
-          aria-label="Ways to teach Browsentic"
+          aria-label="Skill types"
           className="mt-12 inline-flex flex-wrap gap-1 rounded-full border border-line bg-ground-2/60 p-1 backdrop-blur"
         >
           {MODES.map((m, i) => (

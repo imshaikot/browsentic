@@ -1,5 +1,5 @@
 import { AlertTriangle, ShieldCheck } from 'lucide-react'
-import { LIMITS, SECURITY } from '@/data/content'
+import { LIMITS, SECTIONS, SECURITY } from '@/data/content'
 import { Reveal, Section, SectionHeading, Stagger, StaggerItem } from '@/components/primitives'
 
 export function Security() {
@@ -7,11 +7,7 @@ export function Security() {
     <Section id="security" className="relative">
       <div aria-hidden className="line-grid mask-b pointer-events-none absolute inset-0 -z-10" />
 
-      <SectionHeading
-        kicker="Privacy and security"
-        title="An agent driving your real browser has to earn it"
-        lede="Everything below is a property of how it is built, not a promise in a policy document. It is a local daemon, an extension that dials out to it, and no third party in between."
-      />
+      <SectionHeading {...SECTIONS.security} />
 
       <Stagger className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3" gap={0.06}>
         {SECURITY.map((s) => (
@@ -29,7 +25,7 @@ export function Security() {
         <div className="mt-6 rounded-card border border-ember/25 bg-ember/[0.06] p-6 sm:p-7">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="size-4 shrink-0 text-ember" />
-            <h3 className="text-base font-semibold text-ink">Two limits worth stating plainly</h3>
+            <h3 className="text-base font-semibold text-ink">Known limitations</h3>
           </div>
           <div className="mt-4 grid gap-5 sm:grid-cols-2">
             {LIMITS.map((l) => (

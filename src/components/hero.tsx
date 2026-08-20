@@ -1,6 +1,6 @@
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { ArrowRight, Github, Mic } from 'lucide-react'
-import { REPO, VERSION } from '@/data/content'
+import { HERO, REPO, VERSION } from '@/data/content'
 import { Button, Glow } from '@/components/primitives'
 import { CopyCommand } from '@/components/copy-command'
 import { HeroDemo } from '@/components/hero-demo'
@@ -34,9 +34,7 @@ export function Hero() {
             <span className="rounded-full bg-brand/15 px-2.5 py-0.5 font-mono text-[11px] text-brand">
               {VERSION}
             </span>
-            <span className="text-ink-dim">
-              MIT-licensed, and it runs on the Claude Code login you already have
-            </span>
+            <span className="text-ink-dim">{HERO.badge}</span>
             <ArrowRight className="size-3.5 text-ink-faint" />
           </motion.a>
 
@@ -46,9 +44,10 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
             className="mt-7 text-[clamp(2.5rem,7vw,4.75rem)] leading-[0.99] font-semibold"
           >
-            Reimagine browsing
+            {HERO.title.lead}
             <br />
-            as <span className="text-gradient">agentic</span>
+            {HERO.title.tail}
+            <span className="text-gradient">{HERO.title.accent}</span>
           </motion.h1>
 
           <motion.p
@@ -57,9 +56,7 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
             className="mx-auto mt-6 max-w-2xl text-[1.0625rem] leading-relaxed text-ink-dim sm:text-lg"
           >
-            Browsentic is a browser extension plus a small local daemon. Instruct it by voice, by
-            typing, or by showing it once — and it turns that into real actions on the tab in front
-            of you: clicking, filling, reading, navigating. Your sessions. Your logins. Your machine.
+            {HERO.lede}
           </motion.p>
 
           <motion.div
@@ -84,10 +81,10 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
             className="mx-auto mt-8 max-w-md"
           >
-            <CopyCommand command="claude mcp add browsentic -- browsentic-mcp" />
+            <CopyCommand command={HERO.command} />
             <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-ink-faint">
               <Mic className="size-3" />
-              or open the side panel and just say it
+              {HERO.voice}
             </p>
           </motion.div>
         </div>

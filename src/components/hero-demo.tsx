@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Check, Eye, MousePointerClick, ShieldQuestion, Sparkles, Type, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -98,7 +98,7 @@ function FauxPage({ focus }: { focus?: Step['focus'] }) {
   const ring = 'ring-2 ring-brand shadow-[0_0_22px_-4px_var(--color-brand)]'
 
   return (
-    <div className="relative min-h-[300px] overflow-hidden rounded-lg border border-line bg-ground-2/50 p-3 sm:min-h-[340px]">
+    <div className="relative h-[300px] overflow-hidden rounded-lg border border-line bg-ground-2/50 p-3 sm:h-[340px]">
       <div className="flex gap-3">
         <div className="hidden w-24 shrink-0 flex-col gap-1.5 sm:flex">
           {['Overview', 'Invoices', 'Customers', 'Settings'].map((item) => (
@@ -173,7 +173,7 @@ function SidePanel({
   approving: boolean
 }) {
   return (
-    <div className="flex min-h-[300px] flex-col rounded-lg border border-line bg-ground-2/70 p-3 sm:min-h-[340px]">
+    <div className="flex h-[300px] flex-col rounded-lg border border-line bg-ground-2/70 p-3 sm:h-[340px]">
       <div className="mb-2.5 flex items-center gap-2 border-b border-line pb-2.5">
         <span className="size-1.5 rounded-full bg-lime shadow-[0_0_8px_var(--color-lime)]" />
         <span className="font-mono text-[10px] tracking-wider text-ink-faint uppercase">
@@ -181,65 +181,60 @@ function SidePanel({
         </span>
       </div>
 
-      <div className="mb-3 rounded-md border border-line bg-ground/60 px-2.5 py-2 text-[11px] leading-snug text-ink">
+      <div className="mb-3 shrink-0 rounded-md border border-line bg-ground/60 px-2.5 py-2 text-[11px] leading-snug text-ink">
         {PROMPT.slice(0, typed)}
         <span className="ml-px inline-block h-3 w-px translate-y-0.5 bg-brand animate-blink" />
       </div>
 
-      <ul className="flex-1 space-y-1.5 overflow-hidden">
-        <AnimatePresence initial={false}>
-          {shown.map((step, i) => {
-            const Icon = step.icon
-            const isLast = i === shown.length - 1
-            return (
-              <motion.li
-                key={`${step.tool}-${i}`}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-                className={cn(
-                  'flex items-start gap-2 rounded-md border px-2 py-1.5 transition-colors',
-                  isLast && approving
-                    ? 'border-ember/45 bg-ember/8'
-                    : 'border-line/70 bg-ground/40',
-                )}
-              >
-                <Icon className={cn('mt-px size-3 shrink-0', KIND_STYLE[step.kind])} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate font-mono text-[10px] text-ink">{step.tool}</span>
-                    {step.kind === 'local' && (
-                      <span className="rounded-sm bg-amber/15 px-1 text-[8px] tracking-wide text-amber uppercase">
-                        local
-                      </span>
-                    )}
-                  </div>
-                  <div className="truncate text-[10px] text-ink-faint">{step.detail}</div>
+      <ul className="mask-t flex min-h-0 flex-1 flex-col justify-end space-y-1.5 overflow-hidden">
+        {shown.map((step, i) => {
+          const Icon = step.icon
+          const isLast = i === shown.length - 1
+          return (
+            <motion.li
+              key={`${step.tool}-${i}`}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className={cn(
+                'flex shrink-0 items-start gap-2 rounded-md border px-2 py-1.5 transition-colors',
+                isLast && approving
+                  ? 'border-ember/45 bg-ember/8'
+                  : 'border-line/70 bg-ground/40',
+              )}
+            >
+              <Icon className={cn('mt-px size-3 shrink-0', KIND_STYLE[step.kind])} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-mono text-[10px] text-ink">{step.tool}</span>
+                  {step.kind === 'local' && (
+                    <span className="rounded-sm bg-amber/15 px-1 text-[8px] tracking-wide text-amber uppercase">
+                      local
+                    </span>
+                  )}
                 </div>
-                {!isLast && <Check className="mt-px size-3 shrink-0 text-lime/70" />}
-              </motion.li>
-            )
-          })}
-        </AnimatePresence>
+                <div className="truncate text-[10px] text-ink-faint">{step.detail}</div>
+              </div>
+              {!isLast && <Check className="mt-px size-3 shrink-0 text-lime/70" />}
+            </motion.li>
+          )
+        })}
       </ul>
 
-      <AnimatePresence>
-        {approving && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="mt-2 flex gap-1.5"
-          >
-            <span className="flex-1 rounded-md bg-brand py-1.5 text-center text-[10px] font-medium text-ground">
-              Allow
-            </span>
-            <span className="flex-1 rounded-md border border-line-strong py-1.5 text-center text-[10px] text-ink-dim">
-              Deny
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <motion.div
+        aria-hidden={!approving}
+        initial={false}
+        animate={{ opacity: approving ? 1 : 0, y: approving ? 0 : 6 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className="mt-2 flex shrink-0 gap-1.5"
+      >
+        <span className="flex-1 rounded-md bg-brand py-1.5 text-center text-[10px] font-medium text-ground">
+          Allow
+        </span>
+        <span className="flex-1 rounded-md border border-line-strong py-1.5 text-center text-[10px] text-ink-dim">
+          Deny
+        </span>
+      </motion.div>
     </div>
   )
 }

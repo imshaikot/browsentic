@@ -1,6 +1,6 @@
 import { useRef, type MouseEvent } from 'react'
 import { Eye, FileUp, MousePointerClick, Navigation, Radio, Video } from 'lucide-react'
-import { RESOURCES, TOOL_GROUPS, type ToolGroup } from '@/data/content'
+import { RESOURCES, SECTIONS, TOOL_GROUPS, type ToolGroup } from '@/data/content'
 import { Reveal, Section, SectionHeading, Stagger, StaggerItem } from '@/components/primitives'
 import { cn } from '@/lib/utils'
 
@@ -91,16 +91,7 @@ function CapabilityCard({ group }: { group: ToolGroup }) {
 export function Capabilities() {
   return (
     <Section id="capabilities">
-      <SectionHeading
-        kicker="What it can do"
-        title={
-          <>
-            Twenty-eight page capabilities,
-            <br className="hidden sm:block" /> generated from one registry
-          </>
-        }
-        lede="The extension and the MCP server are built from the same action registry, so a tool can never describe something the browser cannot actually do. Most of them take a target described by CSS selector, visible text, ARIA role or index — and targeting by visible text survives the redesigns that break selectors."
-      />
+      <SectionHeading {...SECTIONS.capabilities} />
 
       <Stagger className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3" gap={0.06}>
         {TOOL_GROUPS.map((g) => (
@@ -112,15 +103,15 @@ export function Capabilities() {
         <div className="card mt-4 p-6">
           <div className="flex flex-wrap items-center gap-3">
             <h3 className="text-base font-semibold text-ink">
-              Plus three read-only resources
+              Three read-only MCP resources
             </h3>
             <span className="rounded-full bg-lime/12 px-2.5 py-0.5 font-mono text-[10px] tracking-wide text-lime uppercase">
               zero tool calls
             </span>
           </div>
           <p className="mt-2 max-w-3xl text-sm text-ink-dim">
-            An MCP client can pull page context as a resource instead of spending a tool call on it —
-            useful when the agent just needs to know what it is looking at.
+            An MCP client can pull page context as a resource instead of spending a tool call on
+            it, which is all the agent needs when it is only working out what it is looking at.
           </p>
           <ul className="mt-4 grid gap-2 sm:grid-cols-3">
             {RESOURCES.map((r) => (

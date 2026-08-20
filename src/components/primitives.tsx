@@ -1,5 +1,5 @@
 import { motion, useReducedMotion, type Variants } from 'motion/react'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 const revealVariants: Variants = {
@@ -108,10 +108,12 @@ export function SectionHeading({
   align = 'left',
 }: {
   kicker: string
-  title: ReactNode
+  title: string | readonly string[]
   lede?: ReactNode
   align?: 'left' | 'center'
 }) {
+  const lines = typeof title === 'string' ? [title] : title
+
   return (
     <div className={cn('max-w-3xl', align === 'center' && 'mx-auto text-center')}>
       <Reveal>
@@ -119,7 +121,12 @@ export function SectionHeading({
       </Reveal>
       <Reveal delay={0.06}>
         <h2 className="mt-5 text-[clamp(1.9rem,4.4vw,3.1rem)] leading-[1.06] font-semibold">
-          {title}
+          {lines.map((line, i) => (
+            <Fragment key={line}>
+              {i > 0 && <br className="hidden sm:block" />}
+              {i > 0 ? ` ${line}` : line}
+            </Fragment>
+          ))}
         </h2>
       </Reveal>
       {lede && (

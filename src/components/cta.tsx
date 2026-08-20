@@ -1,5 +1,5 @@
 import { ArrowRight, Github } from 'lucide-react'
-import { REPO } from '@/data/content'
+import { CTA, REPO } from '@/data/content'
 import { Button, Glow, Reveal } from '@/components/primitives'
 import { CopyCommand } from '@/components/copy-command'
 
@@ -15,15 +15,14 @@ export function Cta() {
       <div className="mx-auto max-w-3xl text-center">
         <Reveal>
           <h2 className="text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.03] font-semibold">
-            Stop describing the page.
+            {CTA.title.lead}
             <br />
-            <span className="text-gradient">Hand it over.</span>
+            <span className="text-gradient">{CTA.title.accent}</span>
           </h2>
         </Reveal>
         <Reveal delay={0.08}>
           <p className="mx-auto mt-6 max-w-xl text-[1.0625rem] leading-relaxed text-ink-dim">
-            Free and MIT licensed. Nothing to sign up for, no key to paste, and a fresh install
-            connects to nothing until you redeem a pairing code yourself.
+            {CTA.lede}
           </p>
         </Reveal>
         <Reveal delay={0.14}>
@@ -40,7 +39,7 @@ export function Cta() {
         </Reveal>
         <Reveal delay={0.2}>
           <div className="mx-auto mt-8 max-w-md">
-            <CopyCommand command="git clone https://github.com/imshaikot/browsentic.git" />
+            <CopyCommand command={CTA.command} />
           </div>
         </Reveal>
       </div>

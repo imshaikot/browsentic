@@ -7,9 +7,9 @@ const COLUMNS = [
   {
     title: 'Product',
     links: [
-      { label: 'How it works', href: '#how' },
+      { label: 'Architecture', href: '#how' },
       { label: 'Capabilities', href: '#capabilities' },
-      { label: 'Teach it', href: '#teach' },
+      { label: 'Skills', href: '#teach' },
       { label: 'MCP server', href: '#mcp' },
     ],
   },
@@ -42,7 +42,7 @@ export function Footer() {
           <div>
             <Wordmark />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-faint">
-              Agentic browsing driven by the AI agent you already run. Built with WXT, React 19,
+              Agentic browsing, driven by the AI you already run. Built with WXT, React 19,
               TypeScript and Tailwind CSS.
             </p>
             <a

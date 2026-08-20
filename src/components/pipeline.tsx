@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { Bot, Chrome, Mic, Server } from 'lucide-react'
-import { PIPELINE } from '@/data/content'
+import { PIPELINE, SECTIONS } from '@/data/content'
 import { Reveal, Section, SectionHeading, Stagger, StaggerItem } from '@/components/primitives'
 
 const ICONS = [Mic, Chrome, Server, Bot]
@@ -63,16 +63,7 @@ function Connector({ index }: { index: number }) {
 export function Pipeline() {
   return (
     <Section id="how">
-      <SectionHeading
-        kicker="How it works"
-        title={
-          <>
-            Four hops, and every one of them
-            <br className="hidden sm:block" /> is on your machine
-          </>
-        }
-        lede="No relay, no hosted runner, no browser in someone else's data centre. The extension dials out to a daemon on loopback, because a Manifest V3 service worker cannot listen for connections. One daemon owns the browser link, so several MCP clients can share one browser."
-      />
+      <SectionHeading {...SECTIONS.how} />
 
       <Stagger className="mt-14 flex flex-col lg:flex-row lg:items-stretch" gap={0.09}>
         {PIPELINE.map((node, i) => {
@@ -104,7 +95,7 @@ export function Pipeline() {
             return path
           </span>
           <p className="text-sm text-ink-dim">
-            Page actions travel back the way they came — the agent's tool call reaches the daemon,
+            Page actions travel back the way they came. The agent's tool call reaches the daemon,
             the daemon hands it to the extension over the socket the extension itself opened, and the
             result lands on the timeline in the side panel as it happens.
           </p>

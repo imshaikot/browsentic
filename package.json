@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Landing page for Browsentic — lives on the orphan `website` branch, never on `main`.",
+  "description": "Landing page for Browsentic \u2014 lives on the orphan `website` branch, never on `main`.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run check:copy && tsc --noEmit && vite build",
     "preview": "vite preview",
     "compile": "tsc --noEmit",
-    "og": "node scripts/generate-og.mjs"
+    "og": "node scripts/generate-og.mjs",
+    "check:copy": "node scripts/check-copy.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

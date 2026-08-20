@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { Plus } from 'lucide-react'
-import { FAQ as ITEMS } from '@/data/content'
+import { FAQ as ITEMS, SECTIONS } from '@/data/content'
 import { Reveal, Section, SectionHeading } from '@/components/primitives'
 import { cn } from '@/lib/utils'
 
@@ -10,7 +10,7 @@ export function Faq() {
 
   return (
     <Section id="faq">
-      <SectionHeading kicker="Questions" title="The ones people ask first" align="center" />
+      <SectionHeading {...SECTIONS.faq} align="center" />
 
       <div className="mx-auto mt-12 max-w-3xl">
         {ITEMS.map((item, i) => {

@@ -125,6 +125,9 @@
   .mask-b {
     mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
   }
+  .mask-t {
+    mask-image: linear-gradient(to top, #000 82%, transparent 100%);
+  }
   .mask-x {
     mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
   }

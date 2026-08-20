@@ -51,6 +51,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Copy check
+        run: npm run check:copy
+
       - name: Type check
         run: npm run compile
 
@@ -63,6 +66,17 @@ jobs:
 
       - name: Verify the build produced a page
         run: test -s dist/index.html
+
+      # The page is client rendered, so these are the only things a crawler that does
+      # not run JavaScript can read. A silent regression here is invisible in the browser.
+      - name: Verify the machine-readable layer
+        run: |
+          for f in llms.txt llms-full.txt sitemap.xml robots.txt og.png; do
+            test -s "dist/$f" || { echo "::error::dist/$f is missing or empty"; exit 1; }
+          done
+          grep -q 'application/ld+json' dist/index.html || { echo "::error::JSON-LD missing from dist/index.html"; exit 1; }
+          grep -q '<noscript>' dist/index.html || { echo "::error::no-JS content mirror missing from dist/index.html"; exit 1; }
+          grep -q 'rel="canonical"' dist/index.html || { echo "::error::canonical link missing from dist/index.html"; exit 1; }
 
       # enablement turns Pages on via the API when it is not already on, and
       # points it at Actions — this is what removes the manual settings step.

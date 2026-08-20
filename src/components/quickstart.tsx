@@ -1,5 +1,5 @@
 import { ArrowRight, BookOpen } from 'lucide-react'
-import { QUICKSTART, REPO } from '@/data/content'
+import { QUICKSTART, REPO, SECTIONS } from '@/data/content'
 import { Button, Reveal, Section, SectionHeading } from '@/components/primitives'
 import { CodeBlock } from '@/components/copy-command'
 
@@ -13,11 +13,7 @@ const DOCS = [
 export function QuickStart() {
   return (
     <Section id="start">
-      <SectionHeading
-        kicker="Get started"
-        title="Four steps, about five minutes"
-        lede="You need Chrome or another Chromium browser, Node.js 20 or newer, and Claude Code on your PATH. Yarn is pinned inside the repository, so whichever yarn you have re-executes into the right one — there is no global install or Corepack setup."
-      />
+      <SectionHeading {...SECTIONS.start} />
 
       <ol className="mt-14 space-y-4">
         {QUICKSTART.map((step, i) => (
@@ -49,7 +45,7 @@ export function QuickStart() {
         <div className="mt-10">
           <div className="flex items-center gap-2.5">
             <BookOpen className="size-4 text-ink-faint" />
-            <h3 className="text-base font-semibold text-ink">The long version</h3>
+            <h3 className="text-base font-semibold text-ink">Full documentation</h3>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {DOCS.map((d) => (
