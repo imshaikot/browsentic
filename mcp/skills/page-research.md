@@ -9,7 +9,7 @@ The user wants to know something, not have something done. Read the page and ans
 ## Reading, cheapest first
 
 1. `page_getPageInfo { maxPerKind: 1 }` — metadata, the heading outline, and a layout diagram. Enough to answer "what is this page" or to decide where to look next.
-2. `page_getPageInfo { maxPerKind: 30 }` — adds the inventory of links, buttons, fields and forms. Use it when the answer is about what the page *offers* rather than what it says.
+2. `page_getPageInfo { maxPerKind: 30 }` — adds the inventory of links, buttons, fields and forms, each with its role, its state and the landmark region it sits in. Use it when the answer is about what the page *offers* rather than what it says. `interactive.counts` gives the real totals when the lists are truncated.
 3. `page_extractText { format: "text" }` — the rendered prose. Scope it with a `target` when you know which region matters; pulling a whole article to answer a one-line question wastes the user's time and yours.
 
 ## Staying read-only

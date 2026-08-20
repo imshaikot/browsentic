@@ -11,6 +11,8 @@ You are acting on the page, not just reading it. Work in a loop: snapshot, targe
 
 Call `page_getPageInfo` first. It returns the page's shape plus an inventory of links, buttons, fields and forms, each with a stable selector already computed. Use those selectors — never invent one from what the page "probably" looks like.
 
+Each entry also carries its `role`, its `state` and the `region` it lives in. Check `state` before acting: `disabled` means the click goes nowhere, `checked` means clicking toggles it *off*, and `expanded: false` means the menu's items are not in the DOM yet. When a label appears twice, `region` is what separates the header's "Sign in" from the form's.
+
 `page_getPageInfo { maxPerKind: 30 }` is the useful default. Drop to `maxPerKind: 1` when you only need the layout diagram and the URL.
 
 ## 2. Target by what the user can see
@@ -25,6 +27,10 @@ Visible text survives redesigns that break CSS paths, so prefer it. Fall back to
 ## 3. Act, then confirm
 
 After anything that changes the page, check that it landed. `page_waitForElement` for the state you expect next is the direct way; a fresh `page_getPageInfo` works when you are not sure what to expect. A click that silently did nothing looks exactly like a click that worked, until you look.
+
+When a click verifiably did nothing — the dialog never opened, the file picker never appeared, the page has a handler that checks `event.isTrusted` — `page_trustedClick` is the fallback. It sends a real browser-level mouse event through Chrome's debugger, so the browser shows a "Browsentic is debugging this browser" bar while it runs and it refuses on a tab with DevTools open (`DEBUGGER_UNAVAILABLE` — say so and fall back). It takes the same `target`, plus `button` for a right-click, `clickCount: 2` for a double click and `modifiers` like `["meta"]`. The pointer travels to the target and dwells before pressing, so widgets that only react after real pointer movement get the sequence they wait for. It is slower and visibly intrusive, so `page_clickElement` stays the default: reach for the trusted one only after an ordinary click has already failed.
+
+A page stuck on "verifying you are human" is a different problem and neither click tool solves it — the checkbox is inside a closed shadow root inside a cross-origin iframe, so no selector reaches it. Use `page_findCaptcha` and `page_solveCaptcha`; the **captcha** skill covers the whole path, including handing an image challenge back to the user.
 
 Navigation has two shapes and they behave differently. `page_navigate` takes **either** a `url` **or** an `action` (`back` / `forward` / `reload`) — never both, never neither. From a tab with no content script the URL must be absolute. The result tells you which path ran: `navigatingTo` pushed a history entry so `back` works afterwards; `navigatedTo` replaced it. `loaded: true` means the load actually finished.
 
@@ -56,9 +62,11 @@ Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` bef
 
 ## 7. Screenshots
 
-`page_screenshot` captures the tab as an image. By default it captures the **full scroll view** and hands the picture back to you to look at — reach for it when you need to *see* layout or rendering that the text inventory can't convey. Narrow it when asked: `{ fullPage: false }` for just the current viewport, or `{ target: { text: "Pricing" } }` to capture a single element or block.
+`page_screenshot` captures the tab as an image and hands the picture back to you to look at — reach for it when you need to *see* layout or rendering that the text inventory can't convey. By default it captures the **current viewport** as a JPEG, which is a single fast grab. `{ fullPage: true }` captures the entire scroll view instead, and it is genuinely expensive: the browser only allows two captures a second, so a tall page is tiled and costs about a second per screenful. Ask for it when you need what is below the fold, not by reflex. `{ target: { text: "Pricing" } }` captures a single element or block, and `{ format: "png" }` gets you lossless pixels when detail matters more than speed.
 
-**Every capture is saved.** The image is written under `~/browsentic/screenshot/` and the result reports the exact path as `savedTo` — **always relay that path**, because the side panel renders your reply as text and turns images into links, so the path is the only way the user can actually open the picture. Pass `filename` when the user names one; otherwise it is auto-named. Pass `save: false` only when the user explicitly does not want a file, and then say nothing about a saved path. If the result carries `saveError` instead, the capture worked but the write did not — say so rather than naming a file that is not there.
+**Nothing is written to disk unless you ask for it.** The picture comes back to you in the result either way, so a capture you take to see the page for yourself leaves nothing behind on the user's machine — which is what you want, because most captures are for your eyes only and a folder full of them is litter.
+
+Pass `save: true` when the user asked for a picture they can keep. Then the result carries `savedTo`, and you must **relay that path**: the side panel renders your reply as text and turns images into links, so the path is the only way they can open it. Pass `filename` when they name one. If the result carries `saveError` instead, the capture worked but the write did not — say so rather than naming a file that is not there.
 
 ## 8. Multi-step tasks
 

@@ -8,15 +8,16 @@
 
 Browsentic is a browser extension plus a small local daemon. Say what you want and it drives the page. Ask a question and it reads the page and answers. Every action it takes shows up on a live timeline, and anything consequential waits for your approval first.
 
-It runs on **your own [Claude Code](https://claude.com/claude-code) login**. There is no Anthropic API client in this repository and no API key to configure.
+It runs on **an agent CLI you already have logged in** — [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli). Pick one in the popup and switch whenever you like. There is no API client in this repository and no API key to configure.
 
 ## Features
 
 - **Voice or text.** Hands free dictation in the side panel, press to talk in the popup, plain typing anywhere.
-- **Real page control.** 28 page capabilities covering reading, clicking, typing, form submission, navigation, screenshots and background progress monitoring.
+- **Real page control.** 34 page capabilities covering reading, clicking, typing, form submission, navigation, screenshots, captcha handling, theming and accessibility, and background progress monitoring.
 - **Site maps.** Point Browsentic at a site and it explores it, then writes reusable notes so later sessions already know their way around. See [Site maps](#site-maps-teach-it-a-site-once).
 - **Recordings.** Do a repetitive job once yourself and Browsentic keeps it as ordered steps, so "do it like last time" repeats it. See [Recordings](#recordings-show-it-once-repeat-it-later).
 - **Instant commands.** "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent run.
+- **Bring your own agent.** The side panel runs on Claude Code, Codex or Antigravity — chosen from the status pill in the side panel or from the popup, either of which tells you which ones are installed and what a missing one needs.
 - **Works as an MCP server.** Claude Code or any other MCP client can drive your real, logged in browser through the same local daemon.
 - **Off by default.** A fresh install connects to nothing until you redeem a one time pairing code.
 
@@ -31,8 +32,8 @@ This README is the short version. The long ones live in [`docs/`](docs/):
 ## How it works
 
 ```
-You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your Claude Code
-                            ▲                                                   │
+You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI
+                            ▲                                        (claude │ codex │ agy)
                             └──────────────── page actions ─────────────────────┘
 
 Any MCP client ──stdio──> browsentic-mcp ──> the same daemon ──> the same browser
@@ -45,7 +46,9 @@ connections. One daemon owns the browser link, so several MCP clients can share 
 
 - Chrome or another Chromium browser (Firefox builds work too)
 - Node.js 20 or newer
-- [Claude Code](https://claude.com/claude-code) on your `PATH`
+- One agent CLI on your `PATH`, logged in: [Claude Code](https://claude.com/claude-code) (`claude`),
+  [Codex](https://developers.openai.com/codex/cli) (`codex`) or
+  [Antigravity](https://antigravity.google/docs/cli) (`agy`)
 
 ## Quick start
 
@@ -80,7 +83,9 @@ Type or speak an instruction into the side panel. Replies stream back token by t
 action appears on a timeline as it happens, and follow ups continue the same conversation, so
 "now click the second one" works.
 
-Actions that change something other people can see wait for an explicit **Allow** or **Deny**.
+Actions that change something other people can see wait for an explicit **Allow** or **Deny** — or
+**Always on ‹host›**, which grants that one action on that one site and stops asking. Review them with
+`browsentic-mcp approvals`.
 Form submission is gated by default.
 
 ## Site maps: teach it a site once
@@ -89,7 +94,7 @@ An agent that has never seen your site spends its first minutes rediscovering it
 lives, what a button is really called, why the list looks empty until you scroll. Site maps do
 that exploration once and keep the result.
 
-Press **Map** in the Skills panel, or say:
+Press **Map this site** in the side panel’s **Skills** tab, or say:
 
 ```
 @site-mapper map this site
@@ -136,7 +141,7 @@ search for public background on the domain.
 
 ### Writing notes by hand
 
-If you would rather describe a site by hand, upload a markdown file from the side panel composer:
+If you would rather describe a site by hand, upload a markdown file from the side panel’s **Skills** tab:
 
 ```markdown
 ---
@@ -161,7 +166,7 @@ you ask, and `browsentic-mcp skills` lists everything currently in scope.
 
 A site map teaches Browsentic what a site **is**. A recording teaches it what **you do** there.
 
-Press the red record button in the composer, then do the job yourself — click through the pages,
+Press **Record** in the side panel’s **Recordings** tab, then do the job yourself — click through the pages,
 fill the fields, submit the form — and press stop. Browsentic splits what you did into ordered
 steps, names them after what you accomplished, and keeps them in a list you can rename. Later,
 "do it like last time" runs them again. You can also just say it:
@@ -219,7 +224,7 @@ to the agent, as does any local command that runs and fails.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Claude Code now has 28 page tools plus `browsentic_status`, and three read only resources that
+Claude Code now has 34 page tools plus `browsentic_status`, and three read only resources that
 return page context without spending a tool call. Tool definitions are generated from the same
 registry the extension ships, so they cannot drift from what the browser can actually do.
 
@@ -228,10 +233,12 @@ registry the extension ships, so they cannot drift from what the browser can act
 | Category | Capabilities |
 | --- | --- |
 | Read | Structured page snapshot with a layout diagram and stable selectors, rendered text or HTML, wait for an element to appear or vanish, screenshot the tab or one element |
-| Act | Click, hover, focus, type into inputs and contenteditables, stream text in keystroke by keystroke at a human pace, choose a `<select>` option, select text, press keys with modifiers, submit a form |
+| Act | Click, hover, focus, type into inputs and contenteditables, stream text in keystroke by keystroke at a human pace, choose a `<select>` option, select text, press keys with modifiers, submit a form, and — for pages that only accept a genuine gesture — click with a real browser-level mouse event |
+| Captchas | Identify the widget behind a "verify you are human" block, reading through the closed shadow roots and cross-origin frames vendors hide it in, and tick its checkbox with a real click. An image challenge is handed back to you to answer |
 | Move | Open a URL, back, forward, reload, scroll to an element or position, open a URL in a new tab, list and switch between open tabs, close one |
 | Files | List files stored in Browsentic and attach one to a file input on the page |
 | Recordings | List the browsing sessions the user recorded, and read one back as ordered, replayable steps |
+| Theme | Measure what the page is actually painting — background luminance, the palette by area, design tokens, a tree of coloured surfaces — score its text against WCAG contrast, then retheme it through the page's own dark/light hook and tokens, or through a filter when it has none, and revert |
 | Monitor | Find progress signals on a page, then watch one tab in the background until an upload, build or deploy completes — the tab is pinned, percent and ETA are tracked, the user is notified, and an MCP client can long-poll for completion |
 
 Most capabilities take a target described by CSS selector, visible text, ARIA role or index.
@@ -243,7 +250,12 @@ Optional, at `~/.browsentic/config.json`:
 
 ```json
 {
-  "claudeBin": "/opt/homebrew/bin/claude",
+  "agent": "claude",
+  "agents": {
+    "claude": { "bin": "/opt/homebrew/bin/claude", "model": "claude-sonnet-5" },
+    "codex": { "bin": "codex" },
+    "antigravity": { "bin": "agy" }
+  },
   "requireApproval": ["page.submitForm"],
   "screenshotDir": "~/browsentic/screenshot",
   "skillsDir": "~/browsentic/skills",
@@ -251,8 +263,9 @@ Optional, at `~/.browsentic/config.json`:
 }
 ```
 
-`requireApproval` lists the actions an agent run has to ask you about first. It defaults to form
-submission, which is the one effect that reaches someone other than you. Add any other action name
+`agent` is the CLI the side panel runs on, and the popup writes it for you — `agents.<name>.bin`
+is only needed when the daemon's `PATH` differs from your shell's. `requireApproval` lists the
+actions an agent run has to ask you about first. It defaults to form submission, which is the one effect that reaches someone other than you. Add any other action name
 to it — `"page.closeTab"` if you would rather approve each tab the agent closes, for instance. The
 cost of a longer list is a longer list: a prompt you see on every other tool call is a prompt you
 stop reading.
@@ -260,7 +273,9 @@ stop reading.
 Useful commands:
 
 ```sh
-browsentic-mcp status      # daemon and extension state
+browsentic-mcp status      # daemon, extension and agent state
+browsentic-mcp agent       # which agents are installed, and which one runs the side panel
+browsentic-mcp agent codex # switch agents from the terminal
 browsentic-mcp sessions    # which browsers are paired
 browsentic-mcp revoke      # unpair everything, or one origin
 browsentic-mcp skills      # every skill in scope, and where it came from
@@ -273,8 +288,12 @@ browsentic-mcp stop
 - **Nothing connects until you pair.** An unpaired extension never contacts the daemon.
 - **Two independent gates.** Any web page can open a WebSocket to loopback, so the daemon first
   classifies the peer by handshake `Origin`, which browsers set themselves and pages cannot forge,
-  then requires a pairing token or a session key bound to that same origin. A web page can never
-  reach the control path.
+  then requires proof of a pairing code or of a session key bound to that same origin. A web page
+  can never reach the control path.
+- **Both ends prove themselves.** The daemon's ports are well known, so the extension does not
+  trust whatever answers one: neither secret ever crosses the wire, and a peer that cannot prove it
+  holds the same one is abandoned for the next port. That is what keeps another local process from
+  posing as your daemon and driving your browser.
 - **Consequential actions ask first.** Approval prompts appear in the side panel with the action
   named. Cancelling a run stops it mid flight.
 - **Recordings capture what you do, not what you type.** A recording stores the identity of each
@@ -288,7 +307,8 @@ browsentic-mcp stop
   under `~/.browsentic` and `~/browsentic`.
 
 Two limits worth stating plainly. Pairing controls **which browser**, not which local process:
-anything running as your user can read the daemon lockfile and drive an already paired browser.
+anything running as your user can read the daemon lockfile and drive an already paired browser —
+though the token in it is minted fresh per daemon, so a copy stops working once that daemon exits.
 And an agent reading a hostile page is still susceptible to prompt injection, so treat page content
 as data, never as instructions.
 

@@ -14,19 +14,20 @@ AI agent you already run locally.
 | --- | --- | --- |
 | **Node** | 20 or newer | `node --version` |
 | **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc). Firefox has a build target. | — |
-| **Agent** | [Claude Code](https://claude.com/claude-code) on your `PATH`, logged in | `claude --version` |
+| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version` |
 | **git** | To clone the repository | `git --version` |
 
 Notes:
 
-- **Claude Code is required for the side panel**, and only for the side panel. It is what the daemon
+- **An agent CLI is required for the side panel**, and only for the side panel. It is what the daemon
   spawns to reason about an instruction. If you only ever drive the browser from an MCP client, the
-  daemon never spawns anything and Claude Code is optional — see
-  [Using a different agent](#using-a-different-agent).
-- **Keep Claude Code reasonably current.** Browsentic passes flags that sandbox the run
-  (`--strict-mcp-config`, `--disallowedTools`, `--append-system-prompt`). An older build that does
-  not understand them fails the run with an explicit "update Claude Code" message rather than
-  running unsandboxed.
+  daemon never spawns anything and no agent CLI is needed — see
+  [Choosing the agent](#choosing-the-agent).
+- **Only one is needed.** Browsentic checks all three, tells you in the popup which are installed,
+  and runs whichever you picked. Switching is a click and takes effect on the next instruction.
+- **Keep it reasonably current.** Browsentic passes flags that sandbox the run. An older build that
+  does not understand them fails the run with an explicit "update it" message rather than running
+  unsandboxed.
 - **Yarn is not a prerequisite.** The pinned Yarn 4 release ships inside the repository and the
   setup script invokes it through Node. No global install, no Corepack.
 - **@browsentic/mcp is not published to npm.** Install from source; `npx -y @browsentic/mcp` will
@@ -115,7 +116,8 @@ manifest:  in sync
 paired:    1
 ```
 
-Open the side panel and start talking. That is the whole setup.
+Open the side panel and start talking. That is the whole setup. The panel’s status pill reopens the
+pairing form and the agent picker later, so you never have to go back to the popup.
 
 ---
 
@@ -151,40 +153,74 @@ command = "browsentic-mcp"
 Check your client's own documentation for the exact file and key — the *command* is the part that
 matters, and it is the same everywhere.
 
-The client then gets 28 page tools, `browsentic_status`, and three read-only resources.
+The client then gets 29 page tools, `browsentic_status`, and three read-only resources.
 **MCP servers are loaded at session start**, so restart the client session after registering.
 
 ---
 
-## Using a different agent
+## Choosing the agent
 
-Worth being precise here, because Browsentic has two independent agent surfaces and only one of them
-is switchable.
+Browsentic has two independent agent surfaces, and both are switchable.
 
-### The side panel: Claude Code only
+### The side panel: claude, codex or antigravity
 
-The in-extension agent spawns `claude -p` and speaks Claude Code's CLI protocol — `stream-json`
-output, `--mcp-config`, `--allowedTools`, `--session-id`/`--resume`, `--append-system-prompt`. There
-is no adapter for Codex, Gemini CLI or any other agent, and pointing `claudeBin` at a different
-binary will not work: it would be handed flags it does not understand.
+The daemon spawns one agent CLI per instruction and speaks its own headless protocol. Three are
+supported, and each one gets the same system prompt, the same `browsentic` MCP server pointed back
+at the daemon, and the same approval gate.
 
-What you *can* change is which Claude runs it, in `~/.browsentic/config.json`:
+| | Claude Code | Codex | Antigravity |
+| --- | --- | --- | --- |
+| Binary | `claude` | `codex` | `agy` |
+| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` |
+| MCP server | `--mcp-config` | `-c mcp_servers.browsentic.*` | `.agents/mcp_config.json` in its working directory |
+| System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its working directory |
+| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` |
+| Kept off the machine by | `--disallowedTools` | `--sandbox read-only`, `--ask-for-approval never` | its own permission rules, which deny shell commands by default |
+| Effort names | `low`…`max` | `minimal`…`high` | `low`…`high` |
+
+Pick one in the extension popup. It lists all three with their state — *ready*, *not installed*,
+*needs setup* — so a missing CLI is visible before you send an instruction rather than after. The
+same thing from a terminal:
+
+```sh
+browsentic-mcp agent                  # what is installed, and what runs the side panel
+browsentic-mcp agent codex            # switch
+browsentic-mcp agent setup antigravity
+```
+
+**Antigravity needs one permission rule.** Headless `agy` soft-denies any MCP tool it has no rule
+for, which would refuse every browser action. The popup shows this as *needs setup*, and the button
+(or `agent setup antigravity`) appends exactly one entry — `mcp(browsentic/*)` — to
+`permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, leaving the rest of that file
+alone. Nothing is written until you press it. If you have a `deny` rule covering the same tools,
+Browsentic will not overrule it — remove it yourself.
+
+Each agent's binary, model and effort live in `~/.browsentic/config.json`:
 
 ```json
 {
-  "claudeBin": "/opt/homebrew/bin/claude",
-  "model": "claude-sonnet-5",
-  "effort": "high"
+  "agent": "claude",
+  "agents": {
+    "claude": { "bin": "/opt/homebrew/bin/claude", "model": "claude-sonnet-5", "effort": "high" },
+    "codex": { "bin": "codex", "model": "gpt-5.6-terra" },
+    "antigravity": { "bin": "agy" }
+  }
 }
 ```
 
 | Key | Default | Effect |
 | --- | --- | --- |
-| `claudeBin` | `claude` | Path to the Claude Code binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `NO_CLAUDE`. |
-| `model` | `claude-sonnet-5` | Passed as `--model`. Use `claude-opus-5` for harder multi-step work, `claude-haiku-4-5-20251001` for speed. |
-| `effort` | unset | Passed as `--effort`: `low`, `medium`, `high`, `xhigh`, `max`. |
+| `agent` | `claude` | Which CLI the side panel runs on. The agent picker — in the popup, or behind the side panel’s status pill — writes this. |
+| `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. |
+| `agents.<name>.model` | `claude-sonnet-5` for Claude, otherwise the CLI's own default | Passed as `--model`. |
+| `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
-Changes apply to the next run — the config is re-read each time, no daemon restart needed.
+Changes apply to the next run — the config is re-read each time, no daemon restart needed. The older
+top-level `claudeBin`, `model` and `effort` keys are still honoured and read as the Claude runner's
+settings.
+
+Switching agents also drops the conversation being held open: agents cannot resume each other's
+sessions, so the next instruction starts a fresh one.
 
 ### Everything else: any MCP client
 
@@ -193,15 +229,14 @@ Gemini CLI, Cursor, Zed, Claude Desktop** — anything that speaks MCP — can d
 through the same daemon and the same paired session. Register it as shown
 [above](#5-register-with-an-mcp-client-optional).
 
-So the practical answer to "can I use Browsentic with Codex or Gemini?" is **yes, as an MCP client**.
-You drive the browser from that agent's own interface, with its own permission prompts, rather than
-from Browsentic's side panel.
+So Gemini CLI, Cursor or Zed can drive the browser from their own interface, with their own
+permission prompts, rather than from Browsentic's side panel — and Codex can do either.
 
 The two surfaces differ in more than which model runs them:
 
 | | Side panel (agent run) | MCP client |
 | --- | --- | --- |
-| Agent | Claude Code, spawned by the daemon | Whatever you registered |
+| Agent | The CLI you picked, spawned by the daemon | Whatever you registered |
 | Approval gate | Yes — `requireApproval`, prompts in the panel | No — your client's own permissions apply |
 | Timeline | Every action, live | Actions appear tagged `external` |
 | Skills / site notes | Routed and applied automatically | Not applied |
@@ -220,9 +255,10 @@ Everything is optional. `~/.browsentic/config.json`:
 
 ```json
 {
-  "claudeBin": "/opt/homebrew/bin/claude",
-  "model": "claude-sonnet-5",
-  "effort": "high",
+  "agent": "claude",
+  "agents": {
+    "claude": { "bin": "/opt/homebrew/bin/claude", "model": "claude-sonnet-5", "effort": "high" }
+  },
   "requireApproval": ["page.submitForm"],
   "screenshotDir": "~/browsentic/screenshot",
   "skillsDir": "~/browsentic/skills",
@@ -238,6 +274,8 @@ Everything is optional. `~/.browsentic/config.json`:
 
 | Key | Default | Notes |
 | --- | --- | --- |
+| `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex` or `antigravity`. See [Choosing the agent](#choosing-the-agent). |
+| `agents.<name>` | — | Per-agent `bin`, `model` and `effort`. |
 | `requireApproval` | `["page.submitForm"]` | Actions an agent run must ask about first. Listing `page.submitForm` also catches `pressEnter: true` and pressing Enter, because those submit forms too. Add `"page.closeTab"` to approve each tab close, and so on — but a prompt you see on every other tool call is a prompt you stop reading. |
 | `screenshotDir` | `~/browsentic/screenshot` | Where captures are written, mode `0600`. |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live. |
@@ -375,8 +413,11 @@ which live in extension storage.
 | "No Browsentic daemon is running" | Nothing on 8765–8767 | `browsentic-mcp status`; check the log with `browsentic-mcp logs` |
 | Tools missing from an MCP session | The server was registered mid-session | Restart the client session — MCP servers load at start |
 | `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn mcp:build`, then reload the extension |
-| `NO_CLAUDE` | Claude Code is not on the daemon's `PATH` | Set `claudeBin` to an absolute path in `config.json` |
-| "does not understand the flags Browsentic uses to sandbox a run" | Claude Code is too old | Update Claude Code |
+| `AGENT_MISSING` | The chosen agent CLI is not on the daemon's `PATH` | `browsentic-mcp agent` to see all three; set `agents.<name>.bin` to an absolute path in `config.json` |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule allowing Browsentic's MCP tools | Press the button in the popup, or run `browsentic-mcp agent setup antigravity` |
+| "does not understand the flags Browsentic uses" | The agent CLI is too old | Update it |
+| Antigravity answers but never touches the page | Its permission rule was removed | `browsentic-mcp agent` — it reports *needs setup* again |
+| Codex fails with "not logged in" | The daemon inherits no session | `codex login`, then retry |
 | `EXTENSION_OFFLINE` | Browser closed, or not paired | Open the browser; `browsentic-mcp sessions` to check pairing |
 | `TAB_UNREACHABLE` on a normal site | The extension needs reloading | ↻ at `chrome://extensions`; ordinary sites otherwise self-heal |
 | `RUN_IN_PROGRESS` | One instruction at a time | Cancel the running one in the side panel |
@@ -385,7 +426,8 @@ which live in extension storage.
 Useful commands:
 
 ```sh
-browsentic-mcp status      # daemon and extension state
+browsentic-mcp status      # daemon, extension and agent state
+browsentic-mcp agent       # which agents are installed, and which one runs the side panel
 browsentic-mcp sessions    # which browsers are paired
 browsentic-mcp revoke      # unpair everything, or one origin
 browsentic-mcp skills      # every skill in scope, and where it came from

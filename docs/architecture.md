@@ -3,7 +3,7 @@
 How an instruction becomes a click, end to end.
 
 Browsentic is four processes cooperating over loopback: a browser extension, a local daemon, one
-stdio MCP server per client, and — when the side panel is driving — a headless Claude Code. This
+stdio MCP server per client, and — when the side panel is driving — a headless agent CLI. This
 document follows a request through all of them, then covers the pieces that make that path safe:
 authorization, the shared action registry, the gates, and the state on disk.
 
@@ -19,8 +19,8 @@ That something is the daemon. It owns exactly one live browser link and fans it 
 MCP clients want a turn:
 
 ```
-You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your Claude Code
-                            ▲                                                   │
+You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI
+                            ▲                                        (claude │ codex │ agy)
                             └──────────────── page actions ─────────────────────┘
 
 Any MCP client ──stdio──> browsentic-mcp ──> the same daemon ──> the same browser
@@ -54,9 +54,13 @@ Every upgrade is classified by the handshake `Origin` header before anything els
 
 | `Origin` | Role | Requirement |
 | --- | --- | --- |
-| `chrome-extension://…`, `moz-extension://…`, `safari-web-extension://…` | `extension` | A pairing token or a session key bound to that same origin |
+| `chrome-extension://…`, `moz-extension://…`, `safari-web-extension://…` | `extension` | Proof of a pairing code, or of a session key bound to that same origin |
 | Any other value | — | **Refused.** This is what keeps web pages out. |
 | Absent | `control` | `Authorization: Bearer <token>` matching the lockfile, compared with `timingSafeEqual` |
+
+Every request — the `/health` endpoint included — must also carry a loopback `Host`. A page whose
+own DNS points at `127.0.0.1` still arrives with the attacker's hostname, so rebinding gets a 403
+before the `Origin` check even runs.
 
 The split matters because any web page can open a WebSocket to loopback. Browsers set `Origin`
 themselves and page JavaScript cannot forge it, so a page reaching the daemon is classified as a web
@@ -68,9 +72,11 @@ Two independent gates, then: the origin says *what kind of peer this is*, and th
 
 ### The control token
 
-Generated once (24 random bytes, base64url) and written to `~/.browsentic/daemon.json` with mode
-`0600`. A restarted daemon reuses the previous token, so MCP clients survive daemon restarts. Read
-it with `browsentic-mcp token`.
+24 random bytes, base64url, minted fresh by **each** daemon and written to `~/.browsentic/daemon.json`
+with mode `0600`. It dies with the daemon that issued it, so a token that leaked once does not open
+every future daemon. Clients re-read the lockfile before every connection, and `probeExisting()`
+matches the pid in `/health` against the lockfile so it never offers a token the daemon on that port
+never issued. Read it with `browsentic-mcp token`.
 
 ### Pairing and sessions
 
@@ -79,29 +85,45 @@ The extension connects to nothing until you pair it.
 1. `browsentic-mcp pair` asks the daemon for a code: 8 characters from an alphabet with the
    ambiguous glyphs removed, valid **10 minutes**, single use.
 2. You paste it into the Browsentic popup. The extension dials `ws://127.0.0.1:<port>/extension`,
-   walking the three ports until one answers, and sends a `hello` frame carrying the pairing token.
-3. The daemon consumes the code and mints a **session key** (32 random bytes) bound to that
-   extension origin, returned in the `welcome` frame and stored in `browser.storage.local`.
-4. Every later connection presents the session key instead. It survives browser and daemon restarts
-   and dies only when you `browsentic-mcp revoke`.
+   walking the three ports, and sends `hello` — which names *which* secret it holds and a fresh
+   nonce, never the secret itself.
+3. The daemon answers `challenge` with a nonce of its own. Both sides now share a transcript:
+   protocol version, extension version, manifest hash, and the two nonces.
+4. The extension replies `prove` with `HMAC(secret, "browsentic/client" ‖ transcript)`. For a
+   pairing code the key is not the code but `PBKDF2(code, nonces, 250 000)`, so recording one
+   handshake does not let anyone grind an 8-character code offline.
+5. The daemon verifies, then proves *itself*: `welcome` carries
+   `HMAC(secret, "browsentic/server" ‖ transcript ‖ the rest of the welcome)`. The two labels are
+   distinct, so an impostor cannot reflect the extension's own proof back at it.
+6. On pairing, the daemon mints a **session key** (32 random bytes) bound to that extension origin
+   and returns it XORed with a keystream derived from the same secret, so the long-lived credential
+   never crosses the wire in the clear. It survives browser and daemon restarts and dies only when
+   you `browsentic-mcp revoke`.
+
+The mutual half is the point. The three ports are well known and any local process can bind one
+first, so an extension that trusted whatever answered could be driven by a squatter. Instead, a
+socket that closes without a *verified* `welcome` — a squatter, a daemon from an older protocol, an
+`unauthorized` frame, five seconds of silence — is abandoned and the walk moves to the next port.
+Only a peer that proves it holds the same secret ever gets to send an `invoke`.
 
 Reconnection is exponential backoff from 1 s to 30 s with jitter, plus a one-minute
 `browser.alarms` tick that re-dials if the service worker was torn down in between.
 
-A rejected `hello` comes back as an `unauthorized` frame carrying a `retryable` flag. A wrong or
-expired code is retryable and leaves the stored key alone; a revoked session is not, and the
-extension discards its key rather than retrying forever.
+A rejected `hello` comes back as an `unauthorized` frame carrying a `retryable` flag. Nothing has
+proved itself at that point, so the extension treats it as a claim rather than a verdict: it notes
+the reason, tries the remaining ports, and if none work it reports the error and stops dialling —
+but it never deletes the stored key. Only pairing again or `disconnect` replaces it.
 
 ### Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **7**). A mismatch closes the socket with
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **10**). A mismatch closes the socket with
 an explicit reason instead of letting two incompatible frame vocabularies talk past each other.
 
 ---
 
 ## 4. One registry, two bundles
 
-There are 28 page capabilities. They are defined once, in `lib/actions/registry.ts`, and that array
+There are 34 page capabilities. They are defined once, in `lib/actions/registry.ts`, and that array
 is compiled into **both** the extension and the daemon.
 
 Each action is a small module — a name, a description, a zod input schema, and an `execute()`:
@@ -186,10 +208,13 @@ Details worth knowing:
 - **Timeouts are per action, not global.** The control request waits 60 s by default; the
   extension link allows 120 s for a screenshot, the computed typing duration plus 30 s for
   `page.typeText`, any declared `timeoutMs` plus 5 s, and 30 s otherwise.
-- **Screenshots are persisted by the daemon**, not the browser. `persistScreenshot()` decodes the
-  data URL and writes it to `screenshotDir` (default `~/browsentic/screenshot`) at mode `0600`,
-  then adds `savedTo` to the result. A failed write becomes `saveError` — the capture still
-  succeeds.
+- **Screenshots are persisted by the daemon**, not the browser, and only on request.
+  `persistScreenshot()` writes nothing unless the call passed `save: true` or a mapping run
+  supplied a `saveTo` — so the captures an agent takes to look at a page leave no files behind. It
+  reads `save` off the *raw* input rather than the parsed one, because the zod default is applied
+  in the content script and never reaches the daemon. When it does write, it decodes the data URL
+  into `screenshotDir` (default `~/browsentic/screenshot`) at mode `0600` and adds `savedTo` to the
+  result. A failed write becomes `saveError` — the capture still succeeds.
 - **Three read-only resources** (`browsentic://page/current`, `/diagram`, `/text`) give an MCP
   client page context without spending a tool call. They *throw* on failure rather than returning
   an error result, because MCP resources have no error channel.
@@ -280,7 +305,7 @@ sequenceDiagram
     D-->>S: run events (text, tool, toolResult, approval, done)
 ```
 
-The loop closes on itself: the daemon spawns Claude Code, which spawns *another* `browsentic-mcp`,
+The loop closes on itself: the daemon spawns the agent CLI, which spawns *another* `browsentic-mcp`,
 which connects back to the same daemon. That indirection is what lets an agent run reuse the exact
 tool surface an external client gets, while still being gated differently.
 
@@ -291,23 +316,43 @@ it, stamps `runId` on every control invoke, and the daemon routes those to
 
 ### How the child is sandboxed
 
-`runInstruction()` spawns `claude -p` with:
+`runInstruction()` hands the request to one **runner** — `mcp/src/agent/runners/{claude,codex,antigravity}.ts`
+— which turns it into an argv, a working directory and any files that CLI reads from disk. A shared
+driver (`runners/drive.ts`) does the spawning, the abort wiring and the line reading; the runner
+only decides *what* to say and *how to read the answer back*. Adding a fourth agent is one file plus
+one line in `runners/index.ts`.
 
-- `--strict-mcp-config` and an explicit `--mcp-config` naming only Browsentic, so the user's own MCP
-  servers are not in scope;
-- `--allowedTools mcp__browsentic`, and a `--disallowedTools` list covering every built-in that
-  touches the filesystem, the shell or subagents (`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`,
-  `Task`, `Skill`, …);
-- `WebSearch`/`WebFetch` allowed **only** during a site-mapping run with `research` on;
-- `--append-system-prompt` carrying the assembled prompt;
-- `--session-id` on the first turn and `--resume` afterwards, which is what makes "now click the
-  second one" work;
-- a scrubbed environment — `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT` and `BROWSENTIC_AGENT_RUN` are
-  deleted before the spawn so the child does not think it is nested inside another run.
+Every runner is given the same four things, by whichever mechanism its CLI supports:
 
-Output is `stream-json` with partial messages, so text deltas reach the side panel token by token.
-Only top-level content is forwarded — anything with a `parent_tool_use_id` is a subagent's chatter
-and is dropped.
+- **only Browsentic's MCP server** — Claude via `--mcp-config` + `--strict-mcp-config`, Codex via
+  `-c mcp_servers.browsentic.*`, Antigravity via a `.agents/mcp_config.json` written into its
+  working directory. The user's own MCP servers stay out of scope where the CLI allows it.
+- **no reach outside the browser** — Claude gets a `--disallowedTools` list covering every built-in
+  that touches the filesystem, the shell or subagents (`Bash`, `Read`, `Write`, `Edit`, `Glob`,
+  `Grep`, `Task`, `Skill`, …); Codex runs under `--sandbox read-only --ask-for-approval never`;
+  Antigravity's own permission system denies shell commands unless a rule allows them.
+- **the assembled system prompt** — `--append-system-prompt`, `-c developer_instructions`, or an
+  `AGENTS.md` in the working directory.
+- **conversation continuity** — the runner reports whatever session id its CLI established
+  (`session_id`, `thread_id`, `conversation_id`) and gets it back on the next turn as `--resume`,
+  `exec resume` or `--conversation`. That is what makes "now click the second one" work. Session ids
+  are agent-scoped: switching agents drops the held conversation rather than handing one agent
+  another's id.
+
+`WebSearch`/`WebFetch` and their equivalents are enabled **only** during a site-mapping run with
+`research` on. The environment is scrubbed — `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT` and
+`BROWSENTIC_AGENT_RUN` are deleted before every spawn so the child does not think it is nested
+inside another run, and `BROWSENTIC_AGENT_RUN` is then handed only to the MCP server the child
+starts.
+
+Each runner's reader normalizes that CLI's event stream into the same five signals — text delta,
+tool started, session established, done, failed — so the side panel renders every agent identically.
+Only top-level content is forwarded; a subagent's chatter is dropped.
+
+Before a run starts, `agentState()` probes each CLI (`--version`, plus any extra readiness check)
+and the result is cached for 30 seconds. A run against an agent that is not ready fails immediately
+with `AGENT_MISSING` or `AGENT_NEEDS_PERMISSION` and a message naming the fix, rather than spawning
+something that cannot work.
 
 ### Prompt assembly
 
@@ -419,6 +464,7 @@ Nothing lives in the repository.
 ├── daemon.json    0600        lockfile: pid, port, control token, protocol + daemon version
 ├── auth.json      0600        outstanding pairing code, session keys per origin
 ├── config.json                optional, hand-written
+├── approvals.json 0600        “always on this site” grants, one action + host per entry
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
 └── skills/                    hand-written skill overrides
 
@@ -426,7 +472,7 @@ Nothing lives in the repository.
 ├── skills/                    panel uploads + activated site maps
 │   ├── acme-com/SKILL.md
 │   └── .staging/              maps awaiting review — unreadable to the loader
-└── screenshot/    0600        every capture, unless save:false
+└── screenshot/    0600        captures taken with save:true
 ```
 
 Recordings are the exception: they stay in the extension's own storage.
@@ -450,11 +496,14 @@ Errors are `{ ok: false, error: { code, message } }` all the way through, surfac
 | `TIMEOUT` | Link or action | A wait expired, or the extension did not answer in the window for that action. |
 | `ACTION_FAILED` | Action | `execute()` threw — e.g. `back` with no history. |
 | `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, or a reserved action reached from outside. |
+| `DEBUGGER_UNAVAILABLE` | Extension | Chrome’s debugger could not attach — usually DevTools is open on that tab. Close it, or use `page.clickElement`. |
+| `CAPTCHA_NOT_FOUND` | Extension | No known captcha widget on the page, so whatever is blocking the run is something else. |
 | `DAEMON_UNREACHABLE` | RemoteBridge | The daemon died mid-call. |
 | `RUN_IN_PROGRESS` | AgentSession | One instruction at a time. |
 | `RUN_INACTIVE` | AgentSession | The run was cancelled while a tool call was in flight. |
 | `DECLINED` | Approval gate | The user said no. Final. |
-| `NO_CLAUDE` | Runner | `claudeBin` is not on the daemon's PATH. |
+| `AGENT_MISSING` | Runner | The chosen agent's binary is not on the daemon's PATH. |
+| `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools. |
 | `MAPPING_*` | Mapping gate | Read-only, off-site, budget or tab-change refusal. |
 
 Two design choices show up repeatedly here: failures carry the *fix* in the message, and a failed

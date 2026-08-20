@@ -13,7 +13,7 @@ a live timeline, and anything consequential waits for your approval first.
 | | Side panel | MCP client |
 | --- | --- | --- |
 | You talk to | Browsentic, by voice or typing | Claude Code, Codex, Gemini CLI, Cursor, … |
-| Agent | Claude Code, spawned locally by the daemon | Whichever client you registered |
+| Agent | Claude Code, Codex or Antigravity, spawned locally by the daemon | Whichever client you registered |
 | Skills and site notes | Routed and applied automatically | Not applied |
 | Approval prompts | Yes | Your client's own permissions |
 | Recording, site mapping | Full access | Read-only |
@@ -36,17 +36,17 @@ history.
 
 ## Page capabilities
 
-28 actions, published to MCP clients as 28 tools generated from the same registry the extension
+29 actions, published to MCP clients as 29 tools generated from the same registry the extension
 ships — so a tool can never describe something the browser cannot do.
 
 ### Reading
 
 | Tool | What it does |
 | --- | --- |
-| `page_getPageInfo` | The workhorse. Document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of links, buttons, fields and forms — **each with a stable selector already computed**. |
+| `page_getPageInfo` | The workhorse. Document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of links, buttons, fields and forms — **each with a stable selector already computed**, plus its ARIA role, its live state (disabled, checked, expanded, filled, `aria-current`) and the landmark region it sits in. |
 | `page_extractText` | Rendered text, or raw HTML, of an element or the whole page. |
 | `page_waitForElement` | Wait until an element is attached, visible, hidden or detached. |
-| `page_screenshot` | The full scroll view, the current viewport, or one element. Saved to disk automatically. |
+| `page_screenshot` | The current viewport, the full scroll view, or one element. Written to disk only when asked. |
 | `page_findProgress` | Scan for progress signals worth monitoring — bars, percent readouts, spinners — each with a selector. |
 
 Start with `getPageInfo` and use the selectors it hands back rather than guessing. Better still,
@@ -57,6 +57,9 @@ target by **visible text** — it survives redesigns that break CSS paths.
 | Tool | What it does |
 | --- | --- |
 | `page_clickElement` | Clicks like a user, firing the full pointer and mouse sequence. |
+| `page_trustedClick` | A real browser-level click — `isTrusted` is true, dispatched through Chrome’s debugger rather than from the page. The pointer travels to the target and dwells before pressing, so widgets that sample pointer movement get the sequence they wait for. Takes a raw viewport point as well as an element. For the handful of pages that reject synthetic clicks, and the browser features that only a genuine gesture unlocks. |
+| `page_findCaptcha` | Identify the captcha behind a "verify you are human" block — Turnstile, reCAPTCHA, hCaptcha, GeeTest, Arkose, AWS WAF — reading through the closed shadow roots and cross-origin frames vendors hide it in. Read-only. |
+| `page_solveCaptcha` | Tick the widget's checkbox with a real click and wait for the verdict. Confirm-gated. An image challenge is handed back to you to answer, never attempted. |
 | `page_hoverElement` | Triggers menus, tooltips and hover states. |
 | `page_focusInput` | Focus and place the caret, or select all. |
 | `page_fillInput` | Set a value in an input, textarea or contenteditable. |
@@ -164,7 +167,7 @@ An agent that has never seen your site spends its first minutes rediscovering it
 lives, what a button is really called, why the list looks empty until you scroll. Site maps do that
 exploration once and keep the result.
 
-Press **Map** in the Skills panel, or say:
+Press **Map this site** in the side panel’s **Skills** tab, or say:
 
 ```
 @site-mapper map this site
@@ -213,7 +216,7 @@ start one, because a mapping run takes minutes and commandeers the tab.
 
 ### Writing notes by hand
 
-If you would rather describe a site yourself, upload a markdown file from the side panel composer:
+If you would rather describe a site yourself, upload a markdown file from the side panel’s **Skills** tab:
 
 ```markdown
 ---
@@ -240,7 +243,7 @@ ask, and `browsentic-mcp skills` lists everything currently in scope.
 
 A site map teaches Browsentic what a site **is**. A recording teaches it what **you do** there.
 
-Press the red record button in the composer, do the job yourself — click through the pages, fill the
+Press **Record** in the side panel’s **Recordings** tab, do the job yourself — click through the pages, fill the
 fields, submit the form — and press stop. Browsentic splits what you did into ordered steps, names
 them after what you accomplished, and keeps them in a renameable list. Later, "do it like last time"
 runs them again. You can also just say it:
@@ -282,6 +285,7 @@ Every side-panel instruction is routed to exactly one **base skill**, chosen by 
 | `browse-navigation` | Replay a recorded session — "do it like last time" |
 | `monitor-progress` | Watch a long-running task and report when it finishes |
 | `site-mapper` | Walk a site and write up how it is laid out |
+| `captcha` | Get past a "verify you are human" block, or hand a real challenge to you |
 
 Skills are plain markdown. Drop your own into `~/.browsentic/skills/`, or upload one from the panel,
 and it shadows a bundled skill of the same name. All three skill directories are re-read on every
@@ -293,9 +297,15 @@ run, so an edit applies to the very next instruction.
 
 ## Screenshots
 
-Full scroll view by default; `fullPage: false` for the viewport, or a `target` for one element or
-block. Every capture is written to `~/browsentic/screenshot/` (mode `0600`) unless you pass
-`save: false`, and the result reports the path as `savedTo`.
+The current viewport by default; `fullPage: true` for the whole scroll view, or a `target` for one
+element or block. The viewport capture is a single fast grab; a full-page one is stitched from
+viewport tiles and paced by the browser's two-captures-per-second limit, so it costs about a second
+per screenful.
+
+**Captures do not touch the disk unless you ask.** The image is handed straight back to whoever
+called for it, so the screenshots an agent takes to see the page for itself leave nothing behind.
+Pass `save: true` for a picture you want to keep: it is written to `~/browsentic/screenshot/`
+(mode `0600`) and the result reports the path as `savedTo`.
 
 Very tall pages are stitched from viewport tiles and capped — beyond the limit the bottom is cut off
 and the result says `truncated: true`, rather than silently returning a partial image.
@@ -322,9 +332,27 @@ submission is gated by default, and the gate is smarter than a name match — it
 Denying is final: the agent is told to report it and stop, not to find another route to the same
 effect.
 
-Add more actions to `requireApproval` in `~/.browsentic/config.json` if you want them gated. The
-cost of a longer list is a longer list — a prompt you see on every other tool call is a prompt you
-stop reading.
+### Always on this site
+
+The card carries a third button — **Always on ‹host›** — which allows the action and stops asking
+for *that action on that host*. It is the answer to a prompt you keep clicking through: a captcha
+checkbox on a site you use daily, or Enter-to-submit on a search box.
+
+The grant is a pair, one action and one host, keyed to the site the run started on. It is written
+to `~/.browsentic/approvals.json` (mode `0600`), survives restarts, and **only ever short-circuits a
+`confirm`** — a `deny` rule stays denied, because those are the ones you are not meant to be able to
+click past. The button is hidden when a run has no single site to attach the grant to.
+
+```sh
+browsentic-mcp approvals              # what no longer asks
+browsentic-mcp approvals clear        # forget all of them
+browsentic-mcp approvals clear a.com  # forget one site's
+```
+
+Add more actions to `requireApproval` in `~/.browsentic/config.json` if you want them gated, or set
+a rule's effect outright — `{ "guardrails": { "rules": { "captcha-solve": "allow" } } }` turns one
+off everywhere, including for external MCP clients. The cost of a longer list is a longer list — a
+prompt you see on every other tool call is a prompt you stop reading.
 
 ---
 
@@ -334,7 +362,8 @@ stop reading.
 claude mcp add browsentic -- browsentic-mcp
 ```
 
-Your client gets the 28 page tools, plus:
+Your client gets the 29 page tools — every one listed with its parameters in [tools.md](tools.md) —
+plus:
 
 **`browsentic_status`** — whether the extension is connected, its version, the active tab, any
 running monitors, and a `hint` naming the fix when something is wrong. Call it first when a page
@@ -363,8 +392,11 @@ tool calls stay correctly correlated, but page state can shift under either of t
   code.
 - **Two independent gates.** Any web page can open a WebSocket to loopback, so the daemon first
   classifies the peer by handshake `Origin` — which browsers set themselves and pages cannot forge —
-  then requires a pairing token or an origin-bound session key. A web page can never reach the
-  control path.
+  then requires proof of a pairing code or of an origin-bound session key. A web page can never
+  reach the control path.
+- **Both ends prove themselves.** Neither secret crosses the wire; each side answers the other's
+  nonce. A peer that cannot prove it holds the same secret is abandoned for the next port, so no
+  other local process can squat a port and pose as your daemon.
 - **Consequential actions ask first**, named in the prompt, in the side panel.
 - **Recordings capture what you do, not what you type.** Literal values are opt-in per recording;
   passwords, hidden fields, one-time codes and card numbers are never stored either way. Recording
@@ -384,5 +416,6 @@ Full list in [installation.md § Limitations](installation.md#limitations).
 
 ## See also
 
+- [tools.md](tools.md) — every MCP tool and its parameters, as a reference
 - [architecture.md](architecture.md) — how the pieces fit together
 - [installation.md](installation.md) — prerequisites, setup, configuration, agent switching
