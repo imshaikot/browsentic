@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineAction } from '../core';
 import { describeElement, resolveTarget, targetSchema } from './dom';
+import { hoverSequence } from './pointer';
 
 export const hoverElement = defineAction({
   name: 'page.hoverElement',
@@ -13,20 +14,7 @@ export const hoverElement = defineAction({
     const el = resolveTarget(target);
     if (scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'instant' });
     const rect = el.getBoundingClientRect();
-    const clientX = rect.x + rect.width / 2;
-    const clientY = rect.y + rect.height / 2;
-    const sequence: Array<['pointer' | 'mouse', string, boolean]> = [
-      ['pointer', 'pointerover', true],
-      ['pointer', 'pointerenter', false],
-      ['pointer', 'pointermove', true],
-      ['mouse', 'mouseover', true],
-      ['mouse', 'mouseenter', false],
-      ['mouse', 'mousemove', true],
-    ];
-    for (const [kind, type, bubbles] of sequence) {
-      const Ctor = kind === 'pointer' ? PointerEvent : MouseEvent;
-      el.dispatchEvent(new Ctor(type, { clientX, clientY, bubbles, composed: true }));
-    }
+    hoverSequence(el, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
     return describeElement(el);
   },
 });
