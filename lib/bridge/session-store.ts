@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { AgentKind } from '@/lib/agents/catalog';
 import type { RunItem } from './use-run';
 import { nameSession } from './socket';
 
@@ -17,7 +18,9 @@ export interface StoredSessionMeta {
   title?: string;
   host?: string;
   url?: string;
-  claudeSessionId?: string;
+  /** The agent CLI that owns `agentSessionId` — another agent cannot resume it. */
+  agent?: AgentKind;
+  agentSessionId?: string;
   turns: number;
   titledAtTurn?: number;
   namingAt?: number;

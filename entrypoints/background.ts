@@ -2,6 +2,7 @@ import { failure, isBridgeRequest, success } from '@/lib/actions/protocol';
 import { describeActions } from '@/lib/actions/registry';
 import { injectContentScript } from '@/lib/actions/client';
 import { invokeForHarness } from '@/lib/bridge/invoke';
+import { serveDebuggerEvents } from '@/lib/bridge/cdp';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
@@ -9,9 +10,24 @@ import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/reco
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
 import { serveRunPorts } from '@/lib/bridge/run-port';
-import { RECONNECT_ALARM, connectDaemon, disconnectDaemon, onWelcome, pairDaemon } from '@/lib/bridge/socket';
+import { openSidePanel } from '@/lib/bridge/side-panel';
+import { isAgentKind } from '@/lib/agents/catalog';
+import {
+  RECONNECT_ALARM,
+  chooseAgent,
+  connectDaemon,
+  disconnectDaemon,
+  onWelcome,
+  pairDaemon,
+  readAgentState,
+  setUpAgent,
+} from '@/lib/bridge/socket';
+
+const OPEN_PANEL_MENU = 'open-side-panel';
 
 export default defineBackground(() => {
+  serveDebuggerEvents();
+
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isBridgeRequest(message)) return;
     if (message.op === 'describe') {
@@ -71,6 +87,24 @@ export default defineBackground(() => {
         .catch(() => sendResponse(success({ monitors: [] })));
       return true;
     }
+    if (message.op === 'agentState') {
+      readAgentState(message.refresh === true)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'setAgent' && isAgentKind(message.agent)) {
+      chooseAgent(message.agent)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'grantAgent' && isAgentKind(message.agent)) {
+      setUpAgent(message.agent)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
         .then((result) =>
@@ -88,7 +122,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"pair"|"disconnect"}',
       ),
     );
     return;
@@ -100,6 +134,17 @@ export default defineBackground(() => {
         if (tab.id != null && !tab.discarded) void injectContentScript(tab.id);
       }
     });
+  });
+
+  void browser.contextMenus
+    .removeAll()
+    .then(() =>
+      browser.contextMenus.create({ id: OPEN_PANEL_MENU, title: 'Open Browsentic', contexts: ['all'] }),
+    );
+
+  browser.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId !== OPEN_PANEL_MENU || tab?.windowId == null) return;
+    void openSidePanel(tab.windowId);
   });
 
   serveRecorder();

@@ -45,7 +45,7 @@ const CANCEL_CONFIRM_MS = 4_000;
 export type RunCommand =
   | { op: 'instruct'; text: string; context?: RunContext }
   | { op: 'cancel' }
-  | { op: 'decision'; toolId: string; allow: boolean }
+  | { op: 'decision'; toolId: string; allow: boolean; remember?: boolean }
   | { op: 'reset' }
   | { op: 'activateMap'; stagingId: string; exactHost?: boolean }
   | { op: 'discardMap'; stagingId: string }
@@ -150,7 +150,7 @@ function handle(command: RunCommand): void {
       stopRun();
       return;
     case 'decision':
-      if (activeRunId) sendDecision(activeRunId, command.toolId, command.allow);
+      if (activeRunId) sendDecision(activeRunId, command.toolId, command.allow, command.remember);
       return;
     case 'activateMap':
     case 'discardMap': {

@@ -26,6 +26,7 @@ export type RunItem =
       summary?: string;
       ok?: boolean;
       awaiting?: boolean;
+      site?: string;
       source?: 'local' | 'external';
       preview?: ScreenshotPreview;
     };
@@ -36,7 +37,7 @@ export interface Run {
   sessionId: string;
   send: (text: string) => void;
   cancel: () => void;
-  decide: (toolId: string, allow: boolean) => void;
+  decide: (toolId: string, allow: boolean, remember?: boolean) => void;
   clear: () => void;
   restore: (sessionId: string) => Promise<void>;
   draft: SiteMapDraft | null;
@@ -121,7 +122,8 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
           setItems((previous) => attachPreview(previous, runMessage.preview));
         } else {
           if (runMessage.event.kind === 'session') {
-            session.current.claudeSessionId = runMessage.event.claudeSessionId ?? undefined;
+            session.current.agent = runMessage.event.agent;
+            session.current.agentSessionId = runMessage.event.agentSessionId ?? undefined;
           }
           setItems((previous) => reduce(previous, runMessage.event));
         }
@@ -203,7 +205,7 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
       setItems((previous) => [...previous, { kind: 'user', id: nextId(), text: trimmed }]);
       setRunning(true);
       session.current.turns += 1;
-      const claudeSessionId = session.current.claudeSessionId;
+      const { agent, agentSessionId } = session.current;
       const failed = () => lost('Lost the connection to the extension — that never went anywhere. Try again.');
       void browser.tabs
         .query({ active: true, currentWindow: true })
@@ -212,11 +214,13 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
             session.current.url = tab.url;
             session.current.host = hostOf(tab.url) ?? session.current.host;
           }
-          const context = tab?.url ? { url: tab.url, tabId: tab.id, claudeSessionId } : { claudeSessionId };
+          const context = tab?.url
+            ? { url: tab.url, tabId: tab.id, agent, agentSessionId }
+            : { agent, agentSessionId };
           if (!post({ op: 'instruct', text: trimmed, context })) failed();
         })
         .catch(() => {
-          if (!post({ op: 'instruct', text: trimmed, context: { claudeSessionId } })) failed();
+          if (!post({ op: 'instruct', text: trimmed, context: { agent, agentSessionId } })) failed();
         });
     },
     [post, lost],
@@ -295,9 +299,9 @@ export function useRun({ persist = false }: { persist?: boolean } = {}): Run {
       if (!post({ op: 'cancel' })) lost('Lost the connection to the extension, so this run is no longer being watched.');
     }, [post, lost]),
     decide: useCallback(
-      (toolId: string, allow: boolean) => {
+      (toolId: string, allow: boolean, remember?: boolean) => {
         setItems((previous) => patchTool(previous, toolId, { awaiting: false }));
-        post({ op: 'decision', toolId, allow });
+        post({ op: 'decision', toolId, allow, remember });
       },
       [post],
     ),
@@ -375,7 +379,7 @@ function reduce(items: RunItem[], event: RunEvent): RunItem[] {
       ];
 
     case 'approval':
-      return patchTool(items, event.toolId, { awaiting: true });
+      return patchTool(items, event.toolId, { awaiting: true, site: event.site });
 
     case 'toolResult':
       return patchTool(items, event.toolId, { ok: event.ok, summary: event.summary, awaiting: false });
