@@ -7,6 +7,7 @@ import { auditContrast } from './page/audit-contrast';
 import { awaitMonitor } from './page/await-monitor';
 import { clickElement } from './page/click-element';
 import { closeTab } from './page/close-tab';
+import { dragElement } from './page/drag-element';
 import { extractText } from './page/extract-text';
 import { fillInput } from './page/fill-input';
 import { findCaptcha } from './page/find-captcha';
@@ -46,6 +47,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       findCaptcha,
       solveCaptcha,
       hoverElement,
+      dragElement,
       focusInput,
       fillInput,
       typeText,
