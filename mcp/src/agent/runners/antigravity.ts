@@ -6,7 +6,7 @@ import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { MCP_SERVER_NAME } from './claude';
-import { effortOf, parseJsonLine } from './util';
+import { effortOf, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
 
 /** Antigravity reads MCP servers and instructions from the directory it runs in, not from flags. */
@@ -68,8 +68,10 @@ export const antigravityRunner: Runner = {
   stream(context: StreamContext): Plan {
     const { settings } = context;
     const effort = effortOf(settings, this.efforts);
+    const base = this.workspace('run');
+    sweepRunDirs(base);
     return {
-      cwd: this.workspace('run'),
+      cwd: join(base, context.runId),
       env: { BROWSENTIC_AGENT_RUN: context.runId },
       files: [
         { path: MCP_CONFIG, content: mcpConfig(context.mcp) },

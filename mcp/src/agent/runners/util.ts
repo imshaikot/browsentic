@@ -1,5 +1,28 @@
+import { readdirSync, rmSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { log } from '../../log';
 import type { AgentSettings } from '../config';
+
+const RUN_DIR_TTL_MS = 24 * 60 * 60_000;
+
+/** Concurrent runs each get their own workspace; yesterday's are nobody's. */
+export function sweepRunDirs(base: string, ttlMs = RUN_DIR_TTL_MS): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(base);
+  } catch {
+    return;
+  }
+  const cutoff = Date.now() - ttlMs;
+  for (const entry of entries) {
+    const path = join(base, entry);
+    try {
+      if (statSync(path).mtimeMs < cutoff) rmSync(path, { recursive: true, force: true });
+    } catch {
+      continue;
+    }
+  }
+}
 
 /** Drops a reasoning-effort name the CLI would reject rather than letting it fail the run. */
 export function effortOf(settings: AgentSettings, accepted: string[]): string | undefined {
