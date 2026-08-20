@@ -9,6 +9,7 @@ import {
   type RunContext,
   type RunEvent,
 } from '@/lib/actions/protocol';
+import { openTab } from '@/lib/actions/page/open-tab';
 import { READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
@@ -26,7 +27,7 @@ import {
 } from '../guardrails';
 import { log } from '../log';
 import { isGranted, rememberGrant } from './approvals';
-import { readAgentConfig, siteMapSettings, type AgentConfig } from './config';
+import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { buildSystemPrompt } from './prompt';
 import { RunError, runInstruction } from './runner';
@@ -47,7 +48,7 @@ export interface AgentSessionDeps {
   invoke: (
     action: string,
     input?: unknown,
-    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number },
+    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string },
   ) => Promise<ActionResult>;
   emit: (runId: string, event: RunEvent) => void;
   draft: (runId: string, draft: import('@/lib/skills/site-map').SiteMapDraft) => void;
@@ -55,11 +56,15 @@ export interface AgentSessionDeps {
 
 interface ActiveRun {
   id: string;
+  /** The tab-bound conversation this run belongs to; one run at a time per session. */
+  sessionId?: string;
   config: AgentConfig;
   policy: Policy;
   scope: Scope;
   abort: AbortController;
   pending: Map<string, (answer: Decision) => void>;
+  /** Tabs this run opened itself, which its own scope may therefore reach. */
+  ownedTabIds: number[];
   /** Host of the tab this run started on — what "this site" means on an approval card. */
   site?: string;
   map?: MapRun;
@@ -71,9 +76,9 @@ interface Decision {
 }
 
 export class AgentSession {
-  /** The conversation the current agent is holding open. Switching agents drops it. */
-  private held: { agent: AgentKind; sessionId: string } | null = null;
-  private active: ActiveRun | null = null;
+  /** Per session, the conversation its agent is holding open. Switching agents drops them all. */
+  private held = new Map<string, { agent: AgentKind; sessionId: string }>();
+  private runs = new Map<string, ActiveRun>();
 
   constructor(private readonly deps: AgentSessionDeps) {}
 
@@ -86,18 +91,22 @@ export class AgentSession {
         this.cancel(request.id);
         return;
       case 'decision':
-        this.active?.pending.get(request.toolId)?.({ allow: request.allow, remember: request.remember });
+        this.runs.get(request.id)?.pending.get(request.toolId)?.({
+          allow: request.allow,
+          remember: request.remember,
+        });
         return;
       case 'reset':
-        this.held = null;
-        log('agent conversation reset');
+        if (request.sessionId) this.held.delete(request.sessionId);
+        else this.held.clear();
+        log(request.sessionId ? `agent conversation reset for session ${request.sessionId}` : 'agent conversations reset');
         return;
     }
   }
 
   async invokeForRun(runId: string, action: string, input?: unknown): Promise<ActionResult> {
-    const run = this.active;
-    if (!run || run.id !== runId) {
+    const run = this.runs.get(runId);
+    if (!run) {
       return failure('RUN_INACTIVE', 'This agent run is no longer active');
     }
     const emit = (event: RunEvent) => this.deps.emit(runId, event);
@@ -128,7 +137,8 @@ export class AgentSession {
       return result;
     }
 
-    const decision = decide({ action, input, caller: 'agent', scope: run.scope }, run.policy);
+    const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
+    const decision = decide({ action, input, caller: 'agent', scope }, run.policy);
     if (decision.effect === 'deny') {
       log(`agent run ${runId} blocked ${action}: ${describeDecision(decision)}`);
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
@@ -145,15 +155,19 @@ export class AgentSession {
       if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
     }
 
-    const result = await this.deps.invoke(action, input);
+    const result = await this.deps.invoke(action, input, { runId });
+    if (action === openTab.name && result.ok) {
+      const opened = (result.data as { tabId?: unknown } | null)?.tabId;
+      if (typeof opened === 'number') run.ownedTabIds.push(opened);
+    }
     log(`agent → ${action} ${result.ok ? 'ok' : result.error.code}`);
     emit({ kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
     return result;
   }
 
   dispose(): void {
-    if (this.active) this.cancel(this.active.id);
-    this.held = null;
+    for (const runId of [...this.runs.keys()]) this.cancel(runId);
+    this.held.clear();
   }
 
   private async start(runId: string, instruction: string, context?: RunContext): Promise<void> {
@@ -161,11 +175,16 @@ export class AgentSession {
 
     const text = instruction.trim();
     if (!text) return emit({ kind: 'error', code: 'INVALID_INPUT', message: 'Say what you want done.' });
-    if (this.active) {
+
+    const sessionId = context?.sessionId;
+    const clashes = sessionId
+      ? [...this.runs.values()].some((run) => run.sessionId === sessionId)
+      : this.runs.size > 0;
+    if (clashes) {
       return emit({
         kind: 'error',
         code: 'RUN_IN_PROGRESS',
-        message: 'Another instruction is still running — cancel it first.',
+        message: 'This conversation is still running — cancel it first.',
       });
     }
 
@@ -179,6 +198,14 @@ export class AgentSession {
     }
 
     const config = readAgentConfig();
+    const limit = maxConcurrentRuns(config);
+    if (this.runs.size >= limit) {
+      return emit({
+        kind: 'error',
+        code: 'RUN_LIMIT',
+        message: `${limit} runs are already going — let one finish, or stop it, before starting another.`,
+      });
+    }
     const mapping = routed.base.name === SITE_MAPPER_SKILL && routed.base.source === 'bundled';
     if (mapping && !explicitlyAsked(text)) {
       return emit({
@@ -200,20 +227,22 @@ export class AgentSession {
     });
     const run: ActiveRun = {
       id: runId,
+      sessionId,
       config,
       policy,
       scope,
       site: siteOf(context?.url),
       abort: new AbortController(),
       pending: new Map(),
+      ownedTabIds: [],
     };
-    this.active = run;
+    this.runs.set(runId, run);
 
     // Claim the slot before probing, so a second instruction still meets RUN_IN_PROGRESS.
     const runner = activeRunner(await agentState(config));
     if (!runner?.ready) {
       const problem = runner?.problem;
-      if (this.active === run) this.active = null;
+      this.release(run);
       log(`agent run ${runId} refused: ${AGENTS[config.agent].label} is not ready`);
       return emit({
         kind: 'error',
@@ -237,13 +266,13 @@ export class AgentSession {
         });
       }
     } catch (error) {
-      this.active = null;
+      this.release(run);
       return emit({ kind: 'error', code: 'AGENT_FAILED', message: String(error) });
     }
 
     if (run.abort.signal.aborted) {
       if (run.map) discardStaging(run.map.staging.id);
-      if (this.active === run) this.active = null;
+      this.release(run);
       log(`agent run ${runId} was cancelled before it started`);
       return emit({ kind: 'error', code: 'CANCELLED', message: 'Run cancelled.' });
     }
@@ -255,7 +284,8 @@ export class AgentSession {
     );
     emit({ kind: 'started', skill: routed.base.name, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
 
-    const held = this.held?.agent === config.agent ? this.held.sessionId : null;
+    const holding = sessionId ? this.held.get(sessionId) : undefined;
+    const held = holding?.agent === config.agent ? holding.sessionId : null;
     const supplied = mapping ? null : sessionFrom(context, config.agent);
     const resuming = mapping ? null : (supplied ?? held);
     const budget = run.map ? setTimeout(() => run.abort.abort(), run.map.settings.timeoutMs) : undefined;
@@ -272,7 +302,10 @@ export class AgentSession {
         emit,
       });
       if (!mapping) {
-        this.held = outcome.sessionId ? { agent: config.agent, sessionId: outcome.sessionId } : null;
+        if (sessionId) {
+          if (outcome.sessionId) this.held.set(sessionId, { agent: config.agent, sessionId: outcome.sessionId });
+          else this.held.delete(sessionId);
+        }
         if (outcome.sessionId !== resuming) {
           emit({ kind: 'session', agent: config.agent, agentSessionId: outcome.sessionId });
         }
@@ -286,8 +319,12 @@ export class AgentSession {
     } finally {
       clearTimeout(budget);
       if (run.map && !run.map.submitted) discardStaging(run.map.staging.id);
-      if (this.active === run) this.active = null;
+      this.release(run);
     }
+  }
+
+  private release(run: ActiveRun): void {
+    if (this.runs.get(run.id) === run) this.runs.delete(run.id);
   }
 
   private async prepareMapping(
@@ -297,13 +334,13 @@ export class AgentSession {
     emit: (event: RunEvent) => void,
   ): Promise<{ built: { prompt: string; dropped: string[] }; instruction: string } | null> {
     if (!context?.url) {
-      this.active = null;
+      this.release(run);
       emit({ kind: 'error', code: 'INVALID_INPUT', message: 'Open the site you want mapped in this tab first.' });
       return null;
     }
     const target = mapTargetFor(context.url);
     if (!target.ok) {
-      this.active = null;
+      this.release(run);
       emit({ kind: 'error', code: 'MAPPING_REFUSED', message: target.message });
       return null;
     }
@@ -380,16 +417,16 @@ export class AgentSession {
   }
 
   private cancel(runId: string): void {
-    if (!this.active || this.active.id !== runId) {
-      log(`cancel for run ${runId}, which is not the active run`);
+    const cancelled = this.runs.get(runId);
+    if (!cancelled) {
+      log(`cancel for run ${runId}, which is not running`);
       this.deps.emit(runId, { kind: 'done', stopReason: 'cancelled' });
       return;
     }
-    const cancelled = this.active;
     for (const [, settle] of cancelled.pending) settle({ allow: false });
     cancelled.pending.clear();
     cancelled.abort.abort();
-    this.active = null;
+    this.runs.delete(runId);
     log(`agent run ${runId} cancelled`);
   }
 

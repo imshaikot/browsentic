@@ -16,6 +16,8 @@ export interface AgentConfig {
   agent: AgentKind;
   agents: Record<AgentKind, AgentSettings>;
   requireApproval: string[];
+  /** How many tab sessions may have a run going at once. */
+  maxConcurrentRuns?: number;
   /** Overrides for the declared guardrail policy. See mcp/src/guardrails/policy.ts. */
   guardrails?: GuardrailConfig;
   screenshotDir?: string;
@@ -27,6 +29,12 @@ export interface AgentConfig {
     maxScreenshots?: number;
     timeoutMs?: number;
   };
+}
+
+export const CONCURRENT_RUNS = { fallback: 3, max: 8 } as const;
+
+export function maxConcurrentRuns(config: AgentConfig): number {
+  return clamp(config.maxConcurrentRuns, CONCURRENT_RUNS);
 }
 
 export const SITE_MAP_LIMITS = {
