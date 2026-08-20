@@ -27,10 +27,20 @@ const lines = (t: string | readonly string[]) => (typeof t === 'string' ? t : t.
 
 const heroTitle = `${HERO.title.lead} ${HERO.title.tail}${HERO.title.accent}`
 
+/**
+ * Google Search Console ownership token for the URL-prefix property
+ * https://imshaikot.github.io/browsentic/. Paste the content value from
+ * GSC's "HTML tag" verification method; empty renders no tag.
+ */
+const GOOGLE_SITE_VERIFICATION = ''
+
 export function headTags(siteUrl: string) {
   const image = `${siteUrl}og.png`
 
   return [
+    ...(GOOGLE_SITE_VERIFICATION
+      ? [`<meta name="google-site-verification" content="${esc(GOOGLE_SITE_VERIFICATION)}" />`]
+      : []),
     `<title>${esc(SEO.title)}</title>`,
     `<meta name="description" content="${esc(SEO.description)}" />`,
     `<link rel="canonical" href="${siteUrl}" />`,

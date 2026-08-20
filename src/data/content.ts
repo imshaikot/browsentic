@@ -13,7 +13,7 @@ export const SEO = {
       'Scan, capture, behave, automate. 35 page tools, automatic site maps, recordings and instant commands, all inside the real logged-in browser you already use.',
   },
   imageAlt:
-    'Browsentic. Your real browser, now agentic. 35 page tools, trusted input, MCP server, MIT licensed.',
+    'Browsentic. Every tab, its own agent. 35 page tools, concurrent sessions, record and replay, site maps, no API key.',
   author: 'imshaikot',
   summary:
     'A browser extension plus a local daemon that lets any MCP client drive your real, logged-in browser tab by voice, by typing, or by replaying a session you recorded once.',
