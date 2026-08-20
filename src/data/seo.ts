@@ -32,7 +32,7 @@ const heroTitle = `${HERO.title.lead} ${HERO.title.tail}${HERO.title.accent}`
  * https://imshaikot.github.io/browsentic/. Paste the content value from
  * GSC's "HTML tag" verification method; empty renders no tag.
  */
-const GOOGLE_SITE_VERIFICATION = ''
+const GOOGLE_SITE_VERIFICATION = 'Gmr19xvpOAMf0o5vcWy5pw_E0jikNDjuRXHCPm1K4Bw'
 
 export function headTags(siteUrl: string) {
   const image = `${siteUrl}og.png`
