@@ -21,6 +21,8 @@ export interface Scope {
   readonly hosts: readonly string[];
   /** Tab the run is pinned to. Undefined means the run may roam between tabs. */
   readonly tabId?: number;
+  /** Tabs the run opened itself, which count as its own for the pinned-tab rule. */
+  readonly ownedTabIds?: readonly number[];
 }
 
 /** No confinement. What an external MCP client gets: it has no run to be scoped to. */
@@ -119,6 +121,8 @@ export function urlPayloadBytes(url: URL): number {
 export function targetsAnotherTab(action: string, input: unknown, scope: Scope): boolean {
   if (scope.tabId === undefined || !TAB_MOVES.has(action)) return false;
   const args = (input ?? {}) as { tabId?: unknown; match?: unknown };
-  if (typeof args.tabId === 'number') return args.tabId !== scope.tabId;
+  if (typeof args.tabId === 'number') {
+    return args.tabId !== scope.tabId && !scope.ownedTabIds?.includes(args.tabId);
+  }
   return typeof args.match === 'string' && args.match.length > 0;
 }
