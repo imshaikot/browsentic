@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { forgetGrants, listGrants } from './agent/approvals';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
-import { clearLockfile, logPath, readLockfile } from './lockfile';
+import { clearLockfile, isRunning, logPath, readLockfile } from './lockfile';
 import { log } from './log';
 import { RemoteBridge } from './remote-bridge';
 import { createMcpServer } from './server';
@@ -29,6 +29,7 @@ const USAGE = `browsentic-mcp ${pkg.version} — MCP access to your browser via 
   browsentic-mcp approvals clear [host]   forget them, all of them or one site's
   browsentic-mcp status       show daemon and extension connection state
   browsentic-mcp stop         stop the background daemon
+  browsentic-mcp restart      stop the daemon and bring up a fresh one
   browsentic-mcp logs         print the daemon log
   browsentic-mcp token        print the control token (for MCP clients, not the browser)
   browsentic-mcp --version    print the version
@@ -66,6 +67,9 @@ switch (command) {
     break;
   case 'stop':
     stop();
+    break;
+  case 'restart':
+    await restart();
     break;
   case 'skills':
     printSkills();
@@ -175,6 +179,21 @@ function stop(): void {
     console.log(`Daemon (pid ${lock.pid}) was not running; clearing the lockfile.`);
     clearLockfile();
   }
+}
+
+async function restart(): Promise<void> {
+  const lock = readLockfile();
+  stop();
+  const deadline = Date.now() + 5_000;
+  while (lock && isRunning(lock.pid)) {
+    if (Date.now() > deadline) {
+      console.error(`Daemon (pid ${lock.pid}) is still exiting — try again in a moment.`);
+      process.exit(1);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  const fresh = await ensureDaemon();
+  console.log(`Daemon running on 127.0.0.1:${fresh.port} (pid ${fresh.pid}, v${fresh.daemonVersion}).`);
 }
 
 function showLogs(): void {
