@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
+import { AGENTS, AGENT_KINDS, isAgentKind } from '@/lib/agents/catalog';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { join } from 'node:path';
+import { forgetGrants, listGrants } from './agent/approvals';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
 import { clearLockfile, logPath, readLockfile } from './lockfile';
@@ -18,8 +20,13 @@ const USAGE = `browsentic-mcp ${pkg.version} — MCP access to your browser via 
   browsentic-mcp pair         issue a one-time code to type into the extension
   browsentic-mcp sessions     list paired browsers
   browsentic-mcp revoke [origin]   unpair one browser, or all of them
+  browsentic-mcp agent        show which agent runs the side panel, and which are installed
+  browsentic-mcp agent <name> switch to claude, codex or antigravity
+  browsentic-mcp agent setup <name>   let Browsentic fix what that agent still needs
   browsentic-mcp tools        print the bundled tool manifest (no browser needed)
   browsentic-mcp skills       list the skills the agent can route to, and where they came from
+  browsentic-mcp approvals    list the “always on this site” approvals you have granted
+  browsentic-mcp approvals clear [host]   forget them, all of them or one site's
   browsentic-mcp status       show daemon and extension connection state
   browsentic-mcp stop         stop the background daemon
   browsentic-mcp logs         print the daemon log
@@ -48,6 +55,9 @@ switch (command) {
   case 'revoke':
     await revoke(process.argv[3]);
     break;
+  case 'agent':
+    await chooseAgent(process.argv[3], process.argv[4]);
+    break;
   case 'tools':
     printTools();
     break;
@@ -59,6 +69,9 @@ switch (command) {
     break;
   case 'skills':
     printSkills();
+    break;
+  case 'approvals':
+    manageApprovals(process.argv[3], process.argv[4]);
     break;
   case 'logs':
     showLogs();
@@ -137,9 +150,14 @@ async function showStatus(): Promise<void> {
   }
   const bridge = await RemoteBridge.connect(lock.port, lock.token);
   const status = await bridge.status();
+  const agents = await bridge.agent();
   await bridge.close();
+  const active = agents.runners.find((runner) => runner.kind === agents.active);
   console.log(`daemon:    running on 127.0.0.1:${status.port} (pid ${lock.pid}, v${status.daemonVersion})`);
   console.log(`extension: ${status.connected ? `connected (v${status.extensionVersion})` : 'not connected'}`);
+  console.log(
+    `agent:     ${AGENTS[agents.active].label} — ${active?.ready ? active.version ?? 'ready' : active?.problem?.message ?? 'unavailable'}`,
+  );
   console.log(`manifest:  ${status.manifestInSync ? 'in sync' : 'DRIFTED — extension and CLI were built from different registries'}`);
   console.log(
     `paired:    ${status.pairedBrowsers || 'none'}${status.pairingPending ? ' (a pairing code is outstanding)' : ''}`,
@@ -197,6 +215,33 @@ async function showSessions(): Promise<void> {
   }
 }
 
+async function chooseAgent(first?: string, second?: string): Promise<void> {
+  const setup = first === 'setup';
+  const named = setup ? second : first;
+  if (named !== undefined && !isAgentKind(named)) {
+    console.error(`Unknown agent "${named}". Pick one of: ${AGENT_KINDS.join(', ')}`);
+    process.exit(1);
+  }
+  const kind = isAgentKind(named) ? named : undefined;
+
+  const bridge = await connect();
+  const state = await bridge.agent(kind && (setup ? { grant: kind } : { set: kind }));
+  await bridge.close();
+
+  for (const runner of state.runners) {
+    const agent = AGENTS[runner.kind];
+    const mark = runner.kind === state.active ? '●' : '○';
+    const version = runner.version ? ` — ${runner.version}` : '';
+    console.log(`${mark} ${agent.label.padEnd(12)} ${runner.ready ? 'ready' : 'unavailable'}${version}`);
+    if (runner.problem) {
+      console.log(`    ${runner.problem.message}`);
+      if (runner.problem.fix) console.log(`    ${runner.problem.fix}`);
+      if (runner.problem.grantable) console.log(`    Fix it with "browsentic-mcp agent setup ${runner.kind}".`);
+    }
+  }
+  console.log(`\nThe side panel runs on ${AGENTS[state.active].label}.`);
+}
+
 async function revoke(origin?: string): Promise<void> {
   const bridge = await connect();
   const revoked = await bridge.revoke(origin);
@@ -208,4 +253,30 @@ async function revoke(origin?: string): Promise<void> {
 async function connect(): Promise<RemoteBridge> {
   const lock = await ensureDaemon();
   return RemoteBridge.connect(lock.port, lock.token);
+}
+
+function manageApprovals(sub?: string, host?: string): void {
+  if (sub === 'clear') {
+    const dropped = forgetGrants(host);
+    console.log(
+      dropped
+        ? `Forgot ${dropped} approval${dropped === 1 ? '' : 's'}${host ? ` for ${host}` : ''}.`
+        : `No approvals to forget${host ? ` for ${host}` : ''}.`,
+    );
+    return;
+  }
+  if (sub) {
+    console.log(`Unknown command "approvals ${sub}". Use "approvals" or "approvals clear [host]".`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const grants = listGrants();
+  if (!grants.length) {
+    console.log('No standing approvals. Every gated action still asks.');
+    return;
+  }
+  console.log(`${grants.length} standing approval${grants.length === 1 ? '' : 's'} — these no longer ask:\n`);
+  for (const grant of grants) console.log(`  ${grant.action.padEnd(24)} on ${grant.host.padEnd(28)} since ${grant.at.slice(0, 10)}`);
+  console.log('\nRemove one site with "browsentic-mcp approvals clear <host>", or all with "approvals clear".');
 }
