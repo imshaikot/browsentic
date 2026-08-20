@@ -1,0 +1,129 @@
+# Cuts a GitHub release when a v* tag is pushed.
+#
+# The tag is both the trigger and the source of truth. CI bumps nothing and tags nothing:
+# it rebuilds the tagged commit from scratch, checks the build agrees with the tag, and
+# publishes the three store archives under a release of that name. So the whole local half
+# of a release is "bump both package.json files, commit, tag vX.Y.Z, push the tag".
+#
+# Two properties this leans on:
+#   - Both package.json files must already say X.Y.Z at the tagged commit. A mismatch fails
+#     the run rather than shipping a zip whose filename disagrees with its manifest.
+#   - An annotated tag's own message, if it has one, becomes the release notes verbatim.
+#     Otherwise they are generated from the conventional-commit log since the previous tag.
+#     Either way scripts/release-notes.mjs decides, and it runs the same locally.
+#
+# Anything that creates the release by hand (`gh release create` for the same tag) races
+# this workflow, and whichever call lands second fails on an existing release.
+#
+# One gotcha: a tag push runs the workflow as it exists *in the tagged commit*, not as it
+# exists on main. Re-tagging a commit from before this file was added therefore does
+# nothing, and editing this workflow only takes effect from the next tag cut after it.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# The release step needs to write to the Releases API. Nothing else is granted.
+permissions:
+  contents: write
+
+# One tag at a time, and never cancel a run mid-upload: a half-uploaded release is worse
+# than a slow queue.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Notes come from the commit log since the previous tag, so a shallow clone
+          # would render an empty changelog rather than fail.
+          fetch-depth: 0
+
+      - name: Resolve the version and check both manifests agree with the tag
+        # package.json is an output of `prepare`, not an input, so a mismatch means the tag
+        # was cut by hand at the wrong commit. Catching it here beats shipping a zip whose
+        # filename and manifest disagree with the release it hangs under.
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$tag' is not a vX.Y.Z tag"
+            exit 1
+          fi
+          for file in package.json mcp/package.json; do
+            found=$(node -p "require('./$file').version")
+            if [ "$found" != "$version" ]; then
+              echo "::error::$file says $found but the tag is $tag"
+              exit 1
+            fi
+          done
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        # Yarn is vendored at the path .yarnrc.yml pins, so this does not depend on whichever
+        # yarn the runner image ships (its classic 1.x cannot read yarnPath at all). Running
+        # the release through node needs nothing but node. mcp/ is a separate project with its
+        # own lockfile, so the root install does not cover it.
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          test -f "$yarn_bin" || { echo "::error::no vendored Yarn at '$yarn_bin'"; exit 1; }
+          echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
+          node "$yarn_bin" install --immutable
+          node "$yarn_bin" --cwd mcp install --immutable
+
+      - name: Check
+        # The same gate the README asks for before a pull request: both type checks, the intent
+        # fixtures and the security fixtures.
+        run: node "$YARN" check
+
+      - name: Build the store archives and the daemon
+        # WXT reads the version out of package.json at build time, so it lands in the manifest
+        # and in the zip filename. The firefox zip emits the sources zip as a side effect;
+        # there is no separate command for it.
+        run: |
+          node "$YARN" zip
+          node "$YARN" zip -b firefox
+          node "$YARN" mcp:build
+
+      - name: Verify the build carries the tagged version
+        run: |
+          built=$(node -p "require('./dist/chrome-mv3/manifest.json').version")
+          if [ "$built" != "$VERSION" ]; then
+            echo "::error::built manifest says $built, expected $VERSION"
+            exit 1
+          fi
+          for asset in chrome firefox sources; do
+            test -s "dist/browsentic-$VERSION-$asset.zip" || {
+              echo "::error::missing artifact: dist/browsentic-$VERSION-$asset.zip"
+              exit 1
+            }
+          done
+
+      - name: Release notes
+        # Prefers the text `prepare` wrote into the annotated tag, and falls back to reading
+        # the conventional-commit log when the tag carries none.
+        run: node scripts/release-notes.mjs "$VERSION" --out "dist/RELEASE_NOTES-$TAG.md"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --verify-tag \
+            --notes-file "dist/RELEASE_NOTES-$TAG.md" \
+            "dist/browsentic-$VERSION-chrome.zip" \
+            "dist/browsentic-$VERSION-firefox.zip" \
+            "dist/browsentic-$VERSION-sources.zip"
+          gh release view "$TAG" --json url -q '"released: " + .url' >> "$GITHUB_STEP_SUMMARY"
