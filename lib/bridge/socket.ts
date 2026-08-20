@@ -378,15 +378,29 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
     void handle(ws, String(event.data), attempt);
   };
 
-  ws.onclose = () => {
+  ws.onclose = (event) => {
     clearTimeout(handshakeTimer);
     if (socket === ws) socket = null;
+    // A daemon that refuses the handshake outright — a protocol mismatch above all — says why in
+    // the close frame and never sends an `unauthorized`. Without this the walk ends on the generic
+    // "no daemon is running", which sends the user hunting for a process that is running fine.
+    refusal ??= closeRefusal(event);
     // Nothing on this port ever proved itself — a squatter, a stale daemon, an empty port — so the
     // walk continues instead of pinning the extension to whoever answered first.
     if (!welcomed) return dial(credential, portIndex + 1, refusal);
     void setState({ connected: false, paired: true, error: undefined, lastChangeAt: Date.now() });
     if (credential.kind === 'session') scheduleRetry(credential);
   };
+}
+
+const OWN_CLOSE = new Set(['unproven daemon', '']);
+
+function closeRefusal(event: CloseEvent): Refusal | undefined {
+  const reason = event.reason?.trim();
+  if (!reason || OWN_CLOSE.has(reason)) return undefined;
+  return /protocol version mismatch/i.test(reason)
+    ? { reason: `${reason}. Rebuild and reload the extension — “yarn build”, then Reload at chrome://extensions.`, retryable: false }
+    : { reason, retryable: true };
 }
 
 function giveUp(credential: Credential, refusal?: Refusal): void {
