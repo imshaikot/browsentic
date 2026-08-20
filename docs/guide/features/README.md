@@ -1,0 +1,41 @@
+# Features
+
+One page per capability: what it does, how to reach it, and where its edges are.
+
+New to Browsentic? [Install](../install.md) → [Pair](../pair.md) → [First run](../first-run.md)
+first.
+
+## Talking to it
+
+| | |
+| --- | --- |
+| [Conversations](conversations.md) | Voice and text, one conversation per tab, the sessions strip, history |
+| [Instant commands](instant-commands.md) | "go back", "scroll to the top" — the things that run in milliseconds without waking an agent |
+| [Skills](skills.md) | How an instruction gets routed to the right playbook, and how to write your own |
+
+## Acting on a page
+
+| | |
+| --- | --- |
+| [Page actions](page-actions.md) | The 35 things it can do to a page, grouped by what you would want |
+| [Screenshots](screenshots.md) | Viewport, full page, or one element — and when a capture touches disk |
+| [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
+| [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |
+| [Files](files.md) | Attaching a file and putting it into a file input |
+
+## Doing things over time
+
+| | |
+| --- | --- |
+| [Monitoring](monitoring.md) | Watching an upload, a build or a deploy in the background |
+| [Site maps](site-maps.md) | Teaching it a site once, so later sessions already know their way around |
+| [Recordings](recordings.md) | Doing a repetitive job once yourself, then "do it like last time" |
+
+---
+
+Two things cut across all of it:
+
+- **[Approvals](../approvals.md)** — anything consequential asks first
+- **[Limits](../limits.md)** — where each of these stops
+
+Looking for a tool's exact parameters? [reference/tools.md](../../reference/tools.md).

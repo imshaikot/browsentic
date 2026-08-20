@@ -1,0 +1,96 @@
+# Troubleshooting
+
+Symptom, cause, fix. For what an error *code* means, see [reference/errors.md](../reference/errors.md).
+
+---
+
+## Start here
+
+```sh
+browsentic-mcp status      # daemon, extension, manifest sync, pairings
+browsentic-mcp agent       # which agents are installed, which one runs the side panel
+browsentic-mcp logs        # run starts, routed skills, every tool call and its outcome
+```
+
+Those three answer most questions. The daemon log also lives at `~/.browsentic/daemon.log`.
+
+---
+
+## Setup and connection
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Popup shows `Expected {op:…}` | Stale service worker after a rebuild | `chrome://extensions` → ↻ reload Browsentic |
+| "That pairing code is wrong or expired" | Codes are single-use and last 10 minutes | `browsentic-mcp pair` for a fresh one. A failed attempt does not burn the outstanding code |
+| "No Browsentic daemon is running" | Nothing on 8765–8767 | `browsentic-mcp status`; check `browsentic-mcp logs` |
+| `browsentic-mcp: command not found` | The global npm prefix is not on `PATH` | `npm prefix -g`, then add its `bin` directory |
+| `EXTENSION_OFFLINE` | Browser closed, or not paired | Open the browser; `browsentic-mcp sessions` to check pairing |
+
+## MCP clients
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Tools missing from a session | The server was registered mid-session | Restart the client session — MCP servers load at start |
+| A tool call is refused as needing approval | External callers cannot answer a prompt, so `confirm` becomes deny | Do it from the side panel, or set `guardrails.unattended: "allow"` — [read this first](approvals.md#callers-with-nobody-to-ask) |
+| `page_extractText` with `format: "html"` is denied | `raw-html-read` is denied by default | Use the default text format, or `{"guardrails":{"rules":{"raw-html-read":"allow"}}}` |
+| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn mcp:restart`, then reload the extension |
+
+## Agents
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `AGENT_MISSING` | The chosen CLI is not on the *daemon's* `PATH` | `browsentic-mcp agent` to see all three; set `agents.<name>.bin` to an absolute path in `config.json` |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule allowing Browsentic's MCP tools | Press the button in the popup, or `browsentic-mcp agent setup antigravity` |
+| "does not understand the flags Browsentic uses" | The agent CLI is too old | Update it |
+| Antigravity answers but never touches the page | Its permission rule was removed | `browsentic-mcp agent` — it reports *needs setup* again |
+| Codex fails with "not logged in" | The daemon inherits no session | `codex login`, then retry |
+
+## Pages and tabs
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `TAB_UNREACHABLE` on a normal site | The extension needs reloading | ↻ at `chrome://extensions`; ordinary sites otherwise self-heal |
+| `TAB_UNREACHABLE` on `chrome://`, the Web Store, the new-tab page | Those pages cannot host a content script | `page_navigate` to an http(s) page — it still works there |
+| `TARGET_NOT_FOUND` for something clearly on screen | The page changed since the snapshot, or it is inside a captcha widget's shadow root | Re-snapshot with `page_getPageInfo`; for a captcha use [`page_findCaptcha`](features/captcha.md) |
+| `DEBUGGER_UNAVAILABLE` | DevTools is open on that tab | Close DevTools, or use `page_clickElement` instead of `page_trustedClick` |
+| `RUN_IN_PROGRESS` | One instruction at a time per tab | Cancel the running one, or use another tab |
+| `TAB_IN_USE` | That tab belongs to another Browsentic conversation | Switch to it from the Sessions strip |
+
+## Behaviour that looks wrong but is not
+
+| Symptom | Why |
+| --- | --- |
+| An action ran but nothing appears in `logs` | It matched the local intent grammar and never reached the daemon. Those carry a ⚡ on the timeline. Explain any single routing decision with `yarn check:intent "<what you said>"` |
+| `page_awaitMonitor` returns `settled: false` | The poll window passed while the watch continues. Call again — the monitor is still running in the browser |
+| A theme change vanished | Themes do not survive a reload or a navigation. Reapply it |
+| A site map was written but nothing changed | Maps stage for review. Open **Skills** in the panel and press **Activate** |
+| The panel switched conversations on its own | The panel follows the tab in front, and each tab has its own conversation |
+| A recording's typed values came back as `{{placeholders}}` | That is the default. Tick **Save what I type** to keep literal values |
+
+---
+
+## Useful commands
+
+```sh
+browsentic-mcp status      # daemon, extension and agent state
+browsentic-mcp agent       # which agents are installed, and which one runs the side panel
+browsentic-mcp sessions    # which browsers are paired
+browsentic-mcp revoke      # unpair everything, or one origin
+browsentic-mcp skills      # every skill in scope, and where it came from
+browsentic-mcp approvals   # the "always on this site" grants
+browsentic-mcp tools       # the tool manifest, no browser needed
+browsentic-mcp logs        # run starts, routed skills, every tool call
+browsentic-mcp token       # the control token, for MCP clients
+browsentic-mcp restart     # swap the running daemon for a fresh one
+browsentic-mcp stop
+```
+
+Full descriptions in [reference/cli.md](../reference/cli.md).
+
+---
+
+## Still stuck
+
+- [Limits](limits.md) — it may be a boundary rather than a bug
+- [reference/errors.md](../reference/errors.md) — every code, with what it implies about the next move
+- [internals/](../internals/) — how the piece that is failing actually works

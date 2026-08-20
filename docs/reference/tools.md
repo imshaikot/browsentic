@@ -4,8 +4,8 @@ Every tool Browsentic publishes to an MCP client, the action behind each one, th
 resources, and the reserved actions that never become tools.
 
 The page tools are generated from the shared action registry
-([lib/actions/registry.ts](../lib/actions/registry.ts)) — one module per action under
-[lib/actions/page/](../lib/actions/page/), one entry in the registry, and the daemon publishes it.
+([lib/actions/registry.ts](../../lib/actions/registry.ts)) — one module per action under
+[lib/actions/page/](../../lib/actions/page/), one entry in the registry, and the daemon publishes it.
 Because the extension and the MCP server are built from the same registry, a tool can never
 describe something the browser cannot do. This page is the human-readable copy; the machine
 listing is always `yarn mcp:manifest` (see [Keeping this page honest](#keeping-this-page-honest)).
@@ -24,6 +24,7 @@ The surface, at a glance:
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Moving](#moving) | `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
+| [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Files](#files) | `page_listFiles`, `page_attachFile` |
 | [Recordings](#recordings) | `page_listRecordings`, `page_readRecording` |
@@ -433,6 +434,71 @@ later actions follow the browser to whichever tab it brings to the front.
 
 ---
 
+## Theming
+
+Measure what the page is painting, score its readability, and change it. `page_readTheme` before
+`page_applyTheme` — the hooks and tokens it reports are what makes a theme change land on the page's
+own terms rather than by filtering it. `page_auditContrast` is comparable before and after, so it is
+how a change is checked rather than assumed.
+
+Nothing here survives a reload or a navigation.
+
+### page_readTheme
+
+Measure the page's theme: the relative luminance of its background and text, whether it is rendering
+light or dark, the palette actually painted on screen grouped into surface, text, border and accent
+colours with how much area each covers, the CSS custom properties (design tokens) resolved at
+`:root`, the type scale, a nested tree of the page's coloured surfaces with a text diagram, and any
+dark/light theme hook its own stylesheets define (a `.dark` class or a `[data-theme]` attribute).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `maxScan` | integer | `1200` | Elements to measure, max 4000; a larger document is sampled at an even stride across it |
+| `maxPerGroup` | integer | `8` | Colours listed per palette group, max 30, widest coverage first |
+| `maxTokens` | integer | `40` | CSS custom properties listed, max 200, sorted by name; `0` skips them |
+| `maxSurfaces` | integer | `20` | Coloured surfaces kept in the surface tree, max 60, largest region first |
+
+### page_auditContrast
+
+Score the readability of the page against WCAG contrast rules. Walks the visible text, resolves each
+run's foreground against the real background painted behind it — blending translucent layers up the
+ancestor chain — and reports the ratio, the ratio the level requires, and whether it passes. The
+score is the share of sampled text runs that pass.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `target` | [target](#element-targets) | — | Subtree to audit; defaults to the whole page |
+| `level` | `"AA"` \| `"AAA"` | `"AA"` | AA needs 4.5:1 for body text and 3:1 for large text; AAA needs 7:1 and 4.5:1 |
+| `maxSamples` | integer | `400` | Text-bearing elements to check, max 2000, in document order |
+| `maxFailures` | integer | `20` | Failures listed, max 200, worst ratio first. The counts always cover everything sampled |
+
+### page_applyTheme
+
+Retheme the page, or put it back. Prefers the page's own terms — it switches on the dark/light hook
+its stylesheets already define, sets `color-scheme`, and overrides the design tokens you name. Only
+when that leaves the page at the wrong luminance does it fall back to repainting through a CSS
+filter. Reports the measured background luminance and text contrast before and after.
+
+The result names the `strategy` it used: `stylesheet` (the page's own theme), `colors` (your
+overrides), or `filter`. The filter fallback creates a containing block on `<html>`, which re-anchors
+`position: fixed` elements, and re-inverts images so photos stay right way round.
+
+Calls do not stack — each replaces the last, so re-applying with adjusted numbers is how to iterate.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `mode` | `"keep"` \| `"dark"` \| `"light"` \| `"revert"` | `"keep"` | `dark`/`light` retheme it, `revert` removes everything Browsentic applied, `keep` leaves the light/dark decision alone and applies only the colours below |
+| `targetLuminance` | number | — | Relative luminance to bring the background to, 0–1, as reported by `page_readTheme`. Overrides the luminance a mode implies. Reached by filtering, so it repaints images and text alike |
+| `background` | string | — | CSS colour for the page background, e.g. `"#0f172a"`. Suppresses the luminance a mode would imply |
+| `text` | string | — | CSS colour for body text; elements that set their own colour keep it |
+| `accent` | string | — | CSS colour for links and form-control accents |
+| `tokens` | object | — | CSS custom properties to override on `:root`, e.g. `{"--background": "#0f172a"}`. Names come from `page_readTheme`. The cleanest way to retheme a token-based page, because its own rules do the work |
+| `saturation` | number | — | Colour intensity multiplier, 0–3: `0` greyscale, `1` unchanged, above `1` more vivid |
+| `contrast` | number | — | Contrast multiplier, 0–3: `1` unchanged, above `1` pushes lights and darks apart |
+| `transitionMs` | integer | `200` | Cross-fade duration, max 2000; `0` switches instantly |
+
+---
+
 ## Monitoring
 
 The background-watch lifecycle: `page_findProgress` picks a signal, `page_startMonitor` starts the
@@ -602,6 +668,8 @@ reports whether the two halves are in sync.
 
 ## See also
 
-- [features.md](features.md) — the same capabilities, explained by workflow
-- [architecture.md § Adding a capability](architecture.md#13-adding-a-capability) — how to add a tool
-- [installation.md](installation.md) — registering Browsentic with an MCP client
+- [guide/features/page-actions.md](../guide/features/page-actions.md) — the same capabilities, explained by what you would want
+- [guide/mcp-clients.md](../guide/mcp-clients.md) — registering Browsentic with an MCP client
+- [guide/approvals.md](../guide/approvals.md) — which of these pause and ask, and which are refused
+- [internals/registry.md](../internals/registry.md) — why this list cannot describe something the browser cannot do
+- [internals/contributing.md § Adding a capability](../internals/contributing.md#adding-a-capability)
