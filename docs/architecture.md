@@ -116,14 +116,14 @@ but it never deletes the stored key. Only pairing again or `disconnect` replaces
 
 ### Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **10**). A mismatch closes the socket with
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **11**). A mismatch closes the socket with
 an explicit reason instead of letting two incompatible frame vocabularies talk past each other.
 
 ---
 
 ## 4. One registry, two bundles
 
-There are 34 page capabilities. They are defined once, in `lib/actions/registry.ts`, and that array
+There are 35 page capabilities. They are defined once, in `lib/actions/registry.ts`, and that array
 is compiled into **both** the extension and the daemon.
 
 Each action is a small module — a name, a description, a zod input schema, and an `execute()`:
@@ -201,7 +201,8 @@ Details worth knowing:
 
 - **`browsentic-mcp` starts the daemon if needed.** `ensureDaemon()` reads the lockfile, checks the
   pid is alive and `/health` answers, and otherwise spawns a detached `daemon-main.js`, polling for
-  up to 8 seconds.
+  up to 8 seconds. It never compares versions, so a running daemon keeps serving an old build until
+  `browsentic-mcp restart` (or `stop`) — in the repo, `yarn mcp:restart` chains the rebuild with it.
 - **External calls are visible.** The daemon emits a `tool`/`toolResult` pair tagged
   `source: 'external'` on the run channel, so anything an MCP client does appears on the user's
   timeline. It does **not** pass the approval gate — that gate applies to agent runs only.
@@ -250,9 +251,24 @@ it is the documented escape hatch.
 
 ### Tab scoping
 
-Every action targets the active tab of the current window unless a `tabId` is threaded through — the
-one caller that does is a site-mapping run, which pins itself to the tab it started in and fails
-with `MAPPING_TAB_CHANGED` if that tab goes away.
+A panel conversation is **bound to the tab it started in**. The background keeps a registry of tab
+sessions in `browser.storage.session` under `browsentic/tabSessions`: each entry maps a `sessionId`
+to its main tab, the subtabs its runs opened, the tab its next action should land on, the live tab
+title, and the run currently going in it, if any.
+
+Every frame the daemon sends for an agent run carries that run's `runId`, and the extension resolves
+it to the owning session's current tab. So a run keeps working in its own tab while the user browses
+somewhere else, and two sessions in two tabs act independently. A run that opens a tab with
+`page.openTab` adopts it as a subtab; `page.switchTab` onto a tab another session owns is refused
+with `TAB_IN_USE`, and if every tab of a session is gone its actions fail with `SESSION_TAB_CLOSED`.
+
+Calls with no run behind them — an external MCP client, the local fast path — still target the
+active tab of the current window. A site-mapping run keeps its own older pin, threading a literal
+`tabId` and failing with `MAPPING_TAB_CHANGED` if that tab goes away.
+
+Closing a tab ends its session: the run is cancelled, the transcript is flushed to history, and the
+entry leaves the registry. Closing the side panel does not — the tab is the anchor, and while a run
+is going its tab carries a dot on the toolbar badge and on its favicon.
 
 ---
 
@@ -289,15 +305,15 @@ sequenceDiagram
     participant K as claude -p
     participant M as browsentic-mcp (child)
 
-    S->>B: instruction + context (url, tabId, files, recordings)
-    B->>B: tryFastPath() — grammar
-    B->>D: {t:"instruct", id, text, context}
+    S->>B: instruction + the tab it was typed on
+    B->>B: resolve tab → session, tryFastPath() — grammar
+    B->>D: {t:"instruct", id, text, context (url, tabId, sessionId, files, recordings)}
     D->>D: route skill, build system prompt
     D->>K: spawn with --mcp-config {browsentic}, BROWSENTIC_AGENT_RUN=<runId>
     K->>M: stdio (its only MCP server)
     M->>D: {op:"invoke", runId, action} (control WS)
     D->>D: approval / mapping gate
-    D->>B: {t:"invoke", …}
+    D->>B: {t:"invoke", runId, …} → the session's own tab
     B-->>D: result
     D-->>M: result
     M-->>K: tool result
@@ -499,7 +515,11 @@ Errors are `{ ok: false, error: { code, message } }` all the way through, surfac
 | `DEBUGGER_UNAVAILABLE` | Extension | Chrome’s debugger could not attach — usually DevTools is open on that tab. Close it, or use `page.clickElement`. |
 | `CAPTCHA_NOT_FOUND` | Extension | No known captcha widget on the page, so whatever is blocking the run is something else. |
 | `DAEMON_UNREACHABLE` | RemoteBridge | The daemon died mid-call. |
-| `RUN_IN_PROGRESS` | AgentSession | One instruction at a time. |
+| `RUN_IN_PROGRESS` | AgentSession | One instruction at a time *per tab session*; other sessions are unaffected. |
+| `RUN_LIMIT` | AgentSession | Too many sessions running at once (`maxConcurrentRuns`, default 3). |
+| `SESSION_LIMIT` | Extension | Eight tab sessions are already open. |
+| `SESSION_TAB_CLOSED` | Extension | Every tab this conversation was working in has been closed. |
+| `TAB_IN_USE` | Extension | That tab belongs to another Browsentic conversation. |
 | `RUN_INACTIVE` | AgentSession | The run was cancelled while a tool call was in flight. |
 | `DECLINED` | Approval gate | The user said no. Final. |
 | `AGENT_MISSING` | Runner | The chosen agent's binary is not on the daemon's PATH. |

@@ -127,7 +127,7 @@ Local commands never reach the daemon, so they leave no trace in `browsentic-mcp
 expected, not a bug. Explain any single routing decision with:
 
 ```sh
-yarn intent:check "take me to the checkout page"
+yarn check:intent "take me to the checkout page"
 ```
 
 ---
@@ -321,10 +321,36 @@ consequential.
 
 ---
 
+## One conversation per tab
+
+Each tab gets its own conversation, and several can run at once. A conversation is bound to the tab
+it started in: it keeps working there while you read something else, and its actions stay in its own
+tab instead of following whichever one you are looking at.
+
+The side panel follows the tab in front. Switch tabs and the chat switches with it — to that tab's
+conversation, or to a fresh empty one if it has none. The **Sessions** strip above the chat lists
+everything currently open, with each tab's live title, a pulsing dot while it is working, and how
+many messages it holds. Click a row to jump to that tab and its transcript; press **×** to end that
+session. The strip collapses to a single line when you want the room back.
+
+While a conversation is working, its tab is marked in two places — a dot on the Browsentic toolbar
+icon and a dot drawn onto the tab's favicon — so a run you have scrolled away from is still visible
+in the tab strip. Closing the panel does not stop anything. **Closing the tab does**: the run is
+cancelled and the conversation moves to **History**, where you can reopen it on any tab.
+
+If a conversation opens a tab of its own, that tab joins the same session as a subtab and its work
+belongs to the same transcript. It will not act in a tab another conversation has claimed.
+
+Eight tab sessions can be open at once, and three can run at the same time — raise the latter with
+`maxConcurrentRuns` in `~/.browsentic/config.json`.
+
+---
+
 ## The timeline and approvals
 
 Every action appears as it happens, with what it targeted and what came back. Local commands carry
-a ⚡; actions from an MCP client are tagged as external. Cancelling stops a run mid-flight.
+a ⚡; actions from an MCP client are tagged as external. Cancelling stops the run in the conversation
+you are looking at; the others keep going.
 
 Actions that change something other people can see wait for an explicit **Allow** or **Deny**. Form
 submission is gated by default, and the gate is smarter than a name match — it also catches
