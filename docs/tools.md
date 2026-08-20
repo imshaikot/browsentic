@@ -22,7 +22,7 @@ The surface, at a glance:
 | --- | --- |
 | [Status](#status) | `browsentic_status` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_screenshot` |
-| [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
+| [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Moving](#moving) | `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Files](#files) | `page_listFiles`, `page_attachFile` |
@@ -249,6 +249,44 @@ Hover an element to trigger menus, tooltips, and other hover states.
 | --- | --- | --- | --- |
 | `target` | [target](#element-targets) | required | Element to hover |
 | `scrollIntoView` | boolean | `true` | Bring the element into view first |
+
+### page_dragElement
+
+Drag one thing onto another — reorder a list, move a card between columns, pull a slider handle,
+draw on a canvas. Both ends must be on screen at once; nothing auto-scrolls mid-drag.
+
+The web has two unrelated drag mechanisms, and `mode: "auto"` picks between them by reading the
+grabbed element. `"pointer"` presses, moves and releases a pointer, which is what dnd-kit,
+react-beautiful-dnd, Sortable's fallback mode, sliders and canvases listen for. `"native"` fires the
+HTML5 `dragstart`/`dragover`/`drop` sequence with a `DataTransfer`, which is what an element
+carrying `draggable="true"` expects. Auto reads that attribute off the element you grab.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `from` | [target](#element-targets) | one of | Element to pick up — the card, row, or drag handle |
+| `fromPoint` | `{ x, y }` | one of | Viewport coordinates to grab from, when the grip is not an element |
+| `to` | [target](#element-targets) | one of | Element to drop onto |
+| `toPoint` | `{ x, y }` | one of | Viewport coordinates to drop at — empty space, a slider position, a canvas spot |
+| `mode` | `"auto"` \| `"pointer"` \| `"native"` | `"auto"` | Which drag mechanism to use |
+| `steps` | integer 2–60 | `16` | Moves dispatched along the way to the drop point |
+| `holdMs` | integer 0–5000 | `120` | How long the button stays down before the drag starts moving |
+| `settleMs` | integer 0–5000 | `120` | Pause on the drop point before releasing |
+| `trusted` | boolean | `false` | Dispatch real browser-level mouse events. Pointer mode only, Chrome only |
+| `scrollIntoView` | boolean | `true` | Bring the grabbed element into view first |
+
+Returns `from` and `to` element summaries, the `grip` and `drop` points it used, the `mechanism`
+it chose, and `landedOn` — the selector actually under the pointer at release. Native drags also
+return `started` (the source accepted `dragstart`) and `accepted` (some element under the path
+called `preventDefault` on `dragover`, which is how a real drop zone signals it will take the drop).
+`accepted: false` with nothing moved means the page wants the other mode.
+
+The drop point is measured before the drag starts, so a list that reflows as the pointer passes over
+it can land a slot out — raise `steps` and `settleMs`, then read `landedOn` back.
+
+`trusted: true` routes through Chrome's debugger like [page_trustedClick](#page_trustedclick), with
+the same costs: the debugging bar appears, DevTools must be closed, and Firefox is unsupported. It
+cannot drive HTML5 drag-and-drop, so it is refused with `INVALID_INPUT` when the mechanism resolves
+to `native`.
 
 ### page_focusInput
 
