@@ -1,4 +1,5 @@
 import { exposeActions } from '@/lib/actions/host';
+import { exposeIndicator } from '@/lib/indicator/host';
 import { exposeMonitor } from '@/lib/monitor/watch';
 import { exposeRecorder } from '@/lib/recordings/host';
 
@@ -11,5 +12,6 @@ export default defineContentScript({
     exposeActions();
     exposeRecorder();
     exposeMonitor();
+    exposeIndicator();
   },
 });
