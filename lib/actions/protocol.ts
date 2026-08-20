@@ -9,7 +9,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 10;
+export const SOCKET_PROTOCOL_VERSION = 11;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -89,6 +89,8 @@ export interface RecordingPayload {
 export interface RunContext {
   url?: string;
   tabId?: number;
+  /** The tab-bound conversation this run belongs to. Scopes one-at-a-time and the held conversation. */
+  sessionId?: string;
   files?: AttachedFile[];
   recordings?: SavedRecording[];
   /** The agent that issued `agentSessionId`; a different agent cannot resume it. */
@@ -119,14 +121,14 @@ export type SocketFrame =
   | { t: 'unauthorized'; reason: string; retryable: boolean }
   | { t: 'describe'; id: string }
   | { t: 'manifest'; id: string; tools: ToolDescriptor[] }
-  | { t: 'invoke'; id: string; action: string; input?: unknown; tabId?: number }
+  | { t: 'invoke'; id: string; action: string; input?: unknown; tabId?: number; runId?: string }
   | { t: 'result'; id: string; result: ActionResult }
   | { t: 'ping'; id: string }
   | { t: 'pong'; id: string }
   | { t: 'instruct'; id: string; text: string; context?: RunContext }
   | { t: 'cancel'; id: string }
   | { t: 'decision'; id: string; toolId: string; allow: boolean; remember?: boolean }
-  | { t: 'reset' }
+  | { t: 'reset'; sessionId?: string }
   | { t: 'run'; id: string; event: RunEvent }
   | { t: 'analyzeFile'; id: string; name: string; mime: string; size: number; content: string }
   | { t: 'fileSummary'; id: string; result: ActionResult<{ summary: string; digest?: string }> }
