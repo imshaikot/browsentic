@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        width: 1360px; height: 740px; overflow: hidden;
+        background: oklch(0.152 0.016 52);
+        position: relative;
+        font-family: "Inter Tight", system-ui, sans-serif;
+      }
+      .glow { position: absolute; border-radius: 999px; filter: blur(120px); }
+      .g1 { width: 560px; height: 560px; top: -240px; left: -100px; background: oklch(0.735 0.168 42); opacity: 0.16; }
+      .g2 { width: 520px; height: 520px; top: -200px; right: -120px; background: oklch(0.83 0.13 195); opacity: 0.15; }
+      .dots {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(circle at 1px 1px, oklch(0.98 0.01 60 / 9%) 1px, transparent 0);
+        background-size: 30px 30px;
+        -webkit-mask-image: radial-gradient(ellipse 80% 75% at 50% 45%, #000 40%, transparent 100%);
+      }
+      svg { position: relative; display: block; }
+      .title { font: 600 20px "Inter Tight"; fill: oklch(0.958 0.012 70); }
+      .sub { font: 400 12.5px "JetBrains Mono"; fill: oklch(0.735 0.018 60); }
+      .lbl { font: 500 12.5px "JetBrains Mono"; }
+      .kicker { font: 500 14px "JetBrains Mono"; fill: oklch(0.62 0.02 60); letter-spacing: 0.04em; }
+      .node { fill: oklch(0.185 0.018 52 / 92%); stroke: oklch(0.98 0.01 60 / 15%); }
+      .brand { stroke: oklch(0.83 0.13 195); }
+      .ember { stroke: oklch(0.735 0.168 42); }
+      .magenta { stroke: oklch(0.7 0.21 335 / 85%); }
+      .tbrand { fill: oklch(0.83 0.13 195); }
+      .tember { fill: oklch(0.78 0.15 48); }
+      .tmagenta { fill: oklch(0.78 0.17 335); }
+    </style>
+  </head>
+  <body>
+    <div class="glow g1"></div>
+    <div class="glow g2"></div>
+    <div class="dots"></div>
+
+    <svg width="1360" height="740" viewBox="0 0 1360 740" fill="none">
+      <defs>
+        <marker id="ab" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="oklch(0.83 0.13 195)"/>
+        </marker>
+        <marker id="ae" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="oklch(0.735 0.168 42)"/>
+        </marker>
+        <marker id="am" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="oklch(0.7 0.21 335 / 85%)"/>
+        </marker>
+      </defs>
+
+      <!-- header -->
+      <g transform="translate(70, 52)">
+        <svg width="34" height="34" viewBox="0 0 32 32" style="color: oklch(0.83 0.13 195)" x="0" y="-23">
+          <rect x="2.25" y="4.25" width="27.5" height="23.5" rx="6" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"/>
+          <path d="M2.5 10.5h27" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.25"/>
+          <circle cx="6.4" cy="7.4" r="1" fill="currentColor" fill-opacity="0.5"/>
+          <circle cx="9.8" cy="7.4" r="1" fill="currentColor" fill-opacity="0.35"/>
+          <path d="M9 22.2c2.4 0 2.4-6.4 6.9-6.4s4.6 6.4 7 6.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <circle cx="9" cy="22.2" r="2.35" fill="oklch(0.152 0.016 52)" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="15.9" cy="15.8" r="2.55" fill="currentColor"/>
+          <circle cx="22.9" cy="22.2" r="2.35" fill="oklch(0.152 0.016 52)" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+        <text class="kicker" x="46" y="0">BROWSENTIC · HOW AN INSTRUCTION BECOMES A CLICK</text>
+      </g>
+
+      <!-- ═══ main lane: nodes 210/210/210/230 wide at y=170, gaps 120 ═══ -->
+      <!-- You -->
+      <g transform="translate(70, 170)">
+        <rect class="node" width="210" height="116" rx="14" stroke-width="1"/>
+        <circle cx="32" cy="44" r="9" class="brand" stroke-width="1.6"/>
+        <path d="M19 74 c2-11 24-11 26 0" class="brand" stroke-width="1.6" stroke-linecap="round"/>
+        <text class="title" x="58" y="50">You</text>
+        <text class="sub" x="58" y="76">speak · type · show</text>
+      </g>
+
+      <!-- Extension -->
+      <g transform="translate(400, 170)">
+        <rect class="node" width="210" height="116" rx="14" stroke-width="1"/>
+        <rect x="18" y="34" width="30" height="24" rx="5" class="brand" stroke-width="1.6"/>
+        <path d="M18 42 h30" class="brand" stroke-width="1.2" opacity="0.5"/>
+        <text class="title" x="58" y="50">Extension</text>
+        <text class="sub" x="58" y="76">your logged-in tab</text>
+      </g>
+
+      <!-- Daemon -->
+      <g transform="translate(730, 170)">
+        <rect class="node" width="210" height="116" rx="14" stroke-width="1"/>
+        <rect x="18" y="32" width="30" height="12" rx="3" class="brand" stroke-width="1.6"/>
+        <rect x="18" y="48" width="30" height="12" rx="3" class="brand" stroke-width="1.6" opacity="0.55"/>
+        <text class="title" x="58" y="50">Daemon</text>
+        <text class="sub" x="58" y="76">only on 127.0.0.1</text>
+      </g>
+
+      <!-- Agent CLI -->
+      <g transform="translate(1060, 170)">
+        <rect class="node" width="230" height="116" rx="14" stroke-width="1"/>
+        <path d="M20 38 l10 8 -10 8 M36 54 h14" class="brand" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <text class="title" x="60" y="50">Your agent CLI</text>
+        <text class="sub" x="60" y="76">claude · codex · agy</text>
+      </g>
+
+      <!-- forward arrows -->
+      <g class="brand" stroke-width="1.8">
+        <path d="M280 228 H 396" marker-end="url(#ab)"/>
+        <path d="M610 228 H 726" marker-end="url(#ab)"/>
+        <path d="M940 228 H 1056" marker-end="url(#ab)"/>
+      </g>
+      <text class="lbl tbrand" x="338" y="212" text-anchor="middle">instruction</text>
+      <text class="lbl tbrand" x="668" y="212" text-anchor="middle">WebSocket</text>
+      <text class="lbl tbrand" x="998" y="212" text-anchor="middle">spawns</text>
+
+      <!-- page-actions return: CLI bottom → Extension bottom -->
+      <path d="M1175 286 V 354 Q 1175 372 1157 372 H 549 Q 531 372 531 354 V 292"
+            class="ember" stroke-width="1.8" marker-end="url(#ae)"/>
+      <text class="lbl tember" x="688" y="360" text-anchor="middle">page actions · click · fill · read</text>
+
+      <!-- ═══ MCP lane at y=520 ═══ -->
+      <g transform="translate(70, 520)">
+        <rect class="node" width="286" height="104" rx="14" stroke-width="1"/>
+        <rect x="24" y="42" width="17" height="22" rx="4" class="magenta" stroke-width="1.6"/>
+        <path d="M28.5 42 v-7 M36.5 42 v-7 M32.5 64 v9" class="magenta" stroke-width="1.6" stroke-linecap="round"/>
+        <text class="title" x="64" y="50">Any MCP client</text>
+        <text class="sub" x="64" y="76">Claude Code · Cursor · Zed</text>
+      </g>
+
+      <g transform="translate(466, 520)">
+        <rect class="node" width="250" height="104" rx="14" stroke-width="1"/>
+        <circle cx="28" cy="46" r="4.5" class="magenta" stroke-width="1.6"/>
+        <circle cx="44" cy="62" r="4.5" class="magenta" stroke-width="1.6"/>
+        <path d="M31.5 49.5 l9 9" class="magenta" stroke-width="1.5"/>
+        <text class="title" x="62" y="50">browsentic-mcp</text>
+        <text class="sub" x="62" y="76">stdio · one per client</text>
+      </g>
+
+      <g class="magenta" stroke-width="1.8">
+        <path d="M356 572 H 462" marker-end="url(#am)"/>
+        <path d="M716 572 H 827 Q 845 572 845 554 V 381 A 9 9 0 0 0 845 363 V 292" marker-end="url(#am)"/>
+      </g>
+      <text class="lbl tmagenta" x="409" y="556" text-anchor="middle">stdio</text>
+      <text class="lbl tmagenta" x="862" y="466">the same daemon,</text>
+      <text class="lbl tmagenta" x="862" y="486">the same browser</text>
+
+      <!-- footnote -->
+      <text class="sub" x="70" y="700" opacity="0.75">Everything binds to 127.0.0.1. No cloud, no relay, no API key. Page actions travel back through the same daemon and land in the tab in front of you.</text>
+    </svg>
+  </body>
+</html>
