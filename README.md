@@ -40,6 +40,11 @@ You also need one agent CLI on your `PATH` and logged in — `claude`, `codex` o
 
 ## How It Works
 
+![How an instruction becomes a click](https://raw.githubusercontent.com/imshaikot/browsentic/website/public/flow.png)
+
+<details>
+<summary>The same flow, as text</summary>
+
 ```
 You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI
                             ▲                                        (claude │ codex │ agy)
@@ -47,6 +52,8 @@ You ──speak or type──> Extension ──local WebSocket──> Daemon ─
 
 Any MCP client ──stdio──> browsentic-mcp ──> the same daemon ──> the same browser
 ```
+
+</details>
 
 The extension dials out to the daemon, because a Manifest V3 service worker cannot listen for connections. One daemon owns the browser link, so several MCP clients can share one browser. Everything binds to `127.0.0.1`.
 
