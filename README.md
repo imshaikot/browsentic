@@ -72,6 +72,8 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 
 Two limits worth stating plainly: pairing controls **which browser**, not which local process, and an agent reading a hostile page is still susceptible to prompt injection. Both are covered in [Limits](docs/guide/limits.md).
 
+Browsentic is provided as is, without warranty — you are responsible for what you approve and where you point it. The plain-language version, and how to report a vulnerability privately, are in [SECURITY.md](SECURITY.md).
+
 ## Contributing
 
 Found a bug 🐛 or have an idea for a capability ✨? Adding a page capability is one file plus one line in the registry, which publishes it as an MCP tool at the same time. See the [contributing guide](docs/internals/contributing.md) for the setup, the checks, and the four conventions that are load-bearing at runtime.
