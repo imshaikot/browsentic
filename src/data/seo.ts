@@ -11,7 +11,7 @@ import {
   MCP_POINTS,
   MODES,
   ORCHESTRATION_POINTS,
-  ORCHESTRATION_RUNS,
+  ORCHESTRATION_SESSIONS,
   ORCHESTRATION_SHARED,
   PIPELINE,
   QUICKSTART,
@@ -174,8 +174,8 @@ export function noscriptBody(siteUrl: string) {
       lines(SECTIONS.orchestrate.title),
       `<p>${esc(SECTIONS.orchestrate.lede)}</p>` +
         list(
-          ORCHESTRATION_RUNS.map(
-            (r) => `<strong>${esc(r.host)}</strong> ${esc(r.task)} (${esc(r.result)})`,
+          ORCHESTRATION_SESSIONS.map(
+            (r) => `<strong>${esc(r.host)}</strong> ${esc(r.title)} (${esc(r.agent)}, ${esc(r.status)})`,
           ),
         ) +
         list(ORCHESTRATION_POINTS.map(([t, b]) => `<strong>${esc(t)}</strong> ${esc(b)}`)) +
@@ -307,8 +307,8 @@ ${block(
 ${block(
   SECTIONS.orchestrate.title,
   SECTIONS.orchestrate.lede,
-  ORCHESTRATION_RUNS.map(
-    (r) => `### ${r.host}\n\n${r.task}. Steps: ${r.steps.map((s) => s.tool).join(', ')}. Result: ${r.result}.`,
+  ORCHESTRATION_SESSIONS.map(
+    (r) => `### ${r.host}\n\n${r.title}, on ${r.agent}, ${r.status}: ${r.timeline.join('; ')}.`,
   ).join('\n\n') +
     `\n\n${ORCHESTRATION_POINTS.map(([t, b]) => `- **${t}** ${b}`).join('\n')}` +
     `\n\n${ORCHESTRATION_SHARED.body}`,

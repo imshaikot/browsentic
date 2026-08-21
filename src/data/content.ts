@@ -38,7 +38,7 @@ export const SEO = {
 export const HERO = {
   badge: 'MIT licensed, and it runs on the agent CLI you already pay for: Claude Code, Codex or Antigravity',
   title: { lead: 'Every tab,', tail: 'its own ', accent: 'AI agent' },
-  lede: 'No new browser. No new subscription. Hand any tab to the AI agent you already run and it reads the page, clicks, fills and finishes the job in the session you are already signed in to. The web work you grind through by hand, automated where you already browse.',
+  lede: 'No new browser. No new subscription. Hand any tab to the AI agent you already run: it senses what is on the page, works out what you asked for, and carries the job through in the session you are already signed in to. Anything you would otherwise do by hand, it can automate for you.',
   voice: 'or open the side panel and speak it aloud',
   command: 'claude mcp add browsentic -- browsentic-mcp',
 } as const
@@ -53,18 +53,18 @@ export const SECTIONS = {
   },
   capabilities: {
     kicker: 'Capabilities',
-    title: ['35 page tools: read a page,', 'act on it, and wait it out'],
+    title: ['35 page tools: sense a page,', 'act on it, and wait it out'],
     lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors.',
   },
   orchestrate: {
     kicker: 'Agent orchestration',
     title: ['Several tabs, several agents,', 'one browser, all at once'],
-    lede: 'A conversation belongs to the tab it started in, not to whatever you happen to be looking at. Start one in the tab that is uploading, another in the tab that is answering support, a third watching a deploy, then go and read something else. Each keeps to its own tab, reports on its own timeline, and stops for you on its own terms.',
+    lede: 'A conversation belongs to the tab it started in, not to whatever you happen to be looking at. Start one where an upload is running, another where support is waiting on an answer, a third watching a release, then go and read something else. The extension holds each session in its own tab and dials out to a single local daemon, which wakes one agent per session and streams the work back to the panel as it happens.',
   },
   automations: {
     kicker: 'In practice',
     title: ['Jobs people actually hand over,', 'and where each one stops for you'],
-    lede: 'Ordinary browsing work, in sites you are already signed in to: the negotiation, the application, the cancellation, the thing you redo every Friday. The agent does the reading, the typing and the clicking. Anything that commits something or sends it to someone else pauses first, naming the action, and waits for you.',
+    lede: 'Ordinary browsing work, in sites you are already signed in to: the negotiation, the application, the cancellation, the thing you redo every Friday. The agent senses what is in front of it, works out what the job needs and sees it through. Anything that commits something, or sends it to someone other than you, pauses first and names itself before it happens.',
   },
   teach: {
     kicker: 'Skills',
@@ -243,97 +243,111 @@ export const PIPELINE = [
 
 export type RunStep = { tool: string; note: string; ms: number; gate?: boolean }
 
-export type OrchestrationRun = {
+export type SessionStatus = 'working' | 'approval' | 'queued'
+
+export type Session = {
   id: string
   host: string
-  task: string
-  /** Milliseconds into the loop when a slot frees up for this run. */
-  start: number
-  result: string
-  steps: RunStep[]
+  tab: string
+  title: string
+  agent: 'claude' | 'codex' | 'agy'
+  status: SessionStatus
+  timeline: string[]
 }
 
 /**
- * The board animates one loop of four tab sessions. Three run at a time, which is the
- * real default, so the fourth waits for the first to finish before it starts.
+ * The board is drawn from the extension outwards: four tab sessions, the panel that
+ * follows whichever tab is in front, then the one local link out to the daemon and the
+ * agents it wakes. Three sessions are live, which is the real default, so the fourth waits.
  */
-export const ORCHESTRATION_RUNS: OrchestrationRun[] = [
+export const ORCHESTRATION_SESSIONS: Session[] = [
   {
     id: 'billing',
     host: 'app.acme.com',
-    task: 'Chase the six invoices that went past due',
-    start: 0,
-    result: 'six reminders sent',
-    steps: [
-      { tool: 'page_getPageInfo', note: 'invoices · 6 unpaid, 41 interactive elements', ms: 1200 },
-      { tool: 'page_selectOption', note: 'status → Unpaid', ms: 1100 },
-      { tool: 'page_fillInput', note: 'reminder note · due 12 Aug', ms: 1200 },
-      { tool: 'page_submitForm', note: 'Send reminders', ms: 2000, gate: true },
-      { tool: 'page_extractText', note: 'confirmation · 6 of 6 delivered', ms: 1200 },
+    tab: 'Invoices',
+    title: 'Six invoices gone past due',
+    agent: 'claude',
+    status: 'working',
+    timeline: [
+      'sees six invoices past due',
+      'takes in the terms agreed on each',
+      'wording the reminders now',
     ],
   },
   {
     id: 'support',
     host: 'help.vendor.io',
-    task: 'Argue the renewal back down to last year',
-    start: 900,
-    result: 'counteroffer drafted, sent on your Allow',
-    steps: [
-      { tool: 'page_getPageInfo', note: 'ticket 8841 · 14 messages', ms: 1200 },
-      { tool: 'page_extractText', note: 'what support actually offered', ms: 1800 },
-      { tool: 'page_typeText', note: 'counteroffer · your words, their numbers', ms: 2000 },
-      { tool: 'page_submitForm', note: 'Send message', ms: 2200, gate: true },
+    tab: 'Ticket 8841',
+    title: 'The renewal, argued back down',
+    agent: 'codex',
+    status: 'approval',
+    timeline: [
+      'read fourteen messages of history',
+      'weighed the offer against last year',
+      'waiting on you before it reaches them',
     ],
   },
   {
     id: 'deploy',
     host: 'dash.deploys.dev',
-    task: 'Watch the release and say when it lands',
-    start: 400,
-    result: 'landed in 4m 12s',
-    steps: [
-      { tool: 'page_startMonitor', note: 'build 2291 · pinned to this tab', ms: 1100 },
-      { tool: 'page_awaitMonitor', note: 'long-polling · 62% · eta 1m 40s', ms: 6500 },
-      { tool: 'page_extractText', note: 'release notes · 12 commits', ms: 1000 },
+    tab: 'Release 2291',
+    title: 'Watching the release land',
+    agent: 'claude',
+    status: 'working',
+    timeline: [
+      'senses the progress the page gives off',
+      'pinned to this tab, in the background',
+      '62 percent, about a minute to go',
     ],
   },
   {
     id: 'jobs',
     host: 'jobs.acme.com',
-    task: 'Apply with the resume you attached',
-    start: 6700,
-    result: 'submitted · 1 of 6 on this board',
-    steps: [
-      { tool: 'page_getPageInfo', note: 'application form · 22 fields', ms: 1200 },
-      { tool: 'page_fillInput', note: 'experience · matched to your resume', ms: 1500 },
-      { tool: 'page_attachFile', note: 'resume.pdf → #cv-upload', ms: 1800, gate: true },
-      { tool: 'page_submitForm', note: 'Submit application', ms: 2000, gate: true },
-    ],
+    tab: 'Application',
+    title: 'Applying with the resume you attached',
+    agent: 'agy',
+    status: 'queued',
+    timeline: ['holding for a slot', 'three sessions already at work'],
   },
 ]
 
+export const ORCHESTRATION_CHAIN = {
+  out: 'what you asked for',
+  back: 'what it saw and did',
+  daemon: {
+    title: 'One local daemon',
+    sub: '127.0.0.1 · loopback only',
+    body: 'Nothing listens inside the browser. The extension opens the link itself, and one daemon owns it however many sessions are in flight.',
+  },
+  agents: {
+    title: 'One agent per session',
+    sub: '3 of 3 slots in use',
+    body: 'Woken as you, on the CLI you already signed in to, and told about this session and no other.',
+  },
+}
+
 export const ORCHESTRATION_POINTS: [string, string][] = [
   [
-    'A run belongs to its tab, not to your attention',
-    'The conversation is bound to the tab it started in. It keeps working there while you read something else, its actions land there rather than in whichever tab is in front, and moving to a tab it was not pointed at is a gated action.',
+    'A session belongs to its tab, not to your attention',
+    'The conversation is bound to the tab it started in. It carries on there while you look at something else, its work stays in that tab instead of following you, and reaching into a tab it was never pointed at is a gated action.',
   ],
   [
-    'Two runs never share a tab',
-    'A tab another conversation has claimed answers TAB_IN_USE. Tabs a run opens for itself join that same session as subtabs, so everything it did stays in one transcript.',
+    'Two sessions never share a tab',
+    'A tab another conversation has claimed answers TAB_IN_USE. Tabs a session opens for itself join that same session as subtabs, so everything it did stays in one transcript.',
   ],
   [
     'Three at a time, eight open',
-    'Three runs go at once by default and eight tab sessions can be open, so the fourth waits for a slot instead of crowding the browser. Raise maxConcurrentRuns as far as eight.',
+    'Three sessions work at once by default and eight can be open, so the fourth holds for a slot instead of crowding the browser. Raise maxConcurrentRuns as far as eight.',
   ],
   [
-    'Cancelling one leaves the rest running',
-    'Stop the run you are looking at and the others carry on. Close a tab and only that session ends, with its transcript moved to History. A pulsing dot on the toolbar icon and on the tab’s own favicon marks whatever is still working.',
+    'Stopping one leaves the rest alone',
+    'End the session you are looking at and the others carry on. Close a tab and only that one ends, with its transcript moved to History. A pulsing dot on the toolbar icon and on the tab’s own favicon marks whatever is still at work.',
   ],
 ]
 
 export const ORCHESTRATION_SHARED = {
   chip: 'shared link',
-  body: 'One daemon owns the browser link, so panel runs and MCP clients interleave on the same tabs. Claude Code in one terminal, Codex in another, Cursor or Zed alongside them: they drive the browser you are already signed into, and every call they make shows up on the timeline marked external.',
+  body: 'The same link carries anything else you point at it. Claude Code in one terminal, Codex in another, Cursor or Zed alongside them: they all reach the browser you are already signed into, and every step they take surfaces on the timeline marked external.',
 }
 
 export type Automation = {
@@ -348,15 +362,15 @@ export type Automation = {
 export const AUTOMATION_FEATURED = {
   kicker: 'Worked example',
   title: 'Find the job, then apply as you',
-  body: 'Attach your resume once. Browsentic reads it at attach time and keeps notes, so the agent knows what it is sending without ever seeing your filesystem. From then on it reads the posting in front of it, weighs it against what you have actually done, fills the application in your own words, and puts the file into the upload field. Both of the steps that reach the employer stop and ask you first, by name.',
+  body: 'Attach your resume once. Browsentic takes it in there and then and keeps notes on it, so the agent knows what it is offering without ever seeing your filesystem. From then on it senses the posting in front of it, weighs it against what you have actually done, answers the application in your own words, and hands over the file the form is asking for. Both of the steps that reach the employer stop and name themselves first.',
   result: 'Submitted · 1 of 6 postings on this board',
   gates: ['file-upload · page_attachFile', 'form-submission · page_submitForm'],
   steps: [
     { tool: 'page_listFiles', note: 'resume.pdf · read once, at attach time', ms: 1500 },
     { tool: 'page_getPageInfo', note: 'application form · 22 fields, 3 required', ms: 1600 },
     { tool: 'page_fillInput', note: 'experience · matched to your resume', ms: 1800 },
-    { tool: 'page_attachFile', note: 'resume.pdf → #cv-upload', ms: 2400, gate: true },
-    { tool: 'page_submitForm', note: 'Submit application', ms: 2600, gate: true },
+    { tool: 'page_attachFile', note: 'resume.pdf, where the form asks for it', ms: 2400, gate: true },
+    { tool: 'page_submitForm', note: 'the step that reaches the employer', ms: 2600, gate: true },
   ] as RunStep[],
 }
 
@@ -364,7 +378,7 @@ export const AUTOMATIONS: Automation[] = [
   {
     id: 'support',
     title: 'Negotiate, in the chat you are already signed into',
-    body: 'Your account, your ticket history, last year’s invoice open in the next tab. It reads what support actually said, drafts the counteroffer with the numbers in front of it, and holds at the button that sends it, because the message is the part that reaches someone else.',
+    body: 'Your account, your ticket history, last year’s invoice open in the next tab. It takes in what support actually said, weighs it against what you paid before, drafts the counteroffer in your own words, and holds right at the moment it would reach them.',
     accent: 'ember',
     tools: ['page_extractText', 'page_typeText', 'page_submitForm'],
     gate: 'Pauses at Send, under the form-submission rule',
@@ -372,15 +386,15 @@ export const AUTOMATIONS: Automation[] = [
   {
     id: 'cancel',
     title: 'Cancel the things you stopped using',
-    body: 'Point it at a billing page and it finds the cancellation flow, reads past the retention offer, answers the exit survey and walks up to the click that actually cancels. The consequence is the last step, so that is the step you keep.',
+    body: 'Point it at a billing page and it works out where the cancellation actually lives, sees the retention offer for what it is, answers the exit survey and comes to a halt in front of the one step that cannot be undone. The consequence is the last step, so that is the step you keep for yourself.',
     accent: 'magenta',
     tools: ['page_getPageInfo', 'page_clickElement', 'page_extractText'],
-    gate: 'Name page_clickElement in requireApproval and the last click asks first',
+    gate: 'Name page_clickElement in requireApproval and the final step asks first',
   },
   {
     id: 'watch',
     title: 'Sit through the slow part so you do not have to',
-    body: 'Start the upload, the build or the export, then hand the tab over. It reads the progress signals the page gives off, tracks percent and ETA in the background, and tells you the moment it lands. Nobody has to hover over a bar that moves once a minute.',
+    body: 'Start the upload, the build or the export, then hand the tab over. It senses the progress a page gives off, keeps percent and ETA in view from the background, and tells you the moment it lands. Nobody has to sit watching a bar that moves once a minute.',
     accent: 'lime',
     tools: ['page_startMonitor', 'page_awaitMonitor', 'page_monitorStatus'],
     gate: 'Nothing to approve. It is only watching',
@@ -388,7 +402,7 @@ export const AUTOMATIONS: Automation[] = [
   {
     id: 'repeat',
     title: 'Do Friday’s expense report like last time',
-    body: 'Work through it yourself once with the recorder on. Browsentic keeps ordered steps named after what you accomplished, and the values you typed come back as placeholders it asks you to fill. Next Friday the whole instruction is “do it like last time”.',
+    body: 'Show it once, with the recorder on. Browsentic keeps ordered steps named after what you accomplished, and whatever you typed comes back as a placeholder it asks you for. Next Friday the whole instruction is “do it like last time”.',
     accent: 'amber',
     tools: ['page_listRecordings', 'page_readRecording', 'page_fillInput'],
     gate: 'Replay is a plan, not a script. A step that no longer lands halts the run',
@@ -396,7 +410,7 @@ export const AUTOMATIONS: Automation[] = [
   {
     id: 'digest',
     title: 'Pull the week out of five dashboards',
-    body: 'Five tools you are logged into, one summary. It reads each one as rendered text, the way you would read it, rather than scraping markup full of hidden nodes and off-screen strings that never met your eyes.',
+    body: 'Five tools you are logged into, one summary. It takes each one in as rendered text, the way it appears to you, rather than scraping markup full of hidden nodes and off-screen strings that never met your eyes.',
     accent: 'brand',
     tools: ['page_extractText', 'page_screenshot', 'page_openTab'],
     gate: 'Raw HTML reads are denied by default, hidden text with them',
@@ -404,10 +418,10 @@ export const AUTOMATIONS: Automation[] = [
   {
     id: 'bulk',
     title: 'Work a list, one record at a time',
-    body: 'The same twelve fields across forty rows: the job nobody schedules and everybody postpones. It fills each record, submits, checks what came back, and moves on, stopping the moment a page stops looking like the one before it.',
+    body: 'The same twelve fields across forty rows: the job nobody schedules and everybody postpones. It works each record through, checks what came back against what it expected, and moves on, stopping the moment a page stops resembling the one before it.',
     accent: 'brand-deep',
     tools: ['page_fillInput', 'page_submitForm', 'page_waitForElement'],
-    gate: 'Asks on every submit, until you grant Always on this host',
+    gate: 'Asks each time it commits one, until you grant Always on this host',
   },
 ]
 
@@ -566,11 +580,11 @@ export const FAQ = [
   },
   {
     q: 'Can it automate several tabs at the same time?',
-    a: 'Yes. Every tab gets its own conversation, bound to the tab it started in, so a run keeps working there while you read something else instead of following whichever tab is in front. Eight tab sessions can be open and three run at once by default, raised as far as eight with maxConcurrentRuns. A fourth waits for a slot, cancelling one leaves the rest running, and a tab another conversation has claimed answers TAB_IN_USE.',
+    a: 'Yes. Every tab gets its own conversation, bound to the tab it started in, so a session carries on there while you look at something else instead of following whichever tab is in front. Eight sessions can be open and three work at once by default, raised as far as eight with maxConcurrentRuns. A fourth holds for a slot, ending one leaves the rest alone, and a tab another conversation has claimed answers TAB_IN_USE.',
   },
   {
     q: 'What can I actually automate with it?',
-    a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat that already has your ticket history, filling and submitting a job application from a resume you attached, walking a cancellation flow to its last click, watching a slow deploy and reporting when it lands, redoing Friday’s expense report from a recording, or pulling one summary out of five dashboards. Anything that commits something or sends data somewhere pauses and names the action before it happens.',
+    a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat that already holds your ticket history, answering a job application from a resume you attached, taking a cancellation as far as the step that cannot be undone, watching a slow release and saying when it lands, redoing Friday’s expense report from a recording, or pulling one summary out of five dashboards. Anything that commits something, or sends it to someone other than you, pauses and names itself before it happens.',
   },
   {
     q: 'Which browsers work?',
