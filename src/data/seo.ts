@@ -2,12 +2,17 @@
 // Head tags, JSON-LD, the no-JS body mirror, llms.txt, sitemap.xml and robots.txt
 // all derive from content.ts, so none of them can drift from the visible copy.
 import {
+  AUTOMATIONS,
+  AUTOMATION_FEATURED,
   CTA,
   FAQ,
   HERO,
   LIMITS,
   MCP_POINTS,
   MODES,
+  ORCHESTRATION_POINTS,
+  ORCHESTRATION_RUNS,
+  ORCHESTRATION_SHARED,
   PIPELINE,
   QUICKSTART,
   REPO,
@@ -136,10 +141,11 @@ export function noscriptBody(siteUrl: string) {
     `<p>${esc(HERO.lede)}</p>`,
     list([
       `<a href="${REPO}">Source on GitHub</a>`,
-      `<a href="${REPO}/blob/main/docs/installation.md">Installation</a>`,
-      `<a href="${REPO}/blob/main/docs/features.md">Features</a>`,
-      `<a href="${REPO}/blob/main/docs/architecture.md">Architecture</a>`,
-      `<a href="${REPO}/blob/main/docs/tools.md">Tools</a>`,
+      `<a href="${REPO}/blob/main/docs/guide/install.md">Install and pair</a>`,
+      `<a href="${REPO}/tree/main/docs/guide/features">Features</a>`,
+      `<a href="${REPO}/blob/main/docs/guide/approvals.md">Approvals and guardrails</a>`,
+      `<a href="${REPO}/tree/main/docs/internals">Architecture</a>`,
+      `<a href="${REPO}/blob/main/docs/reference/tools.md">All 35 page tools</a>`,
       `<a href="${siteUrl}llms.txt">llms.txt</a>`,
     ]),
     list(STATS.map((s) => `<strong>${s.value}${s.suffix}</strong> ${esc(s.label)} (${esc(s.note)})`)),
@@ -162,6 +168,30 @@ export function noscriptBody(siteUrl: string) {
         ).join('') +
         `<h3>Read-only resources</h3>` +
         list(RESOURCES.map((r) => `<code>${esc(r.uri)}</code> ${esc(r.desc)}`)),
+    ),
+
+    section(
+      lines(SECTIONS.orchestrate.title),
+      `<p>${esc(SECTIONS.orchestrate.lede)}</p>` +
+        list(
+          ORCHESTRATION_RUNS.map(
+            (r) => `<strong>${esc(r.host)}</strong> ${esc(r.task)} (${esc(r.result)})`,
+          ),
+        ) +
+        list(ORCHESTRATION_POINTS.map(([t, b]) => `<strong>${esc(t)}</strong> ${esc(b)}`)) +
+        `<p>${esc(ORCHESTRATION_SHARED.body)}</p>`,
+    ),
+
+    section(
+      lines(SECTIONS.automations.title),
+      `<p>${esc(SECTIONS.automations.lede)}</p>` +
+        `<h3>${esc(AUTOMATION_FEATURED.title)}</h3><p>${esc(AUTOMATION_FEATURED.body)}</p>` +
+        list(AUTOMATION_FEATURED.steps.map((s) => `<code>${esc(s.tool)}</code> ${esc(s.note)}`)) +
+        AUTOMATIONS.map(
+          (a) =>
+            `<h3>${esc(a.title)}</h3><p>${esc(a.body)}</p>` +
+            list([...a.tools.map((t) => `<code>${esc(t)}</code>`), esc(a.gate)]),
+        ).join(''),
     ),
 
     section(
@@ -222,10 +252,11 @@ ${TOOL_GROUPS.map((g) => `- **${g.label}** (${g.tools.length} tools): ${g.blurb}
 
 ## Docs
 
-${link('Installation', `${REPO}/blob/main/docs/installation.md`, 'prerequisites, setup, configuration, limitations, and driving it from a non-Claude agent')}
-${link('Features', `${REPO}/blob/main/docs/features.md`, 'every capability and when to reach for it')}
-${link('Architecture', `${REPO}/blob/main/docs/architecture.md`, 'how an instruction becomes a click, end to end')}
-${link('Tools', `${REPO}/blob/main/docs/tools.md`, 'every tool published to an MCP client, and the action behind it')}
+${link('Install and pair', `${REPO}/blob/main/docs/guide/install.md`, 'prerequisites, setup, pairing and first run')}
+${link('Features', `${REPO}/tree/main/docs/guide/features`, 'every capability and when to reach for it')}
+${link('Approvals and guardrails', `${REPO}/blob/main/docs/guide/approvals.md`, 'what asks before acting, what is refused outright, and how to change either')}
+${link('Architecture', `${REPO}/tree/main/docs/internals`, 'how an instruction becomes a click, end to end')}
+${link('Tools', `${REPO}/blob/main/docs/reference/tools.md`, 'every tool published to an MCP client, and the action behind it')}
 ${link('README', REPO, 'project overview')}
 
 ## Optional
@@ -237,6 +268,7 @@ ${link('Releases', `${REPO}/releases`, 'built extension archives per version')}
 
 - Install as an MCP server: \`claude mcp add browsentic -- browsentic-mcp\`
 - ${STATS.map((s) => `${s.value}${s.suffix} ${s.label}`).join('\n- ')}
+- Concurrency: one conversation per tab, bound to the tab it started in. Eight tab sessions open, three runs at once by default, ceiling of eight (\`maxConcurrentRuns\`).
 - The side panel runs on Claude Code, Codex or Antigravity, switched with one click. As an MCP server it is agent-agnostic: Cursor, Zed, Claude Desktop or any MCP client drives the same browser.
 - Pairing is two-gated: the daemon classifies the WebSocket peer by handshake Origin, then requires a pairing token or an origin-bound session key. A web page cannot reach the control path.
 `
@@ -270,6 +302,28 @@ ${block(
   SECTIONS.capabilities.lede,
   TOOL_GROUPS.map((g) => `### ${g.label}\n\n${g.blurb}\n\n${g.tools.map((t) => `- \`${t}\``).join('\n')}`).join('\n\n') +
     `\n\n### Read-only resources\n\n${RESOURCES.map((r) => `- \`${r.uri}\`: ${r.desc}`).join('\n')}`,
+)}
+
+${block(
+  SECTIONS.orchestrate.title,
+  SECTIONS.orchestrate.lede,
+  ORCHESTRATION_RUNS.map(
+    (r) => `### ${r.host}\n\n${r.task}. Steps: ${r.steps.map((s) => s.tool).join(', ')}. Result: ${r.result}.`,
+  ).join('\n\n') +
+    `\n\n${ORCHESTRATION_POINTS.map(([t, b]) => `- **${t}** ${b}`).join('\n')}` +
+    `\n\n${ORCHESTRATION_SHARED.body}`,
+)}
+
+${block(
+  SECTIONS.automations.title,
+  SECTIONS.automations.lede,
+  `### ${AUTOMATION_FEATURED.title}\n\n${AUTOMATION_FEATURED.body}\n\n${AUTOMATION_FEATURED.steps
+    .map((s) => `- \`${s.tool}\` ${s.note}${s.gate ? ' (asks you first)' : ''}`)
+    .join('\n')}\n\n` +
+    AUTOMATIONS.map(
+      (a) =>
+        `### ${a.title}\n\n${a.body}\n\n${a.tools.map((t) => `- \`${t}\``).join('\n')}\n\nGate: ${a.gate}`,
+    ).join('\n\n'),
 )}
 
 ${block(

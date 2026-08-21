@@ -4,37 +4,41 @@ export const REPO = 'https://github.com/imshaikot/browsentic'
 export const VERSION = 'v0.2.1'
 
 export const SEO = {
-  title: 'Browsentic: give your browser real agency',
+  title: 'Browsentic: AI browser automation in your own browser',
   description:
-    'Browsentic hands your browser real agency. Perceiving the page, listening when you speak, sensing when a job lands, then reasoning, acting and automating inside your real, logged-in tab. It plugs into the AI you already run, with no API key.',
+    'No new browser, no new subscription. Hand any tab to the AI agent you already run: 35 page tools over MCP, in the logged-in session you already use.',
   social: {
-    title: 'Browsentic: agentic browsing, in the browser you already use',
+    title: 'Browsentic: every tab, its own AI agent',
     description:
-      'Scan, capture, behave, automate. 35 page tools, automatic site maps, recordings and instant commands, all inside the real logged-in browser you already use.',
+      'Hand any tab to Claude Code, Codex or Antigravity. 35 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key.',
   },
   imageAlt:
-    'Browsentic. Every tab, its own agent. 35 page tools, concurrent sessions, record and replay, site maps, no API key.',
+    'Browsentic. Every tab, its own AI agent. 35 page tools, three runs at once, record and replay, site maps, no API key.',
   author: 'imshaikot',
   summary:
-    'A browser extension plus a local daemon that lets any MCP client drive your real, logged-in browser tab by voice, by typing, or by replaying a session you recorded once.',
+    'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, or to any MCP client, by voice, by typing, or by replaying a session you recorded once.',
   keywords: [
+    'AI browser automation',
     'browser automation',
+    'AI browser agent',
+    'agentic browsing',
+    'browser automation without API key',
     'MCP server',
     'Model Context Protocol',
-    'agentic browsing',
+    'Claude Code browser automation',
     'browser extension',
-    'Claude Code',
     'Chrome extension',
-    'browser agent',
     'web automation',
+    'automate job applications',
+    'record and replay browser',
     'site mapping',
   ],
 } as const
 
 export const HERO = {
-  badge: 'MIT-licensed, and it thinks with the agent CLI you already run: Claude Code, Codex or Antigravity',
-  title: { lead: 'Reimagine browsing', tail: 'as ', accent: 'agentic' },
-  lede: 'Browsentic hands your browser real agency. Perceiving the page, listening when you speak, sensing the moment a job lands, then reasoning, acting and automating everything you would otherwise grind through by hand. All of it inside the tab you already trust: your sessions, your logins, your machine.',
+  badge: 'MIT licensed, and it runs on the agent CLI you already pay for: Claude Code, Codex or Antigravity',
+  title: { lead: 'Every tab,', tail: 'its own ', accent: 'AI agent' },
+  lede: 'No new browser. No new subscription. Hand any tab to the AI agent you already run and it reads the page, clicks, fills and finishes the job in the session you are already signed in to. The web work you grind through by hand, automated where you already browse.',
   voice: 'or open the side panel and speak it aloud',
   command: 'claude mcp add browsentic -- browsentic-mcp',
 } as const
@@ -49,8 +53,18 @@ export const SECTIONS = {
   },
   capabilities: {
     kicker: 'Capabilities',
-    title: ['Scan, capture, behave, automate.', 'Thirty-five ways to work a page'],
+    title: ['35 page tools: read a page,', 'act on it, and wait it out'],
     lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors.',
+  },
+  orchestrate: {
+    kicker: 'Agent orchestration',
+    title: ['Several tabs, several agents,', 'one browser, all at once'],
+    lede: 'A conversation belongs to the tab it started in, not to whatever you happen to be looking at. Start one in the tab that is uploading, another in the tab that is answering support, a third watching a deploy, then go and read something else. Each keeps to its own tab, reports on its own timeline, and stops for you on its own terms.',
+  },
+  automations: {
+    kicker: 'In practice',
+    title: ['Jobs people actually hand over,', 'and where each one stops for you'],
+    lede: 'Ordinary browsing work, in sites you are already signed in to: the negotiation, the application, the cancellation, the thing you redo every Friday. The agent does the reading, the typing and the clicking. Anything that commits something or sends it to someone else pauses first, naming the action, and waits for you.',
   },
   teach: {
     kicker: 'Skills',
@@ -227,6 +241,176 @@ export const PIPELINE = [
   },
 ]
 
+export type RunStep = { tool: string; note: string; ms: number; gate?: boolean }
+
+export type OrchestrationRun = {
+  id: string
+  host: string
+  task: string
+  /** Milliseconds into the loop when a slot frees up for this run. */
+  start: number
+  result: string
+  steps: RunStep[]
+}
+
+/**
+ * The board animates one loop of four tab sessions. Three run at a time, which is the
+ * real default, so the fourth waits for the first to finish before it starts.
+ */
+export const ORCHESTRATION_RUNS: OrchestrationRun[] = [
+  {
+    id: 'billing',
+    host: 'app.acme.com',
+    task: 'Chase the six invoices that went past due',
+    start: 0,
+    result: 'six reminders sent',
+    steps: [
+      { tool: 'page_getPageInfo', note: 'invoices · 6 unpaid, 41 interactive elements', ms: 1200 },
+      { tool: 'page_selectOption', note: 'status → Unpaid', ms: 1100 },
+      { tool: 'page_fillInput', note: 'reminder note · due 12 Aug', ms: 1200 },
+      { tool: 'page_submitForm', note: 'Send reminders', ms: 2000, gate: true },
+      { tool: 'page_extractText', note: 'confirmation · 6 of 6 delivered', ms: 1200 },
+    ],
+  },
+  {
+    id: 'support',
+    host: 'help.vendor.io',
+    task: 'Argue the renewal back down to last year',
+    start: 900,
+    result: 'counteroffer drafted, sent on your Allow',
+    steps: [
+      { tool: 'page_getPageInfo', note: 'ticket 8841 · 14 messages', ms: 1200 },
+      { tool: 'page_extractText', note: 'what support actually offered', ms: 1800 },
+      { tool: 'page_typeText', note: 'counteroffer · your words, their numbers', ms: 2000 },
+      { tool: 'page_submitForm', note: 'Send message', ms: 2200, gate: true },
+    ],
+  },
+  {
+    id: 'deploy',
+    host: 'dash.deploys.dev',
+    task: 'Watch the release and say when it lands',
+    start: 400,
+    result: 'landed in 4m 12s',
+    steps: [
+      { tool: 'page_startMonitor', note: 'build 2291 · pinned to this tab', ms: 1100 },
+      { tool: 'page_awaitMonitor', note: 'long-polling · 62% · eta 1m 40s', ms: 6500 },
+      { tool: 'page_extractText', note: 'release notes · 12 commits', ms: 1000 },
+    ],
+  },
+  {
+    id: 'jobs',
+    host: 'jobs.acme.com',
+    task: 'Apply with the resume you attached',
+    start: 6700,
+    result: 'submitted · 1 of 6 on this board',
+    steps: [
+      { tool: 'page_getPageInfo', note: 'application form · 22 fields', ms: 1200 },
+      { tool: 'page_fillInput', note: 'experience · matched to your resume', ms: 1500 },
+      { tool: 'page_attachFile', note: 'resume.pdf → #cv-upload', ms: 1800, gate: true },
+      { tool: 'page_submitForm', note: 'Submit application', ms: 2000, gate: true },
+    ],
+  },
+]
+
+export const ORCHESTRATION_POINTS: [string, string][] = [
+  [
+    'A run belongs to its tab, not to your attention',
+    'The conversation is bound to the tab it started in. It keeps working there while you read something else, its actions land there rather than in whichever tab is in front, and moving to a tab it was not pointed at is a gated action.',
+  ],
+  [
+    'Two runs never share a tab',
+    'A tab another conversation has claimed answers TAB_IN_USE. Tabs a run opens for itself join that same session as subtabs, so everything it did stays in one transcript.',
+  ],
+  [
+    'Three at a time, eight open',
+    'Three runs go at once by default and eight tab sessions can be open, so the fourth waits for a slot instead of crowding the browser. Raise maxConcurrentRuns as far as eight.',
+  ],
+  [
+    'Cancelling one leaves the rest running',
+    'Stop the run you are looking at and the others carry on. Close a tab and only that session ends, with its transcript moved to History. A pulsing dot on the toolbar icon and on the tab’s own favicon marks whatever is still working.',
+  ],
+]
+
+export const ORCHESTRATION_SHARED = {
+  chip: 'shared link',
+  body: 'One daemon owns the browser link, so panel runs and MCP clients interleave on the same tabs. Claude Code in one terminal, Codex in another, Cursor or Zed alongside them: they drive the browser you are already signed into, and every call they make shows up on the timeline marked external.',
+}
+
+export type Automation = {
+  id: string
+  title: string
+  body: string
+  accent: ToolGroup['accent']
+  tools: string[]
+  gate: string
+}
+
+export const AUTOMATION_FEATURED = {
+  kicker: 'Worked example',
+  title: 'Find the job, then apply as you',
+  body: 'Attach your resume once. Browsentic reads it at attach time and keeps notes, so the agent knows what it is sending without ever seeing your filesystem. From then on it reads the posting in front of it, weighs it against what you have actually done, fills the application in your own words, and puts the file into the upload field. Both of the steps that reach the employer stop and ask you first, by name.',
+  result: 'Submitted · 1 of 6 postings on this board',
+  gates: ['file-upload · page_attachFile', 'form-submission · page_submitForm'],
+  steps: [
+    { tool: 'page_listFiles', note: 'resume.pdf · read once, at attach time', ms: 1500 },
+    { tool: 'page_getPageInfo', note: 'application form · 22 fields, 3 required', ms: 1600 },
+    { tool: 'page_fillInput', note: 'experience · matched to your resume', ms: 1800 },
+    { tool: 'page_attachFile', note: 'resume.pdf → #cv-upload', ms: 2400, gate: true },
+    { tool: 'page_submitForm', note: 'Submit application', ms: 2600, gate: true },
+  ] as RunStep[],
+}
+
+export const AUTOMATIONS: Automation[] = [
+  {
+    id: 'support',
+    title: 'Negotiate, in the chat you are already signed into',
+    body: 'Your account, your ticket history, last year’s invoice open in the next tab. It reads what support actually said, drafts the counteroffer with the numbers in front of it, and holds at the button that sends it, because the message is the part that reaches someone else.',
+    accent: 'ember',
+    tools: ['page_extractText', 'page_typeText', 'page_submitForm'],
+    gate: 'Pauses at Send, under the form-submission rule',
+  },
+  {
+    id: 'cancel',
+    title: 'Cancel the things you stopped using',
+    body: 'Point it at a billing page and it finds the cancellation flow, reads past the retention offer, answers the exit survey and walks up to the click that actually cancels. The consequence is the last step, so that is the step you keep.',
+    accent: 'magenta',
+    tools: ['page_getPageInfo', 'page_clickElement', 'page_extractText'],
+    gate: 'Name page_clickElement in requireApproval and the last click asks first',
+  },
+  {
+    id: 'watch',
+    title: 'Sit through the slow part so you do not have to',
+    body: 'Start the upload, the build or the export, then hand the tab over. It reads the progress signals the page gives off, tracks percent and ETA in the background, and tells you the moment it lands. Nobody has to hover over a bar that moves once a minute.',
+    accent: 'lime',
+    tools: ['page_startMonitor', 'page_awaitMonitor', 'page_monitorStatus'],
+    gate: 'Nothing to approve. It is only watching',
+  },
+  {
+    id: 'repeat',
+    title: 'Do Friday’s expense report like last time',
+    body: 'Work through it yourself once with the recorder on. Browsentic keeps ordered steps named after what you accomplished, and the values you typed come back as placeholders it asks you to fill. Next Friday the whole instruction is “do it like last time”.',
+    accent: 'amber',
+    tools: ['page_listRecordings', 'page_readRecording', 'page_fillInput'],
+    gate: 'Replay is a plan, not a script. A step that no longer lands halts the run',
+  },
+  {
+    id: 'digest',
+    title: 'Pull the week out of five dashboards',
+    body: 'Five tools you are logged into, one summary. It reads each one as rendered text, the way you would read it, rather than scraping markup full of hidden nodes and off-screen strings that never met your eyes.',
+    accent: 'brand',
+    tools: ['page_extractText', 'page_screenshot', 'page_openTab'],
+    gate: 'Raw HTML reads are denied by default, hidden text with them',
+  },
+  {
+    id: 'bulk',
+    title: 'Work a list, one record at a time',
+    body: 'The same twelve fields across forty rows: the job nobody schedules and everybody postpones. It fills each record, submits, checks what came back, and moves on, stopping the moment a page stops looking like the one before it.',
+    accent: 'brand-deep',
+    tools: ['page_fillInput', 'page_submitForm', 'page_waitForElement'],
+    gate: 'Asks on every submit, until you grant Always on this host',
+  },
+]
+
 export const MODES = [
   {
     id: 'site-maps',
@@ -381,6 +565,14 @@ export const FAQ = [
     a: 'Yes. The daemon speaks MCP over stdio, so any MCP client drives the same browser: Codex, Antigravity, Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic-mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do. The side panel is switchable too: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click.',
   },
   {
+    q: 'Can it automate several tabs at the same time?',
+    a: 'Yes. Every tab gets its own conversation, bound to the tab it started in, so a run keeps working there while you read something else instead of following whichever tab is in front. Eight tab sessions can be open and three run at once by default, raised as far as eight with maxConcurrentRuns. A fourth waits for a slot, cancelling one leaves the rest running, and a tab another conversation has claimed answers TAB_IN_USE.',
+  },
+  {
+    q: 'What can I actually automate with it?',
+    a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat that already has your ticket history, filling and submitting a job application from a resume you attached, walking a cancellation flow to its last click, watching a slow deploy and reporting when it lands, redoing Friday’s expense report from a recording, or pulling one summary out of five dashboards. Anything that commits something or sends data somewhere pauses and names the action before it happens.',
+  },
+  {
     q: 'Which browsers work?',
     a: 'Chrome or any Chromium browser via Manifest V3, and Firefox builds work too. You will need Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy.',
   },
@@ -397,8 +589,9 @@ export const FAQ = [
 export const NAV_LINKS = [
   { href: '#how', label: 'Architecture' },
   { href: '#capabilities', label: 'Capabilities' },
+  { href: '#orchestrate', label: 'Orchestration' },
+  { href: '#automations', label: 'Automations' },
   { href: '#teach', label: 'Skills' },
-  { href: '#mcp', label: 'MCP' },
   { href: '#security', label: 'Security' },
   { href: '#start', label: 'Quickstart' },
 ]

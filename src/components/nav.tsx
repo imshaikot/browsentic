@@ -39,12 +39,12 @@ export function Nav() {
             <Wordmark />
           </a>
 
-          <ul className="hidden items-center gap-1 lg:flex">
+          <ul className="hidden items-center gap-1 xl:flex">
             {NAV_LINKS.map((l) => (
               <li key={l.href}>
                 <a
                   href={l.href}
-                  className="rounded-full px-3.5 py-2 text-sm text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
+                  className="rounded-full px-3 py-2 text-sm text-ink-dim transition-colors hover:bg-surface/60 hover:text-ink"
                 >
                   {l.label}
                 </a>
@@ -68,7 +68,7 @@ export function Nav() {
               onClick={() => setOpen((v) => !v)}
               aria-label={open ? 'Close menu' : 'Open menu'}
               aria-expanded={open}
-              className="inline-flex size-9 items-center justify-center rounded-full border border-line-strong text-ink lg:hidden"
+              className="inline-flex size-9 items-center justify-center rounded-full border border-line-strong text-ink xl:hidden"
             >
               {open ? <X className="size-4" /> : <Menu className="size-4" />}
             </button>
@@ -83,7 +83,7 @@ export function Nav() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="fixed inset-0 z-40 bg-ground/96 px-6 pt-28 backdrop-blur-xl lg:hidden"
+            className="fixed inset-0 z-40 bg-ground/96 px-6 pt-28 backdrop-blur-xl xl:hidden"
           >
             <ul className="flex flex-col gap-1">
               {NAV_LINKS.map((l, i) => (

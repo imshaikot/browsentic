@@ -4,6 +4,8 @@ import { Hero } from '@/components/hero'
 import { Stats } from '@/components/stats'
 import { Pipeline } from '@/components/pipeline'
 import { Capabilities } from '@/components/capabilities'
+import { Orchestration } from '@/components/orchestration'
+import { Automations } from '@/components/automations'
 import { Teach } from '@/components/teach'
 import { Mcp } from '@/components/mcp'
 import { Security } from '@/components/security'
@@ -45,6 +47,10 @@ export default function App() {
         <Pipeline />
         <Rule className="mx-auto max-w-6xl" />
         <Capabilities />
+        <Rule className="mx-auto max-w-6xl" />
+        <Orchestration />
+        <Rule className="mx-auto max-w-6xl" />
+        <Automations />
         <Rule className="mx-auto max-w-6xl" />
         <Teach />
         <Rule className="mx-auto max-w-6xl" />

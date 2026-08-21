@@ -9,6 +9,8 @@ const COLUMNS = [
     links: [
       { label: 'Architecture', href: '#how' },
       { label: 'Capabilities', href: '#capabilities' },
+      { label: 'Orchestration', href: '#orchestrate' },
+      { label: 'Automations', href: '#automations' },
       { label: 'Skills', href: '#teach' },
       { label: 'MCP server', href: '#mcp' },
     ],
@@ -16,10 +18,11 @@ const COLUMNS = [
   {
     title: 'Docs',
     links: [
-      { label: 'Installation', href: `${REPO}/blob/main/docs/installation.md`, ext: true },
-      { label: 'Features', href: `${REPO}/blob/main/docs/features.md`, ext: true },
-      { label: 'Architecture', href: `${REPO}/blob/main/docs/architecture.md`, ext: true },
-      { label: 'Tools', href: `${REPO}/blob/main/docs/tools.md`, ext: true },
+      { label: 'Install and pair', href: `${REPO}/blob/main/docs/guide/install.md`, ext: true },
+      { label: 'Features', href: `${REPO}/tree/main/docs/guide/features`, ext: true },
+      { label: 'Approvals', href: `${REPO}/blob/main/docs/guide/approvals.md`, ext: true },
+      { label: 'Architecture', href: `${REPO}/tree/main/docs/internals`, ext: true },
+      { label: 'All 35 tools', href: `${REPO}/blob/main/docs/reference/tools.md`, ext: true },
     ],
   },
   {

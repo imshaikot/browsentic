@@ -4,10 +4,12 @@ import { Button, Reveal, Section, SectionHeading } from '@/components/primitives
 import { CodeBlock } from '@/components/copy-command'
 
 const DOCS = [
-  { href: `${REPO}/blob/main/docs/installation.md`, title: 'Installation', body: 'Prerequisites, configuration, limitations, troubleshooting, and driving it from a non-Claude agent.' },
-  { href: `${REPO}/blob/main/docs/features.md`, title: 'Features', body: 'Every capability, and when to reach for it.' },
-  { href: `${REPO}/blob/main/docs/architecture.md`, title: 'Architecture', body: 'How an instruction becomes a click, end to end.' },
-  { href: `${REPO}/blob/main/docs/tools.md`, title: 'Tools', body: 'Every tool published to an MCP client, and the action behind each one.' },
+  { href: `${REPO}/blob/main/docs/guide/install.md`, title: 'Install and pair', body: 'Prerequisites, setup, pairing, first run, and driving it from a non-Claude agent.' },
+  { href: `${REPO}/tree/main/docs/guide/features`, title: 'Features', body: 'Every capability, and when to reach for it.' },
+  { href: `${REPO}/blob/main/docs/guide/approvals.md`, title: 'Approvals', body: 'What asks before acting, what is refused outright, and how to change either.' },
+  { href: `${REPO}/tree/main/docs/internals`, title: 'Architecture', body: 'How an instruction becomes a click, end to end.' },
+  { href: `${REPO}/blob/main/docs/reference/tools.md`, title: 'All 35 tools', body: 'Every tool published to an MCP client, and the action behind each one.' },
+  { href: `${REPO}/blob/main/docs/guide/troubleshooting.md`, title: 'Troubleshooting', body: 'What each error means, and the fix that clears it.' },
 ]
 
 export function QuickStart() {
@@ -47,7 +49,7 @@ export function QuickStart() {
             <BookOpen className="size-4 text-ink-faint" />
             <h3 className="text-base font-semibold text-ink">Full documentation</h3>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {DOCS.map((d) => (
               <a
                 key={d.title}
