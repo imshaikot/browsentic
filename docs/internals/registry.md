@@ -6,7 +6,7 @@ One definition, compiled into two bundles.
 
 ## One array, two consumers
 
-There are **35 page capabilities**. They are defined once, in
+There are **37 page capabilities**. They are defined once, in
 [`lib/actions/registry.ts`](../../lib/actions/registry.ts), and that array is compiled into **both**
 the extension and the daemon.
 

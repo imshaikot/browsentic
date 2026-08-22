@@ -21,9 +21,9 @@ The surface, at a glance:
 | Group | Tools |
 | --- | --- |
 | [Status](#status) | `browsentic_status` |
-| [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_screenshot` |
+| [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
-| [Moving](#moving) | `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
+| [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Files](#files) | `page_listFiles`, `page_attachFile` |
@@ -126,6 +126,26 @@ like instead of starting a monitor.
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `maxCandidates` | integer | `10` | Cap on candidates returned, strongest signals first |
+
+### page_findSearch
+
+Report how this site can be searched from where you are: the search boxes on the page — including
+one hidden behind a header toggle — the buttons that reveal them, links to a search page, and the
+URL template a search would land on, with `{query}` where the words go. Read-only: it never types
+and never navigates.
+
+`searchable: false` with empty lists is the honest answer that this site has no search of its own.
+`template` comes from the site's own GET search form where there is one (`templateFrom: "form"`),
+otherwise from the current address when it already carries a search parameter
+(`templateFrom: "address"`), which is how a re-search keeps the filters you are looking at. A field
+reported with `hidden: true` is in the DOM but not on screen — click the `toggles` entry first.
+
+It is one of the read-only actions a [site-mapping run](#mapping-runs-only) may call, so a map can
+record where a site's search lives. `page_searchSite` is not — it navigates.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `maxPerKind` | integer | `5` | Cap on search boxes, toggles and links listed per kind, most likely first |
 
 ### page_screenshot
 
@@ -379,6 +399,30 @@ the user what was found.
 ---
 
 ## Moving
+
+### page_searchSite
+
+Search the site you are on, using that site's own search rather than a web search engine. It works
+out how this site searches and does it in one call: `strategy: "auto"` goes straight to the URL the
+site's search form would land on when one can be derived — which skips the autocomplete overlay
+entirely — and types into the search box when it cannot.
+
+It stays on the current site. If this site hands its search to another host the call is refused with
+`UNSUPPORTED` naming the URL, so that navigation goes through `page_navigate` and the guardrails
+that judge it. `query` is capped at 200 characters: this is a search box, not a channel for sending
+a site a payload.
+
+The result reports `via` (`"url"` or `"field"`), `landedOn` — the tab's URL once the search settled,
+which is how you confirm it ran — and `loaded`. It does **not** read the results: snapshot with
+`page_getPageInfo` or `page_extractText` afterwards. Two refusals name their own fix: a hidden
+search box names the toggle to click first, and a page with no search at all points at
+`page_findSearch`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `query` | string | required | What to look for on this site. 1–200 characters |
+| `strategy` | `"auto"` \| `"url"` \| `"field"` | `"auto"` | `"url"` insists on the search URL, `"field"` insists on typing — which is what a box that filters as you type needs |
+| `target` | [target](#element-targets) | — | The search box to use, when the page has several or the one picked was wrong |
 
 ### page_navigate
 

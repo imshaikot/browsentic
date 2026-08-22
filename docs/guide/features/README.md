@@ -17,7 +17,7 @@ first.
 
 | | |
 | --- | --- |
-| [Page actions](page-actions.md) | The 35 things it can do to a page, grouped by what you would want |
+| [Page actions](page-actions.md) | The 37 things it can do to a page, grouped by what you would want |
 | [Screenshots](screenshots.md) | Viewport, full page, or one element — and when a capture touches disk |
 | [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |

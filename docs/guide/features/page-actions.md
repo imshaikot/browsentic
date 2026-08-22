@@ -1,6 +1,6 @@
 # Page actions
 
-The 35 things Browsentic can do to a page. You never have to name these — you say what you want and
+The 37 things Browsentic can do to a page. You never have to name these — you say what you want and
 the agent picks — but knowing what exists tells you what is worth asking for.
 
 Exact parameters for every one: [reference/tools.md](../../reference/tools.md).
@@ -25,6 +25,7 @@ by **visible text** survives redesigns that break CSS paths.
 | `page_extractText` | Rendered text of an element or the whole page. Raw HTML is [denied by default](../approvals.md) |
 | `page_waitForElement` | Wait until an element is attached, visible, hidden or detached |
 | `page_findProgress` | Scan for progress signals worth [monitoring](monitoring.md) |
+| `page_findSearch` | Report whether this site has a search of its own, where its box is, and the URL a search lands on |
 | `page_screenshot` | See [Screenshots](screenshots.md) |
 
 ## Clicking and typing
@@ -48,6 +49,7 @@ by **visible text** survives redesigns that break CSS paths.
 
 | | |
 | --- | --- |
+| `page_searchSite` | Search this site with its own search, by its search URL or its search box, and land on the results |
 | `page_navigate` | Go to a URL, or back / forward / reload |
 | `page_scrollTo` | To an element, an absolute position, or by one viewport |
 | `page_openTab` | Open a URL in a new tab, which becomes the target for later actions unless `active: false` |
