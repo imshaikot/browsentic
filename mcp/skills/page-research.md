@@ -12,6 +12,8 @@ The user wants to know something, not have something done. Read the page and ans
 2. `page_getPageInfo { maxPerKind: 30 }` — adds the inventory of links, buttons, fields and forms, each with its role, its state and the landmark region it sits in. Use it when the answer is about what the page *offers* rather than what it says. `interactive.counts` gives the real totals when the lists are truncated.
 3. `page_extractText { format: "text" }` — the rendered prose. Scope it with a `target` when you know which region matters; pulling a whole article to answer a one-line question wastes the user's time and yours.
 
+A long page comes back one group at a time, cut on sentence boundaries. If the reply carries a `cursor`, there is more: ask for the next group with `page_extractText { cursor }` — but only when the answer is not already in hand. Reading to the end of a page you have already answered from is the same waste as pulling it all at once. A reply of `stale: true` means the page rewrote itself under the read; start again with no cursor, and say so if it keeps happening — a page that changes while you read it may not have a stable answer.
+
 ## Staying read-only
 
 The actions that change the page — click, fill, submit, select, press, navigate — are not part of this job. Three exceptions, all about seeing rather than changing:

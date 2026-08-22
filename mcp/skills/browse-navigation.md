@@ -23,7 +23,9 @@ Any `value` written as `{{name}}` was deliberately never captured — the record
 
 - Collect every `{{placeholder}}` the run will need, from `variables` and from the steps themselves.
 - Ask the user for all of them in one message, naming the field each belongs to.
-- Never invent, guess, or reuse a value from an earlier conversation. Never fill a password-shaped placeholder from anything but the user's answer in this run.
+- Never invent, guess, or reuse a value from an earlier conversation. Never fill a password-shaped `{{placeholder}}` from anything but the user's answer in this run.
+
+A sealed secret is the one exception, and it is a different kind of placeholder. `⟦password:7f3a@example.com⟧` is not a gap to fill — it is a real credential Browsentic is already holding for you. Pass it through unchanged as the `value` and it becomes the credential at the field. Do not ask the user for it, and do not confuse the two: `{{name}}` means *ask*, `⟦…⟧` means *already have it*.
 
 If the user declines to supply one, stop at that step and say which one is missing.
 
