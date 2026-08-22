@@ -24,6 +24,7 @@
  */
 
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
+import { handlesIn, sealedHandles } from '@/lib/secrets';
 import { hostAllowed, targetUrl, targetsAnotherTab, urlPayloadBytes, type Scope } from './scope';
 
 export const SUBMIT_ACTION = 'page.submitForm';
@@ -87,6 +88,28 @@ export const CONDITIONS = {
 
   /** Acting on another site's human-verification control. */
   answersCaptcha: (request) => request.action === CAPTCHA_ACTION,
+
+  /**
+   * Turns a sealed placeholder back into the credential it stands for. The release
+   * itself happens in the extension, one hop from the page; this is where a person gets
+   * told it is about to. An external caller has nobody to tell, so `unattended` answers.
+   */
+  releasesSecret: (request) => sealedHandles(request.input).length > 0,
+
+  /** Releasing a credential read on one site into a page on another. */
+  releasesSecretOffScope: (request) =>
+    sealedHandles(request.input).some((handle) => !!handle.origin && !hostAllowed(handle.origin, request.scope.hosts)),
+
+  /**
+   * A sealed secret in a URL is a credential on its way out of the browser. Read from
+   * the raw argument, not the parsed URL: parsing percent-encodes the handle's brackets
+   * and the placeholder stops looking like one.
+   */
+  carriesSecretInUrl: (request) => {
+    if (!targetUrl(request.action, request.input)) return false;
+    const url = (request.input as { url?: unknown } | undefined)?.url;
+    return typeof url === 'string' && handlesIn(url).length > 0;
+  },
 
   /** Raw outerHTML: comments, aria-hidden nodes and off-screen text, the classic carrier. */
   readsRawHtml: (request) =>
@@ -174,6 +197,30 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Answers a captcha',
     reason: 'That ticks a site’s “I am a human” check on your behalf.',
+  },
+  {
+    id: 'secret-release',
+    when: 'releasesSecret',
+    effect: 'confirm',
+    title: 'Types a saved secret into the page',
+    reason: 'That field holds a credential Browsentic sealed earlier.',
+  },
+  {
+    // The seal records where each value was read. A password from a reset mail typed
+    // into the app it is for is the point of the vault; the same password typed into a
+    // page that merely asks for one is how a credential changes hands.
+    id: 'secret-off-scope',
+    when: 'releasesSecretOffScope',
+    effect: 'confirm',
+    title: 'Uses a secret from another site',
+    reason: 'That credential was read on a different site to the one this run is about.',
+  },
+  {
+    id: 'secret-in-url',
+    when: 'carriesSecretInUrl',
+    effect: 'deny',
+    title: 'Puts a secret in a URL',
+    reason: 'A sealed secret cannot travel in a URL. Type it into the field it belongs in and Browsentic will release it there.',
   },
   {
     id: 'config-require-approval',
