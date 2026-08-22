@@ -4,6 +4,7 @@ import { navigate } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
+import { searchSite } from '@/lib/actions/page/search-site';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/events';
 
@@ -26,6 +27,7 @@ type NavigateInput = z.input<typeof navigate.input>;
 type OpenTabInput = z.input<typeof openTab.input>;
 type ScrollInput = z.input<typeof scrollTo.input>;
 type ClickInput = z.input<typeof clickElement.input>;
+type SearchSiteInput = z.input<typeof searchSite.input>;
 type PressKeyInput = z.input<typeof pressKey.input>;
 
 const SITES: Record<string, string> = {
@@ -150,6 +152,16 @@ export const RULES: readonly Rule[] = [
         `Search the web for "${query}"`,
         verb === 'google' ? 0.95 : 1,
       );
+    },
+  },
+  {
+    id: 'site.search',
+    action: searchSite.name,
+    certainty: 0.95,
+    pattern: /^search\s+(?:(?:on|in)\s+)?(?:(?:this|the)\s+(?:site|website)|here)\s+for\s+(?<q>.+)$/,
+    build: ({ q }) => {
+      const query = q!.trim();
+      return query ? built({ query } satisfies SearchSiteInput, `Search this site for "${query}"`) : null;
     },
   },
   {
