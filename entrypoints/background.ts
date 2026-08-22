@@ -20,6 +20,8 @@ import {
   onWelcome,
   pairDaemon,
   readAgentState,
+  readGuardrails,
+  setGuardrail,
   setUpAgent,
 } from '@/lib/bridge/socket';
 
@@ -105,6 +107,18 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
+    if (message.op === 'guardrails') {
+      readGuardrails()
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'setGuardrail' && typeof message.setting === 'string') {
+      setGuardrail(message.setting, message.value)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
         .then((result) =>
@@ -122,7 +136,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"disconnect"}',
       ),
     );
     return;

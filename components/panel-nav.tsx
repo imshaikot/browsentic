@@ -1,14 +1,15 @@
-import { BookOpen, Clapperboard, History, MessagesSquare, type LucideIcon } from 'lucide-react';
+import { BookOpen, Clapperboard, History, MessagesSquare, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings';
+export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings' | 'settings';
 
 const TABS: { id: PanelTab; label: string; icon: LucideIcon }[] = [
   { id: 'chat', label: 'Chat', icon: MessagesSquare },
   { id: 'history', label: 'History', icon: History },
   { id: 'skills', label: 'Skills', icon: BookOpen },
   { id: 'recordings', label: 'Recordings', icon: Clapperboard },
+  { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
 ];
 
 export function PanelNav({

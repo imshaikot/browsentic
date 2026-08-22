@@ -16,6 +16,7 @@ import { RecordingPanel } from '@/components/recording-panel';
 import { RunTimeline } from '@/components/run-timeline';
 import { SessionList } from '@/components/session-list';
 import { SessionRail } from '@/components/session-rail';
+import { SettingsPanel } from '@/components/settings-panel';
 import { SiteMapReview } from '@/components/site-map-review';
 import { SkillsPanel } from '@/components/skills-panel';
 import { StatusPill, describeStatus } from '@/components/status-pill';
@@ -252,6 +253,8 @@ export default function App() {
             />
           ) : tab === 'skills' ? (
             <SkillsPanel tabUrl={tabUrl} connected={connected} onMapSite={mapSite} mapping={run.running} />
+          ) : tab === 'settings' ? (
+            <SettingsPanel />
           ) : (
             <RecordingPanel
               tabUrl={tabUrl}
