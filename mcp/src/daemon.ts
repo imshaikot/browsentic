@@ -55,6 +55,7 @@ import {
   decide,
   describe as describeDecision,
   policyFrom,
+  sealSecrets,
   summary as summarizeDecision,
 } from './guardrails';
 import { log } from './log';
@@ -553,7 +554,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       kind: 'toolResult',
       toolId,
       ok: result.ok,
-      summary: result.ok ? 'ok' : `${result.error.code}: ${result.error.message}`,
+      summary: result.ok ? 'ok' : sealSecrets(`${result.error.code}: ${result.error.message}`),
     });
     return result;
   }

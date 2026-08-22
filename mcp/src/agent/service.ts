@@ -21,6 +21,7 @@ import {
   normalizeHost,
   policyFrom,
   scopeFor,
+  sealSecrets,
   summary as summarizeDecision,
   type Policy,
   type Scope,
@@ -585,6 +586,6 @@ function summarize(input: unknown, result: ActionResult): string {
 }
 
 function clip(text: string): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
+  const flat = sealSecrets(text).replace(/\s+/g, ' ').trim();
   return flat.length > SUMMARY_LIMIT ? `${flat.slice(0, SUMMARY_LIMIT - 1)}…` : flat;
 }

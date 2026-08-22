@@ -10,7 +10,7 @@ import { RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/a
 import { actionNameFor, assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { readAgentConfig } from './agent/config';
 import type { Bridge } from './control';
-import { IMAGE_NOTE, fence, fenceTag, policyFrom, shouldFence } from './guardrails';
+import { IMAGE_NOTE, fence, fenceTag, policyFrom, sealSecrets, shouldFence } from './guardrails';
 import { log } from './log';
 
 const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
@@ -124,7 +124,11 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
         'get stable selectors, then target elements by selector or visible text. ' +
         'page_screenshot hands the image back to you in the result and writes nothing to disk, so captures you take to see ' +
         'the page for yourself leave no files behind. Pass save: true only when the user asked for a picture they can keep; ' +
-        'then read the returned savedTo path back so the image renders, and include that path in your reply.',
+        'then read the returned savedTo path back so the image renders, and include that path in your reply. ' +
+        'Passwords, keys, tokens and cookies are replaced in every result by a sealed placeholder such as ' +
+        '⟦password:4f2a@example.com⟧; the real value stays in the browser. Pass a placeholder through unchanged as ' +
+        'page_fillInput’s value or page_typeText’s text and it becomes the credential at the moment it reaches the field. ' +
+        'Anywhere else it is refused, and it is never yours to read, rebuild or repeat.',
     },
   );
 
@@ -166,7 +170,10 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
 
     // Resources are read straight into the client's context, so they are fenced the
     // same way tool results are.
-    const wrap = (body: string) => (policy.fence.enabled ? fence(body, tag) : body);
+    const wrap = (body: string) => {
+      const sealed = sealSecrets(body);
+      return policy.fence.enabled ? fence(sealed, tag) : sealed;
+    };
 
     if (uri === 'browsentic://page/text') {
       const result = await bridge.invoke('page.extractText', { format: 'text' });
@@ -265,7 +272,7 @@ function renderScreenshot(result: ActionResult) {
   return {
     content: [
       { type: 'image' as const, data: base64, mimeType },
-      { type: 'text' as const, text: notes },
+      { type: 'text' as const, text: sealSecrets(notes) },
     ],
   };
 }
@@ -278,15 +285,19 @@ function splitDataUrl(dataUrl: string): [mimeType: string, base64: string] {
 /**
  * `fenceWith` marks the payload as untrusted page data. Failures are left bare: they
  * are daemon-authored and the run preamble teaches the agent to read `CODE: message`.
+ *
+ * The seal runs on every body, fenced or not. The extension has normally sealed already
+ * and this pass leaves its handles alone; what it catches is a result that reached the
+ * daemon another way.
  */
 function render(result: ActionResult, fenceWith?: string) {
   if (result.ok) {
-    const body = JSON.stringify(result.data, null, 2);
+    const body = sealSecrets(JSON.stringify(result.data, null, 2));
     return { content: [{ type: 'text' as const, text: fenceWith ? fence(body, fenceWith) : body }] };
   }
   return {
     isError: true,
-    content: [{ type: 'text' as const, text: `${result.error.code}: ${result.error.message}` }],
+    content: [{ type: 'text' as const, text: sealSecrets(`${result.error.code}: ${result.error.message}`) }],
   };
 }
 

@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import type { RunEvent } from '@/lib/actions/protocol';
 import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
-import { describeContainment, sealEnv, sealedAway, vetPlan, type SpawnMode } from '../../guardrails';
+import { describeContainment, sealEnv, sealedAway, sealingStream, vetPlan, type SpawnMode } from '../../guardrails';
 import { configPath, type AgentSettings } from '../config';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
@@ -111,14 +111,29 @@ export function runStream(
       outcome();
     };
 
+    // What the agent says reaches the user and the transcript, so it goes through the
+    // same sanitizer page text does. Deltas split a credential across two writes, which
+    // is why this holds back the tail of the stream rather than sealing each one.
+    const outbound = sealingStream();
+    const say = (delta: string) => delta && emit({ kind: 'text', delta });
+    const flush = () => say(outbound.flush());
+
     const sink: StreamSink = {
-      text: (delta) => delta && emit({ kind: 'text', delta }),
+      text: (delta) => delta && say(outbound.push(delta)),
       tool: (toolId, name) => emit({ kind: 'tool', toolId, action: name, input: {} }),
       session: (id) => {
         if (id) sessionId = id;
       },
-      done: (stopReason) => settle(() => resolve({ stopReason, sessionId })),
-      fail: (code, message) => settle(() => reject(new RunError(code, message))),
+      done: (stopReason) =>
+        settle(() => {
+          flush();
+          resolve({ stopReason, sessionId });
+        }),
+      fail: (code, message) =>
+        settle(() => {
+          flush();
+          reject(new RunError(code, message));
+        }),
     };
 
     child.stderr.on('data', (chunk: Buffer) => {
