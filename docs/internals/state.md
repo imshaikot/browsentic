@@ -26,7 +26,11 @@ Nothing lives in the repository.
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `daemon.log` | The daemon | `browsentic-mcp logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
-## The two exceptions
+## The three exceptions
+
+**Held secrets** never reach disk at all. A credential the sanitizer seals out of a page is kept in
+the extension's `browser.storage.session` under `browsentic/secrets`, capped at 64 entries, expiring
+after two hours and emptied by the browser on restart. The daemon never receives one.
 
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
 

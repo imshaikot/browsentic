@@ -25,14 +25,19 @@ The full write-up lives in the docs and is the authority:
 - [Transport and authorization](docs/internals/transport.md) — the origin gate, the mutual
   pairing handshake, why a web page can never reach the control path
 - [Guardrails](docs/internals/guardrails.md) — the action policy, run scope, fencing of page
-  text, containment of the spawned agent CLI
+  text, sealing of credentials, containment of the spawned agent CLI
 - [Limits](docs/guide/limits.md) — the boundaries stated plainly
 
-Two of those boundaries matter enough to repeat here. **Pairing controls which browser, not
+Three of those boundaries matter enough to repeat here. **Pairing controls which browser, not
 which local process**: anything running as your user can drive an already-paired browser, so
-your user account is the trust boundary. And **prompt injection is mitigated, not solved**: an
+your user account is the trust boundary. **Prompt injection is mitigated, not solved**: an
 agent reading a hostile page can be influenced by it, and the design goal is to leave a
-successful injection nowhere to act or send data — not to make injection impossible.
+successful injection nowhere to act or send data — not to make injection impossible. And
+**secret detection is a filter, not a proof**: the sanitizer is deterministic and errs toward
+sealing, but a credential with no recognisable shape, no label near it and low entropy — a short
+passphrase in running prose — can still read as ordinary text. Held secrets live in the
+extension's session storage in the clear, gone when the browser closes; they are never written to
+disk and never cross the socket.
 
 ## Disclaimer and liability
 

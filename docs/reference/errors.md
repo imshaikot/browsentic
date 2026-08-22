@@ -61,6 +61,8 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | --- | --- | --- |
 | `DECLINED` | Approval gate | The user said no. **Final** — do not seek another route to the same effect |
 | `BLOCKED` | Policy | A `deny` rule matched, or a `confirm` with nobody to answer it. The message names why. [Guide](../guide/approvals.md) |
+| `SECRET_NOT_RELEASABLE` | Extension | A sealed secret placeholder was passed somewhere it cannot be released. Only `page_fillInput`'s `value` and `page_typeText`'s `text` release one |
+| `SECRET_EXPIRED` | Extension | That placeholder is no longer held — it aged out, or it was read in an earlier browser session. Read the value again |
 | `MAPPING_READ_ONLY` | Mapping gate | A mapping run may only call the 14 read-only actions (plus `page_clickElement` when `allowClicks` is on) |
 | `MAPPING_OFF_SITE` | Mapping gate | Navigation must be an absolute URL on the mapped origin — `back` and `forward` included |
 | `MAPPING_BUDGET` | Mapping gate | The page or screenshot budget is spent |

@@ -75,6 +75,7 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 - **Both Ends Prove Themselves**: Neither secret crosses the wire; each side answers the other's nonce, so no local process can squat a port and pose as your daemon
 - **Consequential Actions Ask First**: Form submission, file upload, answering a captcha and leaving the run's sites all pause for an explicit Allow or Deny
 - **Agent Runs Are Contained**: The spawned CLI gets Browsentic's tools and nothing else — no shell, no filesystem, no other MCP servers, and a sealed environment stripped of your cloud keys and tokens
+- **Credentials Are Sealed, Not Read**: A deterministic sanitizer runs on both sides of the socket. Passwords, keys, tokens, cookies and card numbers found in a page are replaced by a placeholder before the agent ever sees them, and become plaintext again only in the field they are typed into
 - **Recordings Capture What You Do, Not What You Type**: Passwords, hidden fields, one-time codes and card numbers are never stored
 
 Two limits worth stating plainly: pairing controls **which browser**, not which local process, and an agent reading a hostile page is still susceptible to prompt injection. Both are covered in [Limits](docs/guide/limits.md).
