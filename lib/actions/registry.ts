@@ -27,6 +27,7 @@ import { readRecording } from './page/read-recording';
 import { readTheme } from './page/read-theme';
 import { screenshot } from './page/screenshot';
 import { scrollTo } from './page/scroll-to';
+import { searchSite } from './page/search-site';
 import { selectOption } from './page/select-option';
 import { selectText } from './page/select-text';
 import { solveCaptcha } from './page/solve-captcha';
@@ -68,6 +69,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       awaitMonitor,
       stopMonitor,
       highlightElement,
+      searchSite,
       navigate,
       openTab,
       switchTab,

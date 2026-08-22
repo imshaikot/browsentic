@@ -14,6 +14,7 @@ import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/p
 import { openTab } from '@/lib/actions/page/open-tab';
 import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
+import { searchSite } from '@/lib/actions/page/search-site';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
@@ -56,6 +57,7 @@ export async function invokeForHarness(
       : failure('MAPPING_TAB_CHANGED', 'The tab this run started in has been closed.');
   }
   if (action === navigate.name) return navigateTab(tab.id, input);
+  if (action === searchSite.name) return searchTab(tab.id, input);
   if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input, runId);
@@ -275,4 +277,25 @@ async function navigateViaTabsApi(tabId: number, input: unknown): Promise<Action
       ? { navigatedTo: plan.href, loaded: completed }
       : { performed: plan.action, loaded: completed },
   );
+}
+
+const FIELD_SETTLE_MS = 2_000;
+
+async function searchTab(tabId: number, input: unknown): Promise<ActionResult> {
+  const inPage = await invokeInTab(tabId, searchSite.name, input);
+  if (!inPage.ok) return inPage;
+  const searched = inPage.data as { via?: unknown; submitted?: unknown };
+  const loaded = await settleAfterSearch(tabId, searched.via === 'url' || searched.submitted === true);
+  return success({ ...(inPage.data as object), loaded, landedOn: (await pinnedTab(tabId))?.url });
+}
+
+async function settleAfterSearch(tabId: number, navigating: boolean): Promise<boolean> {
+  const watcher = watchForLoad(tabId);
+  if (navigating) return watcher.settled;
+  const raced = await Promise.race([
+    watcher.settled,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), FIELD_SETTLE_MS)),
+  ]);
+  if (raced === null) watcher.cancel();
+  return raced ?? false;
 }
