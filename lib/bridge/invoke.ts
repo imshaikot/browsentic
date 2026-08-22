@@ -21,6 +21,8 @@ import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { switchTab } from '@/lib/actions/page/switch-tab';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
+import { releaseForAction, sealForPage } from '@/lib/bridge/secret-vault';
 import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
@@ -30,9 +32,46 @@ import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
 import { adoptSubtab, sessionForRun, sessionForTab, setCurrentTab, type TabSession } from '@/lib/bridge/tab-sessions';
 
+/**
+ * The sanitizer's client-side half, wrapped around every action the harness runs.
+ *
+ * In: a sealed handle becomes plaintext only if it sits in a field that types into the
+ * page, and only one hop before the content script gets it. Out: whatever the page gave
+ * back is scanned and sealed before it can reach the daemon, so a credential read from a
+ * page never crosses the socket at all.
+ */
 export async function invokeForHarness(
   action: string,
   input?: unknown,
+  tabId?: number,
+  runId?: string,
+): Promise<ActionResult> {
+  const release = await releaseForAction(action, input);
+  if (release.refused.length) return failure('SECRET_NOT_RELEASABLE', REFUSED_MESSAGE);
+  if (release.unresolved.length) return failure('SECRET_EXPIRED', EXPIRED_MESSAGE);
+
+  const result = await dispatch(action, release.input, tabId, runId);
+  const { value } = await sealForPage(result, await targetOrigin(tabId, runId));
+  return value;
+}
+
+async function targetOrigin(tabId?: number, runId?: string): Promise<string | undefined> {
+  const owner = runId ? await sessionForRun(runId) : null;
+  const tab = await resolveTab(tabId, owner);
+  return tab?.url ? hostOf(tab.url) : undefined;
+}
+
+function hostOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname.toLowerCase() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function dispatch(
+  action: string,
+  input: unknown,
   tabId?: number,
   runId?: string,
 ): Promise<ActionResult> {
