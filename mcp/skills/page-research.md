@@ -14,10 +14,11 @@ The user wants to know something, not have something done. Read the page and ans
 
 ## Staying read-only
 
-The actions that change the page — click, fill, submit, select, press, navigate — are not part of this job. Two exceptions, both about seeing rather than changing:
+The actions that change the page — click, fill, submit, select, press, navigate — are not part of this job. Three exceptions, all about seeing rather than changing:
 
 - `page_scrollTo` when content is lazily rendered and genuinely is not in the DOM yet.
 - `page_hoverElement` when the answer lives in a tooltip or a dropdown.
+- `page_findSearch` when the question is whether this site can be searched at all, and from where. It reads; `page_searchSite` acts, so that one is not yours to call — if the answer is only reachable by searching the site, say so and let the user decide.
 
 If answering honestly requires navigating somewhere else or interacting with the page, say so and let the user decide. Do not go and do it.
 

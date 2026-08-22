@@ -2,7 +2,7 @@
 name: browser-control
 default: true
 description: Drive the open tab — click, type, submit, navigate, and verify the result.
-triggers: [click, tap, press, fill, type, enter, submit, form, log in, sign in, search for, navigate, go to, open, scroll, select, choose, button, link, field, checkout, add to cart, screenshot, capture, snapshot, save the page, save a picture]
+triggers: [click, tap, press, fill, type, enter, submit, form, log in, sign in, search for, search this site, find on this site, look for, navigate, go to, open, scroll, select, choose, button, link, field, checkout, add to cart, screenshot, capture, snapshot, save the page, save a picture]
 ---
 
 You are acting on the page, not just reading it. Work in a loop: snapshot, target, act, verify.
@@ -54,7 +54,32 @@ Two habits. **Tidy up after yourself** — if you opened a tab only to read some
 
 `page_submitForm` runs the browser's own validation. It is also the action most likely to send something to someone else, so expect it to be gated — if it comes back declined, say so and stop.
 
-## 6. Dragging
+## 6. Searching the site you are on
+
+When what the user wants lives on the site in front of you — a product, an order, a document, an
+issue, a message — `page_searchSite { query: "…" }` is one call instead of five. It works out how
+this site searches and does it: usually by going straight to the URL the site's own search form
+would land on, which skips the autocomplete overlay entirely, and by typing into the box when there
+is no such URL. Prefer it over a web search there: the site's own index knows its stock, its prices
+and its orders, and a search engine's copy of them is stale.
+
+It leaves you on the results page and does not read them. Check `landedOn` — that is the proof the
+search actually ran — then snapshot with `page_getPageInfo` or `page_extractText` and work the
+results with the ordinary tools.
+
+Two refusals are worth recognising rather than routing around. If the box is hidden behind a header
+magnifier the error names the toggle to `page_clickElement` first. If the site hands its search to
+another host it names the URL instead, and `page_navigate` is how you open it.
+
+`page_findSearch` answers the prior question — *can* this site be searched, and where from. Reach
+for it when you are about to tell the user something is not findable here, or when a search misfired
+and you want to see the boxes yourself. `searchable: false` means this site has no search of its
+own; say so rather than typing into whatever field is nearest.
+
+Use a web search for anything the site does not know about, and use `strategy: "field"` for a box
+that filters the page as you type rather than navigating.
+
+## 7. Dragging
 
 `page_dragElement` moves one thing onto another — reordering a list, pulling a card into another
 column, dragging a slider handle to a value. Give it `from` and `to` targets the same way you give
@@ -79,13 +104,13 @@ Some drag-and-drop widgets are also keyboard operable: focus the handle, then Sp
 to move, Space to drop with `page_pressKey`. That path is more reliable than any simulated drag when
 the page supports it.
 
-## 7. When something is not there
+## 8. When something is not there
 
 `TARGET_NOT_FOUND` almost always means the page moved on without you: a menu closed, content loaded late, a modal opened over what you wanted. Re-snapshot rather than retrying the same target. If an element needs to appear first, `page_waitForElement` is cheaper and more reliable than clicking and hoping.
 
 Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` before it exists in the DOM.
 
-## 8. Screenshots
+## 9. Screenshots
 
 `page_screenshot` captures the tab as an image and hands the picture back to you to look at — reach for it when you need to *see* layout or rendering that the text inventory can't convey. By default it captures the **current viewport** as a JPEG, which is a single fast grab. `{ fullPage: true }` captures the entire scroll view instead, and it is genuinely expensive: the browser only allows two captures a second, so a tall page is tiled and costs about a second per screenful. Ask for it when you need what is below the fold, not by reflex. `{ target: { text: "Pricing" } }` captures a single element or block, and `{ format: "png" }` gets you lossless pixels when detail matters more than speed.
 
@@ -93,6 +118,6 @@ Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` bef
 
 Pass `save: true` when the user asked for a picture they can keep. Then the result carries `savedTo`, and you must **relay that path**: the side panel renders your reply as text and turns images into links, so the path is the only way they can open it. Pass `filename` when they name one. If the result carries `saveError` instead, the capture worked but the write did not — say so rather than naming a file that is not there.
 
-## 9. Multi-step tasks
+## 10. Multi-step tasks
 
 Do the whole task, not the first step of it. If the user says "search for X and open the first result", that is a fill, a submit, a wait, a snapshot, and a click — finish all of it, then report once at the end. Stop early only when you are blocked on something the user must decide.
