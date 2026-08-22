@@ -12,6 +12,7 @@ import { extractText } from './page/extract-text';
 import { fillInput } from './page/fill-input';
 import { findCaptcha } from './page/find-captcha';
 import { findProgress } from './page/find-progress';
+import { findSearch } from './page/find-search';
 import { focusInput } from './page/focus-input';
 import { getPageInfo } from './page/get-page-info';
 import { highlightElement } from './page/highlight-element';
@@ -58,6 +59,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       submitForm,
       waitForElement,
       findProgress,
+      findSearch,
       readTheme,
       auditContrast,
       applyTheme,
