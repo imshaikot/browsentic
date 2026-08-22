@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, type AgentKind } from '@/lib/agents/catalog';
+import { FENCE_SETTING, UNATTENDED_SETTING, type GuardrailValue, type RuleEffect } from '@/lib/settings/guardrails';
 import type { GuardrailConfig } from '../guardrails';
 import { stateDir } from '../lockfile';
 
@@ -79,6 +80,7 @@ interface StoredConfig extends Record<string, unknown> {
   agent?: unknown;
   agents?: Record<string, { bin?: unknown; model?: unknown; effort?: unknown } | undefined>;
   requireApproval?: unknown;
+  guardrails?: unknown;
   /** Pre-0.2 layout: one Claude Code runner, configured at the top level. */
   claudeBin?: unknown;
   model?: unknown;
@@ -134,6 +136,36 @@ export function activeAgent(config: AgentConfig): ActiveAgent {
 export function writeActiveAgent(kind: AgentKind): void {
   const stored = readStored();
   write({ ...stored, agent: kind });
+}
+
+/**
+ * Write one guardrail override, leaving every other key in config.json alone. `null`
+ * removes the override rather than writing a value equal to the default — so a config
+ * file only ever names the decisions someone actually made, and a change to a shipped
+ * default reaches an install that never overrode it.
+ */
+export function writeGuardrailSetting(setting: string, value: GuardrailValue): void {
+  const stored = readStored();
+  const guardrails: GuardrailConfig = { ...((stored.guardrails as GuardrailConfig | undefined) ?? {}) };
+
+  if (setting === FENCE_SETTING) {
+    if (value === null) delete guardrails.fence;
+    else guardrails.fence = value === true;
+  } else if (setting === UNATTENDED_SETTING) {
+    if (value === null) delete guardrails.unattended;
+    else guardrails.unattended = value === 'allow' ? 'allow' : 'deny';
+  } else {
+    const rules = { ...(guardrails.rules ?? {}) };
+    if (value === null) delete rules[setting];
+    else rules[setting] = value as RuleEffect;
+    if (Object.keys(rules).length) guardrails.rules = rules;
+    else delete guardrails.rules;
+  }
+
+  const next = { ...stored };
+  if (Object.keys(guardrails).length) next.guardrails = guardrails;
+  else delete next.guardrails;
+  write(next);
 }
 
 function write(config: StoredConfig): void {

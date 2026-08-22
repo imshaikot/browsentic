@@ -3,13 +3,14 @@ import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
+import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 11;
+export const SOCKET_PROTOCOL_VERSION = 12;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -37,7 +38,9 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'monitorState' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'agentState'; refresh?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgent'; agent: AgentKind }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'guardrails' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'setGuardrail'; setting: string; value: GuardrailValue };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -146,7 +149,10 @@ export type SocketFrame =
   | { t: 'agentState'; id: string; refresh?: boolean }
   | { t: 'setAgent'; id: string; agent: AgentKind }
   | { t: 'grantAgent'; id: string; agent: AgentKind }
-  | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> };
+  | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> }
+  | { t: 'guardrails'; id: string }
+  | { t: 'setGuardrail'; id: string; setting: string; value: GuardrailValue }
+  | { t: 'guardrailInfo'; id: string; result: ActionResult<GuardrailSettings> };
 
 export interface RecordingAnalysis {
   workflow: RecordingWorkflow;
@@ -175,6 +181,8 @@ export const EXTENSION_REQUEST_FRAMES = [
   'agentState',
   'setAgent',
   'grantAgent',
+  'guardrails',
+  'setGuardrail',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

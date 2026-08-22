@@ -25,6 +25,7 @@
 
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { handlesIn, sealedHandles } from '@/lib/secrets';
+import type { RuleEffect } from '@/lib/settings/guardrails';
 import { hostAllowed, targetUrl, targetsAnotherTab, urlPayloadBytes, type Scope } from './scope';
 
 export const SUBMIT_ACTION = 'page.submitForm';
@@ -32,7 +33,8 @@ export const UPLOAD_ACTION = 'page.attachFile';
 export const EXTRACT_ACTION = 'page.extractText';
 export const CAPTCHA_ACTION = 'page.solveCaptcha';
 
-export type Effect = 'allow' | 'confirm' | 'deny';
+/** One definition, shared with the settings screen that renders it. */
+export type Effect = RuleEffect;
 
 /**
  * Who is asking. `agent` is a Browsentic run driven from the side panel — it has a

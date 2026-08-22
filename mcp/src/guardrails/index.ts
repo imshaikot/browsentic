@@ -7,6 +7,7 @@
  *   policy.ts   what may happen in a page — rules as data over a closed set of conditions
  *   fence.ts    what the model is told about where text came from
  *   secrets.ts  what a credential looks like on its way out, and why it cannot come back
+ *   settings.ts the same policy, described for the panel that lets you override it
  *   spawn.ts    what the agent CLI itself is allowed to reach on the machine
  *
  * and pure helpers that read them: `decide()`, `fence()`, `sealSecrets()`, `vetPlan()`,
@@ -37,6 +38,8 @@ export type { Decision } from './decide';
 export { FENCE_NOTE, IMAGE_NOTE, fence, fenceTag, shouldFence } from './fence';
 
 export { sealSecrets, sealSecretsIn, sealingStream } from './secrets';
+
+export { guardrailSettings, settingWritable } from './settings';
 
 export { CONTAINMENT, describeContainment, sealEnv, sealedAway, vetPlan } from './spawn';
 export type { LocalTools, SpawnMode, SpawnPlan } from './spawn';

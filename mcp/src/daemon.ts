@@ -13,6 +13,7 @@ import {
   type RunEvent,
   type SocketFrame,
 } from '@/lib/actions/protocol';
+import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import { hashManifest } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
@@ -43,7 +44,7 @@ import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
-import { readAgentConfig, writeActiveAgent } from './agent/config';
+import { configPath, readAgentConfig, writeActiveAgent, writeGuardrailSetting } from './agent/config';
 import { agentState, grantRunner } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { commitStaging, discardStaging } from './agent/site-map-store';
@@ -54,14 +55,17 @@ import {
   blocked,
   decide,
   describe as describeDecision,
+  guardrailSettings,
   policyFrom,
   sealSecrets,
+  settingWritable,
   summary as summarizeDecision,
 } from './guardrails';
 import { log } from './log';
 import { readLockfile, writeLockfile, clearLockfile, type Lockfile } from './lockfile';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'grantAgent' }>;
+type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -323,6 +327,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           );
           return;
         }
+        if (request.t === 'guardrails' || request.t === 'setGuardrail') {
+          return source.send({ t: 'guardrailInfo', id: request.id, result: settleGuardrail(request) });
+        }
         if (request.t === 'saveSkill') {
           return source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
         }
@@ -369,6 +376,21 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (request.t === 'grantAgent') await grantRunner(request.agent);
     const refresh = request.t !== 'agentState' || request.refresh === true;
     return success(await agentState(readAgentConfig(), { refresh }));
+  }
+
+  function settleGuardrail(request: GuardrailFrame): ActionResult<GuardrailSettings> {
+    if (request.t === 'setGuardrail') {
+      if (!settingWritable(request.setting, request.value)) {
+        return failure(
+          'INVALID_INPUT',
+          `"${request.setting}" is not a guardrail the panel may set. Locked rules are edited in ${configPath}.`,
+        );
+      }
+      writeGuardrailSetting(request.setting, request.value);
+      log(`guardrail ${request.setting} → ${request.value === null ? 'default' : String(request.value)}`);
+    }
+    const config = readAgentConfig();
+    return success(guardrailSettings(config.guardrails ?? {}, config.requireApproval, configPath));
   }
 
   async function pushAgentState(target: ExtensionLink): Promise<void> {
