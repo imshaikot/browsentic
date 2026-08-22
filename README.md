@@ -12,7 +12,7 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
 - **Voice, Text, or Demonstration**: Dictate in the side panel, type anywhere, or record yourself doing a job once and later say "do it like last time"
 - **Teach It a Site Once**: Point it at a site and it explores and writes reusable notes, so every later session already knows its way around
 - **Instant Commands**: "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent round trip
-- **Guardrails, Not Vibes**: A declarative policy gates consequential actions, confines each run to the sites it is about, and marks every byte of page text as untrusted data
+- **Guardrails, Not Vibes**: A declarative policy gates consequential actions, confines each run to the sites it is about, and marks every byte of page text as untrusted data — tunable per rule from a Settings tab, with nothing overridden until you say so
 - **Off By Default**: A fresh install contacts nothing until you redeem a one-time pairing code
 
 ## Quick Start

@@ -46,6 +46,9 @@ The condition vocabulary is closed on purpose: a rule cannot express anything th
 | `file-upload` | `uploadsFile` | confirm | `page.attachFile` |
 | `leaves-pinned-tab` | `leavesPinnedTab` | confirm | A tab move away from the pinned tab, to a tab the run does not own |
 | `captcha-solve` | `answersCaptcha` | confirm | `page.solveCaptcha` |
+| `secret-in-url` | `carriesSecretInUrl` | **deny** | A sealed secret placeholder appears in a navigation URL |
+| `secret-release` | `releasesSecret` | confirm | A sealed secret is about to be typed into the page |
+| `secret-off-scope` | `releasesSecretOffScope` | confirm | …and it was read on a site outside the run's scope |
 | `config-require-approval` | `listedInConfig` | confirm | The action is named in `requireApproval` |
 
 Two are worth the annotation they carry in source:
@@ -89,6 +92,25 @@ client attached to the daemon; it has **neither**, so a `confirm` cannot be answ
 The default is `deny`. Leaning on the client's host to prompt stops being true the moment someone
 allowlists the browsentic tools to stop being asked — so a caller with nobody watching does not get
 the consequential actions. `unattended: 'allow'` goes back to waiving them.
+
+### The settings screen
+
+`guardrailSettings()` in [settings.ts](../../mcp/src/guardrails/settings.ts) describes the policy to
+the side panel's Settings tab. Everything it returns is derived from `DEFAULT_RULES` and the live
+config, so a rule added to the policy appears in the screen with no second edit, and a rule whose
+title or reason changes says the new thing in both places.
+
+Two things it gets right that are easy to get wrong:
+
+**`fallback` is not the shipped constant.** `form-submission` takes its default from the legacy
+`requireApproval` key, so the row is computed by re-running `policyFrom` with the rule overrides
+stripped. Otherwise the screen would claim a default the policy does not use.
+
+**An empty override is not the same as an override equal to the default.** Clearing a row deletes
+the key, so config.json only names real decisions and a changed default still reaches that install.
+
+`settingWritable()` is the gate: unknown ids, locked rules and wrong-shaped values are refused at
+the daemon, not just hidden in the UI.
 
 ### Overriding
 
@@ -162,6 +184,108 @@ through an image-specific renderer with its own note.
 
 It is not a proof of anything — a determined injection can still be persuasive inside the fence — but
 it removes the easy win, where page text is indistinguishable from the transcript around it.
+
+---
+
+## Sealed secrets
+
+Fencing tells the model that page text is data. Sealing goes further for one class of it: a
+credential is removed from the text entirely and replaced by a placeholder that says what it was.
+
+```
+Your new password is ⟦password:7f3a@mail.example.com⟧
+Your API key: sk-ant-…⟦api-key:2c81@console.anthropic.com⟧
+Card ending ⟦card:9d40@shop.example.com⟧…4242
+```
+
+The value itself stays in the browser. It is not in the tool result, not in the transcript, not in
+the model's context, and it never crosses the socket.
+
+### The detector is deterministic
+
+No model, no scoring, no dependence on what was asked — the same text always yields the same
+findings. That is not a stylistic preference: the client seals and the daemon seals again, and the
+second pass can only leave the first one's work alone if both agree about what a secret is.
+
+Three passes, in `lib/secrets/`:
+
+| Pass | Finds | Example |
+| --- | --- | --- |
+| **Shapes** | Credentials that announce their own format | `sk-ant-…`, `ghp_…`, `AKIA…`, a JWT, a PEM block, a card that passes Luhn |
+| **Labels** | A value next to a word that names it, inline or as an object key | `password: …`, `{"apiKey": …}`, `Cookie: …`, `newPassword`, `access_token` |
+| **Entropy** | A bare token that announces nothing | 32+ characters, mixed classes, ≥ 4.3 bits/char **and** ≥ 0.5 case flips per letter |
+
+The label vocabulary is written once, as word parts, and both readers are generated from it — the
+inline regex joins the parts with an optional separator, the key matcher joins them bare. They
+cannot drift, and `yarn check:security` asserts every word is readable both ways.
+
+The entropy gate carries two signals because one is not enough. `ContinueReadingTheFullArticleHere`
+reaches 3.96 bits per character; a random 32-character token reaches 4.5–5.0, and flips case about
+half the time where an identifier flips once per word. Measured over both populations the ranges do
+not overlap. Hex strings, UUIDs, anything inside a URL path and anything inside a `data:` URL are
+excluded outright — those are digests, ids and asset hashes, not credentials.
+
+Placeholders are left alone, so `password: ********` still reads as a page that says nothing. A
+`selector` is never scanned, because the agent has to hand it back verbatim.
+
+### What may be revealed
+
+Truncating from the middle is only useful if what survives says something, and the only characters
+that say something without giving anything away are the ones a vendor puts there as a format
+marker. `sk-ant-` and `ghp_` are public by construction; four characters of a password are four
+characters of a password. So `reveal` is declared per shape and defaults to nothing.
+
+Cards are the one exception: the last four are conventional, and are what lets a person recognise
+their own card.
+
+### Releasing one
+
+The vault lives in the extension, in `storage.session`, and nowhere else — so the daemon, which
+spawns an agent CLI and serves MCP clients over a local socket, holds no credential it could leak.
+The daemon's half of the sanitizer **only seals**. It has no way to turn a handle back.
+
+A handle becomes plaintext at exactly one place: one hop before the content script, in
+`invokeForHarness`, and only in a field that types into a page.
+
+```
+page.fillInput → value
+page.typeText  → text
+```
+
+A handle anywhere else — a URL, a selector, a search box — is refused with `SECRET_NOT_RELEASABLE`
+rather than passed through, because a form filled with `⟦…⟧` fails in a way nobody can read. A
+handle the vault no longer holds comes back as `SECRET_EXPIRED`.
+
+That is the flow the vault exists for: a reset password read off one page and submitted on another,
+without the value ever being something the model saw, stored, or could repeat.
+
+### A page cannot forge one
+
+The tag at the end of a handle is minted once per browser session and is never rendered into page
+text, a tool result or a transcript. A page can author the brackets; it cannot author the tag.
+
+Two consequences. A page-planted handle **resolves to nothing**, because release checks the tag.
+And sealing in the extension is strict: any bracket that is not one of our own handles is rewritten,
+so a forgery does not even survive the trip out of the page. The daemon's pass is deliberately
+lenient in the other direction — it did not mint those handles and leaves them alone, which is what
+makes sealing idempotent across both sides.
+
+Entries expire after two hours, cap at 64, and are gone when the browser closes.
+
+What this does **not** stop is the agent itself. A handle is in the model's context, and an
+injected agent can choose to put one in a field on a page it is already on. That is why release
+is a gated action rather than a silent one: `secret-release` asks, and `secret-off-scope` says so
+when the credential was read somewhere else. The seal removes the value from the model's reach;
+the policy is what decides where the model may spend it.
+
+### Where it runs
+
+| Side | Where | What it does |
+| --- | --- | --- |
+| Extension | `invokeForHarness` | Seals every action result before it crosses the socket; releases into the two fields |
+| Daemon | `render()` and the resource reader | Seals every tool result and resource body on its way to any MCP client |
+| Daemon | `summarize()` / `invokeExternal` | Seals the one-line summaries the side panel renders |
+| Daemon | the run's stream sink | Seals what the agent writes back to the user, holding the tail of the stream so a credential split across two deltas is still caught |
 
 ---
 

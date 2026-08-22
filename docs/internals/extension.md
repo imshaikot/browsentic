@@ -35,6 +35,17 @@ it is the documented escape hatch.
 
 ---
 
+## The panel's tabs
+
+`PanelNav` owns the tab strip: **Chat**, **History**, **Skills**, **Recordings**, **Settings**.
+Adding one is a variant in `PanelTab`, an entry in `TABS`, and a branch in the side panel's body —
+there is no router.
+
+**Settings** is the only tab whose state lives on the daemon rather than in extension storage. It
+reads and writes `~/.browsentic/config.json` through two bridge ops, `guardrails` and
+`setGuardrail`, which forward to the socket frames of the same name. The extension holds no copy:
+every write returns the daemon's fresh view, which is what the panel then renders.
+
 ## Tab scoping
 
 A panel conversation is **bound to the tab it started in**.

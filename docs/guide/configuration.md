@@ -65,6 +65,11 @@ Eight tab sessions may be *open* at once regardless; that ceiling is compiled in
 
 ## Approvals and guardrails
 
+Most of this section has a UI: the side panel's **Settings** tab writes these same keys, one row at
+a time. Rows start off — meaning "use the default" — so an install that never opens the tab has no
+`guardrails` key at all. Turning a row back off deletes its line rather than writing the default,
+which is why a hand-edited file and a panel-edited file look the same.
+
 | Key | Default | Notes |
 | --- | --- | --- |
 | `requireApproval` | `["page.submitForm"]` | Actions an agent run must ask about first. Listing `page.submitForm` also catches `pressEnter: true` and pressing Enter, because those submit forms too |
@@ -74,7 +79,7 @@ Eight tab sessions may be *open* at once regardless; that ceiling is compiled in
 | `guardrails.hosts` | — | Standing host allowlist added to every run's scope. `["*"]` disables host confinement entirely |
 | `guardrails.fence` | `true` | Whether page-derived text is wrapped and marked as untrusted data |
 
-Every rule id and what it does: [Approvals](approvals.md).
+Every rule id and what it does, plus the three that the panel shows but will not change: [Approvals](approvals.md).
 
 ## Paths
 
