@@ -28,6 +28,7 @@ const READ_ONLY_ACTIONS = new Set([
   'page.hoverElement',
   'page.highlightElement',
   'page.findProgress',
+  'page.findSearch',
   'page.findCaptcha',
   'page.monitorStatus',
   'page.readTheme',
