@@ -93,7 +93,26 @@ totals before `maxPerKind` truncates the lists.
 
 ### page_extractText
 
-Read the rendered text or raw HTML of an element or the whole page.
+Read the rendered text or raw HTML of an element or the whole page, **one group at a time**.
+
+A group is as much text as fits in `maxLength`, cut back to the last paragraph break or sentence
+end inside that budget — so a reply never stops mid-sentence, and the same text always groups the
+same way. When more remains the reply carries a `cursor`; pass it back to get the next group, and
+keep going until no cursor comes back. A first call with no `cursor` behaves exactly as it always
+did, so a caller that only wants the top of the page can ignore all of this.
+
+The cursor is `<offset>.<digest>`, where the digest covers **the text already delivered**. Every
+resume re-derives that digest from the live page and compares. Two consequences worth knowing:
+
+- A page that only **grows** — infinite scroll, an appended log, lazily rendered sections — does not
+  invalidate anything. The part you have read is unchanged, so the read continues seamlessly.
+- A page that **rewrote** what you already read returns `{"stale": true, "source", "length"}` and no
+  content at all, rather than stitching two versions of the document together. Read again with no
+  cursor. This is the whole reply, deliberately: a restart should cost a sentence, not 20,000
+  characters of text the caller may no longer want.
+
+A `cursor` that was not handed out by this tool is refused with `INVALID_INPUT`; offsets cannot be
+hand-rolled, because the digest would not match.
 
 `format: "html"` is denied by default: outerHTML carries comments, `aria-hidden` nodes and
 off-screen text, which is where a page hides instructions meant for the model rather than
@@ -104,7 +123,18 @@ under `guardrails.rules` in `~/.browsentic/config.json` if a run genuinely needs
 | --- | --- | --- | --- |
 | `target` | [target](#element-targets) | — | Element to read; defaults to the whole page |
 | `format` | `"text"` \| `"html"` | `"text"` | Rendered text, or raw HTML when policy allows it |
-| `maxLength` | integer | `20000` | Truncate the result to this many characters |
+| `maxLength` | integer | `20000` | Characters per group, capped at 200,000. The reply stops at the last boundary that fits, so it comes back a little shorter |
+| `cursor` | string | — | Continue a read: the cursor the previous reply returned. Omit to start from the top |
+
+| Result field | When | What it is |
+| --- | --- | --- |
+| `content` | every group | The group's text, trimmed of trailing whitespace |
+| `source` | always | CSS path of the element that was read |
+| `length` | always | Characters in the full text, not just this group |
+| `offset` | every group | Where this group starts in that full text |
+| `truncated` | every group | `true` when more text remains |
+| `nextOffset`, `cursor` | more remains | Where the next group starts, and the cursor that fetches it |
+| `stale` | the page was rewritten | `true`, with no `content` — start over with no cursor |
 
 ### page_waitForElement
 
@@ -673,7 +703,7 @@ tab at the moment it is fetched.
 | --- | --- | --- |
 | `browsentic://page/diagram` | `text/plain` | Text diagram of the page's landmark regions — the cheapest useful view of a page |
 | `browsentic://page/current` | `application/json` | The full `page_getPageInfo` snapshot: metadata, layout tree, headings, interactive inventory |
-| `browsentic://page/text` | `text/plain` | The rendered text of the page, as `page_extractText` would return it |
+| `browsentic://page/text` | `text/plain` | The rendered text of the page — the first `page_extractText` group, with no way to page past it |
 
 ---
 
