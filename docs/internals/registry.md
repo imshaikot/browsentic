@@ -2,6 +2,8 @@
 
 One definition, compiled into two bundles.
 
+![One array compiled into two bundles, and what happens when the two halves drift](../assets/registry.png)
+
 ---
 
 ## One array, two consumers

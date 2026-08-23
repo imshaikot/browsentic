@@ -2,6 +2,8 @@
 
 Build topology, the checks, and how to add a capability.
 
+![One edit, two builds, two reloads — and the checks that gate a pull request](../assets/contributing.png)
+
 ---
 
 ## Two Yarn projects

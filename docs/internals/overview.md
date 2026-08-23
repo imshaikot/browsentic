@@ -2,6 +2,8 @@
 
 Browsentic is four processes cooperating over loopback.
 
+![Four processes over loopback: the extension, the daemon, the spawned agent CLI, and any MCP client](../assets/overview.png)
+
 ---
 
 ## Why there is a daemon at all

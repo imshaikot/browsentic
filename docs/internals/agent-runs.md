@@ -3,6 +3,10 @@
 An instruction typed or spoken into the side panel takes a longer road, and it does not always leave
 the browser.
 
+![Path B: an instruction becoming a spawned agent CLI that loops back through the same daemon](../assets/agent-runs.png)
+
+[The same sequence, animated →](../assets/agent-runs.gif)
+
 ---
 
 ## The intent funnel

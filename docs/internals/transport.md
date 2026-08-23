@@ -2,6 +2,10 @@
 
 How a connection is established, and how each side proves it is allowed.
 
+![The origin gate refusing a web page, then the mutual pairing handshake](../assets/transport.png)
+
+[The same sequence, animated →](../assets/transport.gif)
+
 ---
 
 ## One server, three ports

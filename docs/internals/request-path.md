@@ -2,6 +2,10 @@
 
 The unconditional path. No agent on Browsentic's side, no intent funnel.
 
+![Path A: an MCP client's tool call reaching the page and the result coming back fenced](../assets/request-path.png)
+
+[The same sequence, animated →](../assets/request-path.gif)
+
 ---
 
 ```mermaid

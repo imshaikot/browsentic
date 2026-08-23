@@ -2,6 +2,8 @@
 
 Where an invoke frame actually runs, and how a run stays in its own tab.
 
+![Where an invoke frame runs: the background/content split, and the self-healing injection](../assets/extension.png)
+
 ---
 
 ## Background vs content script

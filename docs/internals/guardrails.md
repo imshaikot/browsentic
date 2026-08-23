@@ -2,6 +2,8 @@
 
 [`mcp/src/guardrails/`](../../mcp/src/guardrails/) — four mechanisms, all declarative.
 
+![decide() and its three outcomes, over the four declarative mechanisms](../assets/guardrails.png)
+
 The daemon closes a loop that is normally kept open: untrusted text comes in from a page, the browser
 holds live logged-in sessions, and the agent can navigate anywhere. **No prompt makes an agent immune
 to injection.** What a policy can do is make sure a successful injection has nowhere to send what it

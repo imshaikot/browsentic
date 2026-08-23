@@ -2,6 +2,8 @@
 
 Nothing lives in the repository.
 
+![Who writes what, where it lands, and the three things that never reach disk](../assets/state.png)
+
 ```
 ~/.browsentic/                 (mode 0700, override with BROWSENTIC_HOME)
 ├── daemon.json    0600        lockfile: pid, port, control token, protocol + daemon version

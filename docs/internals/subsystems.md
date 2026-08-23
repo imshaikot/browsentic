@@ -2,6 +2,8 @@
 
 The five things that are more than a single action.
 
+![The five subsystems, each as its own short pipeline](../assets/subsystems.png)
+
 ---
 
 ## Monitors
