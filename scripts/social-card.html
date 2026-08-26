@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- THEME: swap ember for slate | paper | terminal. -->
+    <link rel="stylesheet" href="../themes/ember.css" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        width: 1200px; height: 630px; overflow: hidden;
+        background: var(--ground);
+        color: var(--ink);
+        position: relative;
+        font-family: var(--font-display);
+      }
+      .glow { position: absolute; border-radius: 999px; filter: blur(120px); opacity: var(--glow-opacity); }
+      .g1 { width: 620px; height: 620px; top: -260px; left: -80px; background: var(--glow1); }
+      .g2 { width: 560px; height: 560px; top: -200px; right: -100px; background: var(--glow2); }
+      .dots {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
+        background-size: 30px 30px;
+        -webkit-mask-image: radial-gradient(ellipse 78% 70% at 46% 40%, #000 40%, transparent 100%);
+      }
+      .wrap { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 84px; }
+      .brandrow { display: flex; align-items: center; gap: 14px; }
+      .brandrow span { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+      h1 {
+        margin-top: 38px; font-size: 74px; line-height: 1.04; font-weight: 600;
+        letter-spacing: -0.03em; max-width: 960px;
+      }
+      h1 .accent { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      p { margin-top: 26px; font-size: 26px; line-height: 1.45; color: var(--ink-dim); max-width: 880px; }
+      .chips { margin-top: 42px; display: flex; gap: 12px; }
+      .chip {
+        font-family: var(--font-mono); font-size: 18px;
+        border: 1px solid var(--line); border-radius: 10px;
+        padding: 10px 16px; color: var(--ink-dim);
+      }
+      .chip.on { color: var(--a1); border-color: color-mix(in oklch, var(--a1) 45%, transparent); }
+      .rule { position: absolute; left: 0; right: 0; bottom: 0; height: 5px;
+        background: linear-gradient(90deg, var(--a1), var(--a2)); }
+    </style>
+  </head>
+  <body>
+    <div class="glow g1"></div>
+    <div class="glow g2"></div>
+    <div class="dots"></div>
+
+    <div class="wrap">
+      <div class="brandrow">
+        <svg width="46" height="46" viewBox="0 0 32 32" fill="none" style="color: var(--a1)">
+          <rect x="2.25" y="4.25" width="27.5" height="23.5" rx="6" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"/>
+          <path d="M2.5 10.5h27" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.25"/>
+          <circle cx="6.4" cy="7.4" r="1" fill="currentColor" fill-opacity="0.5"/>
+          <circle cx="9.8" cy="7.4" r="1" fill="currentColor" fill-opacity="0.35"/>
+          <path d="M9 22.2c2.4 0 2.4-6.4 6.9-6.4s4.6 6.4 7 6.4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          <circle cx="9" cy="22.2" r="2.35" fill="var(--ground)" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="15.9" cy="15.8" r="2.55" fill="currentColor"/>
+          <circle cx="22.9" cy="22.2" r="2.35" fill="var(--ground)" stroke="currentColor" stroke-width="1.6"/>
+        </svg>
+        <span>Browsentic</span>
+      </div>
+
+      <h1>Your real browser,<br />as an <span class="accent">MCP server</span></h1>
+
+      <p>
+        A Chrome extension and a local daemon that hand your signed-in tab to
+        Claude Code, Codex or Antigravity. Nothing leaves the machine.
+      </p>
+
+      <div class="chips">
+        <div class="chip on">41 page tools</div>
+        <div class="chip">MCP over stdio</div>
+        <div class="chip">no API key</div>
+        <div class="chip">MIT</div>
+      </div>
+    </div>
+    <div class="rule"></div>
+  </body>
+</html>

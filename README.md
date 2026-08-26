@@ -1,4 +1,4 @@
-![Browsentic](https://raw.githubusercontent.com/imshaikot/browsentic/website/public/og.png)
+![Browsentic: your real browser, as an MCP server](docs/assets/social-card.png)
 
 # Browsentic – Agentic Browsing in the Browser You Already Use
 
