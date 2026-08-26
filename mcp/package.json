@@ -1,6 +1,6 @@
 {
   "name": "@browsentic/mcp",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "MCP server and local daemon that drive the Browsentic browser extension",
   "type": "module",
   "license": "MIT",
