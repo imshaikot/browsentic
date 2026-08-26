@@ -22,7 +22,7 @@ const COLUMNS = [
       { label: 'Features', href: `${REPO}/tree/main/docs/guide/features`, ext: true },
       { label: 'Approvals', href: `${REPO}/blob/main/docs/guide/approvals.md`, ext: true },
       { label: 'Architecture', href: `${REPO}/tree/main/docs/internals`, ext: true },
-      { label: 'All 35 tools', href: `${REPO}/blob/main/docs/reference/tools.md`, ext: true },
+      { label: 'All 41 tools', href: `${REPO}/blob/main/docs/reference/tools.md`, ext: true },
     ],
   },
   {

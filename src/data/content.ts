@@ -1,19 +1,19 @@
 // Sourced from the repository README and docs/. Components hold no copy of their own.
 
 export const REPO = 'https://github.com/imshaikot/browsentic'
-export const VERSION = 'v0.2.1'
+export const VERSION = 'v0.3.1'
 
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
   description:
-    'No new browser, no new subscription. Hand any tab to the AI agent you already run: 35 page tools over MCP, in the logged-in session you already use.',
+    'No new browser, no new subscription. Hand any tab to the AI agent you already run: 41 page tools over MCP, in the logged-in session you already use.',
   social: {
     title: 'Browsentic: every tab, its own AI agent',
     description:
-      'Hand any tab to Claude Code, Codex or Antigravity. 35 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key.',
+      'Hand any tab to Claude Code, Codex or Antigravity. 41 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key.',
   },
   imageAlt:
-    'Browsentic. Every tab, its own AI agent. 35 page tools, three runs at once, record and replay, site maps, no API key.',
+    'Browsentic. Every tab, its own AI agent. 41 page tools, three runs at once, record and replay, site maps, no API key.',
   author: 'imshaikot',
   summary:
     'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, or to any MCP client, by voice, by typing, or by replaying a session you recorded once.',
@@ -53,8 +53,8 @@ export const SECTIONS = {
   },
   capabilities: {
     kicker: 'Capabilities',
-    title: ['35 page tools: sense a page,', 'act on it, and wait it out'],
-    lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors.',
+    title: ['41 page tools: sense a page,', 'act on it, and wait it out'],
+    lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it, or working to a clock when the page offers nothing to watch. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors. Or hand it the lens and point at the thing yourself.',
   },
   orchestrate: {
     kicker: 'Agent orchestration',
@@ -117,7 +117,7 @@ export const MCP_POINTS = [
 ] as const
 
 export const STATS = [
-  { value: 35, suffix: '', label: 'page tools', note: 'read, act, navigate, monitor' },
+  { value: 41, suffix: '', label: 'page tools', note: 'read, act, navigate, wait' },
   { value: 3, suffix: '', label: 'read-only resources', note: 'page context, zero tool calls' },
   { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
   { value: 10, suffix: ' min', label: 'pairing code lifetime', note: 'single use, then a session key' },
@@ -137,12 +137,14 @@ export const TOOL_GROUPS: ToolGroup[] = [
     label: 'Read',
     accent: 'brand',
     blurb:
-      'Takes in the page as structure rather than pixels: a snapshot carrying a layout diagram and stable selectors, rendered text, patient waiting for an element to appear or vanish, a capture of the whole tab or one element, the palette and luminance a page actually paints, a WCAG contrast score, and the captcha hiding inside a closed shadow root.',
+      'Takes in the page as structure rather than pixels: a snapshot carrying a layout diagram and stable selectors, rendered text, patient waiting for an element to appear or vanish, the search control wherever a site hid it, a capture of the whole tab or one element, the palette and luminance a page actually paints, a WCAG contrast score, and the captcha hiding inside a closed shadow root. When it cannot name the thing you mean, it hands you the lens and you point at it.',
     tools: [
       'page_getPageInfo',
       'page_extractText',
       'page_waitForElement',
       'page_findProgress',
+      'page_findSearch',
+      'page_pickElement',
       'page_screenshot',
       'page_readTheme',
       'page_auditContrast',
@@ -177,16 +179,24 @@ export const TOOL_GROUPS: ToolGroup[] = [
     label: 'Navigate',
     accent: 'magenta',
     blurb:
-      'Finds its own way around. Opening a URL, retracing back and forward, reloading, scrolling to whatever matters, spawning a tab, surveying the ones you already have open, closing the ones it is finished with.',
-    tools: ['page_navigate', 'page_scrollTo', 'page_openTab', 'page_switchTab', 'page_closeTab'],
+      'Finds its own way around. Opening a URL, retracing back and forward, reloading, searching a site on its own terms rather than guessing at query strings, scrolling to whatever matters, spawning a tab, surveying the ones you already have open, closing the ones it is finished with.',
+    tools: ['page_navigate', 'page_searchSite', 'page_scrollTo', 'page_openTab', 'page_switchTab', 'page_closeTab'],
   },
   {
-    id: 'monitor',
-    label: 'Monitor',
+    id: 'wait',
+    label: 'Wait',
     accent: 'lime',
     blurb:
-      'Senses the progress signals a page gives off, then keeps watch in the background while an upload, a build or a deploy runs its course. The tab stays pinned, percent and ETA are tracked, and an MCP client can long-poll until it lands.',
-    tools: ['page_startMonitor', 'page_monitorStatus', 'page_awaitMonitor', 'page_stopMonitor'],
+      'Senses the progress signals a page gives off, then keeps watch in the background while an upload, a build or a deploy runs its course: the tab stays pinned, percent and ETA are tracked, and an MCP client can long-poll until it lands. When a page offers nothing to watch, it works to a clock instead, waking itself in ten minutes or every two to redo the check and tell you only what changed.',
+    tools: [
+      'page_startMonitor',
+      'page_monitorStatus',
+      'page_awaitMonitor',
+      'page_stopMonitor',
+      'page_startTimer',
+      'page_timerStatus',
+      'page_stopTimer',
+    ],
   },
   {
     id: 'files',
@@ -555,7 +565,7 @@ export const QUICKSTART = [
   {
     n: '04',
     title: 'Point any MCP client at the same browser',
-    body: 'Your agent now commands 35 page tools plus browsentic_status, and three read-only resources that hand back page context without spending a tool call.',
+    body: 'Your agent now commands 41 page tools plus browsentic_status, and three read-only resources that hand back page context without spending a tool call.',
     code: 'claude mcp add browsentic -- browsentic-mcp',
     lang: 'sh',
   },

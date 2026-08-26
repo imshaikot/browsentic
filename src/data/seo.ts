@@ -145,7 +145,7 @@ export function noscriptBody(siteUrl: string) {
       `<a href="${REPO}/tree/main/docs/guide/features">Features</a>`,
       `<a href="${REPO}/blob/main/docs/guide/approvals.md">Approvals and guardrails</a>`,
       `<a href="${REPO}/tree/main/docs/internals">Architecture</a>`,
-      `<a href="${REPO}/blob/main/docs/reference/tools.md">All 35 page tools</a>`,
+      `<a href="${REPO}/blob/main/docs/reference/tools.md">All 41 page tools</a>`,
       `<a href="${siteUrl}llms.txt">llms.txt</a>`,
     ]),
     list(STATS.map((s) => `<strong>${s.value}${s.suffix}</strong> ${esc(s.label)} (${esc(s.note)})`)),

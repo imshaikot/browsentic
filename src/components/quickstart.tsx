@@ -8,7 +8,7 @@ const DOCS = [
   { href: `${REPO}/tree/main/docs/guide/features`, title: 'Features', body: 'Every capability, and when to reach for it.' },
   { href: `${REPO}/blob/main/docs/guide/approvals.md`, title: 'Approvals', body: 'What asks before acting, what is refused outright, and how to change either.' },
   { href: `${REPO}/tree/main/docs/internals`, title: 'Architecture', body: 'How an instruction becomes a click, end to end.' },
-  { href: `${REPO}/blob/main/docs/reference/tools.md`, title: 'All 35 tools', body: 'Every tool published to an MCP client, and the action behind each one.' },
+  { href: `${REPO}/blob/main/docs/reference/tools.md`, title: 'All 41 tools', body: 'Every tool published to an MCP client, and the action behind each one.' },
   { href: `${REPO}/blob/main/docs/guide/troubleshooting.md`, title: 'Troubleshooting', body: 'What each error means, and the fix that clears it.' },
 ]
 
