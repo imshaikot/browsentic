@@ -26,6 +26,7 @@ The surface, at a glance:
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
+| [Scheduling](#scheduling) | `page_startTimer`, `page_timerStatus`, `page_stopTimer` |
 | [Files](#files) | `page_listFiles`, `page_attachFile` |
 | [Recordings](#recordings) | `page_listRecordings`, `page_readRecording` |
 | [Mapping runs only](#mapping-runs-only) | `browsentic_saveSiteMap` |
@@ -654,6 +655,51 @@ No notification is shown — the stop was asked for.
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `monitorId` | string | — | Omit when only one monitor is running; with several running, an omitted id stops nothing and the candidates are listed |
+
+---
+
+## Scheduling
+
+Work on a clock rather than on a condition: `page_startTimer` schedules it, `page_timerStatus`
+reports on it, `page_stopTimer` cancels it. The schedule is kept by the extension, so it needs no
+further tool calls — when a timer fires it starts a fresh turn in the conversation that set it,
+carrying the `prompt` as the instruction. Use a [monitor](#monitoring) instead whenever the page
+itself can signal completion; a timer is for work that has to be re-done, such as reloading a queue.
+
+### page_startTimer
+
+Schedule work for later — "in ten minutes check whether the build finished", "every two minutes
+refresh the queue". Returns a `timerId` immediately.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `prompt` | string | required | What to do when the timer fires, written as an instruction to the agent starting a fresh turn. With `deliver: "notify"` it is the notification text instead |
+| `afterMs` | integer | required | How long to wait before firing, and for a repeating timer the gap between fires. Floor 30000, ceiling 86400000 |
+| `repeat` | boolean | `false` | Keep firing every `afterMs` instead of once |
+| `maxRuns` | integer | `12` | Stop a repeating timer after this many fires. Ignored when `repeat` is false |
+| `label` | string | — | Short name shown in the side panel and in notifications, e.g. `"deploy check"` |
+| `deliver` | `"agent"` \| `"notify"` | `"agent"` | `agent` wakes the conversation with the prompt; `notify` only shows the user a browser notification and never wakes the agent |
+
+Five timers at most, across everything. `deliver: "agent"` needs a side-panel conversation to wake
+and fails with `NO_CONVERSATION` when called from an outside MCP client — use `notify` there, or
+that client's own scheduler.
+
+### page_timerStatus
+
+Report on scheduled jobs: fires so far, fires skipped because the conversation was still busy, when
+the next one is due, and the latest log lines.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `timerId` | string | — | One timer to report. Omit to list every scheduled and recently finished timer |
+
+### page_stopTimer
+
+Cancel a scheduled job before it has run out. Nothing further fires and no notification is shown.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `timerId` | string | — | Omit when only one timer is scheduled; with several, an omitted id cancels nothing and the candidates are listed |
 
 ---
 

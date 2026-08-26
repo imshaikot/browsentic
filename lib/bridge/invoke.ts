@@ -17,8 +17,11 @@ import { screenshot } from '@/lib/actions/page/screenshot';
 import { searchSite } from '@/lib/actions/page/search-site';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
+import { startTimer } from '@/lib/actions/page/start-timer';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
+import { stopTimer } from '@/lib/actions/page/stop-timer';
 import { switchTab } from '@/lib/actions/page/switch-tab';
+import { timerStatus } from '@/lib/actions/page/timer-status';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
@@ -26,6 +29,7 @@ import { releaseForAction, sealForPage } from '@/lib/bridge/secret-vault';
 import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
+import { startJobTimer, stopJobTimer, timerStatusFor } from '@/lib/bridge/timer';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
@@ -85,6 +89,9 @@ async function dispatch(
   if (action === monitorStatus.name) return statusOfMonitors(input);
   if (action === stopMonitor.name) return stopRequestedMonitor(input);
   if (action === awaitMonitor.name) return awaitRequestedMonitor(input);
+  if (action === startTimer.name) return beginTimer(input, owner?.sessionId);
+  if (action === timerStatus.name) return statusOfTimers(input);
+  if (action === stopTimer.name) return stopRequestedTimer(input);
 
   const tab = await resolveTab(tabId, owner);
   if (tab?.id == null) {
@@ -184,6 +191,24 @@ async function awaitRequestedMonitor(input: unknown): Promise<ActionResult> {
   const parsed = awaitMonitor.input.safeParse(input ?? {});
   if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
   return awaitMonitorDone(parsed.data.monitorId, parsed.data.timeoutMs);
+}
+
+async function beginTimer(input: unknown, sessionId?: string): Promise<ActionResult> {
+  const parsed = startTimer.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return startJobTimer(parsed.data, sessionId);
+}
+
+async function statusOfTimers(input: unknown): Promise<ActionResult> {
+  const parsed = timerStatus.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return timerStatusFor(parsed.data.timerId);
+}
+
+async function stopRequestedTimer(input: unknown): Promise<ActionResult> {
+  const parsed = stopTimer.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return stopJobTimer(parsed.data.timerId);
 }
 
 async function listStoredFiles(input: unknown): Promise<ActionResult> {

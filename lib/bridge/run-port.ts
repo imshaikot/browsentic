@@ -34,6 +34,7 @@ import {
   type StoredSessionMeta,
 } from './session-store';
 import { recordGeneratedSkill } from './skill-store';
+import { dropTimersForSession, onTimerFire, type TimerHandoff } from './timer';
 import {
   activateSiteMap,
   cancelRun,
@@ -134,6 +135,17 @@ export function serveRunPorts(): void {
       if (ports.size > 0) void acknowledgeCompleted(state.monitorId);
     }
   });
+
+  onTimerFire((sessionId, prompt, label) =>
+    serialized<TimerHandoff>(async () => {
+      const session = (await readTabSessions())[sessionId];
+      if (!session) return 'gone';
+      if (session.runId || busy.has(sessionId)) return 'busy';
+      await append(sessionId, notice('info', `Timer “${label}” fired.`));
+      await startTurn(session, prompt, { fastPath: false });
+      return 'delivered';
+    }),
+  );
 
   onSiteMapDraft((_runId, draft) => {
     pendingDraft = draft;
@@ -307,27 +319,36 @@ async function instruct(
     });
     return;
   }
-  const session = ensured.session;
-  const { sessionId } = session;
 
-  if (session.runId || busy.has(sessionId)) {
-    await append(
-      sessionId,
-      notice('error', 'RUN_IN_PROGRESS: This conversation is still running — stop it before sending another instruction.'),
-    );
-    return;
-  }
+  const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, fastPath: true });
+  if (outcome !== 'busy') return;
+  await append(
+    ensured.session.sessionId,
+    notice('error', 'RUN_IN_PROGRESS: This conversation is still running — stop it before sending another instruction.'),
+  );
+}
+
+type TurnOutcome = 'started' | 'local' | 'busy' | 'offline';
+
+async function startTurn(
+  session: TabSession,
+  text: string,
+  options: { agentSkillId?: string; focus?: FocusedElement; fastPath: boolean },
+): Promise<TurnOutcome> {
+  const { agentSkillId, focus, fastPath } = options;
+  const { sessionId } = session;
+  if (session.runId || busy.has(sessionId)) return 'busy';
 
   await append(sessionId, { kind: 'user', id: crypto.randomUUID(), text, focus: focus && focusLabel(focus) });
   await patchSession(sessionId, { turns: session.turns + 1 });
 
   busy.add(sessionId);
   try {
-    // An attached agent skill, or an element the user pointed at, is meaningless to the fast
-    // path — both only mean something to a spawned agent.
-    if (!agentSkillId && !focus && (await handledLocally(text, session))) {
+    // An attached agent skill, an element the user pointed at, or a job a timer is handing
+    // back only mean something to a spawned agent, so none of them may take the fast path.
+    if (fastPath && !agentSkillId && !focus && (await handledLocally(text, session))) {
       await persist(sessionId);
-      return;
+      return 'local';
     }
 
     const runId = sendInstruction(text, {
@@ -350,10 +371,11 @@ async function instruct(
         ),
       );
       await persist(sessionId);
-      return;
+      return 'offline';
     }
     await patchSession(sessionId, { runId });
     await syncRunIndicator();
+    return 'started';
   } finally {
     busy.delete(sessionId);
   }
@@ -404,6 +426,7 @@ async function endRun(sessionId: string, message: string): Promise<void> {
 async function endSession(sessionId: string): Promise<void> {
   const session = (await readTabSessions())[sessionId];
   if (session?.runId) cancelRun(session.runId);
+  await dropTimersForSession(sessionId);
   clearTimeout(cancelTimers.get(sessionId));
   cancelTimers.delete(sessionId);
   await persist(sessionId);
@@ -516,6 +539,7 @@ export function serveTabSessions(): void {
       }
       clearTimeout(cancelTimers.get(closed.sessionId));
       cancelTimers.delete(closed.sessionId);
+      await dropTimersForSession(closed.sessionId);
       await persist(closed.sessionId);
       buffers.delete(closed.sessionId);
       busy.delete(closed.sessionId);

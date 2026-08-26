@@ -18,7 +18,7 @@ first.
 
 | | |
 | --- | --- |
-| [Page actions](page-actions.md) | The 38 things it can do to a page, grouped by what you would want |
+| [Page actions](page-actions.md) | The 41 things it can do to a page, grouped by what you would want |
 | [Screenshots](screenshots.md) | Viewport, full page, or one element — and when a capture touches disk |
 | [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |
@@ -29,6 +29,7 @@ first.
 | | |
 | --- | --- |
 | [Monitoring](monitoring.md) | Watching an upload, a build or a deploy in the background |
+| [Scheduling](scheduling.md) | Doing something in ten minutes, or every two, without an agent sitting there |
 | [Site maps](site-maps.md) | Teaching it a site once, so later sessions already know their way around |
 | [Recordings](recordings.md) | Doing a repetitive job once yourself, then "do it like last time" |
 

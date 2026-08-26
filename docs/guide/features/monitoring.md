@@ -75,5 +75,6 @@ again.
 ## See also
 
 - [reference/tools.md § Monitoring](../../reference/tools.md#monitoring) — every parameter
+- [Scheduling](scheduling.md) — when the page shows nothing to watch and the job must be re-done
 - [Skills](skills.md) — the `monitor-progress` skill routes these requests
 - [internals/subsystems.md](../../internals/subsystems.md) — how sampling actually works

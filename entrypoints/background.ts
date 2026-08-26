@@ -11,6 +11,7 @@ import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
 import { serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
 import { serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
+import { serveTimers } from '@/lib/bridge/timer';
 import { openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
@@ -176,6 +177,7 @@ export default defineBackground(() => {
 
   serveRecorder();
   serveMonitor();
+  serveTimers();
   serveRunPorts();
   serveTabSessions();
   serveRail();

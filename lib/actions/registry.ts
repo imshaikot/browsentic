@@ -33,9 +33,12 @@ import { selectOption } from './page/select-option';
 import { selectText } from './page/select-text';
 import { solveCaptcha } from './page/solve-captcha';
 import { startMonitor } from './page/start-monitor';
+import { startTimer } from './page/start-timer';
 import { stopMonitor } from './page/stop-monitor';
+import { stopTimer } from './page/stop-timer';
 import { submitForm } from './page/submit-form';
 import { switchTab } from './page/switch-tab';
+import { timerStatus } from './page/timer-status';
 import { trustedClick } from './page/trusted-click';
 import { typeText } from './page/type-text';
 import { waitForElement } from './page/wait-for-element';
@@ -70,6 +73,9 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       monitorStatus,
       awaitMonitor,
       stopMonitor,
+      startTimer,
+      timerStatus,
+      stopTimer,
       highlightElement,
       searchSite,
       navigate,

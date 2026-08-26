@@ -12,6 +12,8 @@ Call `page_findProgress` first, always. It returns every measurable signal on th
 
 If `candidates` is empty and there is no `titlePercent`, **do not start a monitor**. Say what the page actually shows, and ask what completion looks like — a phrase that will appear ("Upload complete", "Build passed"), an element that will disappear, a page it will land on. A phrase makes a `text-matches` watch possible even on a page with no visible progress.
 
+If there is nothing to watch because the page only changes when it is reloaded — a queue, a dashboard, an inbox — a monitor is the wrong tool. Schedule the re-check with `page_startTimer` instead and read `scheduled-jobs`.
+
 ## 2. Pick the strongest signal
 
 - A `progressbar` or `progress-element` candidate → `until: { kind: "progress-reaches", target: { selector: … } }`. It completes at 100% unless the user wants a different `threshold`.
