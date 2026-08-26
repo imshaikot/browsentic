@@ -10,7 +10,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 13;
+export const SOCKET_PROTOCOL_VERSION = 14;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -71,6 +71,18 @@ export interface AttachedFile {
   digest?: string;
 }
 
+/** An element the user pointed at with A-Eye. It rides along with the next instruction and scopes it. */
+export interface FocusedElement {
+  tag: string;
+  role?: string;
+  selector: string;
+  label?: string;
+  content: string;
+  truncated: boolean;
+  url: string;
+  title: string;
+}
+
 export interface SavedRecording {
   id: string;
   name: string;
@@ -103,6 +115,8 @@ export interface RunContext {
   agentSessionId?: string;
   /** Opaque handle from the skill catalog. The daemon resolves it to a skill it enumerated itself and attaches the content at spawn; a path never crosses the wire. */
   agentSkillId?: string;
+  /** The element the user pointed at with A-Eye before sending this message. */
+  focus?: FocusedElement;
 }
 
 /** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */

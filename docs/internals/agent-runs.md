@@ -148,7 +148,7 @@ earlier by name:
 
 | Directory | Source | Contents |
 | --- | --- | --- |
-| `mcp/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha` |
+| `mcp/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
 | `~/.browsentic/skills/` | `user` | Hand-written overrides |
 | `~/browsentic/skills/` (or `skillsDir`) | `uploaded` | Panel uploads and generated site maps |
 

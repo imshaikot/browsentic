@@ -2,6 +2,7 @@ import { browser, type Browser } from 'wxt/browser';
 import {
   EXTERNAL_RUN_ID,
   type AttachedFile,
+  type FocusedElement,
   type RunEvent,
   type SavedRecording,
 } from '@/lib/actions/protocol';
@@ -70,7 +71,7 @@ const PERSIST_DEBOUNCE_MS = 800;
 const MAX_EXTERNAL_ITEMS = 100;
 
 export type RunCommand =
-  | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string }
+  | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string; focus?: FocusedElement }
   | { op: 'cancel'; sessionId: string }
   | { op: 'decision'; sessionId: string; toolId: string; allow: boolean; remember?: boolean }
   | { op: 'endSession'; sessionId: string }
@@ -181,7 +182,7 @@ export function serveRunPorts(): void {
 function handle(command: RunCommand): void {
   switch (command.op) {
     case 'instruct':
-      void serialized(() => instruct(command.text, command.tab, command.agentSkillId));
+      void serialized(() => instruct(command.text, command.tab, command.agentSkillId, command.focus));
       return;
     case 'cancel':
       void serialized(() => stopRun(command.sessionId));
@@ -291,7 +292,12 @@ async function settle(sessionId: string): Promise<void> {
   await nameStoredSession(sessionId).catch(() => undefined);
 }
 
-async function instruct(text: string, anchor: TabAnchor, agentSkillId?: string): Promise<void> {
+async function instruct(
+  text: string,
+  anchor: TabAnchor,
+  agentSkillId?: string,
+  focus?: FocusedElement,
+): Promise<void> {
   const ensured = await ensureSessionForTab(anchor);
   if (!ensured.ok) {
     broadcast({
@@ -312,13 +318,14 @@ async function instruct(text: string, anchor: TabAnchor, agentSkillId?: string):
     return;
   }
 
-  await append(sessionId, { kind: 'user', id: crypto.randomUUID(), text });
+  await append(sessionId, { kind: 'user', id: crypto.randomUUID(), text, focus: focus && focusLabel(focus) });
   await patchSession(sessionId, { turns: session.turns + 1 });
 
   busy.add(sessionId);
   try {
-    // An attached agent skill is meaningless to the fast path — the daemon has to spawn for it.
-    if (!agentSkillId && (await handledLocally(text, session))) {
+    // An attached agent skill, or an element the user pointed at, is meaningless to the fast
+    // path — both only mean something to a spawned agent.
+    if (!agentSkillId && !focus && (await handledLocally(text, session))) {
       await persist(sessionId);
       return;
     }
@@ -330,6 +337,7 @@ async function instruct(text: string, anchor: TabAnchor, agentSkillId?: string):
       agent: session.agent,
       agentSessionId: session.agentSessionId,
       agentSkillId,
+      focus,
       files: await attachedFiles(),
       recordings: await attachedRecordings(),
     });
@@ -545,6 +553,9 @@ async function beginRecording(captureValues: boolean): Promise<void> {
     event: { kind: 'error', code: result.error.code, message: result.error.message },
   });
 }
+
+const focusLabel = (focus: FocusedElement): string =>
+  [focus.role ?? focus.tag, focus.label].filter(Boolean).join(' · ');
 
 const MAX_CONTEXT_FILES = 6;
 const MAX_DIGEST_CHARS = 2_000;

@@ -34,6 +34,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `UNSUPPORTED` | Action | e.g. a non-http(s) URL |
 | `TIMEOUT` | Link or action | A wait expired, or the extension did not answer in the window for that action |
 | `ACTION_FAILED` | Action | `execute()` threw — e.g. `back` with no history |
+| `PICK_CANCELLED` | Content script | The user dismissed A-Eye without pointing at anything. **Terminal** — ask in words rather than asking them to point again |
 | `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, or a reserved action reached from outside |
 
 ## Runs and sessions

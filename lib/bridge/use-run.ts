@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
+import type { FocusedElement } from '@/lib/actions/protocol';
 import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
@@ -15,12 +16,17 @@ const EXTERNAL_VIEW = 'external';
 
 export type { RunItem };
 
+export interface SendOptions {
+  agentSkillId?: string;
+  focus?: FocusedElement;
+}
+
 export interface Run {
   items: RunItem[];
   running: boolean;
   sessionId: string | null;
   sessions: TabSession[];
-  send: (text: string, opts?: { agentSkillId?: string }) => void;
+  send: (text: string, opts?: SendOptions) => void;
   cancel: () => void;
   decide: (toolId: string, allow: boolean, remember?: boolean) => void;
   clear: () => void;
@@ -145,13 +151,14 @@ export function useRun(): Run {
   }, [sessionId, bySession]);
 
   const send = useCallback(
-    (text: string, opts?: { agentSkillId?: string }) => {
+    (text: string, opts?: SendOptions) => {
       const trimmed = text.trim();
       if (!trimmed || tab.tabId == null) return;
       post({
         op: 'instruct',
         text: trimmed,
         agentSkillId: opts?.agentSkillId,
+        focus: opts?.focus,
         tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title },
       });
     },

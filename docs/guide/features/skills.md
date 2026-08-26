@@ -17,6 +17,7 @@ Chosen by trigger words in what you said:
 | `monitor-progress` | [Watch a long-running task](monitoring.md) and report when it finishes |
 | `site-mapper` | [Walk a site](site-maps.md) and write up how it is laid out |
 | `captcha` | [Get past a "verify you are human" block](captcha.md), or hand a real challenge to you |
+| `a-eye` | Work on [the element you pointed at](a-eye.md), or ask you to point at one |
 
 Exactly one base skill is picked, by counting trigger-word hits, with `browser-control` as the
 fallback. Prefix an instruction with `@name` to pin one explicitly:

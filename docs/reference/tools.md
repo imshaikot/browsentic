@@ -177,6 +177,33 @@ record where a site's search lives. `page_searchSite` is not — it navigates.
 | --- | --- | --- | --- |
 | `maxPerKind` | integer | `5` | Cap on search boxes, toggles and links listed per kind, most likely first |
 
+### page_pickElement
+
+Hand the page to the user and let them point at one element — **A-Eye**. Their cursor becomes a
+lens, whatever they hover is outlined, and the element they click comes back as a
+[described element](#element-targets) plus its rendered text.
+
+It stops everything and waits for a person, so it costs more than any other tool here: reach for it
+only when a target is genuinely ambiguous and pointing is quicker than describing. `hint` is the
+question you would otherwise have asked, shown in one line over the page.
+
+The pick is invisible to the site. Every pointer event in the sequence is stopped before the page
+sees it and the click itself is cancelled, so picking a link never also follows it. `↑` widens the
+pick to the parent element, `Esc` cancels.
+
+Two terminal refusals: `PICK_CANCELLED` when the user dismisses it without choosing, `TIMEOUT` when
+they never got to it. Both mean ask in words instead.
+
+The user can also point *first*, from the A-Eye button in the side panel — then no tool call is
+involved at all and the element arrives in the run's system prompt. See
+[A-Eye](../guide/features/a-eye.md).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `hint` | string | — | One line shown over the page saying what to point at, e.g. "Point at the price you mean". Max 120 characters |
+| `maxContentLength` | integer | `2000` | Characters of the element's rendered text to return; past that it is cut and `truncated` comes back true |
+| `timeoutMs` | integer | `60000` | Give up after this many milliseconds. 5000–300000 |
+
 ### page_screenshot
 
 Capture the tab as a JPEG or PNG — the current viewport, the full scroll view, or a single

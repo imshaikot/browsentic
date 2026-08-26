@@ -1,6 +1,6 @@
 # Page actions
 
-The 37 things Browsentic can do to a page. You never have to name these — you say what you want and
+The 38 things Browsentic can do to a page. You never have to name these — you say what you want and
 the agent picks — but knowing what exists tells you what is worth asking for.
 
 Exact parameters for every one: [reference/tools.md](../../reference/tools.md).
@@ -26,6 +26,7 @@ by **visible text** survives redesigns that break CSS paths.
 | `page_waitForElement` | Wait until an element is attached, visible, hidden or detached |
 | `page_findProgress` | Scan for progress signals worth [monitoring](monitoring.md) |
 | `page_findSearch` | Report whether this site has a search of its own, where its box is, and the URL a search lands on |
+| `page_pickElement` | Hand the page over and let the user point at the element they mean. See [A-Eye](a-eye.md) |
 | `page_screenshot` | See [Screenshots](screenshots.md) |
 
 ## Clicking and typing

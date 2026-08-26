@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { FileText, FileUp, Loader2, Mic, MicOff, Paperclip, Send, Sparkles, Square, X } from 'lucide-react';
+import { FileText, FileUp, Loader2, Mic, MicOff, Paperclip, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/components/skill-menu';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import type { SkillCatalog } from '@/lib/actions/protocol';
+import type { FocusedElement, SkillCatalog } from '@/lib/actions/protocol';
+import { focusName } from '@/lib/bridge/aeye';
 import type { StoredFileMeta } from '@/lib/bridge/file-store';
 import type { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { cn } from '@/lib/utils';
@@ -26,10 +27,14 @@ export function Composer({
   catalog,
   tabUrl,
   attachedSkill,
+  focus,
+  picking,
   onAttachSkill,
   onSend,
   onStop,
   onToggleVoice,
+  onPick,
+  onClearFocus,
   onAttachPage,
   onAttachFile,
   onRemoveFile,
@@ -43,10 +48,14 @@ export function Composer({
   catalog: SkillCatalog | undefined;
   tabUrl: string;
   attachedSkill: AttachedSkill | null;
+  focus: FocusedElement | null;
+  picking: boolean;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onSend: () => void;
   onStop: () => void;
   onToggleVoice: () => void;
+  onPick: () => void;
+  onClearFocus: () => void;
   onAttachPage: () => void;
   onAttachFile: (file: File) => void;
   onRemoveFile: (fileId: string) => void;
@@ -91,6 +100,8 @@ export function Composer({
           {attachError}
         </p>
       )}
+
+      <FocusChip focus={focus} picking={picking} onClear={onClearFocus} />
 
       {attachedSkill && (
         <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand/35 bg-brand/8 px-2.5 py-1.5 text-xs">
@@ -170,6 +181,17 @@ export function Composer({
 
         <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
           <Button
+            variant={focus || picking ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            title="A-Eye — point at an element on the page and send it with your next message"
+            aria-label="Point at an element with A-Eye"
+            onClick={onPick}
+            disabled={!connected || picking}
+            className={cn(focus || picking ? 'text-ember' : undefined)}
+          >
+            <ScanEye className={cn('size-3.5', picking && 'animate-pulse')} />
+          </Button>
+          <Button
             variant="ghost"
             size="icon-sm"
             title="Add this page’s title, URL and selection to the message"
@@ -239,6 +261,43 @@ export function Composer({
           : 'Enter to send · Shift + Enter for a new line · / for skills'}
       </p>
     </>
+  );
+}
+
+function FocusChip({
+  focus,
+  picking,
+  onClear,
+}: {
+  focus: FocusedElement | null;
+  picking: boolean;
+  onClear: () => void;
+}) {
+  if (!picking && !focus) return null;
+  return (
+    <div className="enters mb-2 flex items-center gap-2 rounded-xl border border-ember/40 bg-ember/8 px-2.5 py-1.5 text-xs">
+      <ScanEye className={cn('size-3.5 shrink-0 text-ember', picking && 'animate-pulse')} />
+      {picking || !focus ? (
+        <span className="min-w-0 flex-1 truncate text-ink-dim">
+          Point at anything on the page — <span className="text-ink-faint">Esc cancels</span>
+        </span>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 truncate text-ink">
+            A-Eye: <span className="font-medium">{focusName(focus)}</span>
+          </span>
+          <span className="shrink-0 font-mono text-[10px] text-ink-faint">{focus.tag}</span>
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Drop the A-Eye selection"
+            className="shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+          >
+            <X className="size-3" />
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

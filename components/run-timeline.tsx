@@ -15,6 +15,7 @@ import {
   MoveVertical,
   Paperclip,
   Radar,
+  ScanEye,
   Terminal,
   TextCursorInput,
   TriangleAlert,
@@ -50,7 +51,7 @@ export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
         ) : item.kind === 'notice' ? (
           <Notice key={item.id} item={item} />
         ) : item.kind === 'user' ? (
-          <UserBubble key={item.id} text={item.text} />
+          <UserBubble key={item.id} text={item.text} focus={item.focus} />
         ) : (
           <Reply key={item.id} text={item.text} streaming={streaming && index === items.length - 1} />
         ),
@@ -60,12 +61,18 @@ export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({ text, focus }: { text: string; focus?: string }) {
   return (
-    <div className="enters flex min-w-0 justify-end">
+    <div className="enters flex min-w-0 flex-col items-end gap-1">
       <div className="min-w-0 max-w-[88%] rounded-2xl rounded-br-md border border-brand/30 bg-brand/10 px-3 py-2 text-sm whitespace-pre-wrap wrap-anywhere text-ink">
         {text}
       </div>
+      {focus && (
+        <span className="flex min-w-0 max-w-[88%] items-center gap-1 rounded-full bg-ember/12 px-2 py-0.5 text-[10px] text-ember">
+          <ScanEye className="size-2.5 shrink-0" />
+          <span className="truncate">{focus}</span>
+        </span>
+      )}
     </div>
   );
 }
@@ -232,6 +239,7 @@ function Notice({ item }: { item: Extract<RunItem, { kind: 'notice' }> }) {
 const ICONS: Record<string, LucideIcon> = {
   getPageInfo: Eye,
   extractText: Eye,
+  pickElement: ScanEye,
   findProgress: Eye,
   clickElement: MousePointerClick,
   trustedClick: MousePointerClick,

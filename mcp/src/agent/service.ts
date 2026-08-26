@@ -4,6 +4,7 @@ import {
   success,
   type ActionResult,
   type AttachedFile,
+  type FocusedElement,
   type SavedRecording,
   type ExtensionRequest,
   type RunContext,
@@ -275,6 +276,7 @@ export class AgentSession {
       } else {
         built = buildSystemPrompt(routed.base, routed.overlays, {
           attached,
+          focus: focusBlock(context?.focus),
           attachments: filesBlock(context?.files),
           recordings: recordingsBlock(context?.recordings),
         });
@@ -470,6 +472,28 @@ function siteOf(url?: string): string | undefined {
 
 function explicitlyAsked(text: string): boolean {
   return /^@site-mapper\b/i.test(text.trim());
+}
+
+const MAX_FOCUS_CONTENT = 6 * 1024;
+
+function focusBlock(focus: FocusedElement | undefined): string | undefined {
+  if (!focus) return undefined;
+  const lines = [
+    `- Selector: \`${flatten(focus.selector)}\``,
+    `- Element: \`<${flatten(focus.tag)}>\`${focus.role ? `, role \`${flatten(focus.role)}\`` : ''}`,
+  ];
+  if (focus.label) lines.push(`- Label: ${flatten(focus.label)}`);
+  lines.push(`- On: ${flatten(focus.title)} — ${flatten(focus.url)}`);
+
+  const content = focus.content.slice(0, MAX_FOCUS_CONTENT);
+  const cut = focus.truncated || content.length < focus.content.length;
+  lines.push(
+    '',
+    cut ? 'Its text when they pointed at it (cut short — re-read it for the rest):' : 'Its text when they pointed at it:',
+    '',
+    content.trim() || '(no text — it is an image, an icon or an empty container)',
+  );
+  return lines.join('\n');
 }
 
 const MAX_FILES_BLOCK = 8 * 1024;

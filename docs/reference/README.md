@@ -5,7 +5,7 @@ Lookup tables. Nothing here explains a workflow — see the [user guide](../guid
 
 | | |
 | --- | --- |
-| [Tools](tools.md) | All 37 MCP tools with their parameters, the three read-only resources, and the reserved actions that never become tools |
+| [Tools](tools.md) | All 38 MCP tools with their parameters, the three read-only resources, and the reserved actions that never become tools |
 | [CLI](cli.md) | Every `browsentic-mcp` command |
 | [Errors](errors.md) | Every error code, where it comes from, and what to do about it |
 

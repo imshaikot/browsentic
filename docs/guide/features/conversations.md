@@ -21,6 +21,10 @@ means audio is streamed to Google for transcription. Type instead if that matter
 Replies stream back token by token. Follow-ups continue the same conversation, so **"now click the
 second one"** works.
 
+Words are not the only way to say which thing you mean. The composer's lens button opens
+[A-Eye](a-eye.md): point at an element on the page and it rides along with your next message as its
+subject.
+
 ---
 
 ## One conversation per tab

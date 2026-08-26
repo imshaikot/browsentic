@@ -11,13 +11,14 @@ first.
 | --- | --- |
 | [Conversations](conversations.md) | Voice and text, one conversation per tab, the sessions strip, history |
 | [Instant commands](instant-commands.md) | "go back", "scroll to the top" — the things that run in milliseconds without waking an agent |
+| [A-Eye](a-eye.md) | Point at an element instead of describing it, and let it point back when it needs to |
 | [Skills](skills.md) | How an instruction gets routed to the right playbook, and how to write your own |
 
 ## Acting on a page
 
 | | |
 | --- | --- |
-| [Page actions](page-actions.md) | The 37 things it can do to a page, grouped by what you would want |
+| [Page actions](page-actions.md) | The 38 things it can do to a page, grouped by what you would want |
 | [Screenshots](screenshots.md) | Viewport, full page, or one element — and when a capture touches disk |
 | [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |

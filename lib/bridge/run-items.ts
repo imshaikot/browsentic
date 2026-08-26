@@ -5,7 +5,7 @@ import { redactInput } from './redact';
 import type { ScreenshotPreview } from './screenshot-preview';
 
 export type RunItem =
-  | { kind: 'user'; id: string; text: string }
+  | { kind: 'user'; id: string; text: string; focus?: string }
   | { kind: 'assistant'; id: string; text: string }
   | { kind: 'notice'; id: string; tone: 'info' | 'error'; text: string }
   | {

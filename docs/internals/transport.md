@@ -98,7 +98,7 @@ dialling — but it never deletes the stored key. Only pairing again or `disconn
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **13**). A mismatch closes the socket
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **14**). A mismatch closes the socket
 with an explicit reason instead of letting two incompatible frame vocabularies talk past each other.
 
 ---

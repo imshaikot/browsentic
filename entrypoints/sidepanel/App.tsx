@@ -4,7 +4,7 @@ import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
-import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
+import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { Wordmark } from '@/components/brand';
 import { Composer, type AttachedSkill } from '@/components/composer';
 import { ConnectionSheet } from '@/components/connection-sheet';
@@ -22,6 +22,7 @@ import { SkillsPanel } from '@/components/skills-panel';
 import { StatusPill, describeStatus } from '@/components/status-pill';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { pickFocus } from '@/lib/bridge/aeye';
 import { putFile, removeFile } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
@@ -51,6 +52,8 @@ export default function App() {
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
+  const [focus, setFocus] = useState<FocusedElement | null>(null);
+  const [picking, setPicking] = useState(false);
   const [tab, setTab] = usePanelTab();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [, setCollapsed] = usePanelCollapsed();
@@ -63,8 +66,9 @@ export default function App() {
   const voice = useVoiceComposer({
     active: voiceEnabled && connected && !run.running,
     onSubmit: (text) => {
-      run.send(text, attachedSkill ? { agentSkillId: attachedSkill.id } : undefined);
+      run.send(text, { agentSkillId: attachedSkill?.id, focus: focus ?? undefined });
       setAttachedSkill(null);
+      setFocus(null);
     },
   });
 
@@ -138,6 +142,16 @@ export default function App() {
   function mapSite() {
     open('chat');
     run.mapSite();
+  }
+
+  async function pointAtElement() {
+    if (picking) return;
+    setAttachError(null);
+    setPicking(true);
+    const outcome = await pickFocus();
+    setPicking(false);
+    if ('focus' in outcome) setFocus(outcome.focus);
+    else if ('error' in outcome) setAttachError(`A-Eye couldn’t read that element: ${outcome.error}`);
   }
 
   async function attachPageContext() {
@@ -326,10 +340,14 @@ export default function App() {
             catalog={daemon?.skillCatalog}
             tabUrl={tabUrl}
             attachedSkill={attachedSkill}
+            focus={focus}
+            picking={picking}
             onAttachSkill={setAttachedSkill}
             onSend={handleSend}
             onStop={run.cancel}
             onToggleVoice={toggleVoice}
+            onPick={() => void pointAtElement()}
+            onClearFocus={() => setFocus(null)}
             onAttachPage={() => void attachPageContext()}
             onAttachFile={(file) => void attachFile(file)}
             onRemoveFile={(id) => void removeFile(id)}

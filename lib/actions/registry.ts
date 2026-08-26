@@ -22,6 +22,7 @@ import { listRecordings } from './page/list-recordings';
 import { monitorStatus } from './page/monitor-status';
 import { navigate } from './page/navigate';
 import { openTab } from './page/open-tab';
+import { pickElement } from './page/pick-element';
 import { pressKey } from './page/press-key';
 import { readRecording } from './page/read-recording';
 import { readTheme } from './page/read-theme';
@@ -56,6 +57,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       selectOption,
       selectText,
       extractText,
+      pickElement,
       pressKey,
       submitForm,
       waitForElement,
