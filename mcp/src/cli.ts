@@ -5,7 +5,9 @@ import { AGENTS, AGENT_KINDS, isAgentKind } from '@/lib/agents/catalog';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { join } from 'node:path';
+import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
+import { readAgentConfig } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
 import { clearLockfile, isRunning, logPath, readLockfile } from './lockfile';
@@ -143,6 +145,16 @@ function printSkills(): void {
     if (skill.provenance === 'generated') console.log(`  ${join(uploadedSkillsDir(), skill.name)}/`);
   }
   console.log(`\nRead in order: ${skillDirNames().join(' → ')} (a later one shadows an earlier one by name)`);
+
+  const config = readAgentConfig();
+  const own = agentSkills(config);
+  if (own.length) {
+    console.log(`\n${AGENTS[config.agent].label}'s own skills (attachable from the panel's / picker):`);
+    for (const skill of own) {
+      console.log(`${skill.name}`);
+      if (skill.description) console.log(`  ${skill.description}`);
+    }
+  }
 }
 
 async function showStatus(): Promise<void> {

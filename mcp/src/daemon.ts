@@ -11,6 +11,7 @@ import {
   success,
   type ActionResult,
   type RunEvent,
+  type SkillCatalog,
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
@@ -45,8 +46,10 @@ import { summarizeFile } from './agent/analyze';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
 import { configPath, readAgentConfig, writeActiveAgent, writeGuardrailSetting } from './agent/config';
+import { agentSkills } from './agent/agent-skills';
 import { agentState, grantRunner } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
+import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
@@ -322,30 +325,39 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           return;
         }
         if (request.t === 'agentState' || request.t === 'setAgent' || request.t === 'grantAgent') {
-          void settleAgent(request).then((state) =>
-            source.send({ t: 'agentInfo', id: request.id, result: state }),
-          );
+          void settleAgent(request).then((state) => {
+            source.send({ t: 'agentInfo', id: request.id, result: state });
+            // The catalog's agent-skill half belongs to the agent that just took over.
+            if (request.t === 'setAgent') pushSkillCatalog(source);
+          });
           return;
+        }
+        if (request.t === 'listSkills') {
+          return source.send({ t: 'skillCatalog', id: request.id, result: skillCatalogNow(request.refresh === true) });
         }
         if (request.t === 'guardrails' || request.t === 'setGuardrail') {
           return source.send({ t: 'guardrailInfo', id: request.id, result: settleGuardrail(request) });
         }
         if (request.t === 'saveSkill') {
-          return source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
+          source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
+          return pushSkillCatalog(source);
         }
         if (request.t === 'deleteSkill') {
-          return source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
+          source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
+          return pushSkillCatalog(source);
         }
         if (request.t === 'deleteSiteMap') {
-          return source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
+          source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
+          return pushSkillCatalog(source);
         }
         if (request.t === 'activateSiteMap') {
           const result = commitStaging(request.stagingId, request.exactHost === true);
-          return source.send({
+          source.send({
             t: 'skillResult',
             id: request.id,
             result: result.ok ? { ok: true, data: { name: result.data.name, path: result.data.path } } : result,
           });
+          return pushSkillCatalog(source);
         }
         if (request.t === 'discardSiteMap') {
           return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
@@ -359,6 +371,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
     scheduleIdleExit();
     void pushAgentState(accepted);
+    pushSkillCatalog(accepted);
     if (manifestInSync) restoreBundledManifest();
     else await adoptExtensionManifest(accepted);
   }
@@ -396,6 +409,26 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   async function pushAgentState(target: ExtensionLink): Promise<void> {
     const state = await agentState(readAgentConfig());
     if (target.isOpen) target.send({ t: 'agentInfo', id: '', result: success(state) });
+  }
+
+  function skillCatalogNow(refresh = false): ActionResult<SkillCatalog> {
+    try {
+      const config = readAgentConfig();
+      const skills = loadSkills().map((skill) => ({
+        name: skill.name,
+        description: skill.description,
+        category: skill.category,
+        domains: skill.domains,
+        source: skill.source,
+      }));
+      return success({ agent: config.agent, skills, agentSkills: agentSkills(config, { refresh }) });
+    } catch (error) {
+      return failure('AGENT_FAILED', String(error));
+    }
+  }
+
+  function pushSkillCatalog(target: ExtensionLink): void {
+    if (target.isOpen) target.send({ t: 'skillCatalog', id: '', result: skillCatalogNow() });
   }
 
   function session(source: ExtensionLink): AgentSession {
@@ -479,7 +512,10 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         }
         if (request.grant) await grantRunner(request.grant);
         const state = await agentState(readAgentConfig(), { refresh: !!changed });
-        if (changed && link?.isOpen) void pushAgentState(link);
+        if (changed && link?.isOpen) {
+          void pushAgentState(link);
+          pushSkillCatalog(link);
+        }
         return send(ws, { id: request.id, op: 'agent', state });
       }
       if (request.op === 'revoke') {

@@ -20,7 +20,7 @@ export interface Run {
   running: boolean;
   sessionId: string | null;
   sessions: TabSession[];
-  send: (text: string) => void;
+  send: (text: string, opts?: { agentSkillId?: string }) => void;
   cancel: () => void;
   decide: (toolId: string, allow: boolean, remember?: boolean) => void;
   clear: () => void;
@@ -145,12 +145,13 @@ export function useRun(): Run {
   }, [sessionId, bySession]);
 
   const send = useCallback(
-    (text: string) => {
+    (text: string, opts?: { agentSkillId?: string }) => {
       const trimmed = text.trim();
       if (!trimmed || tab.tabId == null) return;
       post({
         op: 'instruct',
         text: trimmed,
+        agentSkillId: opts?.agentSkillId,
         tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title },
       });
     },

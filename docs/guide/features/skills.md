@@ -27,6 +27,10 @@ fallback. Prefix an instruction with `@name` to pin one explicitly:
 
 `@site-mapper` is the one case where the prefix is **required** rather than optional.
 
+Typing `/` at the start of the panel's composer opens a picker over everything below — skills for
+the current site first, then the rest — so the prefix does not have to be remembered. Picking a
+Browsentic skill inserts its `@name` for you.
+
 ---
 
 ## Site notes are overlays, not replacements
@@ -77,6 +81,21 @@ no restart.
 ```sh
 browsentic-mcp skills    # everything the router can see, tagged with where it came from
 ```
+
+---
+
+## The agent's own skills
+
+The `/` picker also lists the skills the active agent CLI keeps for itself — Claude Code's
+`~/.claude/skills/`, Codex's `~/.codex/skills/` and `~/.codex/prompts/`, the roots in Antigravity's
+`skills.txt`. Picking one attaches it to that message: the daemon reads the file at spawn time and
+appends it to the system prompt, clearly marked, with a note that browser tools are all the run
+has.
+
+These never go through routing — they ride alongside whatever base skill was picked. Only the
+skill's **title crosses to the extension**; the panel holds an opaque id, and the daemon refuses
+any id it did not mint itself, so the file's path and content stay on your machine's daemon side.
+Files past 48 KB are left out of the picker. Switching agents swaps the list.
 
 ---
 

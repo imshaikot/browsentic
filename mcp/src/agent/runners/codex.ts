@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
 import { effortOf, parseJsonLine } from './util';
@@ -44,6 +46,8 @@ export const codexRunner: Runner = {
   efforts: ['minimal', 'low', 'medium', 'high'],
 
   workspace: () => stateDir,
+
+  skillDirs: () => [join(homedir(), '.codex', 'skills'), join(homedir(), '.codex', 'prompts')],
 
   stream(context: StreamContext): Plan {
     const { settings, mcp, research } = context;

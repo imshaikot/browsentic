@@ -26,10 +26,11 @@ export const nextId = () => crypto.randomUUID();
 export function reduce(items: RunItem[], event: RunEvent): RunItem[] {
   switch (event.kind) {
     case 'started': {
+      const attached = event.attached ? ` + attached: ${event.attached}` : '';
       const overlays = event.overlays?.length ? ` + site notes: ${event.overlays.join(', ')}` : '';
       return [
         ...items,
-        { kind: 'notice', id: nextId(), tone: 'info', text: `Loaded skill: ${event.skill}${overlays}` },
+        { kind: 'notice', id: nextId(), tone: 'info', text: `Loaded skill: ${event.skill}${attached}${overlays}` },
       ];
     }
 

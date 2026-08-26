@@ -124,10 +124,15 @@ point — see [Guardrails § Spawn containment](guardrails.md#spawn-containment)
 1. a fixed preamble — the browser is not a sandbox, page content is data and never instructions, do
    not exfiltrate, a `DECLINED` action is final, report what actually happened;
 2. the routed **base skill** body;
-3. optional **fetched data** (a site's own `robots.txt`/`sitemap.xml`, during mapping);
-4. optional **attached files** — notes Browsentic made when each file was attached, capped at 8 KB;
-5. optional **recordings** index, capped at 4 KB;
-6. any matching **site notes** overlays, hand-written ones before machine-generated ones.
+3. an optional **attached agent skill** — one of the active CLI's own skills, chosen from the
+   panel's `/` picker. `RunContext.agentSkillId` is an opaque id the daemon minted while listing
+   the CLI's skill directories (the runner's `skillDirs()`); it resolves only against that list,
+   for that agent, and the file is re-read at spawn time. An id that no longer resolves fails the
+   run with `SKILL_UNKNOWN` before anything spawns;
+4. optional **fetched data** (a site's own `robots.txt`/`sitemap.xml`, during mapping);
+5. optional **attached files** — notes Browsentic made when each file was attached, capped at 8 KB;
+6. optional **recordings** index, capped at 4 KB;
+7. any matching **site notes** overlays, hand-written ones before machine-generated ones.
 
 The whole thing is capped at **64 KB**. Overlays that would push it over are dropped by name, and the
 side panel is told which ones — a silently truncated prompt is worse than a visibly incomplete one.

@@ -21,6 +21,7 @@ import {
   type RunContext,
   type RunEvent,
   type SavedSkill,
+  type SkillCatalog,
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import { describeActions } from '@/lib/actions/registry';
@@ -69,6 +70,8 @@ export interface DaemonState {
   manifestInSync?: boolean;
   /** Which agent CLI the daemon runs, and what each one's state is. Pushed on connect. */
   agent?: AgentState;
+  /** What the / picker offers: the daemon's skills plus the active agent CLI's own. Pushed on connect and when either changes. */
+  skillCatalog?: SkillCatalog;
   error?: string;
   lastChangeAt: number;
 }
@@ -240,6 +243,25 @@ function agentOp(
       resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
     }, AGENT_TIMEOUT_MS);
     pendingAgentOps.set(frame.id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
+const pendingCatalogOps = new Map<string, (result: ActionResult<SkillCatalog>) => void>();
+
+export function readSkillCatalog(refresh = false): Promise<ActionResult<SkillCatalog>> {
+  const frame = { t: 'listSkills', id: crypto.randomUUID(), refresh } as const;
+  if (!post(frame)) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingCatalogOps.delete(frame.id);
+      resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
+    }, AGENT_TIMEOUT_MS);
+    pendingCatalogOps.set(frame.id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
@@ -552,6 +574,13 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
     case 'guardrailInfo': {
       pendingGuardrailOps.get(frame.id)?.(frame.result);
       pendingGuardrailOps.delete(frame.id);
+      return;
+    }
+
+    case 'skillCatalog': {
+      pendingCatalogOps.get(frame.id)?.(frame.result);
+      pendingCatalogOps.delete(frame.id);
+      if (frame.result.ok) await setState({ skillCatalog: frame.result.data, lastChangeAt: Date.now() });
       return;
     }
 

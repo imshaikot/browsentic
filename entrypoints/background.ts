@@ -22,6 +22,7 @@ import {
   pairDaemon,
   readAgentState,
   readGuardrails,
+  readSkillCatalog,
   setGuardrail,
   setUpAgent,
 } from '@/lib/bridge/socket';
@@ -90,6 +91,12 @@ export default defineBackground(() => {
         .catch(() => sendResponse(success({ monitors: [] })));
       return true;
     }
+    if (message.op === 'listSkills') {
+      readSkillCatalog(message.refresh === true)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'agentState') {
       readAgentState(message.refresh === true)
         .then(sendResponse)
@@ -142,7 +149,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;

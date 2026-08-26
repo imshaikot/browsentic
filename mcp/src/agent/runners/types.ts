@@ -61,6 +61,8 @@ export interface Runner {
   /** Reasoning-effort names this CLI accepts; anything else is dropped. */
   efforts: string[];
   workspace(mode: RunMode): string;
+  /** Directories where this CLI keeps the user's own skills, feeding the panel's skill picker. */
+  skillDirs?(): string[];
   stream(context: StreamContext): Plan;
   /** Fresh per run — readers carry state across lines. */
   reader(): StreamReader;

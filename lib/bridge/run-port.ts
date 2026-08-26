@@ -70,7 +70,7 @@ const PERSIST_DEBOUNCE_MS = 800;
 const MAX_EXTERNAL_ITEMS = 100;
 
 export type RunCommand =
-  | { op: 'instruct'; text: string; tab: TabAnchor }
+  | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string }
   | { op: 'cancel'; sessionId: string }
   | { op: 'decision'; sessionId: string; toolId: string; allow: boolean; remember?: boolean }
   | { op: 'endSession'; sessionId: string }
@@ -181,7 +181,7 @@ export function serveRunPorts(): void {
 function handle(command: RunCommand): void {
   switch (command.op) {
     case 'instruct':
-      void serialized(() => instruct(command.text, command.tab));
+      void serialized(() => instruct(command.text, command.tab, command.agentSkillId));
       return;
     case 'cancel':
       void serialized(() => stopRun(command.sessionId));
@@ -291,7 +291,7 @@ async function settle(sessionId: string): Promise<void> {
   await nameStoredSession(sessionId).catch(() => undefined);
 }
 
-async function instruct(text: string, anchor: TabAnchor): Promise<void> {
+async function instruct(text: string, anchor: TabAnchor, agentSkillId?: string): Promise<void> {
   const ensured = await ensureSessionForTab(anchor);
   if (!ensured.ok) {
     broadcast({
@@ -317,7 +317,8 @@ async function instruct(text: string, anchor: TabAnchor): Promise<void> {
 
   busy.add(sessionId);
   try {
-    if (await handledLocally(text, session)) {
+    // An attached agent skill is meaningless to the fast path — the daemon has to spawn for it.
+    if (!agentSkillId && (await handledLocally(text, session))) {
       await persist(sessionId);
       return;
     }
@@ -328,6 +329,7 @@ async function instruct(text: string, anchor: TabAnchor): Promise<void> {
       sessionId,
       agent: session.agent,
       agentSessionId: session.agentSessionId,
+      agentSkillId,
       files: await attachedFiles(),
       recordings: await attachedRecordings(),
     });

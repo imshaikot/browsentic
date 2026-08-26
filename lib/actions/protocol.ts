@@ -4,13 +4,13 @@ import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
-import type { SkillDraft } from '@/lib/skills/format';
+import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 12;
+export const SOCKET_PROTOCOL_VERSION = 13;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -37,6 +37,7 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeRecording'; recordingId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'monitorSample'; monitorId: string; sample: MonitorSample }
   | { channel: typeof BRIDGE_CHANNEL; op: 'monitorState' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'listSkills'; refresh?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'agentState'; refresh?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgent'; agent: AgentKind }
   | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind }
@@ -48,7 +49,7 @@ export type ActionResult<T = unknown> =
   | { ok: false; error: { code: string; message: string } };
 
 export type RunEvent =
-  | { kind: 'started'; skill: string; overlays?: string[] }
+  | { kind: 'started'; skill: string; attached?: string; overlays?: string[] }
   | { kind: 'text'; delta: string }
   | { kind: 'tool'; toolId: string; action: string; input: unknown; source?: 'local' | 'external' }
   | { kind: 'approval'; toolId: string; action: string; input: unknown; site?: string }
@@ -100,6 +101,31 @@ export interface RunContext {
   /** The agent that issued `agentSessionId`; a different agent cannot resume it. */
   agent?: AgentKind;
   agentSessionId?: string;
+  /** Opaque handle from the skill catalog. The daemon resolves it to a skill it enumerated itself and attaches the content at spawn; a path never crosses the wire. */
+  agentSkillId?: string;
+}
+
+/** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */
+export interface AgentSkillMeta {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** A Browsentic skill projected for the picker: everything but the body. */
+export interface CatalogSkill {
+  name: string;
+  description: string;
+  category: SkillCategory;
+  domains: string[];
+  source: 'bundled' | 'user' | 'uploaded';
+}
+
+export interface SkillCatalog {
+  /** The agent whose library `agentSkills` came from; switching agents replaces the catalog. */
+  agent: AgentKind;
+  skills: CatalogSkill[];
+  agentSkills: AgentSkillMeta[];
 }
 
 export type SocketFrame =
@@ -151,6 +177,8 @@ export type SocketFrame =
   | { t: 'setAgent'; id: string; agent: AgentKind }
   | { t: 'grantAgent'; id: string; agent: AgentKind }
   | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> }
+  | { t: 'listSkills'; id: string; refresh?: boolean }
+  | { t: 'skillCatalog'; id: string; result: ActionResult<SkillCatalog> }
   | { t: 'guardrails'; id: string }
   | { t: 'setGuardrail'; id: string; setting: string; value: GuardrailValue }
   | { t: 'guardrailInfo'; id: string; result: ActionResult<GuardrailSettings> };
@@ -182,6 +210,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'agentState',
   'setAgent',
   'grantAgent',
+  'listSkills',
   'guardrails',
   'setGuardrail',
 ] as const;

@@ -1,13 +1,20 @@
-import { useRef, type MouseEvent } from 'react';
-import { FileText, FileUp, Loader2, Mic, MicOff, Paperclip, Send, Square, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { FileText, FileUp, Loader2, Mic, MicOff, Paperclip, Send, Sparkles, Square, X } from 'lucide-react';
 
+import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/components/skill-menu';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import type { SkillCatalog } from '@/lib/actions/protocol';
 import type { StoredFileMeta } from '@/lib/bridge/file-store';
 import type { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { cn } from '@/lib/utils';
 
 type Voice = ReturnType<typeof useVoiceComposer>;
+
+export interface AttachedSkill {
+  id: string;
+  name: string;
+}
 
 export function Composer({
   voice,
@@ -16,6 +23,10 @@ export function Composer({
   running,
   files,
   attachError,
+  catalog,
+  tabUrl,
+  attachedSkill,
+  onAttachSkill,
   onSend,
   onStop,
   onToggleVoice,
@@ -29,6 +40,10 @@ export function Composer({
   running: boolean;
   files: StoredFileMeta[];
   attachError: string | null;
+  catalog: SkillCatalog | undefined;
+  tabUrl: string;
+  attachedSkill: AttachedSkill | null;
+  onAttachSkill: (skill: AttachedSkill | null) => void;
   onSend: () => void;
   onStop: () => void;
   onToggleVoice: () => void;
@@ -38,6 +53,31 @@ export function Composer({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  const slash = voice.input.startsWith('/') ? voice.input.slice(1) : null;
+  const menuOpen = slash !== null && connected;
+  const [highlight, setHighlight] = useState(0);
+  const menuItems = useMemo(
+    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '') : []),
+    [menuOpen, catalog, tabUrl, slash],
+  );
+
+  useEffect(() => setHighlight(0), [slash]);
+
+  const { cancelPending } = voice;
+  useEffect(() => {
+    if (menuOpen) cancelPending();
+  }, [menuOpen, cancelPending]);
+
+  function choose(item: SkillMenuItem) {
+    if (item.agentSkillId) {
+      onAttachSkill({ id: item.agentSkillId, name: item.name });
+      voice.setInput('');
+    } else {
+      voice.setInput(`@${item.name} `);
+    }
+    composerRef.current?.focus();
+  }
 
   function focusComposer(event: MouseEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).closest('button, textarea')) return;
@@ -52,21 +92,71 @@ export function Composer({
         </p>
       )}
 
+      {attachedSkill && (
+        <div className="mb-2 flex items-center gap-2 rounded-xl border border-brand/35 bg-brand/8 px-2.5 py-1.5 text-xs">
+          <Sparkles className="size-3.5 shrink-0 text-brand" />
+          <span className="min-w-0 flex-1 truncate text-ink">
+            Skill attached: <span className="font-medium">{attachedSkill.name}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onAttachSkill(null)}
+            aria-label={`Detach ${attachedSkill.name}`}
+            className="shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      )}
+
       <FileChips files={files} onRemove={onRemoveFile} />
       <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} />
 
       <div
         onClick={focusComposer}
         className={cn(
-          'panel-card flex flex-col rounded-2xl transition-colors has-[textarea:focus]:border-brand/50',
+          'panel-card relative flex flex-col rounded-2xl transition-colors has-[textarea:focus]:border-brand/50',
           connected && 'cursor-text',
         )}
       >
+        {menuOpen && (
+          <SkillMenu
+            items={menuItems}
+            agent={catalog?.agent}
+            highlight={highlight}
+            onHover={setHighlight}
+            onSelect={choose}
+          />
+        )}
         <Textarea
           ref={composerRef}
           value={voice.input}
           onChange={(event) => voice.setInput(event.target.value)}
           onKeyDown={(event) => {
+            if (menuOpen) {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                voice.setInput('');
+                return;
+              }
+              if (menuItems.length > 0) {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  setHighlight((current) => (current + 1) % menuItems.length);
+                  return;
+                }
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  setHighlight((current) => (current - 1 + menuItems.length) % menuItems.length);
+                  return;
+                }
+                if (event.key === 'Enter' || event.key === 'Tab') {
+                  event.preventDefault();
+                  choose(menuItems[Math.min(highlight, menuItems.length - 1)]);
+                  return;
+                }
+              }
+            }
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
               onSend();
@@ -146,7 +236,7 @@ export function Composer({
       <p className="mt-2 text-center font-mono text-[10px] text-ink-faint">
         {voiceEnabled && voice.supported
           ? 'Speak and pause to send · Enter sends now'
-          : 'Enter to send · Shift + Enter for a new line'}
+          : 'Enter to send · Shift + Enter for a new line · / for skills'}
       </p>
     </>
   );

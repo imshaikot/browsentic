@@ -46,6 +46,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `SESSION_TAB_CLOSED` | Extension | Every tab this conversation was working in has been closed |
 | `TAB_IN_USE` | Extension | That tab belongs to another Browsentic conversation |
 | `RUN_INACTIVE` | AgentSession | The run was cancelled while a tool call was in flight |
+| `SKILL_UNKNOWN` | AgentSession | The attached agent skill's id no longer resolves — the file moved, changed agents, or outgrew the size cap. Reopen the `/` picker and choose again |
 
 ## Agents
 

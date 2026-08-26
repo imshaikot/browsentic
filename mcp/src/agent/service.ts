@@ -27,6 +27,7 @@ import {
   type Scope,
 } from '../guardrails';
 import { log } from '../log';
+import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
@@ -217,6 +218,17 @@ export class AgentSession {
       });
     }
 
+    let attached: { name: string; body: string } | undefined;
+    if (context?.agentSkillId) {
+      if (mapping) {
+        log(`agent run ${runId}: ignoring the attached agent skill — mapping runs build their own prompt`);
+      } else {
+        const resolved = resolveAgentSkill(context.agentSkillId, config);
+        if ('error' in resolved) return emit({ kind: 'error', ...resolved.error });
+        attached = resolved.skill;
+      }
+    }
+
     const overlayNames = routed.overlays.map((overlay) => overlay.name);
     const policy = policyFrom(config.guardrails, config.requireApproval);
     const scope = scopeFor({
@@ -262,6 +274,7 @@ export class AgentSession {
         instructionText = prepared.instruction;
       } else {
         built = buildSystemPrompt(routed.base, routed.overlays, {
+          attached,
           attachments: filesBlock(context?.files),
           recordings: recordingsBlock(context?.recordings),
         });
@@ -278,12 +291,14 @@ export class AgentSession {
       return emit({ kind: 'error', code: 'CANCELLED', message: 'Run cancelled.' });
     }
 
+    const applied = attached && !built.dropped.includes(attached.name) ? attached.name : undefined;
     log(
       `agent run ${runId} started with skill "${routed.base.name}"` +
+        (applied ? ` + attached "${applied}"` : '') +
         (overlayNames.length ? ` + site notes [${overlayNames.join(', ')}]` : '') +
         (run.map ? ` mapping ${run.map.target.host}` : ''),
     );
-    emit({ kind: 'started', skill: routed.base.name, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
+    emit({ kind: 'started', skill: routed.base.name, attached: applied, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
 
     const holding = sessionId ? this.held.get(sessionId) : undefined;
     const held = holding?.agent === config.agent ? holding.sessionId : null;

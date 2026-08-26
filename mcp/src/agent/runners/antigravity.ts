@@ -20,6 +20,9 @@ const TASK_INSTRUCTIONS =
 
 export const settingsPath = join(homedir(), '.gemini', 'antigravity-cli', 'settings.json');
 
+/** Antigravity keeps a list of skill roots, one absolute path per line; skills live under `<root>/skills/`. */
+const skillsIndexPath = join(homedir(), '.gemini', 'antigravity', 'skills.txt');
+
 /** The permission rule that lets a headless run reach Browsentic's tools instead of soft-denying them. */
 export const MCP_RULE = `mcp(${MCP_SERVER_NAME}/*)`;
 
@@ -64,6 +67,18 @@ export const antigravityRunner: Runner = {
   efforts: ['low', 'medium', 'high'],
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'antigravity', mode),
+
+  skillDirs: () => {
+    try {
+      return readFileSync(skillsIndexPath, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((root) => join(root, 'skills'));
+    } catch {
+      return [];
+    }
+  },
 
   stream(context: StreamContext): Plan {
     const { settings } = context;

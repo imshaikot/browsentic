@@ -6,7 +6,7 @@ import { invokeInActiveTab } from '@/lib/actions/client';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
 import { Wordmark } from '@/components/brand';
-import { Composer } from '@/components/composer';
+import { Composer, type AttachedSkill } from '@/components/composer';
 import { ConnectionSheet } from '@/components/connection-sheet';
 import { Greeting } from '@/components/greeting';
 import { MonitorBar } from '@/components/monitor-bar';
@@ -50,6 +50,7 @@ export default function App() {
   const skills = useStoredSkills();
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [tab, setTab] = usePanelTab();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [, setCollapsed] = usePanelCollapsed();
@@ -61,10 +62,18 @@ export default function App() {
 
   const voice = useVoiceComposer({
     active: voiceEnabled && connected && !run.running,
-    onSubmit: (text) => run.send(text),
+    onSubmit: (text) => {
+      run.send(text, attachedSkill ? { agentSkillId: attachedSkill.id } : undefined);
+      setAttachedSkill(null);
+    },
   });
 
   const status = describeStatus(daemon, { running: run.running, listening: voice.listening });
+
+  useEffect(() => {
+    if (!connected || daemon?.skillCatalog) return;
+    void browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'listSkills' });
+  }, [connected, daemon?.skillCatalog]);
 
   useEffect(() => {
     void browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'panelOpened' });
@@ -314,6 +323,10 @@ export default function App() {
             running={run.running}
             files={files}
             attachError={attachError}
+            catalog={daemon?.skillCatalog}
+            tabUrl={tabUrl}
+            attachedSkill={attachedSkill}
+            onAttachSkill={setAttachedSkill}
             onSend={handleSend}
             onStop={run.cancel}
             onToggleVoice={toggleVoice}

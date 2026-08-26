@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { effortOf, parseJsonLine } from './util';
@@ -60,6 +62,8 @@ export const claudeRunner: Runner = {
   efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
 
   workspace: () => stateDir,
+
+  skillDirs: () => [join(homedir(), '.claude', 'skills')],
 
   stream(context: StreamContext): Plan {
     const { settings, research } = context;
