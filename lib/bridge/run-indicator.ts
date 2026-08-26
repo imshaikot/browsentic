@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { INDICATOR_CHANNEL, INDICATOR_COLOR } from '@/lib/indicator/events';
+import { syncRail } from './rail';
 import { readTabSessions } from './tab-sessions';
 
 type BadgeAction = {
@@ -24,6 +25,7 @@ export async function syncRunIndicator(): Promise<void> {
   }
   for (const tabId of busy) if (!marked.has(tabId)) await paint(tabId, true);
   for (const tabId of [...marked]) if (!busy.has(tabId)) await paint(tabId, false);
+  await syncRail();
 }
 
 export function forgetTab(tabId: number): void {

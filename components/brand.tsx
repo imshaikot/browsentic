@@ -33,7 +33,7 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn('flex min-w-0 items-center gap-2', className)}>
       <Logo className="size-6 shrink-0 text-brand" />
-      <span className="font-display text-[0.9375rem] leading-none font-semibold tracking-tight text-ink">
+      <span className="truncate font-display text-[0.9375rem] leading-none font-semibold tracking-tight text-ink max-[19rem]:hidden">
         Browsentic
       </span>
     </span>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, SquarePen } from 'lucide-react';
+import { ArrowDown, PanelRightClose, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
@@ -27,6 +27,8 @@ import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recordin
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { closeSidePanel } from '@/lib/bridge/side-panel';
+import { usePanelCollapsed, usePanelTab } from '@/lib/bridge/use-panel-view';
 import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
 import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
@@ -48,9 +50,11 @@ export default function App() {
   const skills = useStoredSkills();
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
-  const [tab, setTab] = useState<PanelTab>('chat');
+  const [tab, setTab] = usePanelTab();
   const [connectionOpen, setConnectionOpen] = useState(false);
+  const [, setCollapsed] = usePanelCollapsed();
   const viewport = useRef<HTMLDivElement>(null);
+  const windowId = useRef<number | null>(null);
   const [pinned, setPinned] = useState(true);
 
   const connected = daemon?.connected ?? false;
@@ -61,6 +65,13 @@ export default function App() {
   });
 
   const status = describeStatus(daemon, { running: run.running, listening: voice.listening });
+
+  useEffect(() => {
+    void browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'panelOpened' });
+    void browser.windows.getCurrent().then((win) => {
+      windowId.current = win.id ?? null;
+    });
+  }, []);
 
   useEffect(() => {
     const element = viewport.current;
@@ -91,6 +102,12 @@ export default function App() {
     setTab(next);
     setPinned(next === 'chat');
     if (viewport.current) viewport.current.scrollTop = 0;
+  }
+
+  function minimize() {
+    setConnectionOpen(false);
+    setCollapsed(true);
+    void closeSidePanel(windowId.current);
   }
 
   function handleSend() {
@@ -162,6 +179,7 @@ export default function App() {
   const runningCount = run.sessions.filter((session) => session.runId).length;
   const offChatRun = runningCount > 0 && tab !== 'chat';
   const hasBanners = offChatRun || !!run.recording || run.monitors.length > 0 || !!run.draft;
+  const counts = { history: sessions.length, skills: skills.length, recordings: recordings.length };
 
   return (
     <div className="flex h-screen flex-col">
@@ -186,15 +204,20 @@ export default function App() {
         >
           <SquarePen className="size-3.5" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="Minimize to a rail on the page"
+          aria-label="Minimize to a rail on the page"
+          onClick={minimize}
+        >
+          <PanelRightClose className="size-3.5" />
+        </Button>
       </header>
 
       {connectionOpen && <ConnectionSheet onClose={() => setConnectionOpen(false)} />}
 
-      <PanelNav
-        tab={tab}
-        counts={{ history: sessions.length, skills: skills.length, recordings: recordings.length }}
-        onSelect={open}
-      />
+      <PanelNav tab={tab} counts={counts} onSelect={open} />
 
       <SessionRail
         sessions={run.sessions}

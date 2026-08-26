@@ -40,6 +40,20 @@ Above the chat, a row per tab that has a conversation: its live title, a pulsing
 working, and how many messages it holds. Click a row to jump to that tab and its transcript; press
 **×** to end that session. It collapses to a single line when you want the room back.
 
+### Minimizing to the rail
+
+The header's collapse button closes the panel and leaves a small rail floating at the edge of the
+page — the same five tabs as icons, and the link's status dot. Click any of them and the panel comes
+back on that tab.
+
+A run keeps showing itself while you are minimized: **Chat** carries a pulsing mark, the rail counts
+how many runs are live, and its edge picks up the working colour. It stays minimized until you
+reopen it.
+
+The rail is drawn into the page, so it cannot appear on pages Browsentic is not allowed into —
+`chrome://` pages, the Chrome Web Store and the new tab page. The toolbar icon and the right-click
+**Open Browsentic** item always work.
+
 ### Knowing something is running when you are elsewhere
 
 While a conversation is working, its tab is marked in two places — a dot on the Browsentic toolbar

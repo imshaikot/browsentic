@@ -43,10 +43,59 @@ it is the documented escape hatch.
 Adding one is a variant in `PanelTab`, an entry in `TABS`, and a branch in the side panel's body —
 there is no router.
 
+**The strip labels as much as it can afford.** A `ResizeObserver` measures the width the labelled
+row actually needs and steps through three fits: every label, then only the open tab's, then icons
+alone with a dot where the count chip was. A width is only knowable while it is on screen, so each
+fit records its own and steps one rung down; stepping back up waits for the width it already
+learned, which is what keeps the strip from flapping between two fits at one panel width. In
+practice five labels want ~485 px and one wants ~225 px, so a side panel at its usual size lands on
+the middle fit.
+
 **Settings** is the only tab whose state lives on the daemon rather than in extension storage. It
 reads and writes `~/.browsentic/config.json` through two bridge ops, `guardrails` and
 `setGuardrail`, which forward to the socket frames of the same name. The extension holds no copy:
 every write returns the daemon's fresh view, which is what the panel then renders.
+
+## Minimizing: the rail lives in the page
+
+**Nothing can resize a side panel.** `chrome.sidePanel` offers `open`, `close`, `setOptions` and
+`getLayout`, and `PanelLayout` carries only `side` — the width is the user's, dragged and remembered
+by Chrome. So collapsing the panel *into* itself would only leave an empty column. Minimizing
+instead **closes the panel and draws a 44 px rail into the page**, which is a surface the extension
+can size.
+
+| | |
+| --- | --- |
+| `lib/rail/events.ts` | The channel, the `RailView` the background computes, the tab list with its Lucide paths copied out, and the palette spelled in `oklch` |
+| `lib/rail/host.ts` | `exposeRail()` in the content script — builds the rail in a **closed** shadow root on `documentElement` |
+| `lib/bridge/rail.ts` | `serveRail()` and `syncRail()` in the background — what to paint, and when |
+| `lib/bridge/panel-view.ts` | `browsentic/panelCollapsed` and `browsentic/panelTab`, read by `use-panel-view.ts` in the panel |
+
+The content script carries no React and no icon package, which is why the paths and colours are
+copied rather than imported — `components/` would drag the whole panel bundle onto every page.
+
+**A closed shadow root on `documentElement` is load-bearing.** It keeps the rail out of
+`body.innerText` (so `extractText` never returns it), out of the page's `querySelectorAll`, and out
+of any page stylesheet. The host element has no layout footprint; the rail inside it is
+`position: fixed`, centred on the panel's own side, inset from the edge so it never covers the
+page's scrollbar.
+
+**The click is the gesture.** `sidePanel.open()` needs user activation, and the only activation the
+panel will ever get is the click on the rail, forwarded from the content script. `serveRail()`
+spends it before any `await` — a single statement, no storage read in front of it. It deliberately
+does *not* clear the collapsed flag: the panel clears it itself on mount with the `panelOpened`
+bridge op, so an `open()` that gets refused leaves the rail on screen rather than dropping the user
+into nothing.
+
+**`syncRail()` broadcasts to every tab** instead of tracking which tabs carry a rail. That is a
+service-worker decision, not laziness: a `Set` of painted tabs comes back empty when the worker is
+revived, which would strand a rail on a page with no way to clear it. The first sync of a worker's
+life always broadcasts; only a repeated *clear* is skipped. A tab that has just finished loading is
+repainted on its own rather than triggering a broadcast.
+
+Pages that refuse content scripts — `chrome://`, the Web Store, the new-tab page — get no rail.
+That is the same `TAB_UNREACHABLE` set as everywhere else, and it is why the toolbar icon and the
+**Open Browsentic** context-menu item stay the guaranteed way back in.
 
 ## Tab scoping
 

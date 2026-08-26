@@ -10,6 +10,7 @@ import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/reco
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
 import { serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
+import { serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
@@ -127,6 +128,11 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
+    if (message.op === 'panelOpened') {
+      void setPanelCollapsed(false);
+      sendResponse(success(true));
+      return;
+    }
     if (message.op === 'disconnect') {
       disconnectDaemon()
         .then(() => sendResponse(success(true)))
@@ -136,7 +142,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;
@@ -165,6 +171,8 @@ export default defineBackground(() => {
   serveMonitor();
   serveRunPorts();
   serveTabSessions();
+  serveRail();
+  void syncRail();
 
   onWelcome(() => {
     void resyncSkills();

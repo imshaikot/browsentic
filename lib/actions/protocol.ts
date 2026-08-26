@@ -27,6 +27,7 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'invoke'; action: string; input?: unknown }
   | { channel: typeof BRIDGE_CHANNEL; op: 'pair'; token: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'disconnect' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'panelOpened' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeFile'; fileId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveSkill'; skillId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string }
