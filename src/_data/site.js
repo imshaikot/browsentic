@@ -25,7 +25,7 @@ export default {
   nav: [
     { key: 'how-it-works', href: '/how-it-works/', label: 'How it works' },
     { key: 'capabilities', href: '/capabilities/', label: 'Capabilities' },
-    { key: 'mcp-server', href: '/mcp-server/', label: 'MCP server' },
+    { key: 'skills', href: '/skills/', label: 'Skills' },
     { key: 'automations', href: '/automations/', label: 'Automations' },
     { key: 'security', href: '/security/', label: 'Security' },
     { key: 'docs', href: '/docs/', label: 'Docs' },

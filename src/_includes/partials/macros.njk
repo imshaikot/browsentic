@@ -110,8 +110,11 @@
       {{ copy.CTA.title.lead }} <span class="text-gradient">{{ copy.CTA.title.accent }}</span>
     </h2>
     <p class="mx-auto mt-5 max-w-xl text-[1.02rem] leading-relaxed text-ink-dim">{{ copy.CTA.lede }}</p>
-    <div class="mx-auto mt-8 max-w-lg text-left">{{ command(copy.HERO.command) }}</div>
-    <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+    {#- No command here on purpose. The closing panel appears on every page, and the
+        only install command we can honestly print today is a git clone, which is the
+        highest friction path we have. The buttons carry it until `npx browsentic
+        setup` exists, at which point that one line belongs here. -#}
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
       {{ button("/install/", "Install in five minutes") }}
       {{ button(copy.REPO, "Star on GitHub", "ghost", true) }}
     </div>

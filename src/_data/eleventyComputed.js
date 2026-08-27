@@ -12,7 +12,7 @@ const softwareApplication = {
   '@type': 'SoftwareApplication',
   '@id': abs('/#software'),
   name: 'Browsentic',
-  alternateName: 'Browsentic browser MCP server',
+  alternateName: 'Browsentic AI browser extension',
   description: SEO.summary,
   applicationCategory: 'DeveloperApplication',
   applicationSubCategory: 'Browser automation',

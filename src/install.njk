@@ -3,11 +3,11 @@ layout: layouts/page.njk
 pageKey: install
 title: "Install Browsentic: four steps, about five minutes"
 seoTitle: "Install: clone, build, load the extension, pair | Browsentic"
-description: "Clone and build both halves with one command, load the unpacked extension, redeem a pairing code, then point any MCP client at the same browser. About five minutes."
+description: "Clone and build both halves with one command, load the unpacked extension in Chrome or Firefox, then redeem a pairing code. About five minutes, no API key."
 keywords:
   - install browsentic
   - browser automation setup
-  - MCP server install
+  - install AI browser extension
   - load unpacked extension
   - pair browser extension daemon
   - browsentic-mcp pair
@@ -18,8 +18,8 @@ howToSteps:
     body: "Open chrome://extensions, enable Developer mode, choose Load unpacked and select the build output. Firefox builds work too."
   - title: "Put the daemon on your PATH and pair"
     body: "The pairing code is single-use and lives for ten minutes. Paste it into the popup and press Connect."
-  - title: "Point any MCP client at the same browser"
-    body: "Your agent now commands 41 page tools plus browsentic_status, and three read-only resources."
+  - title: "Optional: hand the same browser to an MCP client"
+    body: "The side panel already works. If you also live in a terminal, one more command gives your client the same tab and its 41 page tools."
 ---
 {% import "partials/macros.njk" as m with context %}
 

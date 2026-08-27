@@ -7,7 +7,7 @@ export const VERSION = 'v0.3.1'
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
   description:
-    'No new browser, no new subscription. Hand any tab to the AI agent you already run: 41 page tools over MCP, in the logged-in session you already use.',
+    'No new browser, no new subscription. A browser extension that hands any tab to the AI agent you already run, inside the logged-in session you already use.',
   social: {
     title: 'Browsentic: every tab, its own AI agent',
     description:
@@ -17,22 +17,22 @@ export const SEO = {
     'Browsentic. Every tab, its own AI agent. 41 page tools, three runs at once, record and replay, site maps, no API key.',
   author: 'imshaikot',
   summary:
-    'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, or to any MCP client, by voice, by typing, or by replaying a session you recorded once.',
+    'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, by voice, by typing, or by replaying a session you recorded once. It also speaks MCP, so an external client can drive the same browser.',
   keywords: [
     'AI browser automation',
-    'browser automation',
-    'AI browser agent',
+    'browser AI agent',
+    'browser extension AI',
+    'AI browser extension for Chrome',
+    'automate logged-in browser',
+    'record and replay browser',
     'agentic browsing',
     'browser automation without API key',
-    'MCP server',
-    'Model Context Protocol',
-    'Claude Code browser automation',
-    'browser extension',
-    'Chrome extension',
+    'browser automation',
     'web automation',
     'automate job applications',
-    'record and replay browser',
     'site mapping',
+    'Claude Code browser automation',
+    'MCP server',
   ],
 }
 
@@ -45,27 +45,26 @@ export const HERO = {
 }
 
 /**
- * The two ways in. The extension comes first because it is the product you
- * actually install: a side panel in the browser you already use. Driving it from
- * an MCP client is the second door, for people already living in a terminal.
+ * Not two equal doors. The extension is the product: you install it, and the side
+ * panel is where the work happens. MCP is an optional integration for people who
+ * already live in a terminal, which is why the second card is smaller and quieter.
  */
 export const HERO_PATHS = [
   {
     id: 'extension',
-    kicker: 'Start here',
-    title: 'Add the browser extension',
-    body: 'A side panel in Chrome or Firefox. Speak to it, type at it, or press record and show it once. This is Browsentic.',
+    kicker: 'The product',
+    title: 'Install the browser extension',
+    body: 'A side panel in Chrome or Firefox. Speak to it, type at it, or press record and show it a job once, and it works the tab in front of you inside the session you are already signed in to. This is Browsentic.',
     cta: { href: '/install/', label: 'Install the extension' },
     accent: 'brand',
   },
   {
     id: 'mcp',
-    kicker: 'Or wire it in',
-    title: 'Hand it to an MCP client',
-    body: 'The same paired browser, driven from Claude Code, Codex, Cursor or Zed. One command, and your agent has a tab that is already logged in.',
-    cta: { href: '/mcp-server/', label: 'Set up the MCP server' },
+    kicker: 'Optional',
+    title: 'If you already live in a terminal',
+    body: 'The same paired browser also answers an MCP client. Nothing you need on day one.',
+    cta: { href: '/mcp-server/', label: 'MCP server setup' },
     accent: 'brand-deep',
-    command: 'claude mcp add browsentic -- browsentic-mcp',
   },
 ]
 
@@ -121,10 +120,15 @@ export const SECTIONS = {
     title: ['Map any web app automatically,', 'then keep it as your own skill'],
     lede: 'Turn it loose on a site and it maps itself. It reads robots.txt and the sitemap, explores, screenshots, writes down what it worked out, then hands you a skill to read before you arm it. Walk it through a job once and that becomes a skill of your own. And the obvious commands never bother a model at all.',
   },
+  panel: {
+    kicker: 'The extension',
+    title: ['Everything happens in the side panel', 'of the browser you already have open'],
+    lede: 'Install it, pair it once, and the panel opens beside whatever tab you are on. Speak to it, type at it, or press record and show it a job once. It reads the page you are actually looking at, asks before anything commits, and keeps every conversation in the tab it started in.',
+  },
   mcp: {
-    kicker: 'MCP server',
-    title: ['Plug it into the AI you already run,', 'and hand it a browser that is logged in'],
-    lede: 'Claude Code, Codex, Antigravity, Cursor, Zed: anything fluent in MCP takes the wheel of the same real tab. Headless automation wakes up with amnesia, no session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.',
+    kicker: 'Optional integration',
+    title: ['The browser MCP server, for when', 'you already live in a terminal'],
+    lede: 'The extension is the product and the side panel needs none of this. But the daemon also speaks MCP, so Claude Code, Codex, Antigravity, Cursor or Zed can take the wheel of the same real tab. Headless automation wakes up with amnesia, no session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.',
   },
   security: {
     kicker: 'Security model',
@@ -146,6 +150,37 @@ export const CTA = {
   title: { lead: 'Stop describing the page.', accent: 'Hand it over.' },
   lede: 'Free and MIT licensed. Nothing to sign up for, no key to paste, and a fresh install connects to nothing until you redeem a pairing code yourself.',
   command: 'git clone https://github.com/imshaikot/browsentic.git',
+}
+
+/** What the side panel actually is, in the space the integration cards used to hold. */
+export const PANEL_POINTS = [
+  {
+    id: 'input',
+    title: 'Speak it, type it, or show it once',
+    body: 'Dictate hands-free in the side panel, hold to talk in the popup, or just type. Work a tedious job through yourself with the recorder on and it keeps every step as a skill of your own.',
+  },
+  {
+    id: 'sessions',
+    title: 'A session per tab, working in the background',
+    body: 'The conversation belongs to the tab it started in and carries on there while you read something else. A pulsing dot on the toolbar icon and on the tab favicon marks whatever is still at work.',
+  },
+  {
+    id: 'approvals',
+    title: 'Approvals surface where you are looking',
+    body: 'Anything that commits something, or sends it to someone other than you, pauses in the panel and names itself first. Cancelling a run stops it mid-flight.',
+  },
+  {
+    id: 'agent',
+    title: 'Your agent, switched with one click',
+    body: 'The panel runs on Claude Code, Codex or Antigravity, picked from the popup. No key to paste, because it spawns the CLI you already signed in to, as you.',
+  },
+]
+
+/** One band on the home page, pointing at the page that owns the integration. */
+export const MCP_BAND = {
+  chip: 'Also an MCP server',
+  body: 'Already using an MCP client? It works there too. One command hands Claude Code, Codex, Cursor or Zed the same paired browser.',
+  cta: { href: '/mcp-server/', label: 'MCP server setup' },
 }
 
 export const MCP_POINTS = [
@@ -583,8 +618,8 @@ export const QUICKSTART = [
   },
   {
     n: '04',
-    title: 'Point any MCP client at the same browser',
-    body: 'Your agent now commands 41 page tools plus browsentic_status, and three read-only resources that hand back page context without spending a tool call.',
+    title: 'Optional: hand the same browser to an MCP client',
+    body: 'The side panel already works at this point. If you also live in a terminal, one more command gives your client the same tab, with 41 page tools plus browsentic_status and three read-only resources.',
     code: 'claude mcp add browsentic -- browsentic-mcp',
     lang: 'sh',
   },
@@ -605,7 +640,7 @@ export const FAQ = [
   },
   {
     q: 'Can I use it from something other than Claude Code?',
-    a: 'Yes. The daemon speaks MCP over stdio, so any MCP client drives the same browser: Codex, Antigravity, Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic-mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do. The side panel is switchable too: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click.',
+    a: 'Yes. The side panel itself is switchable: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click, and for most people that is the whole answer. Beyond the panel the daemon also speaks MCP over stdio, so an external client drives the same browser: Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic-mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do.',
   },
   {
     q: 'Can it automate several tabs at the same time?',

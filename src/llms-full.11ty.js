@@ -9,8 +9,8 @@ export default class {
   render({ site, copy }) {
     const {
       ALL_TOOLS, AUTOMATIONS, AUTOMATION_FEATURED, CTA, FAQ, HERO, LIMITS, MCP_POINTS, MODES,
-      ORCHESTRATION_POINTS, ORCHESTRATION_SESSIONS, ORCHESTRATION_SHARED, PIPELINE, QUICKSTART,
-      REPO, RESOURCES, SECTIONS, SECURITY, STATS, TOOL_GROUPS, VERSION,
+      ORCHESTRATION_POINTS, ORCHESTRATION_SESSIONS, ORCHESTRATION_SHARED, PANEL_POINTS, PIPELINE,
+      QUICKSTART, REPO, RESOURCES, SECTIONS, SECURITY, STATS, TOOL_GROUPS, VERSION,
     } = copy
 
     const lines = (t) => (typeof t === 'string' ? t : t.join(' '))
@@ -23,6 +23,9 @@ export default class {
 ${heroTitle}
 
 ${HERO.lede}
+
+The product is the browser extension and its side panel. An external MCP client driving the same
+browser is an optional integration, not the architecture.
 
 Source: ${REPO}
 Site: ${site.url('/')}
@@ -49,10 +52,10 @@ ${block(
 )}
 
 ${block(
-  '/mcp-server/',
-  SECTIONS.mcp.title,
-  SECTIONS.mcp.lede,
-  MCP_POINTS.map((p) => `### ${p.title}\n\n${p.body}`).join('\n\n'),
+  '/',
+  SECTIONS.panel.title,
+  SECTIONS.panel.lede,
+  PANEL_POINTS.map((p) => `### ${p.title}\n\n${p.body}`).join('\n\n'),
 )}
 
 ${block(
@@ -103,6 +106,13 @@ ${block(
   SECTIONS.start.title,
   SECTIONS.start.lede,
   QUICKSTART.map((s) => `### ${s.n}. ${s.title}\n\n${s.body}\n\n\`\`\`${s.lang}\n${s.code}\n\`\`\``).join('\n\n'),
+)}
+
+${block(
+  '/mcp-server/',
+  SECTIONS.mcp.title,
+  SECTIONS.mcp.lede,
+  MCP_POINTS.map((p) => `### ${p.title}\n\n${p.body}`).join('\n\n'),
 )}
 
 ${block('/faq/', SECTIONS.faq.title, undefined, FAQ.map((f) => `### ${f.q}\n\n${f.a}`).join('\n\n'))}

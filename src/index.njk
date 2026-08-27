@@ -2,19 +2,19 @@
 layout: layouts/page.njk
 pageKey: home
 title: "Browsentic: AI browser automation in the browser you already use"
-seoTitle: "Browsentic: AI browser automation in your own logged-in browser"
-description: "Hand any browser tab to the AI agent you already run. 41 page tools over MCP, in the logged-in session you already use. No API key, no headless browser."
+seoTitle: "Browsentic: the AI browser extension for your logged-in browser"
+description: "A browser extension that hands any tab to the AI agent you already run. 41 page tools in the logged-in session you already use. No API key, no headless browser."
 socialTitle: "Browsentic: every tab, its own AI agent"
 socialDescription: "Hand any tab to Claude Code, Codex or Antigravity. 41 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key."
 keywords:
   - AI browser automation
-  - browser automation without API key
-  - AI browser agent
-  - browser MCP server
-  - Claude Code browser automation
-  - agentic browsing
-  - Chrome extension AI agent
+  - browser AI agent
+  - browser extension AI
+  - AI browser extension for Chrome
   - automate logged-in browser
+  - record and replay browser
+  - agentic browsing
+  - browser automation without API key
 showFaq: true
 ---
 {% import "partials/macros.njk" as m with context %}
@@ -47,8 +47,8 @@ showFaq: true
       </div>
     </div>
 
-    <!-- The two ways in. The extension is the product; MCP is the second door. -->
-    <div class="mt-16 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    <!-- Not two equal doors: the extension is the product, MCP is the optional path. -->
+    <div class="mt-16 grid gap-4 md:grid-cols-[1.2fr_0.8fr]" data-reveal data-stagger>
       {%- for path in copy.HERO_PATHS %}
       {%- set a = m.ACCENT[path.accent] %}
       <article class="card spotlight flex flex-col px-6 py-6">
@@ -256,33 +256,38 @@ showFaq: true
   <div class="mt-10">{{ m.button("/skills/", "Site maps, recordings and instant commands", "ghost") }}</div>
 {% endcall %}
 
-<!-- MCP -->
-{% call m.section("mcp", "bg-ground-2/30") %}
+<!-- The extension itself: what the side panel does -->
+{% call m.section("panel", "bg-ground-2/30") %}
   <div class="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
     <div>
-      {{ m.kicker(copy.SECTIONS.mcp.kicker, "brand-deep") }}
-      {{ m.heading(copy.SECTIONS.mcp.title) }}
-      {{ m.lede(copy.SECTIONS.mcp.lede) }}
-      <div class="mt-8">{{ m.button("/mcp-server/", "Set it up as an MCP server", "ghost") }}</div>
+      {{ m.kicker(copy.SECTIONS.panel.kicker) }}
+      {{ m.heading(copy.SECTIONS.panel.title) }}
+      {{ m.lede(copy.SECTIONS.panel.lede) }}
+      <div class="mt-8 flex flex-wrap gap-3">
+        {{ m.button("/install/", "Install the extension") }}
+        {{ m.button("/skills/", "Teach it your own jobs", "ghost") }}
+      </div>
     </div>
-    <div class="space-y-4">
-      {%- for point in copy.MCP_POINTS %}
+    <div class="space-y-4" data-reveal data-stagger>
+      {%- for point in copy.PANEL_POINTS %}
       <div class="card px-5 py-5">
         <h3 class="font-display text-[1rem] font-semibold text-ink">{{ point.title }}</h3>
         <p class="mt-2 text-[0.86rem] leading-relaxed text-ink-faint">{{ point.body }}</p>
       </div>
       {%- endfor %}
-      <div class="card px-5 py-5">
-        <h3 class="font-display text-[1rem] font-semibold text-ink">Three read-only resources</h3>
-        <ul class="mt-3 space-y-2">
-          {%- for r in copy.RESOURCES %}
-          <li class="flex flex-wrap items-baseline gap-2"><code class="font-mono text-[0.76rem] text-brand">{{ r.uri }}</code><span class="text-[0.82rem] text-ink-faint">{{ r.desc }}</span></li>
-          {%- endfor %}
-        </ul>
-      </div>
     </div>
   </div>
 {% endcall %}
+
+<!-- One integration path gets a band, not a section -->
+{%- set bandAccent = m.ACCENT["brand-deep"] %}
+<section id="mcp" class="border-b border-line">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-5 py-8 sm:px-8" data-reveal>
+    <span class="rounded-full border {{ bandAccent.border }} {{ bandAccent.soft }} px-3 py-1 font-display text-[0.7rem] font-medium uppercase tracking-[0.11em] {{ bandAccent.text }}">{{ copy.MCP_BAND.chip }}</span>
+    <p class="min-w-[18rem] flex-1 text-[0.92rem] leading-relaxed text-ink-dim">{{ copy.MCP_BAND.body }}</p>
+    <a href="{{ copy.MCP_BAND.cta.href }}" class="text-[0.92rem] font-medium text-ink-dim transition-colors hover:text-ink">{{ copy.MCP_BAND.cta.label }} &rarr;</a>
+  </div>
+</section>
 
 <!-- Security -->
 {% call m.section("security") %}

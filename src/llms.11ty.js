@@ -14,9 +14,11 @@ export default class {
 
 > ${SEO.summary}
 
-Browsentic is ${VERSION}, MIT licensed, and runs entirely on your own machine: a Manifest V3
-extension, a local daemon on loopback, and the AI agent you already have installed. There is no
-hosted relay, no API key, and no headless browser. It drives the real tab you are signed into.
+The product is the browser extension: a side panel in Chrome or Firefox that you speak to, type
+at, or show a job once. Browsentic is ${VERSION}, MIT licensed, and runs entirely on your own
+machine: a Manifest V3 extension, a local daemon on loopback, and the AI agent you already have
+installed. There is no hosted relay, no API key, and no headless browser. It drives the real tab
+you are signed into. An external MCP client can drive that same browser, but nothing requires one.
 
 ${TOOL_GROUPS.map((g) => `- **${g.label}** (${g.tools.length} tools): ${g.blurb}`).join('\n')}
 
@@ -24,12 +26,12 @@ ${TOOL_GROUPS.map((g) => `- **${g.label}** (${g.tools.length} tools): ${g.blurb}
 
 ${link('How it works', u('/how-it-works/'), 'the four hops, and why a Manifest V3 extension forces a daemon')}
 ${link('Capabilities', u('/capabilities/'), 'all 41 page tools, grouped, plus the three read-only resources')}
-${link('MCP server', u('/mcp-server/'), 'driving the same logged-in browser from Claude Code, Cursor, Zed or Codex')}
 ${link('Agent orchestration', u('/orchestration/'), 'several tabs, several agents, one browser, all at once')}
 ${link('Automations', u('/automations/'), 'the jobs people hand over, and where each one stops for you')}
 ${link('Skills', u('/skills/'), 'automatic site maps, record and replay, local intent routing')}
 ${link('Security', u('/security/'), 'the security model, and the two limits worth stating')}
 ${link('Install', u('/install/'), 'four steps, about five minutes')}
+${link('MCP server', u('/mcp-server/'), 'optional: driving the same logged-in browser from an external MCP client')}
 ${link('FAQ', u('/faq/'), 'the questions people ask first')}
 
 ## Docs
@@ -49,10 +51,11 @@ ${link('Releases', `${REPO}/releases`, 'built extension archives per version')}
 
 ## Key facts
 
-- Install as an MCP server: \`claude mcp add browsentic -- browsentic-mcp\`
+- Install: load the extension in Chrome or Firefox, then redeem a single-use pairing code. The side panel is where the work happens.
+- Optional integration: an external MCP client can drive the same browser with \`claude mcp add browsentic -- browsentic-mcp\`
 - ${STATS.map((s) => `${s.value}${s.suffix} ${s.label}`).join('\n- ')}
 - Concurrency: one conversation per tab, bound to the tab it started in. Eight tab sessions open, three runs at once by default, ceiling of eight (\`maxConcurrentRuns\`).
-- The side panel runs on Claude Code, Codex or Antigravity, switched with one click. As an MCP server it is agent-agnostic: Cursor, Zed, Claude Desktop or any MCP client drives the same browser.
+- The side panel runs on Claude Code, Codex or Antigravity, switched with one click. Beyond the panel it is agent-agnostic: Cursor, Zed, Claude Desktop or any MCP client can drive the same browser.
 - Pairing is two-gated: the daemon classifies the WebSocket peer by handshake Origin, then requires a pairing token or an origin-bound session key. A web page cannot reach the control path.
 `
   }
