@@ -53,6 +53,10 @@
 <link rel="preload" href="/fonts/inter-400-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/main.css">
 
+<!-- Set before first paint. Pre-reveal elements are only hidden when this runs,
+     so a page with scripting blocked renders fully visible instead of blank. -->
+<script>document.documentElement.classList.add('js')</script>
+
 <script type="application/ld+json">{{ structuredData | jsonld | safe }}</script>
 </head>
 

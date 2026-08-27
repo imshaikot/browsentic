@@ -62,7 +62,7 @@ keywords:
   {{ m.heading("Ordinary work, on sites you are already signed in to") }}
   {{ m.lede("Each one names the tools it reaches for, and the moment it stops and hands the decision back to you.") }}
 
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for a in copy.AUTOMATIONS %}
     {%- set ac = m.ACCENT[a.accent] %}
     <article id="{{ a.id }}" class="card flex flex-col px-6 py-6">
@@ -85,16 +85,16 @@ keywords:
   {{ m.heading("Anything that reaches someone other than you pauses first") }}
   {{ m.lede("Approval prompts appear in the side panel with the action named. Form submission is gated by default, because it is the one effect that leaves your machine and lands on somebody else's desk.") }}
 
-  <div class="mt-10 grid gap-4 lg:grid-cols-3">
-    <article class="card px-6 py-6">
+  <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
+    <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.02rem] font-semibold text-ink">Gated out of the box</h3>
       <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Form submission and file upload. Both reach an outside party, so both name themselves and wait.</p>
     </article>
-    <article class="card px-6 py-6">
+    <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.02rem] font-semibold text-ink">Gate anything else you like</h3>
       <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Name a tool in <code class="font-mono text-[0.8rem] text-amber">requireApproval</code> and it asks every time, which is useful for the last click of a cancellation.</p>
     </article>
-    <article class="card px-6 py-6">
+    <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.02rem] font-semibold text-ink">Grant it per host</h3>
       <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Approve once with <em class="text-ink-dim">Always on this host</em> when you are working a long list and every row asks the same question.</p>
     </article>

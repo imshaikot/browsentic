@@ -44,6 +44,57 @@ export const HERO = {
   command: 'claude mcp add browsentic -- browsentic-mcp',
 }
 
+/**
+ * The two ways in. The extension comes first because it is the product you
+ * actually install: a side panel in the browser you already use. Driving it from
+ * an MCP client is the second door, for people already living in a terminal.
+ */
+export const HERO_PATHS = [
+  {
+    id: 'extension',
+    kicker: 'Start here',
+    title: 'Add the browser extension',
+    body: 'A side panel in Chrome or Firefox. Speak to it, type at it, or press record and show it once. This is Browsentic.',
+    cta: { href: '/install/', label: 'Install the extension' },
+    accent: 'brand',
+  },
+  {
+    id: 'mcp',
+    kicker: 'Or wire it in',
+    title: 'Hand it to an MCP client',
+    body: 'The same paired browser, driven from Claude Code, Codex, Cursor or Zed. One command, and your agent has a tab that is already logged in.',
+    cta: { href: '/mcp-server/', label: 'Set up the MCP server' },
+    accent: 'brand-deep',
+    command: 'claude mcp add browsentic -- browsentic-mcp',
+  },
+]
+
+/**
+ * The scripted run the hero plays on a loop: a prompt typed into the side panel,
+ * then tool calls streaming back while the matching element on the faux page
+ * lights up. `focus` names the element each step reaches for.
+ */
+export const HERO_DEMO = {
+  url: 'app.acme.com/billing',
+  prompt: 'find the unpaid invoices and open the newest one',
+  steps: [
+    { tool: 'page_getPageInfo', detail: 'snapshot · 41 interactive elements', kind: 'agent', ms: 1100 },
+    { tool: 'page_clickElement', detail: 'text: "Invoices"', kind: 'agent', focus: 'nav', ms: 1000 },
+    { tool: 'page_selectOption', detail: 'status → Unpaid', kind: 'agent', focus: 'filter', ms: 1000 },
+    { tool: 'page_submitForm', detail: 'waiting for your approval', kind: 'approval', focus: 'submit', ms: 1900 },
+    { tool: 'page_scrollTo', detail: 'top of results', kind: 'local', ms: 800 },
+    { tool: 'page_clickElement', detail: 'row 1 · INV-2291', kind: 'agent', focus: 'row', ms: 1000 },
+    { tool: 'Answer', detail: 'INV-2291 · $4,120 · issued 12 Aug · 6 days overdue', kind: 'answer', ms: 3400 },
+  ],
+  nav: ['Overview', 'Invoices', 'Customers', 'Settings'],
+  rows: [
+    { id: 'INV-2291', amount: '$4,120' },
+    { id: 'INV-2288', amount: '$980' },
+    { id: 'INV-2280', amount: '$2,410' },
+    { id: 'INV-2274', amount: '$610' },
+  ],
+}
+
 export const SECTIONS = {
   how: {
     kicker: 'Architecture',

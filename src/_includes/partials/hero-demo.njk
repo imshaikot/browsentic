@@ -1,0 +1,84 @@
+{#- The scripted run the hero plays on a loop. Every step is rendered here in
+    full: site.js hides them and replays them, so a crawler (and anyone with
+    scripting off) reads the whole transcript as static markup. -#}
+
+{%- set KIND = {
+  local: "text-amber",
+  agent: "text-brand",
+  approval: "text-ember",
+  answer: "text-lime"
+} -%}
+
+<div class="card relative overflow-hidden p-1.5 shadow-[0_40px_120px_-40px_rgb(0_0_0/0.9)]" data-demo>
+
+  <div class="flex items-center gap-2 px-3 py-2.5">
+    <span class="size-2.5 rounded-full bg-ember/70"></span>
+    <span class="size-2.5 rounded-full bg-amber/60"></span>
+    <span class="size-2.5 rounded-full bg-lime/50"></span>
+    <div class="ml-2 flex-1 truncate rounded-md border border-line bg-ground/70 px-3 py-1 font-mono text-[11px] text-ink-faint">{{ copy.HERO_DEMO.url }}</div>
+    <span class="hidden rounded-full border border-brand/30 bg-brand/10 px-2 py-0.5 font-mono text-[10px] text-brand sm:block">extension</span>
+  </div>
+
+  <div class="relative grid gap-1.5 rounded-[0.7rem] bg-ground/60 p-1.5 lg:grid-cols-[1fr_264px]" data-demo-stage>
+
+    <!-- The page the agent is working on -->
+    <div class="relative h-[300px] overflow-hidden rounded-lg border border-line bg-ground-2/50 p-3 sm:h-[340px]">
+      <div class="flex gap-3">
+        <div class="hidden w-20 shrink-0 flex-col gap-1.5 lg:flex">
+          {%- for item in copy.HERO_DEMO.nav %}
+          <div class="demo-target rounded px-2 py-1.5 text-[10px] {% if item == 'Invoices' %}bg-surface/70 text-ink-dim{% else %}text-ink-faint{% endif %}"
+               {% if item == 'Invoices' %}data-target="nav"{% endif %}>{{ item }}</div>
+          {%- endfor %}
+        </div>
+
+        <div class="min-w-0 flex-1 space-y-2.5">
+          <div class="flex items-center gap-2">
+            <div class="h-2.5 w-24 rounded-full bg-surface-2/80"></div>
+            <div class="demo-target ml-auto whitespace-nowrap rounded border border-line bg-surface/60 px-2 py-1 text-[10px] text-ink-dim" data-target="filter">status: Unpaid</div>
+            <div class="demo-target rounded bg-brand/85 px-2 py-1 text-[10px] font-medium text-ground" data-target="submit">Apply</div>
+          </div>
+
+          {%- for row in copy.HERO_DEMO.rows %}
+          <div class="demo-target flex items-center gap-3 rounded border border-line/70 bg-ground/50 px-2.5 py-2"
+               {% if loop.first %}data-target="row"{% endif %}>
+            <div class="whitespace-nowrap font-mono text-[10px] text-ink-dim">{{ row.id }}</div>
+            <div class="h-1.5 flex-1 rounded-full bg-surface-2/60" style="max-width: {{ 72 - loop.index0 * 11 }}%"></div>
+            <div class="font-mono text-[10px] text-ink-faint">{{ row.amount }}</div>
+            <span class="rounded-full bg-ember/15 px-1.5 py-0.5 text-[9px] text-ember">unpaid</span>
+          </div>
+          {%- endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- The extension's side panel -->
+    <div class="flex h-[300px] flex-col rounded-lg border border-line bg-ground-2/70 p-3 sm:h-[340px]">
+      <div class="mb-2.5 flex items-center gap-2 border-b border-line pb-2.5">
+        <span class="pulse relative size-1.5 rounded-full bg-lime text-lime shadow-[0_0_8px_var(--color-lime)]"></span>
+        <span class="font-mono text-[10px] uppercase tracking-wider text-ink-faint">Browsentic &middot; paired</span>
+      </div>
+
+      <div class="mb-3 shrink-0 rounded-md border border-line bg-ground/60 px-2.5 py-2 text-[11px] leading-snug text-ink">
+        <span data-demo-prompt data-text="{{ copy.HERO_DEMO.prompt }}">{{ copy.HERO_DEMO.prompt }}</span><span class="demo-caret" aria-hidden="true"></span>
+      </div>
+
+      <ol class="mask-t flex min-h-0 flex-1 flex-col justify-end space-y-1.5 overflow-hidden">
+        {%- for step in copy.HERO_DEMO.steps %}
+        <li class="demo-step flex shrink-0 items-start gap-2 rounded-md border px-2 py-1.5 {% if step.kind == 'approval' %}border-ember/30 bg-ember/5{% elif step.kind == 'answer' %}border-lime/30 bg-lime/5{% else %}border-line bg-ground/40{% endif %}"
+            data-step data-ms="{{ step.ms }}"{% if step.focus %} data-focus="{{ step.focus }}"{% endif %}>
+          <span class="mt-1 size-1.5 shrink-0 rounded-full {% if step.kind == 'approval' %}bg-ember{% elif step.kind == 'answer' %}bg-lime{% elif step.kind == 'local' %}bg-amber{% else %}bg-brand{% endif %}"></span>
+          <span class="min-w-0">
+            <span class="font-mono text-[10px] {{ KIND[step.kind] }}">{{ step.tool }}</span>
+            <span class="mt-0.5 block text-[10px] leading-snug text-ink-faint">{{ step.detail }}</span>
+          </span>
+        </li>
+        {%- endfor %}
+      </ol>
+    </div>
+
+    <!-- Follows whichever element the current step is reaching for -->
+    <svg class="demo-cursor size-4 text-ink opacity-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" data-demo-cursor>
+      <path d="M2 1.5 13 7.2l-4.6 1.3L6.6 13 2 1.5Z" stroke="var(--color-ground)" stroke-width="1.1"/>
+    </svg>
+  </div>
+</div>

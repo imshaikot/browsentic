@@ -34,14 +34,14 @@ howToSteps:
   {{ m.kicker("Before you start", "lime") }}
   {{ m.heading("Three things, and you probably have all of them") }}
 
-  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+  <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     {%- for req in [
       { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc via Manifest V3. Firefox builds work too.", accent: "brand" },
       { name: "Node.js 20 or newer", body: "Yarn is pinned inside the repository, so whichever yarn you have re-executes into the right one. No Corepack setup.", accent: "lime" },
       { name: "One agent CLI", body: "claude, codex or agy on your PATH: the one you already signed in to. There is no API key to paste anywhere.", accent: "amber" }
     ] %}
     {%- set a = m.ACCENT[req.accent] %}
-    <article class="card px-6 py-6">
+    <article class="card spotlight px-6 py-6">
       <span class="block size-2 rounded-full {{ a.dot }}"></span>
       <h3 class="mt-3.5 font-display text-[1.05rem] font-semibold text-ink">{{ req.name }}</h3>
       <p class="mt-2.5 text-[0.9rem] leading-relaxed text-ink-faint">{{ req.body }}</p>
@@ -54,7 +54,7 @@ howToSteps:
   {{ m.kicker("The four steps") }}
   {{ m.heading("From clone to a connected browser") }}
 
-  <ol class="mt-12 space-y-4">
+  <ol class="mt-12 space-y-4" data-reveal data-stagger>
     {%- for step in copy.QUICKSTART %}
     <li id="step-{{ loop.index }}" class="card px-6 py-7">
       <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
@@ -79,13 +79,13 @@ howToSteps:
 
   <div class="mt-8 max-w-lg">{{ m.command("browsentic-mcp status") }}</div>
 
-  <div class="mt-10 grid gap-4 md:grid-cols-3">
+  <div class="mt-10 grid gap-4 md:grid-cols-3" data-reveal data-stagger>
     {%- for row in [
       { code: "EXTENSION_OFFLINE", body: "The daemon is running but no browser is paired. Redeem a pairing code in the popup." },
       { code: "AGENT_MISSING", body: "The chosen CLI is not on the daemon's PATH. Set agents.<name>.bin to an absolute path." },
       { code: "TAB_UNREACHABLE", body: "The content script has not been injected into that tab yet. Reload the page." }
     ] %}
-    <article class="card px-5 py-5">
+    <article class="card spotlight px-5 py-5">
       <code class="font-mono text-[0.78rem] text-ember">{{ row.code }}</code>
       <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ row.body }}</p>
     </article>

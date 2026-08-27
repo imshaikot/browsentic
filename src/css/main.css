@@ -346,3 +346,221 @@
   body::after, .no-print { display: none !important; }
   body { background: #fff; color: #000; }
 }
+
+/* ==========================================================================
+   Motion
+   Everything below is opt-in through a `js` class set before first paint, so a
+   page with JavaScript blocked renders fully visible and unanimated rather than
+   stuck at opacity 0. Every block ends up neutralised by the reduced-motion
+   rule at the bottom of this file.
+   ========================================================================== */
+
+/* ---- Cross-document page transitions ------------------------------------ */
+
+@view-transition { navigation: auto; }
+
+@keyframes vt-out { to { opacity: 0; transform: translate3d(0, -8px, 0); } }
+@keyframes vt-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+::view-transition-old(root) { animation: vt-out 0.22s ease-in both; }
+::view-transition-new(root) { animation: vt-in 0.42s var(--ease-out-expo) both; }
+
+/* The header is the one thing that should not slide on every navigation. */
+#sitenav { view-transition-name: sitenav; }
+::view-transition-old(sitenav),
+::view-transition-new(sitenav) { animation: none; }
+
+/* ---- Scroll reveals ------------------------------------------------------ */
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A lone element reveals itself. A [data-stagger] container stays put and
+   reveals its children instead, one after another. */
+.js [data-reveal]:not([data-stagger]),
+.js [data-stagger] > * {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 0.72s var(--ease-out-expo) var(--reveal-delay, 0ms),
+    transform 0.72s var(--ease-out-expo) var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.js [data-reveal]:not([data-stagger]).is-in,
+.js [data-stagger].is-in > * {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+.js [data-stagger] > * { --reveal-delay: calc(var(--i, 0) * 70ms); }
+
+/* ---- Entrance, above the fold -------------------------------------------- */
+
+.js [data-enter] {
+  opacity: 0;
+  animation: rise 0.8s var(--ease-out-expo) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+/* ---- Hero demo ----------------------------------------------------------- */
+
+.demo-caret {
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  translate: 0 0.12em;
+  background: var(--color-brand);
+  animation: var(--animate-blink);
+}
+
+/* The element the current step is reaching for. */
+.demo-target {
+  transition: box-shadow 0.32s var(--ease-out-expo), border-color 0.32s, background-color 0.32s;
+}
+.demo-target[data-focused] {
+  box-shadow:
+    0 0 0 2px var(--color-brand),
+    0 0 22px -4px var(--color-brand);
+}
+
+@keyframes step-in { from { opacity: 0; transform: translate3d(10px, 0, 0); } }
+.demo-step { animation: step-in 0.34s var(--ease-out-expo) both; }
+
+@keyframes cursor-hop {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(0.82); opacity: 1; }
+}
+.demo-cursor {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  transition: translate 0.55s var(--ease-out-expo), opacity 0.3s;
+  animation: cursor-hop 1.1s ease-in-out infinite;
+}
+
+/* ---- Pipeline: packets travelling the rails ------------------------------ */
+
+@keyframes packet {
+  0% { offset-distance: 0%; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.rail { position: relative; overflow: hidden; }
+.rail::before {
+  content: "";
+  position: absolute;
+  inset-block: 50%;
+  inset-inline: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--color-line-strong) 0 6px,
+    transparent 6px 12px
+  );
+}
+.rail::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  box-shadow: 0 0 10px 1px var(--color-brand);
+  animation: rail-run 2.8s linear infinite;
+  animation-delay: var(--rail-delay, 0s);
+}
+@keyframes rail-run {
+  0% { left: -6px; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+/* ---- Counters, meters, pulses -------------------------------------------- */
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.55; }
+  70% { box-shadow: 0 0 0 7px transparent; opacity: 0; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
+}
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+.meter > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-brand-deep), var(--color-brand));
+  width: 0;
+  transition: width 1.6s var(--ease-out-expo);
+}
+.meter.is-in > i { width: var(--meter, 60%); }
+
+/* ---- Tabs ---------------------------------------------------------------- */
+
+.tabs [role="tabpanel"][hidden] { display: none; }
+.tabs [role="tabpanel"] > * { animation: rise 0.5s var(--ease-out-expo) both; }
+
+.tab-underline {
+  position: absolute;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-brand);
+  transition: translate 0.4s var(--ease-out-expo), width 0.4s var(--ease-out-expo);
+}
+
+/* ---- Card spotlight ------------------------------------------------------ */
+
+.spotlight { position: relative; isolation: isolate; }
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.35s;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in oklch, var(--color-brand) 12%, transparent),
+    transparent 65%
+  );
+}
+.spotlight:hover::before { opacity: 1; }
+
+/* ---- Reduced motion overrides ------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+
+  .js [data-reveal],
+  .js [data-stagger] > *,
+  .js [data-enter] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .rail::after,
+  .pulse::after,
+  .demo-cursor { animation: none; }
+  .demo-cursor { opacity: 0; }
+  .meter > i { transition: none; width: var(--meter, 60%); }
+}

@@ -11,18 +11,18 @@
 } -%}
 
 {%- macro kicker(text, accent="brand") -%}
-<p class="font-display text-[0.72rem] font-medium uppercase tracking-[0.11em] {{ ACCENT[accent].text }}">{{ text }}</p>
+<p class="font-display text-[0.72rem] font-medium uppercase tracking-[0.11em] {{ ACCENT[accent].text }}" data-reveal>{{ text }}</p>
 {%- endmacro -%}
 
 {%- macro heading(title, level="h2", size="") -%}
 {%- set cls = size or "text-[2rem] leading-[1.14] sm:text-[2.6rem]" -%}
-<{{ level }} class="mt-3 max-w-3xl font-display font-semibold text-ink {{ cls }}">
+<{{ level }} class="mt-3 max-w-3xl font-display font-semibold text-ink {{ cls }}" data-reveal style="--reveal-delay: 60ms">
 {%- if title is string %}{{ title }}{% else %}{% for line in title %}{{ line }}{% if not loop.last %}<br class="hidden sm:block"> {% endif %}{% endfor %}{% endif -%}
 </{{ level }}>
 {%- endmacro -%}
 
 {%- macro lede(text) -%}
-<p class="mt-5 max-w-2xl text-[1.05rem] leading-relaxed text-ink-dim">{{ text }}</p>
+<p class="mt-5 max-w-2xl text-[1.05rem] leading-relaxed text-ink-dim" data-reveal style="--reveal-delay: 120ms">{{ text }}</p>
 {%- endmacro -%}
 
 {#- Page hero. Every segment page opens with one, so the H1 and the lede are
@@ -32,12 +32,12 @@
   <div class="dot-grid mask-radial pointer-events-none absolute inset-0 opacity-70"></div>
   <div class="pointer-events-none absolute -top-40 left-1/2 size-[38rem] -translate-x-1/2 rounded-full bg-brand/8 blur-[120px]"></div>
   <div class="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
-    {{ kicker(kickerText, accent) }}
-    <h1 class="mt-3 max-w-4xl font-display text-[2.3rem] font-semibold leading-[1.1] text-ink sm:text-[3.3rem]">
+    <p class="font-display text-[0.72rem] font-medium uppercase tracking-[0.11em] {{ ACCENT[accent].text }}" data-enter>{{ kickerText }}</p>
+    <h1 class="mt-3 max-w-4xl font-display text-[2.3rem] font-semibold leading-[1.1] text-ink sm:text-[3.3rem]" data-enter style="--enter-delay: 70ms">
       {%- if title is string %}{{ title }}{% else %}{% for line in title %}{{ line }}{% if not loop.last %}<br class="hidden md:block"> {% endif %}{% endfor %}{% endif -%}
     </h1>
-    <p class="mt-6 max-w-2xl text-[1.1rem] leading-relaxed text-ink-dim">{{ ledeText }}</p>
-    {{ caller() if caller }}
+    <p class="mt-6 max-w-2xl text-[1.1rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 140ms">{{ ledeText }}</p>
+    <div data-enter style="--enter-delay: 210ms">{{ caller() if caller }}</div>
   </div>
 </section>
 {%- endmacro -%}
@@ -89,9 +89,9 @@
 <section class="border-b border-line">
   <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
     <h2 class="font-display text-xs uppercase tracking-[0.11em] text-ink-faint">Keep reading</h2>
-    <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
       {%- for link in links %}
-      <a href="{{ link.href }}" class="card group px-5 py-5 transition-colors hover:border-line-strong">
+      <a href="{{ link.href }}" class="card spotlight group px-5 py-5 transition-colors hover:border-line-strong">
         <h3 class="font-display text-[1.02rem] font-medium text-ink">{{ link.title }}</h3>
         <p class="mt-1.5 text-[0.88rem] leading-relaxed text-ink-faint">{{ link.body }}</p>
       </a>
@@ -105,7 +105,7 @@
 <section class="relative overflow-hidden">
   <div class="dot-grid mask-radial pointer-events-none absolute inset-0 opacity-60"></div>
   <div class="pointer-events-none absolute bottom-[-14rem] left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-ember/8 blur-[130px]"></div>
-  <div class="relative mx-auto max-w-3xl px-5 py-24 text-center sm:px-8">
+  <div class="relative mx-auto max-w-3xl px-5 py-24 text-center sm:px-8" data-reveal>
     <h2 class="font-display text-[2rem] font-semibold leading-tight text-ink sm:text-[2.6rem]">
       {{ copy.CTA.title.lead }} <span class="text-gradient">{{ copy.CTA.title.accent }}</span>
     </h2>

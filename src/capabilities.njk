@@ -67,9 +67,9 @@ keywords:
   {{ m.heading("Three read-only resources") }}
   {{ m.lede("Page context an MCP client can read directly, without spending a tool call on it.") }}
 
-  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+  <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     {%- for r in copy.RESOURCES %}
-    <article class="card px-5 py-6">
+    <article class="card spotlight px-5 py-6">
       <code class="font-mono text-[0.82rem] text-brand">{{ r.uri }}</code>
       <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ r.desc }}</p>
     </article>
@@ -82,14 +82,14 @@ keywords:
   {{ m.heading("Four ways to name the thing you mean") }}
   {{ m.lede("Most tools that touch an element take the same target object. Visible text outlives the redesigns that break CSS selectors, so prefer it where you can. Where nothing describes it, hand over the lens and point at it yourself.") }}
 
-  <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-reveal data-stagger>
     {%- for field in [
       { name: "selector", body: "A CSS selector, ideally one page_getPageInfo handed back rather than one you guessed." },
       { name: "text", body: "Case-insensitive visible text the element should contain. The most durable of the four." },
       { name: "role", body: "A tag name or ARIA role, to narrow the matches down." },
       { name: "nth", body: "A zero-based index, for when several elements legitimately match." }
     ] %}
-    <article class="card px-5 py-5">
+    <article class="card spotlight px-5 py-5">
       <code class="font-mono text-[0.82rem] text-amber">{{ field.name }}</code>
       <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ field.body }}</p>
     </article>

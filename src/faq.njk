@@ -37,7 +37,7 @@ showFaq: true
   {{ m.kicker("Still stuck?", "lime") }}
   {{ m.heading("Where the answer probably is") }}
 
-  <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+  <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4" data-reveal data-stagger>
     {%- for link in [
       { href: "/docs/guide/troubleshooting/", title: "Troubleshooting", body: "Symptom, cause, fix, in that order." },
       { href: "/docs/reference/errors/", title: "Error codes", body: "Every code, where it comes from, what to do." },

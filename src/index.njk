@@ -22,60 +22,58 @@ showFaq: true
 <!-- Hero -->
 <section class="relative overflow-hidden border-b border-line">
   <div class="dot-grid mask-radial pointer-events-none absolute inset-0"></div>
-  <div class="pointer-events-none absolute -top-48 left-1/2 size-[46rem] -translate-x-1/2 rounded-full bg-brand/10 blur-[140px]"></div>
+  <div class="pointer-events-none absolute -top-48 left-1/2 size-[46rem] -translate-x-1/2 rounded-full bg-brand/10 blur-[140px] animate-drift"></div>
 
-  <div class="relative mx-auto max-w-7xl px-5 pb-24 pt-24 sm:px-8 sm:pb-28 sm:pt-32">
-    <div class="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+  <div class="relative mx-auto max-w-7xl px-5 pb-20 pt-24 sm:px-8 sm:pt-32">
+    <div class="grid items-center gap-14 lg:grid-cols-[0.88fr_1.12fr]">
       <div>
-        <p class="inline-flex max-w-xl rounded-full border border-line bg-surface/40 px-3.5 py-1.5 text-[0.78rem] leading-snug text-ink-dim">{{ copy.HERO.badge }}</p>
+        <p class="inline-flex max-w-xl rounded-full border border-line bg-surface/40 px-3.5 py-1.5 text-[0.78rem] leading-snug text-ink-dim" data-enter style="--enter-delay: 0ms">{{ copy.HERO.badge }}</p>
 
-        <h1 class="mt-6 font-display text-[2.85rem] font-semibold leading-[1.03] tracking-[-0.03em] text-ink sm:text-[4rem]">
+        <h1 class="mt-6 font-display text-[2.85rem] font-semibold leading-[1.03] tracking-[-0.03em] text-ink sm:text-[4rem]" data-enter style="--enter-delay: 70ms">
           {{ copy.HERO.title.lead }}<br>{{ copy.HERO.title.tail }}<span class="text-gradient">{{ copy.HERO.title.accent }}</span>
         </h1>
 
-        <p class="mt-7 max-w-xl text-[1.08rem] leading-relaxed text-ink-dim">{{ copy.HERO.lede }}</p>
+        <p class="mt-7 max-w-xl text-[1.08rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 140ms">{{ copy.HERO.lede }}</p>
 
-        <div class="mt-9 max-w-lg">{{ m.command(copy.HERO.command) }}</div>
-        <p class="mt-2.5 text-[0.82rem] text-ink-faint">{{ copy.HERO.voice }}</p>
-
-        <div class="mt-8 flex flex-wrap gap-3">
-          {{ m.button("/install/", "Install in five minutes") }}
-          {{ m.button("/capabilities/", "See all 41 tools", "ghost") }}
+        <div class="mt-9 flex flex-wrap items-center gap-3" data-enter style="--enter-delay: 210ms">
+          {{ m.button("/install/", "Install the extension") }}
+          {{ m.button("/how-it-works/", "See how it works", "ghost") }}
         </div>
+        <p class="mt-3 text-[0.82rem] text-ink-faint" data-enter style="--enter-delay: 250ms">Chrome or Firefox &middot; {{ copy.HERO.voice }}</p>
       </div>
 
-      <!-- Static transcript: what a run actually looks like -->
-      <div class="card overflow-hidden">
-        <div class="flex items-center gap-2 border-b border-line px-4 py-3">
-          <span class="size-2.5 rounded-full bg-ember/70"></span>
-          <span class="size-2.5 rounded-full bg-amber/60"></span>
-          <span class="size-2.5 rounded-full bg-lime/50"></span>
-          <span class="ml-2 font-mono text-[0.72rem] text-ink-faint">jobs.acme.com &middot; side panel</span>
-        </div>
-        <div class="space-y-3 px-4 py-5 font-mono text-[0.78rem]">
-          <p class="text-ink"><span class="text-brand">you&nbsp;&rsaquo;</span> apply to this posting with my resume</p>
-          {%- for step in copy.AUTOMATION_FEATURED.steps %}
-          <div class="flex items-start gap-2.5">
-            <span class="mt-1.5 size-1.5 shrink-0 rounded-full {% if step.gate %}bg-amber{% else %}bg-brand/60{% endif %}"></span>
-            <div class="min-w-0">
-              <span class="{% if step.gate %}text-amber{% else %}text-ink-dim{% endif %}">{{ step.tool }}</span>
-              <span class="ml-1.5 text-ink-faint">{{ step.note }}</span>
-            </div>
-          </div>
-          {%- endfor %}
-          <p class="border-t border-line pt-3 text-lime">✓ {{ copy.AUTOMATION_FEATURED.result }}</p>
-        </div>
+      <div data-enter style="--enter-delay: 300ms">
+        {% include "partials/hero-demo.njk" %}
       </div>
+    </div>
+
+    <!-- The two ways in. The extension is the product; MCP is the second door. -->
+    <div class="mt-16 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+      {%- for path in copy.HERO_PATHS %}
+      {%- set a = m.ACCENT[path.accent] %}
+      <article class="card spotlight flex flex-col px-6 py-6">
+        <div class="flex items-center gap-2.5">
+          <span class="size-2 rounded-full {{ a.dot }}"></span>
+          <p class="font-display text-[0.7rem] uppercase tracking-[0.11em] {{ a.text }}">{{ path.kicker }}</p>
+        </div>
+        <h2 class="mt-3 font-display text-[1.25rem] font-semibold text-ink">{{ path.title }}</h2>
+        <p class="mt-2.5 flex-1 text-[0.9rem] leading-relaxed text-ink-faint">{{ path.body }}</p>
+        {%- if path.command %}
+        <div class="mt-5">{{ m.command(path.command) }}</div>
+        {%- endif %}
+        <div class="mt-5">{{ m.button(path.cta.href, path.cta.label, "ghost") }}</div>
+      </article>
+      {%- endfor %}
     </div>
   </div>
 </section>
 
 <!-- Stats -->
 <section class="border-b border-line bg-ground-2/30">
-  <div class="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4">
+  <div class="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4" data-reveal data-stagger>
     {%- for stat in copy.STATS %}
     <div class="px-2 py-10 sm:px-6">
-      <p class="font-display text-[2.4rem] font-semibold leading-none text-ink">{{ stat.value }}{{ stat.suffix }}</p>
+      <p class="font-display text-[2.4rem] font-semibold leading-none text-ink"><span data-count="{{ stat.value }}">{{ stat.value }}</span>{{ stat.suffix }}</p>
       <p class="mt-2 text-[0.92rem] font-medium text-ink-dim">{{ stat.label }}</p>
       <p class="mt-1 text-[0.8rem] text-ink-faint">{{ stat.note }}</p>
     </div>
@@ -89,9 +87,12 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.how.title) }}
   {{ m.lede(copy.SECTIONS.how.lede) }}
 
-  <ol class="mt-12 grid gap-4 lg:grid-cols-4">
+  <ol class="mt-12 grid gap-4 lg:grid-cols-4" data-reveal data-stagger>
     {%- for node in copy.PIPELINE %}
-    <li class="card relative px-5 py-6">
+    <li class="card spotlight relative px-5 py-6">
+      {%- if not loop.last %}
+      <span class="rail pointer-events-none absolute left-full top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 lg:block" style="--rail-delay: {{ loop.index0 * 0.7 }}s" aria-hidden="true"></span>
+      {%- endif %}
       <span class="font-mono text-[0.7rem] text-ink-faint">0{{ loop.index }}</span>
       <h3 class="mt-2.5 font-display text-[1.12rem] font-semibold text-ink">{{ node.title }}</h3>
       <p class="mt-1 text-[0.8rem] font-medium text-brand">{{ node.sub }}</p>
@@ -109,10 +110,10 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.capabilities.title) }}
   {{ m.lede("Perceiving the page as structure rather than pixels, acting with a human hand, and remembering enough to run the whole thing again unprompted.") }}
 
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for group in copy.TOOL_GROUPS %}
     {%- set a = m.ACCENT[group.accent] %}
-    <article class="card px-5 py-6">
+    <article class="card spotlight px-5 py-6">
       <div class="flex items-center gap-2.5">
         <span class="size-2 rounded-full {{ a.dot }}"></span>
         <h3 class="font-display text-[1.05rem] font-semibold text-ink">{{ group.label }}</h3>
@@ -150,12 +151,14 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.orchestrate.title) }}
   {{ m.lede(copy.SECTIONS.orchestrate.lede) }}
 
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4" data-reveal data-stagger>
     {%- for s in copy.ORCHESTRATION_SESSIONS %}
-    <article class="card px-5 py-5">
+    <article class="card spotlight px-5 py-5">
       <div class="flex items-center justify-between gap-2">
         <span class="truncate font-mono text-[0.72rem] text-ink-faint">{{ s.host }}</span>
-        <span class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[0.65rem] {% if s.status == 'working' %}bg-lime/10 text-lime{% elif s.status == 'approval' %}bg-amber/10 text-amber{% else %}bg-surface text-ink-faint{% endif %}">{{ s.status }}</span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[0.65rem] {% if s.status == 'working' %}bg-lime/10 text-lime{% elif s.status == 'approval' %}bg-amber/10 text-amber{% else %}bg-surface text-ink-faint{% endif %}">
+          {%- if s.status == 'working' %}<span class="pulse relative mr-1 inline-block size-1.5 rounded-full bg-lime align-middle text-lime"></span>{% endif -%}
+          {{ s.status }}</span>
       </div>
       <h3 class="mt-3 font-display text-[0.98rem] font-medium leading-snug text-ink">{{ s.title }}</h3>
       <ul class="mt-3 space-y-1.5">
@@ -177,10 +180,10 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.automations.title) }}
   {{ m.lede(copy.SECTIONS.automations.lede) }}
 
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for a in copy.AUTOMATIONS %}
     {%- set ac = m.ACCENT[a.accent] %}
-    <article class="card px-5 py-6">
+    <article class="card spotlight px-5 py-6">
       <span class="size-2 rounded-full {{ ac.dot }} block"></span>
       <h3 class="mt-3.5 font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ a.title }}</h3>
       <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ a.body }}</p>
@@ -198,18 +201,59 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.teach.title) }}
   {{ m.lede(copy.SECTIONS.teach.lede) }}
 
-  <div class="mt-12 grid gap-4 lg:grid-cols-3">
+  {%- set TAB_ACCENT = { "site-maps": "lime", recordings: "amber", instant: "brand" } %}
+
+  <div class="mt-12" data-tabs data-reveal>
+    <div class="relative border-b border-line">
+      <div class="flex gap-6 overflow-x-auto" role="tablist" aria-label="How you teach it">
+        {%- for mode in copy.MODES %}
+        <button type="button" role="tab" id="tab-{{ mode.id }}" aria-controls="panel-{{ mode.id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ '0' if loop.first else '-1' }}"
+                class="tab-label shrink-0 whitespace-nowrap pb-3 font-display text-[0.95rem] transition-colors {% if loop.first %}text-ink{% else %}text-ink-faint{% endif %}">{{ mode.tab }}</button>
+        {%- endfor %}
+      </div>
+      <span class="tab-underline" aria-hidden="true"></span>
+    </div>
+
     {%- for mode in copy.MODES %}
-    <article class="card px-5 py-6">
-      <p class="font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">{{ mode.kicker }}</p>
-      <h3 class="mt-2.5 font-display text-[1.08rem] font-semibold leading-snug text-ink">{{ mode.title }}</h3>
-      <p class="mt-3 line-clamp-5 text-[0.86rem] leading-relaxed text-ink-faint">{{ mode.body }}</p>
-      <code class="mt-4 block truncate rounded-md border border-line bg-surface/30 px-2.5 py-1.5 font-mono text-[0.74rem] text-brand">{{ mode.invocation }}</code>
-    </article>
+    {%- set acc = m.ACCENT[TAB_ACCENT[mode.id]] %}
+    <div role="tabpanel" id="panel-{{ mode.id }}" aria-labelledby="tab-{{ mode.id }}" class="pt-9" {% if not loop.first %}hidden{% endif %}>
+      <div class="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div>
+          <p class="font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">{{ mode.kicker }}</p>
+          <h3 class="mt-2.5 max-w-xl font-display text-[1.5rem] font-semibold leading-snug text-ink">{{ mode.title }}</h3>
+          <p class="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-dim">{{ mode.body }}</p>
+          <code class="mt-5 inline-block rounded-lg border border-line bg-surface/40 px-3 py-2 font-mono text-[0.8rem] {{ acc.text }}">{{ mode.invocation }}</code>
+
+          <ul class="mt-7 space-y-4">
+            {%- for point in mode.points %}
+            <li>
+              <h4 class="font-display text-[0.94rem] font-medium text-ink">{{ point[0] }}</h4>
+              <p class="mt-1 text-[0.86rem] leading-relaxed text-ink-faint">{{ point[1] }}</p>
+            </li>
+            {%- endfor %}
+          </ul>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="border-b border-line px-4 py-2.5">
+            <span class="font-mono text-[0.7rem] uppercase tracking-wider text-ink-faint">{{ mode.tab }}</span>
+          </div>
+          <ul class="divide-y divide-line font-mono text-[0.78rem]">
+            {%- for row in mode.tree %}
+            <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5">
+              <span class="{{ acc.text }}">{{ row[0] }}</span>
+              {%- if row[1] %}<span class="text-ink-faint">{{ row[1] }}</span>{% endif %}
+            </li>
+            {%- endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
     {%- endfor %}
   </div>
 
-  <div class="mt-8">{{ m.button("/skills/", "Site maps, recordings and instant commands", "ghost") }}</div>
+  <div class="mt-10">{{ m.button("/skills/", "Site maps, recordings and instant commands", "ghost") }}</div>
 {% endcall %}
 
 <!-- MCP -->
@@ -246,16 +290,16 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.security.title) }}
   {{ m.lede(copy.SECTIONS.security.lede) }}
 
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for s in copy.SECURITY %}
-    <article class="card px-5 py-6">
+    <article class="card spotlight px-5 py-6">
       <h3 class="font-display text-[1rem] font-semibold leading-snug text-ink">{{ s.title }}</h3>
       <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ s.body }}</p>
     </article>
     {%- endfor %}
   </div>
 
-  <div class="card mt-4 border-amber/25 bg-amber/5 px-6 py-6">
+  <div class="card mt-4 border-amber/25 bg-amber/5 px-6 py-6" data-reveal>
     <h3 class="font-display text-[1rem] font-semibold text-amber">Two limits worth stating</h3>
     <div class="mt-4 grid gap-5 sm:grid-cols-2">
       {%- for l in copy.LIMITS %}
@@ -276,7 +320,7 @@ showFaq: true
   {{ m.heading(copy.SECTIONS.start.title) }}
   {{ m.lede(copy.SECTIONS.start.lede) }}
 
-  <ol class="mt-12 grid gap-4 lg:grid-cols-2">
+  <ol class="mt-12 grid gap-4 lg:grid-cols-2" data-reveal data-stagger>
     {%- for step in copy.QUICKSTART %}
     <li id="step-{{ loop.index }}" class="card px-5 py-6">
       <div class="flex items-baseline gap-3">
@@ -297,7 +341,7 @@ showFaq: true
   {{ m.kicker(copy.SECTIONS.faq.kicker) }}
   {{ m.heading(copy.SECTIONS.faq.title) }}
 
-  <div class="mt-10 max-w-3xl divide-y divide-line border-y border-line">
+  <div class="mt-10 max-w-3xl divide-y divide-line border-y border-line" data-reveal>
     {%- for item in copy.FAQ | take(5) %}
     <details class="faq group py-5"{% if loop.first %} open{% endif %}>
       <summary class="flex items-start gap-4">
