@@ -34,16 +34,21 @@ const rel = (f) => path.relative(OUT, f)
 
 // ---- Required artefacts ----------------------------------------------------
 
-for (const required of ['llms.txt', 'llms-full.txt', 'sitemap.xml', 'robots.txt', 'og.png', 'assets/css/main.css', 'assets/js/site.js', '404.html']) {
+for (const required of ['llms.txt', 'llms-full.txt', 'sitemap.xml', 'robots.txt', 'og.png', '404.html']) {
   const full = path.join(OUT, required)
   if (!existsSync(full)) fail(`missing: ${required}`)
   else if ((await stat(full)).size === 0) fail(`empty: ${required}`)
 }
 
-const css = existsSync(path.join(OUT, 'assets/css/main.css'))
-  ? await readFile(path.join(OUT, 'assets/css/main.css'), 'utf8')
-  : ''
-if (css.length < 10_000) fail(`assets/css/main.css looks unbuilt (${css.length} bytes)`)
+// The stylesheet and script are content-hashed, so find them by shape.
+const hashed = (dir, re) => files.filter((f) => rel(f).startsWith(dir) && re.test(path.basename(f)))
+const cssFiles = hashed('assets/css', /^main\.[0-9a-f]{10}\.css$/)
+const jsFiles = hashed('assets/js', /^site\.[0-9a-f]{10}\.js$/)
+if (cssFiles.length !== 1) fail(`expected 1 fingerprinted stylesheet, found ${cssFiles.length}`)
+if (jsFiles.length !== 1) fail(`expected 1 fingerprinted script, found ${jsFiles.length}`)
+
+const css = cssFiles.length ? await readFile(cssFiles[0], 'utf8') : ''
+if (css.length < 10_000) fail(`the stylesheet looks unbuilt (${css.length} bytes)`)
 
 // ---- Per-page SEO ----------------------------------------------------------
 

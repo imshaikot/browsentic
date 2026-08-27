@@ -6,3 +6,5 @@ _site/
 .env
 .env.*
 !.env.example
+.vercel
+.env*

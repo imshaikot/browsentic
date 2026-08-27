@@ -31,8 +31,9 @@ for (const rule of config.redirects ?? []) {
   })
 }
 
-routes.push({ handle: 'filesystem' })
-
+// Header routes must run BEFORE `handle: filesystem`. Once the filesystem phase
+// serves a static file the remaining routes never execute, so headers placed
+// after it are silently dropped.
 for (const rule of config.headers ?? []) {
   routes.push({
     src: `^${rule.source.replace(/\/\(\.\*\)$/, '/(.*)')}$`,
@@ -40,6 +41,8 @@ for (const rule of config.headers ?? []) {
     continue: true,
   })
 }
+
+routes.push({ handle: 'filesystem' })
 
 // Anything that reaches here is genuinely missing.
 routes.push({ src: '^/(.*)$', status: 404, dest: '/404.html' })

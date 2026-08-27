@@ -10,7 +10,7 @@
     "css:watch": "tailwindcss -i src/css/main.css -o _site/assets/css/main.css --watch",
     "css:min": "tailwindcss -i src/css/main.css -o _site/assets/css/main.css --minify",
     "clean": "rm -rf _site .vercel/output",
-    "build": "npm run clean && npm run sync:docs && npm run check:copy && eleventy && npm run css:min && node scripts/verify.mjs",
+    "build": "npm run clean && npm run sync:docs && npm run check:copy && eleventy && npm run css:min && node scripts/fingerprint.mjs && node scripts/verify.mjs",
     "dev": "npm run sync:docs && npm-run-all --parallel dev:*",
     "dev:11ty": "eleventy --serve --port 8080",
     "dev:css": "npm run css:watch",
@@ -20,7 +20,8 @@
     "deploy:preview": "./scripts/deploy.sh --preview",
     "check:copy": "node scripts/check-copy.mjs",
     "fonts": "node scripts/fetch-fonts.mjs",
-    "pack": "node scripts/vercel-output.mjs"
+    "pack": "node scripts/vercel-output.mjs",
+    "fingerprint": "node scripts/fingerprint.mjs"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.2",

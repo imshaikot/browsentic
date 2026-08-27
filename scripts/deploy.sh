@@ -37,7 +37,8 @@ if [ ! -d .vercel ] || [ ! -f .vercel/project.json ]; then
 fi
 
 step "Deploying to $TARGET"
-vercel deploy --prebuilt "${VERCEL_ARGS[@]}"
+# macOS ships bash 3.2, where an empty array counts as unbound under `set -u`.
+vercel deploy --prebuilt ${VERCEL_ARGS[@]+"${VERCEL_ARGS[@]}"}
 
 step "Done"
 if [ "$TARGET" = "production" ]; then
