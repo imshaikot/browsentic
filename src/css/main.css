@@ -51,6 +51,14 @@
 
 @layer base {
   html {
+    /* The nav is lifted out of the page snapshot by view-transition-name, which
+       leaves a transparent hole where it was. Whatever the UA paints as the
+       canvas shows through that hole, and the default canvas is white. Both of
+       these keep it the ground colour: color-scheme tells the UA to paint dark,
+       and the explicit background means we are not relying on body propagation,
+       which does not apply while a transition overlay is compositing. */
+    color-scheme: dark;
+    background-color: var(--color-ground);
     scroll-behavior: smooth;
     scroll-padding-top: 6rem;
     -webkit-text-size-adjust: 100%;
@@ -368,10 +376,13 @@
 ::view-transition-old(root) { animation: vt-out 0.22s ease-in both; }
 ::view-transition-new(root) { animation: vt-in 0.42s var(--ease-out-expo) both; }
 
-/* The header is the one thing that should not slide on every navigation. */
-#sitenav { view-transition-name: sitenav; }
-::view-transition-old(sitenav),
-::view-transition-new(sitenav) { animation: none; }
+/* The header deliberately has NO view-transition-name.
+   Naming it lifts it out of the root snapshot, and the hole that leaves paints
+   white for the length of the transition, whatever the canvas is set to. Giving
+   html a background and color-scheme: dark does not reach it, because the hole
+   is in the transition overlay rather than in the page.
+   The bar is identical on every page, so letting it cross-fade with the root is
+   invisible anyway, and it costs nothing. */
 
 /* ---- Scroll reveals ------------------------------------------------------ */
 
