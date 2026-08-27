@@ -124,7 +124,7 @@ export const STATS = [
 ] as const
 
 export type ToolGroup = {
-  id: string
+  id: 'read' | 'act' | 'move' | 'wait' | 'files' | 'recordings'
   label: string
   blurb: string
   accent: 'brand' | 'ember' | 'magenta' | 'lime' | 'amber' | 'brand-deep'

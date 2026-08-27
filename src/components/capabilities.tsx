@@ -4,11 +4,11 @@ import { RESOURCES, SECTIONS, TOOL_GROUPS, type ToolGroup } from '@/data/content
 import { Reveal, Section, SectionHeading, Stagger, StaggerItem } from '@/components/primitives'
 import { cn } from '@/lib/utils'
 
-const ICONS: Record<string, typeof Eye> = {
+const ICONS: Record<ToolGroup['id'], typeof Eye> = {
   read: Eye,
   act: MousePointerClick,
   move: Navigation,
-  monitor: Radio,
+  wait: Radio,
   files: FileUp,
   recordings: Video,
 }
