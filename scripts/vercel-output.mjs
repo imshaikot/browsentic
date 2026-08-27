@@ -23,12 +23,21 @@ const config = JSON.parse(await readFile(path.join(SITE, 'vercel.json'), 'utf8')
 // Build Output API expresses headers as routes that set them and carry on.
 const routes = []
 
+// vercel.json uses Vercel's `:path*` placeholder syntax so the file stays valid
+// for a git-driven deploy too. Build Output routes are regex, so translate.
+const toRegex = (source) =>
+  source.includes(':path*') ? `^${source.replace('/:path*', '(?:/(.*))?')}$` : `^${source}/?$`
+const toLocation = (destination) => destination.replace('/:path*', '/$1')
+
 for (const rule of config.redirects ?? []) {
-  routes.push({
-    src: `^${rule.source}/?$`,
-    headers: { Location: rule.destination },
+  const route = {
+    src: toRegex(rule.source),
+    headers: { Location: toLocation(rule.destination) },
     status: rule.permanent ? 308 : 307,
-  })
+  }
+  // A `has` condition (matching on host, for the www redirect) passes straight through.
+  if (rule.has) route.has = rule.has
+  routes.push(route)
 }
 
 // Header routes must run BEFORE `handle: filesystem`. Once the filesystem phase
