@@ -1,33 +1,34 @@
 {
   "name": "browsentic-site",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Landing page for Browsentic \u2014 lives on the orphan `website` branch, never on `main`.",
+  "description": "Browsentic marketing site and documentation \u2014 static HTML, no client framework. Lives on the orphan `website` branch, never on `main`.",
   "scripts": {
-    "dev": "vite",
-    "build": "npm run check:copy && tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "compile": "tsc --noEmit",
+    "sync:docs": "node scripts/sync-docs.mjs",
+    "css": "tailwindcss -i src/css/main.css -o _site/assets/css/main.css",
+    "css:watch": "tailwindcss -i src/css/main.css -o _site/assets/css/main.css --watch",
+    "css:min": "tailwindcss -i src/css/main.css -o _site/assets/css/main.css --minify",
+    "clean": "rm -rf _site .vercel/output",
+    "build": "npm run clean && npm run sync:docs && npm run check:copy && eleventy && npm run css:min && node scripts/verify.mjs",
+    "dev": "npm run sync:docs && npm-run-all --parallel dev:*",
+    "dev:11ty": "eleventy --serve --port 8080",
+    "dev:css": "npm run css:watch",
+    "verify": "node scripts/verify.mjs",
     "og": "node scripts/generate-og.mjs",
-    "check:copy": "node scripts/check-copy.mjs"
-  },
-  "dependencies": {
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.469.0",
-    "motion": "^11.15.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwind-merge": "^2.6.0"
+    "deploy": "./scripts/deploy.sh",
+    "deploy:preview": "./scripts/deploy.sh --preview",
+    "check:copy": "node scripts/check-copy.mjs",
+    "fonts": "node scripts/fetch-fonts.mjs",
+    "pack": "node scripts/vercel-output.mjs"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.0.0",
-    "@types/node": "^22.20.1",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7"
+    "@11ty/eleventy": "^3.1.2",
+    "@11ty/eleventy-plugin-syntaxhighlight": "^5.0.0",
+    "@tailwindcss/cli": "^4.1.13",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-attrs": "^4.3.1",
+    "npm-run-all": "^4.1.5",
+    "tailwindcss": "^4.1.13"
   }
 }

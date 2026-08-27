@@ -1,0 +1,120 @@
+{#- Shared building blocks. Tailwind only ever sees whole class names, so every
+    accent is looked up from this table rather than built by interpolation. -#}
+
+{%- set ACCENT = {
+  brand:        { text: "text-brand",        bg: "bg-brand",        ring: "ring-brand/25",        soft: "bg-brand/10",        border: "border-brand/30",        dot: "bg-brand" },
+  "brand-deep": { text: "text-brand-deep",   bg: "bg-brand-deep",   ring: "ring-brand-deep/25",   soft: "bg-brand-deep/10",   border: "border-brand-deep/30",   dot: "bg-brand-deep" },
+  ember:        { text: "text-ember",        bg: "bg-ember",        ring: "ring-ember/25",        soft: "bg-ember/10",        border: "border-ember/30",        dot: "bg-ember" },
+  magenta:      { text: "text-magenta",      bg: "bg-magenta",      ring: "ring-magenta/25",      soft: "bg-magenta/10",      border: "border-magenta/30",      dot: "bg-magenta" },
+  lime:         { text: "text-lime",         bg: "bg-lime",         ring: "ring-lime/25",         soft: "bg-lime/10",         border: "border-lime/30",         dot: "bg-lime" },
+  amber:        { text: "text-amber",        bg: "bg-amber",        ring: "ring-amber/25",        soft: "bg-amber/10",        border: "border-amber/30",        dot: "bg-amber" }
+} -%}
+
+{%- macro kicker(text, accent="brand") -%}
+<p class="font-display text-[0.72rem] font-medium uppercase tracking-[0.11em] {{ ACCENT[accent].text }}">{{ text }}</p>
+{%- endmacro -%}
+
+{%- macro heading(title, level="h2", size="") -%}
+{%- set cls = size or "text-[2rem] leading-[1.14] sm:text-[2.6rem]" -%}
+<{{ level }} class="mt-3 max-w-3xl font-display font-semibold text-ink {{ cls }}">
+{%- if title is string %}{{ title }}{% else %}{% for line in title %}{{ line }}{% if not loop.last %}<br class="hidden sm:block"> {% endif %}{% endfor %}{% endif -%}
+</{{ level }}>
+{%- endmacro -%}
+
+{%- macro lede(text) -%}
+<p class="mt-5 max-w-2xl text-[1.05rem] leading-relaxed text-ink-dim">{{ text }}</p>
+{%- endmacro -%}
+
+{#- Page hero. Every segment page opens with one, so the H1 and the lede are
+    always the first two things a crawler meets. -#}
+{%- macro pageHero(kickerText, title, ledeText, accent="brand") -%}
+<section class="relative overflow-hidden border-b border-line">
+  <div class="dot-grid mask-radial pointer-events-none absolute inset-0 opacity-70"></div>
+  <div class="pointer-events-none absolute -top-40 left-1/2 size-[38rem] -translate-x-1/2 rounded-full bg-brand/8 blur-[120px]"></div>
+  <div class="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
+    {{ kicker(kickerText, accent) }}
+    <h1 class="mt-3 max-w-4xl font-display text-[2.3rem] font-semibold leading-[1.1] text-ink sm:text-[3.3rem]">
+      {%- if title is string %}{{ title }}{% else %}{% for line in title %}{{ line }}{% if not loop.last %}<br class="hidden md:block"> {% endif %}{% endfor %}{% endif -%}
+    </h1>
+    <p class="mt-6 max-w-2xl text-[1.1rem] leading-relaxed text-ink-dim">{{ ledeText }}</p>
+    {{ caller() if caller }}
+  </div>
+</section>
+{%- endmacro -%}
+
+{%- macro section(id="", tone="") -%}
+<section {% if id %}id="{{ id }}"{% endif %} class="relative border-b border-line {{ tone }}">
+  <div class="mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
+    {{ caller() }}
+  </div>
+</section>
+{%- endmacro -%}
+
+{%- macro button(href, label, variant="primary", external=false) -%}
+{%- set base = "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-[0.95rem] font-medium transition-all" -%}
+{%- if variant == "primary" -%}
+<a href="{{ href }}" class="{{ base }} bg-brand text-ground hover:opacity-90"{% if external %} target="_blank" rel="noopener"{% endif %}>{{ label }}</a>
+{%- else -%}
+<a href="{{ href }}" class="{{ base }} border border-line-strong text-ink-dim hover:border-brand/40 hover:text-ink"{% if external %} target="_blank" rel="noopener"{% endif %}>{{ label }}</a>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- A copyable command line. The text lives in the markup, so copy needs no fetch. -#}
+{%- macro command(cmd, label="") -%}
+<div class="card group flex items-center gap-3 px-4 py-3">
+  <span class="select-none font-mono text-sm text-ink-faint" aria-hidden="true">$</span>
+  <code class="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[0.86rem] text-ink">{{ cmd }}</code>
+  <button type="button" data-copy="{{ cmd }}" class="shrink-0 rounded-lg border border-line px-2.5 py-1 font-mono text-[0.7rem] text-ink-faint transition-colors hover:border-line-strong hover:text-ink-dim" aria-label="Copy command">
+    <span data-copy-label>Copy</span>
+  </button>
+</div>
+{%- endmacro -%}
+
+{%- macro codeblock(code, lang="sh") -%}
+<div class="card overflow-hidden">
+  <div class="flex items-center justify-between border-b border-line px-4 py-2">
+    <span class="font-mono text-[0.7rem] uppercase tracking-wider text-ink-faint">{{ lang }}</span>
+    <button type="button" data-copy="{{ code }}" class="rounded-md px-2 py-0.5 font-mono text-[0.7rem] text-ink-faint transition-colors hover:text-ink-dim" aria-label="Copy code"><span data-copy-label>Copy</span></button>
+  </div>
+  <pre class="overflow-x-auto px-4 py-3.5 font-mono text-[0.83rem] leading-relaxed text-ink-dim"><code>{{ code }}</code></pre>
+</div>
+{%- endmacro -%}
+
+{%- macro toolChip(name, accent="brand") -%}
+<code class="inline-flex items-center rounded-md border border-line bg-surface/40 px-2 py-1 font-mono text-[0.74rem] text-ink-dim">{{ name }}</code>
+{%- endmacro -%}
+
+{#- Cross-links at the foot of every page. Internal linking is the point. -#}
+{%- macro nextUp(links) -%}
+<section class="border-b border-line">
+  <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+    <h2 class="font-display text-xs uppercase tracking-[0.11em] text-ink-faint">Keep reading</h2>
+    <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {%- for link in links %}
+      <a href="{{ link.href }}" class="card group px-5 py-5 transition-colors hover:border-line-strong">
+        <h3 class="font-display text-[1.02rem] font-medium text-ink">{{ link.title }}</h3>
+        <p class="mt-1.5 text-[0.88rem] leading-relaxed text-ink-faint">{{ link.body }}</p>
+      </a>
+      {%- endfor %}
+    </div>
+  </div>
+</section>
+{%- endmacro -%}
+
+{%- macro cta(copy) -%}
+<section class="relative overflow-hidden">
+  <div class="dot-grid mask-radial pointer-events-none absolute inset-0 opacity-60"></div>
+  <div class="pointer-events-none absolute bottom-[-14rem] left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-ember/8 blur-[130px]"></div>
+  <div class="relative mx-auto max-w-3xl px-5 py-24 text-center sm:px-8">
+    <h2 class="font-display text-[2rem] font-semibold leading-tight text-ink sm:text-[2.6rem]">
+      {{ copy.CTA.title.lead }} <span class="text-gradient">{{ copy.CTA.title.accent }}</span>
+    </h2>
+    <p class="mx-auto mt-5 max-w-xl text-[1.02rem] leading-relaxed text-ink-dim">{{ copy.CTA.lede }}</p>
+    <div class="mx-auto mt-8 max-w-lg text-left">{{ command(copy.HERO.command) }}</div>
+    <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+      {{ button("/install/", "Install in five minutes") }}
+      {{ button(copy.REPO, "Star on GitHub", "ghost", true) }}
+    </div>
+  </div>
+</section>
+{%- endmacro -%}

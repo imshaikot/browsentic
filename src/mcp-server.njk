@@ -1,0 +1,112 @@
+---
+layout: layouts/page.njk
+pageKey: mcp-server
+title: "Browser MCP server: give any MCP client a logged-in browser"
+seoTitle: "Browser MCP server for Claude Code, Cursor and Zed | Browsentic"
+description: "Browsentic speaks MCP over stdio, so Claude Code, Codex, Cursor or Zed drives your real, logged-in browser tab. 41 tools and three read-only resources."
+keywords:
+  - browser MCP server
+  - Model Context Protocol browser
+  - Claude Code browser automation
+  - Cursor browser MCP
+  - Zed MCP browser
+  - MCP stdio server
+  - claude mcp add browsentic
+  - AI agent browser tools
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.SECTIONS.mcp.kicker, copy.SECTIONS.mcp.title, copy.SECTIONS.mcp.lede, "brand-deep") %}
+<div class="mt-9 max-w-lg">{{ m.command(copy.HERO.command) }}</div>
+<div class="mt-6 flex flex-wrap gap-3">
+  {{ m.button("/docs/guide/mcp-clients/", "Every client, step by step") }}
+  {{ m.button("/capabilities/", "What it exposes", "ghost") }}
+</div>
+{% endcall %}
+
+{% call m.section("headless") %}
+  {{ m.kicker("The difference that matters", "ember") }}
+  {{ m.heading("A headless browser wakes up with amnesia") }}
+  {{ m.lede("No session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2">
+    <article class="card px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-ink-dim">A headless browser</h3>
+      <ul class="mt-4 space-y-2.5 text-[0.9rem] text-ink-faint">
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-ember/70"></span>Fresh profile, so every site is logged out</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-ember/70"></span>Two-factor prompts nobody is there to answer</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-ember/70"></span>Trips bot detection precisely because it is one</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-ember/70"></span>Runs somewhere you cannot see it</li>
+      </ul>
+    </article>
+    <article class="card border-brand/25 px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-brand">Browsentic</h3>
+      <ul class="mt-4 space-y-2.5 text-[0.9rem] text-ink-faint">
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-brand/70"></span>Your profile, your sessions, your cookies</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-brand/70"></span>Already through two-factor, because you did it</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-brand/70"></span>A real browser making genuine gestures</li>
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-brand/70"></span>Visible in front of you, stoppable mid-run</li>
+      </ul>
+    </article>
+  </div>
+{% endcall %}
+
+{% call m.section("points", "bg-ground-2/30") %}
+  {{ m.kicker("How it is built", "brand-deep") }}
+  {{ m.heading("One registry, so the manifest cannot drift") }}
+
+  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+    {%- for point in copy.MCP_POINTS %}
+    <article class="card px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-ink">{{ point.title }}</h3>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ point.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/docs/internals/registry/", "How the registry works", "ghost") }}</div>
+{% endcall %}
+
+{% call m.section("clients") %}
+  {{ m.kicker("Clients", "lime") }}
+  {{ m.heading("Anything fluent in MCP takes the wheel") }}
+  {{ m.lede("One daemon owns the browser link, so several clients can drive the same browser at once. Every step they take surfaces on the side panel timeline, marked external.") }}
+
+  <div class="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {%- for client in [
+      { name: "Claude Code", cmd: "claude mcp add browsentic -- browsentic-mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Codex", cmd: "browsentic-mcp agent codex", href: "/docs/guide/agents/" },
+      { name: "Antigravity", cmd: "browsentic-mcp agent antigravity", href: "/docs/guide/agents/" },
+      { name: "Cursor", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Zed", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Claude Desktop", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" }
+    ] %}
+    <a href="{{ client.href }}" class="card px-5 py-5 transition-colors hover:border-line-strong">
+      <h3 class="font-display text-[1rem] font-semibold text-ink">{{ client.name }}</h3>
+      <code class="mt-2.5 block truncate font-mono text-[0.75rem] text-ink-faint">{{ client.cmd }}</code>
+    </a>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("resources", "bg-ground-2/30") %}
+  {{ m.kicker("Resources", "amber") }}
+  {{ m.heading("Page context without spending a tool call") }}
+
+  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+    {%- for r in copy.RESOURCES %}
+    <article class="card px-5 py-6">
+      <code class="font-mono text-[0.82rem] text-brand">{{ r.uri }}</code>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ r.desc }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/docs/guide/mcp-clients/", title: "Register it with your client", body: "Claude Code, Cursor, Zed, Codex and Gemini CLI, one at a time." },
+  { href: "/orchestration/", title: "Several clients at once", body: "How multiple agents share a single browser without colliding." },
+  { href: "/docs/reference/cli/", title: "CLI reference", body: "Every browsentic-mcp command, including pair and revoke." }
+]) }}
+
+{{ m.cta(copy) }}

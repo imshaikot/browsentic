@@ -1,0 +1,85 @@
+---
+layout: layouts/page.njk
+pageKey: security
+title: "Security model: an agent driving your real browser has to earn it"
+seoTitle: "Security model: local only, two gates, approvals | Browsentic"
+description: "Off by default, two independent gates on the transport, consequential actions that ask first, and state that never enters your repository. Plus two honest limits."
+keywords:
+  - secure browser automation
+  - AI agent browser security
+  - local AI agent no cloud
+  - browser extension security model
+  - prompt injection browser agent
+  - browser automation permissions
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.SECTIONS.security.kicker, copy.SECTIONS.security.title, copy.SECTIONS.security.lede, "ember") %}{% endcall %}
+
+{% call m.section("properties") %}
+  {{ m.kicker("Properties, not promises", "ember") }}
+  {{ m.heading("Six things that are true because of how it is built") }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {%- for s in copy.SECURITY %}
+    <article class="card px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold leading-snug text-ink">{{ s.title }}</h3>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ s.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("limits", "bg-ground-2/30") %}
+  {{ m.kicker("Stated plainly", "amber") }}
+  {{ m.heading("Two limits worth stating") }}
+  {{ m.lede("Neither of these is a bug with a fix pending. They are the shape of the problem, and you should know them before you rely on any of this.") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2">
+    {%- for l in copy.LIMITS %}
+    <article class="card border-amber/25 bg-amber/5 px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold leading-snug text-amber">{{ l.title }}</h3>
+      <p class="mt-3 text-[0.92rem] leading-relaxed text-ink-dim">{{ l.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/docs/guide/limits/", "The full list of limits", "ghost") }}</div>
+{% endcall %}
+
+{% call m.section("state") %}
+  {{ m.kicker("On disk", "brand") }}
+  {{ m.heading("Everything it writes lives outside your checkout") }}
+  {{ m.lede("Pairing keys, logs, config, skills and screenshots go under your home directory. Never in your repository, never in a commit.") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2">
+    <article class="card px-6 py-6">
+      <code class="font-mono text-[0.85rem] text-brand">~/.browsentic</code>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Config, the daemon lockfile, pairing keys and session keys, and logs. This is the private half.</p>
+    </article>
+    <article class="card px-6 py-6">
+      <code class="font-mono text-[0.85rem] text-brand">~/browsentic</code>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Skills, site maps, recordings, screenshots and files you attached. The half you are meant to read and edit.</p>
+    </article>
+  </div>
+
+  <div class="mt-8 flex flex-wrap gap-3">
+    {{ m.button("/docs/internals/state/", "Every file, and why it is there", "ghost") }}
+    {{ m.button("/docs/internals/guardrails/", "The guardrail policy", "ghost") }}
+  </div>
+{% endcall %}
+
+{% call m.section("report", "bg-ground-2/30") %}
+  {{ m.kicker("Disclosure", "magenta") }}
+  {{ m.heading("Found something?") }}
+  {{ m.lede("Report it privately through GitHub security advisories rather than a public issue, and it gets looked at before it gets published.") }}
+  <div class="mt-8">{{ m.button(site.repo + "/security/advisories/new", "Open a security advisory", "ghost", true) }}</div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/how-it-works/", title: "The two transport gates", body: "Origin classification first, then a pairing token or session key." },
+  { href: "/docs/guide/approvals/", title: "Approvals", body: "What asks before it acts, and how to gate anything else you like." },
+  { href: "/docs/internals/guardrails/", title: "Guardrails, in depth", body: "The declarative policy, run scope, result fencing, spawn containment." }
+]) }}
+
+{{ m.cta(copy) }}

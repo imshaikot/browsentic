@@ -1,0 +1,103 @@
+---
+layout: layouts/base.njk
+ogType: article
+---
+{%- set headings = content | toc -%}
+{%- set docPages = collections.docs -%}
+{%- set flatOrder = [] -%}
+{%- for group in collections.docsNav -%}
+  {%- if group.index %}{% set flatOrder = (flatOrder.push(group.index), flatOrder) %}{% endif -%}
+  {%- for item in group.items %}{% set flatOrder = (flatOrder.push(item), flatOrder) %}{% endfor -%}
+{%- endfor -%}
+{%- set idx = -1 -%}
+{%- for p in flatOrder %}{% if p.url == page.url %}{% set idx = loop.index0 %}{% endif %}{% endfor -%}
+
+<div class="pt-16">
+  <div class="mx-auto flex max-w-[92rem] gap-0 px-0 lg:px-8">
+
+    <!-- Sidebar -->
+    <aside class="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 shrink-0 overflow-y-auto border-r border-line py-9 pr-6 lg:block">
+      <nav aria-label="Documentation">
+        {%- for group in collections.docsNav %}
+        <div class="mb-7">
+          <h2 class="mb-2.5 font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">{{ group.label }}</h2>
+          <ul class="space-y-0.5 border-l border-line">
+            {%- if group.index %}
+            <li><a href="{{ group.index.url }}" class="-ml-px block border-l py-1.5 pl-3.5 text-[0.875rem] transition-colors {% if page.url == group.index.url %}border-brand font-medium text-brand{% else %}border-transparent text-ink-dim hover:border-line-strong hover:text-ink{% endif %}"{% if page.url == group.index.url %} aria-current="page"{% endif %}>Overview</a></li>
+            {%- endif %}
+            {%- for item in group.items %}
+            <li><a href="{{ item.url }}" class="-ml-px block border-l py-1.5 pl-3.5 text-[0.875rem] transition-colors {% if page.url == item.url %}border-brand font-medium text-brand{% else %}border-transparent text-ink-dim hover:border-line-strong hover:text-ink{% endif %}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.data.title }}</a></li>
+            {%- endfor %}
+          </ul>
+        </div>
+        {%- endfor %}
+      </nav>
+    </aside>
+
+    <!-- Article -->
+    <div class="min-w-0 flex-1 px-5 py-9 sm:px-8 lg:px-12">
+      <nav aria-label="Breadcrumb" class="mb-6">
+        <ol class="flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
+          <li><a href="/" class="transition-colors hover:text-ink-dim">Home</a></li>
+          <li aria-hidden="true">/</li>
+          <li><a href="/docs/" class="transition-colors hover:text-ink-dim">Docs</a></li>
+          {%- if section %}
+          <li aria-hidden="true">/</li>
+          <li><a href="/docs/{{ section }}/" class="transition-colors hover:text-ink-dim">{{ sectionLabel }}</a></li>
+          {%- endif %}
+          <li aria-hidden="true">/</li>
+          <li><span class="text-ink-dim">{{ title }}</span></li>
+        </ol>
+      </nav>
+
+      <header class="mb-9">
+        <p class="font-display text-[0.72rem] uppercase tracking-[0.1em] text-brand">{{ sectionLabel }}</p>
+        <h1 class="mt-2.5 font-display text-[2.15rem] font-semibold leading-[1.12] text-ink sm:text-[2.6rem]">{{ title }}</h1>
+        {%- if deck %}
+        <p class="mt-4 max-w-2xl text-[1.06rem] leading-relaxed text-ink-dim">{{ deck }}</p>
+        {%- endif %}
+        <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-faint">
+          <span>{{ content | readingTime }} min read</span>
+          <span aria-hidden="true">&middot;</span>
+          <a href="{{ sourceUrl }}" class="transition-colors hover:text-ink-dim">Edit this page on GitHub</a>
+        </div>
+      </header>
+
+      <article class="prose">
+        {{ content | safe }}
+      </article>
+
+      <!-- Prev / next -->
+      {%- if idx > -1 %}
+      <nav class="mt-14 grid gap-3 border-t border-line pt-8 sm:grid-cols-2" aria-label="Pagination">
+        {%- if idx > 0 %}{% set prev = flatOrder[idx - 1] %}
+        <a href="{{ prev.url }}" class="card group px-5 py-4 transition-colors hover:border-line-strong" rel="prev">
+          <span class="text-xs text-ink-faint">Previous</span>
+          <span class="mt-1 block font-display text-[0.98rem] font-medium text-ink-dim transition-colors group-hover:text-ink">{{ prev.data.title }}</span>
+        </a>
+        {%- else %}<div></div>{% endif %}
+        {%- if idx < (flatOrder.length - 1) %}{% set next = flatOrder[idx + 1] %}
+        <a href="{{ next.url }}" class="card group px-5 py-4 text-right transition-colors hover:border-line-strong sm:col-start-2" rel="next">
+          <span class="text-xs text-ink-faint">Next</span>
+          <span class="mt-1 block font-display text-[0.98rem] font-medium text-ink-dim transition-colors group-hover:text-ink">{{ next.data.title }}</span>
+        </a>
+        {%- endif %}
+      </nav>
+      {%- endif %}
+    </div>
+
+    <!-- On this page -->
+    {%- if headings.length > 1 %}
+    <aside class="sticky top-16 hidden h-[calc(100vh-4rem)] w-56 shrink-0 overflow-y-auto py-9 pl-6 xl:block">
+      <h2 class="mb-3 font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">On this page</h2>
+      <nav aria-label="Table of contents">
+        <ul id="toc" class="space-y-1 border-l border-line text-[0.82rem]">
+          {%- for h in headings %}
+          <li><a href="#{{ h.id }}" class="-ml-px block border-l border-transparent py-1 text-ink-faint transition-colors hover:border-line-strong hover:text-ink-dim {% if h.level == 3 %}pl-6{% else %}pl-3{% endif %}">{{ h.text }}</a></li>
+          {%- endfor %}
+        </ul>
+      </nav>
+    </aside>
+    {%- endif %}
+  </div>
+</div>

@@ -1,0 +1,14 @@
+---
+permalink: /robots.txt
+eleventyExcludeFromCollections: true
+---
+# Browsentic, {{ site.origin }}
+# Everything here is open to everyone, AI crawlers included.
+
+User-agent: *
+Allow: /
+
+# The former GitHub Pages home now serves a redirect stub; every page there
+# carries rel=canonical pointing at this origin.
+
+Sitemap: {{ "/sitemap.xml" | absolute }}

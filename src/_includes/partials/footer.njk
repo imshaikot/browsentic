@@ -1,0 +1,31 @@
+<footer class="relative border-t border-line bg-ground-2/40">
+  <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+    <div class="grid gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+
+      <div class="max-w-xs">
+        <a href="/" class="flex items-center gap-2.5">
+          {% include "partials/logo.njk" %}
+          <span class="font-display text-[1.0625rem] font-semibold tracking-tight text-ink">Browsentic</span>
+        </a>
+        <p class="mt-4 text-sm leading-relaxed text-ink-faint">{{ copy.SEO.summary }}</p>
+        <p class="mt-5 font-mono text-xs text-ink-faint">{{ site.version }} &middot; {{ site.license }} licensed</p>
+      </div>
+
+      {%- for group in site.footer %}
+      <nav aria-label="{{ group.title }}">
+        <h2 class="font-display text-xs uppercase tracking-[0.09em] text-ink-faint">{{ group.title }}</h2>
+        <ul class="mt-4 space-y-2.5">
+          {%- for link in group.links %}
+          <li><a href="{{ link.href }}" class="text-sm text-ink-dim transition-colors hover:text-ink">{{ link.label }}</a></li>
+          {%- endfor %}
+        </ul>
+      </nav>
+      {%- endfor %}
+    </div>
+
+    <div class="mt-14 flex flex-col gap-3 border-t border-line pt-7 text-xs text-ink-faint sm:flex-row sm:items-center sm:justify-between">
+      <p>&copy; {{ site.year }} Browsentic. {{ site.license }} licensed. Built by <a href="{{ site.authorUrl }}" class="text-ink-dim hover:text-ink">{{ site.author }}</a>.</p>
+      <p>Runs entirely on your machine. No hosted relay, no API key.</p>
+    </div>
+  </div>
+</footer>

@@ -5,7 +5,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const ROOTS = ['src', 'index.html', 'scripts/og.html']
+// Site copy only. src/docs/ is synced verbatim from `main` and follows that
+// repository's conventions, not this one, so it is deliberately not scanned.
+const ROOTS = ['src', 'scripts/og.html']
+const SKIP = ['src/docs']
 const BANNED = [
   { char: '—', name: 'em dash', hint: 'use a period, colon, comma or parentheses' },
 ]
@@ -18,7 +21,9 @@ const walk = (path) =>
 const failures = []
 for (const target of ROOTS) {
   for (const file of walk(join(root, target))) {
-    if (!/\.(tsx?|css|html)$/.test(file)) continue
+    const relative = file.slice(root.length + 1)
+    if (SKIP.some((prefix) => relative.startsWith(prefix))) continue
+    if (!/\.(js|njk|css|html)$/.test(file)) continue
     readFileSync(file, 'utf8')
       .split('\n')
       .forEach((line, i) => {

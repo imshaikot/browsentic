@@ -1,6 +1,6 @@
 node_modules/
-dist/
-.vite/
+_site/
+.vercel/
 *.local
 .DS_Store
 .env

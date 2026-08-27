@@ -1,0 +1,108 @@
+---
+layout: layouts/page.njk
+pageKey: capabilities
+title: "41 browser automation tools for AI agents"
+seoTitle: "Capabilities: all 41 page tools, grouped | Browsentic"
+description: "Every tool Browsentic gives an AI agent: read the page as structure, click, fill, type and submit, navigate, wait out long jobs, attach files, replay recordings."
+keywords:
+  - browser automation tools
+  - AI agent page tools
+  - click fill type automation API
+  - screenshot automation tool
+  - wait for element automation
+  - browser MCP tools list
+  - page automation reference
+---
+{% import "partials/macros.njk" as m with context %}
+
+{%- set GROUP_HEADING = {
+  read: "Sense the page before touching it",
+  act: "Reach into the page with a human hand",
+  move: "Find its own way around the site",
+  wait: "Sit through the slow part for you",
+  files: "Hand a file to the form asking for it",
+  recordings: "Replay a job you showed it once"
+} -%}
+
+{% call m.pageHero(copy.SECTIONS.capabilities.kicker, copy.SECTIONS.capabilities.title, copy.SECTIONS.capabilities.lede, "ember") %}
+<div class="mt-9 flex flex-wrap gap-3">
+  {{ m.button("/docs/reference/tools/", "Full parameter reference") }}
+  {{ m.button("/mcp-server/", "Use it from your MCP client", "ghost") }}
+</div>
+{% endcall %}
+
+{%- for group in copy.TOOL_GROUPS %}
+{%- set a = m.ACCENT[group.accent] %}
+<section id="{{ group.id }}" class="border-b border-line {% if loop.index % 2 == 0 %}bg-ground-2/30{% endif %}">
+  <div class="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+    <div class="grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="size-2.5 rounded-full {{ a.dot }}"></span>
+          {{ m.kicker(group.label + " · " + group.tools.length + (" tools" if group.tools.length > 1 else " tool"), group.accent) }}
+        </div>
+        <h2 class="mt-3 font-display text-[1.75rem] font-semibold leading-tight text-ink">
+          {{ GROUP_HEADING[group.id] }}
+        </h2>
+        <p class="mt-4 text-[0.95rem] leading-relaxed text-ink-dim">{{ group.blurb }}</p>
+      </div>
+
+      <ul class="grid gap-2 sm:grid-cols-2">
+        {%- for tool in group.tools %}
+        <li>
+          <a href="/docs/reference/tools/#{{ tool | lower }}" class="card flex items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:border-line-strong">
+            <span class="size-1.5 shrink-0 rounded-full {{ a.dot }} opacity-70"></span>
+            <code class="truncate font-mono text-[0.8rem] text-ink-dim">{{ tool }}</code>
+          </a>
+        </li>
+        {%- endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+{%- endfor %}
+
+{% call m.section("resources") %}
+  {{ m.kicker("Zero tool calls", "brand-deep") }}
+  {{ m.heading("Three read-only resources") }}
+  {{ m.lede("Page context an MCP client can read directly, without spending a tool call on it.") }}
+
+  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+    {%- for r in copy.RESOURCES %}
+    <article class="card px-5 py-6">
+      <code class="font-mono text-[0.82rem] text-brand">{{ r.uri }}</code>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ r.desc }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("targeting", "bg-ground-2/30") %}
+  {{ m.kicker("Aiming", "amber") }}
+  {{ m.heading("Four ways to name the thing you mean") }}
+  {{ m.lede("Most tools that touch an element take the same target object. Visible text outlives the redesigns that break CSS selectors, so prefer it where you can. Where nothing describes it, hand over the lens and point at it yourself.") }}
+
+  <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {%- for field in [
+      { name: "selector", body: "A CSS selector, ideally one page_getPageInfo handed back rather than one you guessed." },
+      { name: "text", body: "Case-insensitive visible text the element should contain. The most durable of the four." },
+      { name: "role", body: "A tag name or ARIA role, to narrow the matches down." },
+      { name: "nth", body: "A zero-based index, for when several elements legitimately match." }
+    ] %}
+    <article class="card px-5 py-5">
+      <code class="font-mono text-[0.82rem] text-amber">{{ field.name }}</code>
+      <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ field.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/docs/guide/features/a-eye/", "Point at an element yourself", "ghost") }}</div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/docs/reference/tools/", title: "Every parameter", body: "The full reference: types, defaults and what each tool returns." },
+  { href: "/automations/", title: "Put them to work", body: "The jobs people actually hand over, and where each one stops." },
+  { href: "/docs/reference/errors/", title: "Error codes", body: "Every code the daemon can return, its cause and its fix." }
+]) }}
+
+{{ m.cta(copy) }}

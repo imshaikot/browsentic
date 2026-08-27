@@ -1,0 +1,8 @@
+# This host is retired. The Browsentic site lives at https://browsentic.com.
+# Pages here carry rel=canonical pointing there, so leave them crawlable
+# long enough for the signal to be picked up.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://browsentic.com/sitemap.xml

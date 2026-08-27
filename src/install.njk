@@ -1,0 +1,107 @@
+---
+layout: layouts/page.njk
+pageKey: install
+title: "Install Browsentic: four steps, about five minutes"
+seoTitle: "Install: clone, build, load the extension, pair | Browsentic"
+description: "Clone and build both halves with one command, load the unpacked extension, redeem a pairing code, then point any MCP client at the same browser. About five minutes."
+keywords:
+  - install browsentic
+  - browser automation setup
+  - MCP server install
+  - load unpacked extension
+  - pair browser extension daemon
+  - browsentic-mcp pair
+howToSteps:
+  - title: "Clone and build both halves"
+    body: "The extension and the daemon are separate packages. One command installs and builds both. It needs nothing on your PATH but Node 20 or newer."
+  - title: "Load the unpacked extension"
+    body: "Open chrome://extensions, enable Developer mode, choose Load unpacked and select the build output. Firefox builds work too."
+  - title: "Put the daemon on your PATH and pair"
+    body: "The pairing code is single-use and lives for ten minutes. Paste it into the popup and press Connect."
+  - title: "Point any MCP client at the same browser"
+    body: "Your agent now commands 41 page tools plus browsentic_status, and three read-only resources."
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.SECTIONS.start.kicker, copy.SECTIONS.start.title, copy.SECTIONS.start.lede) %}
+<div class="mt-9 flex flex-wrap gap-3">
+  {{ m.button(site.repo, "Source on GitHub", "primary", true) }}
+  {{ m.button("/docs/guide/install/", "The long-form install guide", "ghost") }}
+</div>
+{% endcall %}
+
+{% call m.section("prerequisites") %}
+  {{ m.kicker("Before you start", "lime") }}
+  {{ m.heading("Three things, and you probably have all of them") }}
+
+  <div class="mt-10 grid gap-4 lg:grid-cols-3">
+    {%- for req in [
+      { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc via Manifest V3. Firefox builds work too.", accent: "brand" },
+      { name: "Node.js 20 or newer", body: "Yarn is pinned inside the repository, so whichever yarn you have re-executes into the right one. No Corepack setup.", accent: "lime" },
+      { name: "One agent CLI", body: "claude, codex or agy on your PATH: the one you already signed in to. There is no API key to paste anywhere.", accent: "amber" }
+    ] %}
+    {%- set a = m.ACCENT[req.accent] %}
+    <article class="card px-6 py-6">
+      <span class="block size-2 rounded-full {{ a.dot }}"></span>
+      <h3 class="mt-3.5 font-display text-[1.05rem] font-semibold text-ink">{{ req.name }}</h3>
+      <p class="mt-2.5 text-[0.9rem] leading-relaxed text-ink-faint">{{ req.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("steps", "bg-ground-2/30") %}
+  {{ m.kicker("The four steps") }}
+  {{ m.heading("From clone to a connected browser") }}
+
+  <ol class="mt-12 space-y-4">
+    {%- for step in copy.QUICKSTART %}
+    <li id="step-{{ loop.index }}" class="card px-6 py-7">
+      <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <div>
+          <div class="flex items-baseline gap-3">
+            <span class="font-mono text-[0.85rem] text-brand">{{ step.n }}</span>
+            <h3 class="font-display text-[1.15rem] font-semibold text-ink">{{ step.title }}</h3>
+          </div>
+          <p class="mt-3 text-[0.92rem] leading-relaxed text-ink-faint">{{ step.body }}</p>
+        </div>
+        <div>{{ m.codeblock(step.code, step.lang) }}</div>
+      </div>
+    </li>
+    {%- endfor %}
+  </ol>
+{% endcall %}
+
+{% call m.section("verify") %}
+  {{ m.kicker("Check it landed", "lime") }}
+  {{ m.heading("Ask your agent what it can see") }}
+  {{ m.lede("If the daemon is up and the browser is paired, this comes back with the active tab's title and URL rather than an error.") }}
+
+  <div class="mt-8 max-w-lg">{{ m.command("browsentic-mcp status") }}</div>
+
+  <div class="mt-10 grid gap-4 md:grid-cols-3">
+    {%- for row in [
+      { code: "EXTENSION_OFFLINE", body: "The daemon is running but no browser is paired. Redeem a pairing code in the popup." },
+      { code: "AGENT_MISSING", body: "The chosen CLI is not on the daemon's PATH. Set agents.<name>.bin to an absolute path." },
+      { code: "TAB_UNREACHABLE", body: "The content script has not been injected into that tab yet. Reload the page." }
+    ] %}
+    <article class="card px-5 py-5">
+      <code class="font-mono text-[0.78rem] text-ember">{{ row.code }}</code>
+      <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ row.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8 flex flex-wrap gap-3">
+    {{ m.button("/docs/guide/troubleshooting/", "Troubleshooting", "ghost") }}
+    {{ m.button("/docs/reference/errors/", "Every error code", "ghost") }}
+  </div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/docs/guide/pair/", title: "Pairing, in detail", body: "The single-use code, the session key, and how to revoke either." },
+  { href: "/docs/guide/first-run/", title: "Your first instruction", body: "A tour of the side panel and what to try first." },
+  { href: "/mcp-server/", title: "Add it to your MCP client", body: "Claude Code, Cursor, Zed, Codex or Claude Desktop." }
+]) }}
+
+{{ m.cta(copy) }}

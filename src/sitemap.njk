@@ -1,0 +1,30 @@
+---
+permalink: /sitemap.xml
+eleventyExcludeFromCollections: true
+---
+{%- set weights = {
+  "/": "1.0",
+  "/install/": "0.9",
+  "/capabilities/": "0.9",
+  "/mcp-server/": "0.9",
+  "/how-it-works/": "0.8",
+  "/automations/": "0.8",
+  "/security/": "0.8",
+  "/skills/": "0.8",
+  "/orchestration/": "0.7",
+  "/faq/": "0.7",
+  "/docs/": "0.8"
+} -%}
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{%- for item in collections.all %}
+{%- if item.url and not item.data.noindex and not item.url.endsWith(".html") %}
+  <url>
+    <loc>{{ item.url | absolute }}</loc>
+    <lastmod>{{ site.buildDate }}</lastmod>
+    <changefreq>{% if item.url == "/" %}weekly{% else %}monthly{% endif %}</changefreq>
+    <priority>{{ weights[item.url] or ("0.6" if item.url.startsWith("/docs/") else "0.7") }}</priority>
+  </url>
+{%- endif %}
+{%- endfor %}
+</urlset>

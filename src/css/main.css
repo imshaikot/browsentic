@@ -1,0 +1,348 @@
+@import "tailwindcss";
+@import "./fonts.css";
+
+@source "../**/*.njk";
+@source "../**/*.md";
+@source "../js/*.js";
+
+/* ---- Design tokens ------------------------------------------------------
+   Structure follows a node-graph marketing surface: dark ground, dot lattice,
+   one hot accent used sparingly. The deviation is that the ground is warm:
+   every neutral carries a low-chroma amber hue near 50 degrees.               */
+
+@theme {
+  --color-ground: oklch(0.152 0.016 52);
+  --color-ground-2: oklch(0.183 0.018 50);
+  --color-surface: oklch(0.213 0.019 48);
+  --color-surface-2: oklch(0.253 0.021 46);
+
+  --color-ink: oklch(0.958 0.012 70);
+  --color-ink-dim: oklch(0.735 0.018 60);
+  --color-ink-faint: oklch(0.575 0.02 55);
+
+  --color-line: oklch(0.98 0.01 60 / 10%);
+  --color-line-strong: oklch(0.98 0.01 60 / 18%);
+
+  --color-brand: oklch(0.83 0.13 195);
+  --color-brand-deep: oklch(0.62 0.12 200);
+  --color-ember: oklch(0.735 0.168 42);
+  --color-magenta: oklch(0.7 0.21 335);
+  --color-lime: oklch(0.84 0.18 150);
+  --color-amber: oklch(0.84 0.15 85);
+
+  --font-display: "Inter Tight", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: 1rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-marquee: marquee 42s linear infinite;
+  --animate-drift: drift 24s ease-in-out infinite;
+  --animate-dash: dash 2.6s linear infinite;
+  --animate-blink: blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes marquee { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
+@keyframes drift { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(2%,-3%,0) scale(1.07); } }
+@keyframes dash { to { stroke-dashoffset: -32; } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes reveal { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.028em;
+    text-wrap: balance;
+  }
+
+  p { text-wrap: pretty; }
+
+  ::selection {
+    background: color-mix(in oklch, var(--color-brand) 32%, transparent);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  * { scrollbar-width: thin; scrollbar-color: var(--color-surface-2) transparent; }
+
+  [hidden] { display: none !important; }
+}
+
+@layer components {
+  .dot-grid {
+    background-image: radial-gradient(circle at 1px 1px, oklch(0.98 0.01 60 / 9%) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+
+  .line-grid {
+    background-image:
+      linear-gradient(to right, oklch(0.98 0.01 60 / 5%) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.98 0.01 60 / 5%) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  .mask-radial { mask-image: radial-gradient(ellipse 75% 62% at 50% 38%, #000 42%, transparent 100%); }
+  .mask-b { mask-image: linear-gradient(to bottom, #000 55%, transparent 100%); }
+  .mask-t { mask-image: linear-gradient(to top, #000 82%, transparent 100%); }
+  .mask-x { mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent); }
+
+  .card {
+    background: linear-gradient(180deg, oklch(0.98 0.01 60 / 4.5%), oklch(0.98 0.01 60 / 1.5%));
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    backdrop-filter: blur(8px);
+  }
+
+  .glow-brand {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--color-brand) 22%, transparent),
+      0 8px 40px -12px color-mix(in oklch, var(--color-brand) 45%, transparent);
+  }
+
+  /* Warm-only: an ink -> brand -> ember ramp crosses complementary hues and greys out. */
+  .text-gradient {
+    background: linear-gradient(100deg, var(--color-ink) 4%, var(--color-amber) 44%, var(--color-ember) 96%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Scroll reveal without JavaScript. Falls back to fully visible where
+     animation-timeline is unsupported, so content is never hidden. */
+  .reveal {
+    animation: reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 10% cover 26%;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+    margin-block: 1.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+    background: oklch(0.98 0.01 60 / 2%);
+  }
+  .table-scroll table { margin: 0; width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  .table-scroll th, .table-scroll td {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .table-scroll thead th {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+    background: oklch(0.98 0.01 60 / 3%);
+    white-space: nowrap;
+  }
+  .table-scroll tbody tr:last-child td { border-bottom: 0; }
+  .table-scroll tbody tr:hover { background: oklch(0.98 0.01 60 / 2.5%); }
+}
+
+/* ---- Documentation prose ------------------------------------------------ */
+
+@layer components {
+  .prose {
+    color: var(--color-ink-dim);
+    font-size: 1.0125rem;
+    line-height: 1.75;
+    max-width: 46rem;
+  }
+
+  .prose > * + * { margin-block-start: 1.15rem; }
+
+  .prose h2, .prose h3, .prose h4 {
+    color: var(--color-ink);
+    scroll-margin-top: 7rem;
+    position: relative;
+  }
+  .prose h2 {
+    margin-block-start: 3.25rem;
+    padding-block-start: 1.75rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 1.6rem;
+    line-height: 1.25;
+  }
+  .prose h3 { margin-block-start: 2.25rem; font-size: 1.2rem; }
+  .prose h4 { margin-block-start: 1.75rem; font-size: 1.03rem; color: var(--color-ink-dim); }
+
+  .prose h2:first-child, .prose h3:first-child { margin-block-start: 0; border-top: 0; padding-block-start: 0; }
+
+  .heading-anchor {
+    margin-inline-start: 0.4em;
+    color: var(--color-ink-faint);
+    opacity: 0;
+    text-decoration: none;
+    font-weight: 400;
+    transition: opacity 0.15s;
+  }
+  h2:hover > .heading-anchor, h3:hover > .heading-anchor, h4:hover > .heading-anchor,
+  .heading-anchor:focus-visible { opacity: 1; }
+
+  .prose a {
+    color: var(--color-brand);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklch, var(--color-brand) 35%, transparent);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s;
+  }
+  .prose a:hover { text-decoration-color: var(--color-brand); }
+  .prose a.heading-anchor { color: var(--color-ink-faint); text-decoration: none; }
+
+  .prose strong { color: var(--color-ink); font-weight: 600; }
+  .prose em { color: var(--color-ink); }
+
+  .prose ul, .prose ol { padding-inline-start: 1.35rem; }
+  .prose ul { list-style: disc; }
+  .prose ol { list-style: decimal; }
+  .prose li { margin-block: 0.4rem; }
+  .prose li::marker { color: var(--color-ink-faint); }
+  .prose li > ul, .prose li > ol { margin-block-start: 0.4rem; }
+
+  .prose blockquote {
+    border-inline-start: 2px solid color-mix(in oklch, var(--color-amber) 55%, transparent);
+    padding: 0.15rem 0 0.15rem 1.15rem;
+    color: var(--color-ink-dim);
+    font-style: normal;
+  }
+  .prose blockquote > * + * { margin-block-start: 0.75rem; }
+
+  .prose hr { border: 0; border-top: 1px solid var(--color-line); margin-block: 2.75rem; }
+
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-line);
+    margin-block: 1.75rem;
+    background: var(--color-ground-2);
+  }
+
+  .prose :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    color: var(--color-amber);
+    background: oklch(0.98 0.01 60 / 6%);
+    border: 1px solid var(--color-line);
+    border-radius: 0.35rem;
+    padding: 0.12em 0.38em;
+    white-space: nowrap;
+  }
+  .prose a > code { color: var(--color-brand); }
+  .prose td > code, .prose th > code { white-space: normal; }
+
+  .prose pre, .diagram-source pre {
+    font-family: var(--font-mono);
+    font-size: 0.855rem;
+    line-height: 1.65;
+    background: oklch(0.128 0.014 52);
+    border: 1px solid var(--color-line);
+    border-radius: 0.75rem;
+    padding: 1.05rem 1.2rem;
+    overflow-x: auto;
+    margin-block: 1.5rem;
+    tab-size: 2;
+  }
+  .prose pre code { font-family: inherit; font-size: inherit; background: none; border: 0; padding: 0; color: var(--color-ink-dim); white-space: pre; }
+
+  .diagram-source { margin-block: 1.75rem; }
+  .diagram-source figcaption {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-ink-faint);
+    margin-block-end: 0.5rem;
+  }
+  .diagram-source pre { margin-block: 0; }
+
+  .prose .table-scroll { max-width: none; }
+}
+
+/* ---- Prism, warmed to the ground ---------------------------------------- */
+
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: var(--color-ink-faint); font-style: italic; }
+.token.punctuation { color: oklch(0.62 0.02 55); }
+.token.property, .token.tag, .token.constant, .token.symbol, .token.deleted { color: var(--color-magenta); }
+.token.boolean, .token.number { color: var(--color-amber); }
+.token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted { color: var(--color-lime); }
+.token.operator, .token.entity, .token.url, .token.variable { color: var(--color-ink-dim); }
+.token.atrule, .token.attr-value, .token.function, .token.class-name { color: var(--color-brand); }
+.token.keyword { color: var(--color-ember); }
+.token.regex, .token.important { color: var(--color-amber); }
+.token.important, .token.bold { font-weight: 600; }
+.token.italic { font-style: italic; }
+
+/* ---- Interaction without a framework ------------------------------------ */
+
+@layer components {
+  /* Tabs: one radio per panel, sibling selectors do the switching. */
+  .tabs input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .tabs .tab-panel { display: none; }
+  .tabs label.tab-label {
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: var(--color-ink-faint);
+    transition: color 0.18s, border-color 0.18s;
+  }
+  .tabs label.tab-label:hover { color: var(--color-ink-dim); }
+
+  /* Accordion */
+  details.faq > summary { cursor: pointer; list-style: none; }
+  details.faq > summary::-webkit-details-marker { display: none; }
+  details.faq > summary .chev { transition: transform 0.2s var(--ease-out-expo); }
+  details.faq[open] > summary .chev { transform: rotate(45deg); }
+
+  .marquee-track { animation: var(--animate-marquee); will-change: transform; }
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { animation: none; opacity: 1; transform: none; }
+}
+
+@media print {
+  body::after, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}

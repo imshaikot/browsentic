@@ -1,0 +1,317 @@
+---
+layout: layouts/page.njk
+pageKey: home
+title: "Browsentic: AI browser automation in the browser you already use"
+seoTitle: "Browsentic: AI browser automation in your own logged-in browser"
+description: "Hand any browser tab to the AI agent you already run. 41 page tools over MCP, in the logged-in session you already use. No API key, no headless browser."
+socialTitle: "Browsentic: every tab, its own AI agent"
+socialDescription: "Hand any tab to Claude Code, Codex or Antigravity. 41 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key."
+keywords:
+  - AI browser automation
+  - browser automation without API key
+  - AI browser agent
+  - browser MCP server
+  - Claude Code browser automation
+  - agentic browsing
+  - Chrome extension AI agent
+  - automate logged-in browser
+showFaq: true
+---
+{% import "partials/macros.njk" as m with context %}
+
+<!-- Hero -->
+<section class="relative overflow-hidden border-b border-line">
+  <div class="dot-grid mask-radial pointer-events-none absolute inset-0"></div>
+  <div class="pointer-events-none absolute -top-48 left-1/2 size-[46rem] -translate-x-1/2 rounded-full bg-brand/10 blur-[140px]"></div>
+
+  <div class="relative mx-auto max-w-7xl px-5 pb-24 pt-24 sm:px-8 sm:pb-28 sm:pt-32">
+    <div class="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+      <div>
+        <p class="inline-flex max-w-xl rounded-full border border-line bg-surface/40 px-3.5 py-1.5 text-[0.78rem] leading-snug text-ink-dim">{{ copy.HERO.badge }}</p>
+
+        <h1 class="mt-6 font-display text-[2.85rem] font-semibold leading-[1.03] tracking-[-0.03em] text-ink sm:text-[4rem]">
+          {{ copy.HERO.title.lead }}<br>{{ copy.HERO.title.tail }}<span class="text-gradient">{{ copy.HERO.title.accent }}</span>
+        </h1>
+
+        <p class="mt-7 max-w-xl text-[1.08rem] leading-relaxed text-ink-dim">{{ copy.HERO.lede }}</p>
+
+        <div class="mt-9 max-w-lg">{{ m.command(copy.HERO.command) }}</div>
+        <p class="mt-2.5 text-[0.82rem] text-ink-faint">{{ copy.HERO.voice }}</p>
+
+        <div class="mt-8 flex flex-wrap gap-3">
+          {{ m.button("/install/", "Install in five minutes") }}
+          {{ m.button("/capabilities/", "See all 41 tools", "ghost") }}
+        </div>
+      </div>
+
+      <!-- Static transcript: what a run actually looks like -->
+      <div class="card overflow-hidden">
+        <div class="flex items-center gap-2 border-b border-line px-4 py-3">
+          <span class="size-2.5 rounded-full bg-ember/70"></span>
+          <span class="size-2.5 rounded-full bg-amber/60"></span>
+          <span class="size-2.5 rounded-full bg-lime/50"></span>
+          <span class="ml-2 font-mono text-[0.72rem] text-ink-faint">jobs.acme.com &middot; side panel</span>
+        </div>
+        <div class="space-y-3 px-4 py-5 font-mono text-[0.78rem]">
+          <p class="text-ink"><span class="text-brand">you&nbsp;&rsaquo;</span> apply to this posting with my resume</p>
+          {%- for step in copy.AUTOMATION_FEATURED.steps %}
+          <div class="flex items-start gap-2.5">
+            <span class="mt-1.5 size-1.5 shrink-0 rounded-full {% if step.gate %}bg-amber{% else %}bg-brand/60{% endif %}"></span>
+            <div class="min-w-0">
+              <span class="{% if step.gate %}text-amber{% else %}text-ink-dim{% endif %}">{{ step.tool }}</span>
+              <span class="ml-1.5 text-ink-faint">{{ step.note }}</span>
+            </div>
+          </div>
+          {%- endfor %}
+          <p class="border-t border-line pt-3 text-lime">✓ {{ copy.AUTOMATION_FEATURED.result }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section class="border-b border-line bg-ground-2/30">
+  <div class="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4">
+    {%- for stat in copy.STATS %}
+    <div class="px-2 py-10 sm:px-6">
+      <p class="font-display text-[2.4rem] font-semibold leading-none text-ink">{{ stat.value }}{{ stat.suffix }}</p>
+      <p class="mt-2 text-[0.92rem] font-medium text-ink-dim">{{ stat.label }}</p>
+      <p class="mt-1 text-[0.8rem] text-ink-faint">{{ stat.note }}</p>
+    </div>
+    {%- endfor %}
+  </div>
+</section>
+
+<!-- How it works -->
+{% call m.section("how") %}
+  {{ m.kicker(copy.SECTIONS.how.kicker) }}
+  {{ m.heading(copy.SECTIONS.how.title) }}
+  {{ m.lede(copy.SECTIONS.how.lede) }}
+
+  <ol class="mt-12 grid gap-4 lg:grid-cols-4">
+    {%- for node in copy.PIPELINE %}
+    <li class="card relative px-5 py-6">
+      <span class="font-mono text-[0.7rem] text-ink-faint">0{{ loop.index }}</span>
+      <h3 class="mt-2.5 font-display text-[1.12rem] font-semibold text-ink">{{ node.title }}</h3>
+      <p class="mt-1 text-[0.8rem] font-medium text-brand">{{ node.sub }}</p>
+      <p class="mt-3 text-[0.88rem] leading-relaxed text-ink-faint">{{ node.body }}</p>
+    </li>
+    {%- endfor %}
+  </ol>
+
+  <div class="mt-8">{{ m.button("/how-it-works/", "Read the architecture", "ghost") }}</div>
+{% endcall %}
+
+<!-- Capabilities -->
+{% call m.section("capabilities") %}
+  {{ m.kicker(copy.SECTIONS.capabilities.kicker, "ember") }}
+  {{ m.heading(copy.SECTIONS.capabilities.title) }}
+  {{ m.lede("Perceiving the page as structure rather than pixels, acting with a human hand, and remembering enough to run the whole thing again unprompted.") }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {%- for group in copy.TOOL_GROUPS %}
+    {%- set a = m.ACCENT[group.accent] %}
+    <article class="card px-5 py-6">
+      <div class="flex items-center gap-2.5">
+        <span class="size-2 rounded-full {{ a.dot }}"></span>
+        <h3 class="font-display text-[1.05rem] font-semibold text-ink">{{ group.label }}</h3>
+        <span class="ml-auto font-mono text-[0.72rem] text-ink-faint">{{ group.tools.length }}</span>
+      </div>
+      <p class="mt-3 line-clamp-4 text-[0.86rem] leading-relaxed text-ink-faint">{{ group.blurb }}</p>
+      <div class="mt-4 flex flex-wrap gap-1.5">
+        {%- for tool in group.tools | take(4) %}{{ m.toolChip(tool) }}{% endfor %}
+        {%- if group.tools.length > 4 %}<span class="self-center font-mono text-[0.72rem] text-ink-faint">+{{ group.tools.length - 4 }}</span>{% endif %}
+      </div>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8 flex flex-wrap gap-3">
+    {{ m.button("/capabilities/", "All 41 tools, grouped") }}
+    {{ m.button("/docs/reference/tools/", "Full tool reference", "ghost") }}
+  </div>
+{% endcall %}
+
+<!-- Tool marquee -->
+<section class="marquee overflow-hidden border-b border-line bg-ground-2/30 py-6">
+  <div class="mask-x">
+    <div class="marquee-track flex w-max gap-2.5">
+      {%- for pass in [1, 2] %}{% for tool in copy.ALL_TOOLS %}
+      <code class="whitespace-nowrap rounded-md border border-line bg-surface/30 px-2.5 py-1.5 font-mono text-[0.74rem] text-ink-faint">{{ tool }}</code>
+      {%- endfor %}{% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Orchestration -->
+{% call m.section("orchestrate") %}
+  {{ m.kicker(copy.SECTIONS.orchestrate.kicker, "magenta") }}
+  {{ m.heading(copy.SECTIONS.orchestrate.title) }}
+  {{ m.lede(copy.SECTIONS.orchestrate.lede) }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    {%- for s in copy.ORCHESTRATION_SESSIONS %}
+    <article class="card px-5 py-5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="truncate font-mono text-[0.72rem] text-ink-faint">{{ s.host }}</span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[0.65rem] {% if s.status == 'working' %}bg-lime/10 text-lime{% elif s.status == 'approval' %}bg-amber/10 text-amber{% else %}bg-surface text-ink-faint{% endif %}">{{ s.status }}</span>
+      </div>
+      <h3 class="mt-3 font-display text-[0.98rem] font-medium leading-snug text-ink">{{ s.title }}</h3>
+      <ul class="mt-3 space-y-1.5">
+        {%- for line in s.timeline %}
+        <li class="flex gap-2 text-[0.8rem] leading-relaxed text-ink-faint"><span class="mt-1.5 size-1 shrink-0 rounded-full bg-ink-faint/60"></span>{{ line }}</li>
+        {%- endfor %}
+      </ul>
+      <p class="mt-4 border-t border-line pt-3 font-mono text-[0.7rem] text-ink-faint">{{ s.agent }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/orchestration/", "How several agents share one browser", "ghost") }}</div>
+{% endcall %}
+
+<!-- Automations -->
+{% call m.section("automations") %}
+  {{ m.kicker(copy.SECTIONS.automations.kicker, "amber") }}
+  {{ m.heading(copy.SECTIONS.automations.title) }}
+  {{ m.lede(copy.SECTIONS.automations.lede) }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {%- for a in copy.AUTOMATIONS %}
+    {%- set ac = m.ACCENT[a.accent] %}
+    <article class="card px-5 py-6">
+      <span class="size-2 rounded-full {{ ac.dot }} block"></span>
+      <h3 class="mt-3.5 font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ a.title }}</h3>
+      <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ a.body }}</p>
+      <p class="mt-4 border-t border-line pt-3 text-[0.78rem] {{ ac.text }}">{{ a.gate }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/automations/", "See what people hand over", "ghost") }}</div>
+{% endcall %}
+
+<!-- Skills -->
+{% call m.section("teach") %}
+  {{ m.kicker(copy.SECTIONS.teach.kicker, "lime") }}
+  {{ m.heading(copy.SECTIONS.teach.title) }}
+  {{ m.lede(copy.SECTIONS.teach.lede) }}
+
+  <div class="mt-12 grid gap-4 lg:grid-cols-3">
+    {%- for mode in copy.MODES %}
+    <article class="card px-5 py-6">
+      <p class="font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">{{ mode.kicker }}</p>
+      <h3 class="mt-2.5 font-display text-[1.08rem] font-semibold leading-snug text-ink">{{ mode.title }}</h3>
+      <p class="mt-3 line-clamp-5 text-[0.86rem] leading-relaxed text-ink-faint">{{ mode.body }}</p>
+      <code class="mt-4 block truncate rounded-md border border-line bg-surface/30 px-2.5 py-1.5 font-mono text-[0.74rem] text-brand">{{ mode.invocation }}</code>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/skills/", "Site maps, recordings and instant commands", "ghost") }}</div>
+{% endcall %}
+
+<!-- MCP -->
+{% call m.section("mcp", "bg-ground-2/30") %}
+  <div class="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
+    <div>
+      {{ m.kicker(copy.SECTIONS.mcp.kicker, "brand-deep") }}
+      {{ m.heading(copy.SECTIONS.mcp.title) }}
+      {{ m.lede(copy.SECTIONS.mcp.lede) }}
+      <div class="mt-8">{{ m.button("/mcp-server/", "Set it up as an MCP server", "ghost") }}</div>
+    </div>
+    <div class="space-y-4">
+      {%- for point in copy.MCP_POINTS %}
+      <div class="card px-5 py-5">
+        <h3 class="font-display text-[1rem] font-semibold text-ink">{{ point.title }}</h3>
+        <p class="mt-2 text-[0.86rem] leading-relaxed text-ink-faint">{{ point.body }}</p>
+      </div>
+      {%- endfor %}
+      <div class="card px-5 py-5">
+        <h3 class="font-display text-[1rem] font-semibold text-ink">Three read-only resources</h3>
+        <ul class="mt-3 space-y-2">
+          {%- for r in copy.RESOURCES %}
+          <li class="flex flex-wrap items-baseline gap-2"><code class="font-mono text-[0.76rem] text-brand">{{ r.uri }}</code><span class="text-[0.82rem] text-ink-faint">{{ r.desc }}</span></li>
+          {%- endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endcall %}
+
+<!-- Security -->
+{% call m.section("security") %}
+  {{ m.kicker(copy.SECTIONS.security.kicker, "ember") }}
+  {{ m.heading(copy.SECTIONS.security.title) }}
+  {{ m.lede(copy.SECTIONS.security.lede) }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {%- for s in copy.SECURITY %}
+    <article class="card px-5 py-6">
+      <h3 class="font-display text-[1rem] font-semibold leading-snug text-ink">{{ s.title }}</h3>
+      <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ s.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="card mt-4 border-amber/25 bg-amber/5 px-6 py-6">
+    <h3 class="font-display text-[1rem] font-semibold text-amber">Two limits worth stating</h3>
+    <div class="mt-4 grid gap-5 sm:grid-cols-2">
+      {%- for l in copy.LIMITS %}
+      <div>
+        <p class="font-display text-[0.92rem] font-medium text-ink">{{ l.title }}</p>
+        <p class="mt-1.5 text-[0.85rem] leading-relaxed text-ink-faint">{{ l.body }}</p>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+
+  <div class="mt-8">{{ m.button("/security/", "Read the security model", "ghost") }}</div>
+{% endcall %}
+
+<!-- Quickstart -->
+{% call m.section("start", "bg-ground-2/30") %}
+  {{ m.kicker(copy.SECTIONS.start.kicker) }}
+  {{ m.heading(copy.SECTIONS.start.title) }}
+  {{ m.lede(copy.SECTIONS.start.lede) }}
+
+  <ol class="mt-12 grid gap-4 lg:grid-cols-2">
+    {%- for step in copy.QUICKSTART %}
+    <li id="step-{{ loop.index }}" class="card px-5 py-6">
+      <div class="flex items-baseline gap-3">
+        <span class="font-mono text-[0.8rem] text-brand">{{ step.n }}</span>
+        <h3 class="font-display text-[1.05rem] font-semibold text-ink">{{ step.title }}</h3>
+      </div>
+      <p class="mt-2.5 text-[0.87rem] leading-relaxed text-ink-faint">{{ step.body }}</p>
+      <div class="mt-4">{{ m.codeblock(step.code, step.lang) }}</div>
+    </li>
+    {%- endfor %}
+  </ol>
+
+  <div class="mt-8">{{ m.button("/install/", "Full install guide", "ghost") }}</div>
+{% endcall %}
+
+<!-- FAQ -->
+{% call m.section("faq") %}
+  {{ m.kicker(copy.SECTIONS.faq.kicker) }}
+  {{ m.heading(copy.SECTIONS.faq.title) }}
+
+  <div class="mt-10 max-w-3xl divide-y divide-line border-y border-line">
+    {%- for item in copy.FAQ | take(5) %}
+    <details class="faq group py-5"{% if loop.first %} open{% endif %}>
+      <summary class="flex items-start gap-4">
+        <h3 class="flex-1 font-display text-[1.02rem] font-medium text-ink">{{ item.q }}</h3>
+        <span class="chev mt-1 shrink-0 text-ink-faint" aria-hidden="true">
+          <svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3.5v9M3.5 8h9" stroke-linecap="round"/></svg>
+        </span>
+      </summary>
+      <p class="mt-3 max-w-2xl pr-8 text-[0.92rem] leading-relaxed text-ink-dim">{{ item.a }}</p>
+    </details>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/faq/", "All questions", "ghost") }}</div>
+{% endcall %}
+
+{{ m.cta(copy) }}

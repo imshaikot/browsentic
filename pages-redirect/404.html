@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browsentic has moved to browsentic.com</title>
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://browsentic.com/">
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: oklch(0.152 0.016 52); color: oklch(0.958 0.012 70);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    text-align: center; padding: 2rem;
+  }
+  a { color: oklch(0.83 0.13 195); }
+  p { color: oklch(0.735 0.018 60); }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Browsentic has moved</h1>
+    <p>The site now lives at <a href="https://browsentic.com/">browsentic.com</a>.</p>
+  </main>
+  <script>
+    // Carry the path across, so a deep link into the old project site lands on
+    // the matching page rather than dumping everyone on the homepage.
+    var path = location.pathname.replace(/^\/browsentic/, '') || '/'
+    location.replace('https://browsentic.com' + path + location.search + location.hash)
+  </script>
+</body>
+</html>

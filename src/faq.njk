@@ -1,0 +1,55 @@
+---
+layout: layouts/page.njk
+pageKey: faq
+title: "Browsentic FAQ: API keys, headless browsers, security, cost"
+seoTitle: "FAQ: the questions people ask first | Browsentic"
+description: "Do I need an API key? Is this a headless browser? What stops a web page driving my browser? Can I use it from Cursor or Zed? What does it cost? Straight answers."
+keywords:
+  - browsentic faq
+  - browser automation without api key
+  - is browsentic headless
+  - browser agent security questions
+  - free browser automation
+  - MCP browser client support
+showFaq: true
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.SECTIONS.faq.kicker, "The ones people ask first", "Straight answers, no hedging. If yours is not here, the docs go deeper and the issue tracker is open.") %}{% endcall %}
+
+{% call m.section("questions") %}
+  <div class="max-w-3xl divide-y divide-line border-y border-line">
+    {%- for item in copy.FAQ %}
+    <details class="faq group py-6"{% if loop.first %} open{% endif %} id="q{{ loop.index }}">
+      <summary class="flex items-start gap-4">
+        <h2 class="flex-1 font-display text-[1.08rem] font-medium text-ink">{{ item.q }}</h2>
+        <span class="chev mt-1 shrink-0 text-ink-faint" aria-hidden="true">
+          <svg viewBox="0 0 16 16" class="size-4" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3.5v9M3.5 8h9" stroke-linecap="round"/></svg>
+        </span>
+      </summary>
+      <p class="mt-3.5 pr-8 text-[0.95rem] leading-relaxed text-ink-dim">{{ item.a }}</p>
+    </details>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("more", "bg-ground-2/30") %}
+  {{ m.kicker("Still stuck?", "lime") }}
+  {{ m.heading("Where the answer probably is") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    {%- for link in [
+      { href: "/docs/guide/troubleshooting/", title: "Troubleshooting", body: "Symptom, cause, fix, in that order." },
+      { href: "/docs/reference/errors/", title: "Error codes", body: "Every code, where it comes from, what to do." },
+      { href: "/docs/guide/limits/", title: "Limits", body: "Where Browsentic genuinely does not fit." },
+      { href: site.repo + "/issues", title: "Open an issue", body: "If none of the above covered it.", external: true }
+    ] %}
+    <a href="{{ link.href }}" class="card px-5 py-5 transition-colors hover:border-line-strong"{% if link.external %} target="_blank" rel="noopener"{% endif %}>
+      <h3 class="font-display text-[1rem] font-medium text-ink">{{ link.title }}</h3>
+      <p class="mt-1.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ link.body }}</p>
+    </a>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{{ m.cta(copy) }}
