@@ -18,26 +18,22 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
 
 ## Quick Start
 
-Clone and build both halves — the extension and the local daemon (requires [Node.js](https://nodejs.org) 20 or newer):
+One command installs the extension, starts the local daemon and prints a pairing code (requires [Node.js](https://nodejs.org) 20 or newer):
 
 ```sh
-git clone https://github.com/imshaikot/browsentic.git
-cd browsentic
-node scripts/setup.mjs
+npx browsentic setup
 ```
 
-Load the extension at `chrome://extensions` → **Developer mode** → **Load unpacked** → `dist/chrome-mv3`.
+Two steps are left, and both happen inside the browser:
 
-Then put the CLI on your `PATH` and pair your browser:
+1. **Load the extension** at `chrome://extensions` → **Developer mode** → **Load unpacked** → the folder it printed (`~/browsentic/extension/chrome-mv3`)
+2. **Paste the pairing code** into the Browsentic popup and press **Connect**
 
-```sh
-yarn mcp:link
-browsentic-mcp pair
-```
+Then open the side panel and say what you want.
 
-Paste the printed code into the Browsentic popup, press **Connect**, and open the side panel.
+You also need one agent CLI on your `PATH` and logged in — `claude`, `codex` or `agy`. Full prerequisites in the [install guide](docs/guide/install.md), which also covers [building from source](docs/guide/install.md#from-source).
 
-You also need one agent CLI on your `PATH` and logged in — `claude`, `codex` or `agy`. Full prerequisites in the [install guide](docs/guide/install.md).
+Later, `npx browsentic@latest update` refreshes the extension in place. The install path never changes, so your browser stays paired.
 
 ## How It Works
 
@@ -51,7 +47,7 @@ You ──speak or type──> Extension ──local WebSocket──> Daemon ─
                             ▲                                        (claude │ codex │ agy)
                             └──────────────── page actions ─────────────────────┘
 
-Any MCP client ──stdio──> browsentic-mcp ──> the same daemon ──> the same browser
+Any MCP client ──stdio──> browsentic mcp ──> the same daemon ──> the same browser
 ```
 
 </details>

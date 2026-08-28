@@ -1,23 +1,45 @@
 # CLI reference
 
 ```
-browsentic-mcp <command>
+browsentic <command>
 ```
 
-With no command it serves MCP over stdio — that is what an [MCP client](../guide/mcp-clients.md)
-runs, and it is not something you type yourself.
-
-Every command starts the daemon if one is not already running.
+With no command it prints usage. Most commands start the daemon if one is not already running;
+`status`, `stop`, `logs`, `token`, `tools`, `skills` and `approvals` do not.
 
 ---
+
+## Installing
+
+| Command | Does |
+| --- | --- |
+| `browsentic setup` | Install the extension, start the daemon, print a pairing code |
+| `browsentic update` | Refresh the installed extension in place and restart the daemon |
+
+`setup` writes the extension to `~/browsentic/extension/chrome-mv3` and leaves you two steps: load
+that folder at `chrome://extensions` with Developer mode on, and paste the code into the popup.
+
+The install path never carries a version, deliberately. Chrome derives an unpacked extension's ID
+from the absolute path of its directory, and the daemon binds each session key to the resulting
+origin, so a versioned path would unpair the browser on every update.
+
+| Flag | Does |
+| --- | --- |
+| `--dir <path>` | Install somewhere else. Needed for Flatpak or Snap browsers, which cannot read `~/browsentic` without a filesystem grant |
+| `--no-pair` | Install and start the daemon, mint no code |
+| `--force` | Rewrite every file even when the installed build already matches |
+| `--browser <name>` | `chrome` only for now. See [install](../guide/install.md) for the Firefox situation |
+| `--json` | Machine-readable result |
+
+See [guide/install.md](../guide/install.md).
 
 ## Pairing
 
 | Command | Does |
 | --- | --- |
-| `browsentic-mcp pair` | Issue a one-time code to type into the extension popup. 8 characters, valid 10 minutes, single use |
-| `browsentic-mcp sessions` | List paired browsers |
-| `browsentic-mcp revoke [origin]` | Unpair one browser, or all of them |
+| `browsentic pair` | Issue a one-time code to type into the extension popup. 8 characters, valid 10 minutes, single use |
+| `browsentic sessions` | List paired browsers |
+| `browsentic revoke [origin]` | Unpair one browser, or all of them |
 
 See [guide/pair.md](../guide/pair.md).
 
@@ -25,33 +47,45 @@ See [guide/pair.md](../guide/pair.md).
 
 | Command | Does |
 | --- | --- |
-| `browsentic-mcp agent` | Show which agent runs the side panel, and which are installed |
-| `browsentic-mcp agent <name>` | Switch to `claude`, `codex` or `antigravity` |
-| `browsentic-mcp agent setup <name>` | Let Browsentic fix what that agent still needs |
+| `browsentic agent` | Show which agent runs the side panel, and which are installed |
+| `browsentic agent <name>` | Switch to `claude`, `codex` or `antigravity` |
+| `browsentic agent fix <name>` | Let Browsentic fix what that agent still needs |
 
-`agent setup antigravity` appends exactly one entry, `mcp(browsentic/*)`, to `permissions.allow` in
+`agent fix antigravity` appends exactly one entry, `mcp(browsentic/*)`, to `permissions.allow` in
 `~/.gemini/antigravity-cli/settings.json`. See [guide/agents.md](../guide/agents.md).
+
+The verb was `agent setup` before `setup` came to mean installing the extension. The old spelling
+still works and is undocumented.
+
+## MCP
+
+| Command | Does |
+| --- | --- |
+| `browsentic mcp` | Serve MCP over stdio. What an [MCP client](../guide/mcp-clients.md) runs, not something you type |
+
+`browsentic-mcp` is a legacy alias binary that serves MCP on bare invocation, so client
+configurations written against the older name keep working.
 
 ## State and diagnostics
 
 | Command | Does |
 | --- | --- |
-| `browsentic-mcp status` | Daemon and extension connection state, manifest sync, pairing count |
-| `browsentic-mcp logs` | Print the daemon log (`~/.browsentic/daemon.log`) |
-| `browsentic-mcp tools` | Print the bundled tool manifest as JSON. **No browser needed** |
-| `browsentic-mcp skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
-| `browsentic-mcp approvals` | The "always on this site" grants |
-| `browsentic-mcp approvals clear [host]` | Forget them — all, or one site's |
-| `browsentic-mcp token` | The control token, for MCP clients. Not for the browser |
+| `browsentic status` | Daemon and extension state, the installed build, manifest sync, pairing count |
+| `browsentic logs` | Print the daemon log (`~/.browsentic/daemon.log`) |
+| `browsentic tools` | Print the bundled tool manifest as JSON. **No browser needed** |
+| `browsentic skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
+| `browsentic approvals` | The "always on this site" grants |
+| `browsentic approvals clear [host]` | Forget them, all or one site's |
+| `browsentic token` | The control token, for MCP clients. Not for the browser |
 
 ## Lifecycle
 
 | Command | Does |
 | --- | --- |
-| `browsentic-mcp stop` | Stop the background daemon |
-| `browsentic-mcp restart` | Stop the daemon and bring up a fresh one |
-| `browsentic-mcp --version` / `-v` | Print the version |
-| `browsentic-mcp help` / `--help` / `-h` | Usage |
+| `browsentic stop` | Stop the background daemon |
+| `browsentic restart` | Stop the daemon and bring up a fresh one |
+| `browsentic --version` / `-v` | Print the version |
+| `browsentic help` / `--help` / `-h` | Usage |
 
 **A rebuild does not replace a running daemon.** It keeps the old code in memory until `stop` or
 `restart`. In the repository, `yarn mcp:restart` chains the rebuild with the restart.
@@ -65,7 +99,7 @@ Not the CLI, but frequently wanted alongside it:
 | Command | Does |
 | --- | --- |
 | `yarn setup` | Install and build both halves |
-| `yarn mcp:link` | Put `browsentic-mcp` on your `PATH` |
+| `yarn mcp:link` | Put `browsentic` on your `PATH` from a source checkout |
 | `yarn mcp:unlink` | Take it off again |
 | `yarn mcp:restart` | Rebuild the daemon, then swap the running one for it |
 | `yarn mcp:manifest` | Build and print the tool manifest |

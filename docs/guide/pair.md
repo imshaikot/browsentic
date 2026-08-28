@@ -6,29 +6,21 @@ Assumes you have [installed and loaded the extension](install.md).
 
 ---
 
-## 1. Put the CLI on your PATH
+`browsentic setup` already printed a code and you may have used it. This page is what to do when
+you need another one, or when you are pairing a second browser.
+
+---
+
+## 1. Redeem a pairing code
 
 ```sh
-yarn mcp:link
+browsentic pair
 ```
 
-This runs `npm link` inside `mcp/`, which writes `browsentic-mcp` and `browsentic-mcpd` to your
-global npm prefix. It reaches outside the repository, which is why it is a separate step from the
-build.
-
-Confirm:
+Through `npx`, if you have not installed the command globally:
 
 ```sh
-browsentic-mcp --version
-```
-
-If the command is not found, your global npm prefix is not on `PATH`. Find it with `npm prefix -g`
-and add its `bin` directory.
-
-## 2. Redeem a pairing code
-
-```sh
-browsentic-mcp pair
+npx browsentic pair
 ```
 
 This starts the daemon if it is not already running and prints a code:
@@ -45,25 +37,27 @@ Open the Browsentic popup, paste the code, press **Connect**.
 The daemon issues a long-lived session key that survives browser and daemon restarts, and dies only
 when you revoke it. You do not need to pair again after an update.
 
-## 3. Verify
+## 2. Verify
 
 ```sh
-browsentic-mcp status
+browsentic status
 ```
 
 ```
-daemon:    running on 127.0.0.1:8765 (pid 41207, v0.2.1)
-extension: connected (v0.2.1)
+daemon:    running on 127.0.0.1:8765 (pid 41207, v0.3.1)
+installed: v0.3.1 at /Users/you/browsentic/extension/chrome-mv3
+extension: connected (v0.3.1)
 manifest:  in sync
 paired:    1
 ```
 
-All four lines matter:
+Every line matters:
 
 | Line | What it means |
 | --- | --- |
 | `daemon` | The local process is up, on one of ports 8765–8767 |
-| `extension` | Your browser is connected right now. `offline` means the browser is closed or unpaired |
+| `installed` | The extension build on disk. If it names a newer version than `extension`, the browser is still running the old one: press ↻ on its card |
+| `extension` | Your browser is connected right now. `not connected` means the browser is closed or unpaired |
 | `manifest` | `in sync` means both halves were built from the same action registry. `DRIFTED` means [rebuild both](maintenance.md) |
 | `paired` | How many browsers hold a session key |
 
@@ -89,9 +83,9 @@ for the mechanism, [internals/transport.md](../internals/transport.md).
 ## Managing pairings
 
 ```sh
-browsentic-mcp sessions          # which browsers are paired
-browsentic-mcp revoke            # unpair every browser
-browsentic-mcp revoke <origin>   # unpair one
+browsentic sessions          # which browsers are paired
+browsentic revoke            # unpair every browser
+browsentic revoke <origin>   # unpair one
 ```
 
 Several browsers can be *paired*, but the daemon keeps **one live link** at a time — a newer

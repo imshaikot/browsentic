@@ -7,7 +7,7 @@ import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names'
 import { basename, join } from 'node:path';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
-import { readAgentConfig } from './agent/config';
+import { readAgentConfig, rememberExtensionDir } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
 import { install, InstallError, readStamp } from './install';
@@ -195,12 +195,13 @@ async function showStatus(): Promise<void> {
 
   // "Updated the CLI, never reloaded the extension" is the failure this reports. Without it
   // the only symptom is a drifted manifest, which names no cause the user can act on.
-  const stamp = readStamp(extensionDir());
+  const installedIn = extensionDir(readAgentConfig().extensionDir);
+  const stamp = readStamp(installedIn);
   if (stamp) {
     const stale = status.connected && status.extensionVersion !== stamp.version;
     console.log(
-      `installed: v${stamp.version} at ${extensionDir()}` +
-        (stale ? ' — press ↻ at chrome://extensions to load it' : ''),
+      `installed: v${stamp.version} at ${installedIn}` +
+        (stale ? ', press ↻ at chrome://extensions to load it' : ''),
     );
   }
   console.log(`extension: ${status.connected ? `connected (v${status.extensionVersion})` : 'not connected'}`);
@@ -306,7 +307,11 @@ async function setup(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const dir = extensionDir(valueOf('dir'));
+  // An explicit --dir is remembered, so `update` lands in the same place rather than laying
+  // down a second copy at the default path and leaving the browser pointed at the first.
+  const chosen = valueOf('dir');
+  const dir = extensionDir(chosen ?? readAgentConfig().extensionDir);
+  if (chosen) rememberExtensionDir(chosen);
   const json = flag('json');
 
   let result;

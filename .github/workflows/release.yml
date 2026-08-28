@@ -25,9 +25,12 @@ on:
   push:
     tags: ['v*']
 
-# The release step needs to write to the Releases API. Nothing else is granted.
+# The release step needs to write to the Releases API. id-token is what npm Trusted
+# Publishing mints its short-lived credential from, so the publish step needs no secret at
+# all and gets a provenance attestation for free.
 permissions:
   contents: write
+  id-token: write
 
 # One tag at a time, and never cancel a run mid-upload: a half-uploaded release is worse
 # than a slow queue.
@@ -69,6 +72,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         # Yarn is vendored at the path .yarnrc.yml pins, so this does not depend on whichever
@@ -110,6 +114,59 @@ jobs:
             }
           done
 
+      - name: Pack and smoke-test the npm tarball
+        # `npm pack` runs mcp/scripts/stage-extension.mjs through prepack, so this exercises
+        # the same path a maintainer gets locally. Everything below runs against the real
+        # tarball rather than the working tree, and it runs before anything is published,
+        # because an npm version cannot be taken back.
+        run: |
+          tarball="$(cd mcp && npm pack --silent)"
+          echo "TARBALL=$GITHUB_WORKSPACE/mcp/$tarball" >> "$GITHUB_ENV"
+
+          tar -tzf "mcp/$tarball" | grep -q 'package/extension/chrome-mv3/manifest.json' \
+            || { echo "::error::the tarball carries no extension"; exit 1; }
+          if tar -tzf "mcp/$tarball" | grep -q '\.map$'; then
+            echo "::error::sourcemaps leaked into the tarball"; exit 1
+          fi
+
+          mkdir -p /tmp/smoke && cd /tmp/smoke && npm init -y >/dev/null
+          npm i --no-audit --no-fund "$GITHUB_WORKSPACE/mcp/$tarball"
+
+          # Zero runtime dependencies. This is the guard that catches someone moving a
+          # package back into `dependencies` and quietly restoring the 33 MB install.
+          deps=$(ls node_modules | grep -cv '^\.')
+          test "$deps" -eq 1 || {
+            echo "::error::expected 1 installed package, found $deps"; ls node_modules; exit 1
+          }
+
+          npx browsentic --version | grep -qx "$VERSION"
+          npx browsentic tools | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const t=JSON.parse(s);if(!Array.isArray(t)||t.length<40)throw new Error("tool manifest looks wrong: "+t.length)})'
+
+          export HOME=/tmp/smoke-home BROWSENTIC_HOME=/tmp/smoke-home/.browsentic
+          mkdir -p "$HOME"
+          npx browsentic setup --no-pair --json
+          node -p "require('$HOME/browsentic/extension/chrome-mv3/manifest.json').version" | grep -qx "$VERSION"
+
+          # The MCP handshake, on both entry points. Bare invocation of the legacy bin must
+          # keep serving, and `browsentic mcp` must serve too: an agent run spawns the CLI
+          # itself, so a regression here breaks every side-panel run silently.
+          cat > /tmp/probe.cjs <<'PROBE'
+          const { spawn } = require('child_process');
+          const [, , bin, ...args] = process.argv;
+          const p = spawn(bin, args, { stdio: ['pipe', 'pipe', 'inherit'] });
+          let out = '';
+          const finish = (code) => { try { p.kill('SIGKILL'); } catch {} process.exit(code); };
+          p.stdout.on('data', (d) => { out += d; if (out.includes('serverInfo')) finish(0); });
+          p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } } }) + '\n');
+          setTimeout(() => { console.error('no serverInfo from ' + bin + ' ' + args.join(' ')); finish(1); }, 20000);
+          PROBE
+          node /tmp/probe.cjs ./node_modules/.bin/browsentic mcp \
+            || { echo "::error::browsentic mcp did not answer initialize"; exit 1; }
+          node /tmp/probe.cjs ./node_modules/.bin/browsentic-mcp \
+            || { echo "::error::browsentic-mcp lost bare-invocation MCP serving"; exit 1; }
+
+          npx browsentic stop || true
+
       - name: Release notes
         # Prefers the text `prepare` wrote into the annotated tag, and falls back to reading
         # the conventional-commit log when the tag carries none.
@@ -127,3 +184,32 @@ jobs:
             "dist/browsentic-$VERSION-firefox.zip" \
             "dist/browsentic-$VERSION-sources.zip"
           gh release view "$TAG" --json url -q '"released: " + .url' >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------
+  # Publishing to npm is written but not enabled yet. Two things have to happen first, in
+  # this order, and neither can be done from CI:
+  #
+  #   1. Publish one version by hand from a maintainer's machine. That claims the name and
+  #      forces someone to install and run the real tarball once before any automation does.
+  #   2. Configure the trusted publisher on npmjs.com for imshaikot/browsentic, workflow
+  #      release.yml. That is what makes `npm publish` work here with no NODE_AUTH_TOKEN.
+  #
+  # Then delete the `if: false` below. Note that a tag runs this workflow as it existed at
+  # the tagged commit, so the change takes effect from the next tag cut after it lands.
+  #
+  # This is deliberately the LAST step. A GitHub release can be deleted; an npm version
+  # cannot — unpublish is restricted to 72 hours and burns the number permanently. Anything
+  # that can still fail should have failed by now.
+  # ---------------------------------------------------------------------------------------
+      - name: Publish to npm
+        if: false
+        working-directory: mcp
+        env:
+          NPM_CONFIG_PROVENANCE: true
+        run: |
+          if npm view "browsentic@$VERSION" version >/dev/null 2>&1; then
+            echo "browsentic@$VERSION is already on npm, skipping" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npm publish
+          echo "published: https://www.npmjs.com/package/browsentic/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"

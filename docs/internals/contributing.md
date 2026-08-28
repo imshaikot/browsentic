@@ -49,7 +49,7 @@ yarn check            # both type checks plus both fixture suites
 ### The daemon keeps the old build in memory
 
 The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
-until `browsentic-mcp stop` or 30 idle minutes with nothing attached.
+until `browsentic stop` or 30 idle minutes with nothing attached.
 
 The flip side is that **a rebuild alone changes nothing while a daemon is running**. That is what
 `yarn mcp:restart` is for: it rebuilds, stops the stale daemon and brings up the fresh build. The

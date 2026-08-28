@@ -45,7 +45,7 @@ underscores** — `page.get_info` would come back as `page.get.info`.
 The extension hashes its bundled manifest and sends the hash in `hello`. If it differs from the
 daemon's, the daemon:
 
-1. flags `manifestInSync: false` — visible in `browsentic-mcp status` and `browsentic_status`;
+1. flags `manifestInSync: false` — visible in `browsentic status` and `browsentic_status`;
 2. asks the extension for its actual descriptor list over a `describe` frame and **adopts it** — the
    browser is the authority on what the browser can do;
 3. broadcasts `manifest-changed` to control clients, which makes each MCP server emit

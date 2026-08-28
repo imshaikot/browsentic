@@ -808,7 +808,7 @@ change an action, regenerate and update this page to match.
 
 At runtime, drift cannot hide: the extension sends a hash of its manifest when it connects, the
 daemon compares it against its own, logs `DRIFTED` if they differ, adopts the browser's listing as
-the truth, and notifies connected MCP clients that the tool list changed. `browsentic-mcp status`
+the truth, and notifies connected MCP clients that the tool list changed. `browsentic status`
 reports whether the two halves are in sync.
 
 ---

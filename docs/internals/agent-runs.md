@@ -27,7 +27,7 @@ A matched rule flagged `risky` — the label contains *buy*, *pay*, *delete*, *s
 
 A confident match runs straight through `invokeForHarness` in the background and emits a
 `source: 'local'` timeline entry with a bolt. It never reaches the daemon, so it leaves no trace in
-`browsentic-mcp logs`. If a local command runs and *fails*, it escalates rather than reporting the
+`browsentic logs`. If a local command runs and *fails*, it escalates rather than reporting the
 failure.
 
 The bias is deliberate: escalating something the browser could have handled costs a round trip;
@@ -45,7 +45,7 @@ sequenceDiagram
     participant B as Background SW
     participant D as Daemon
     participant K as claude -p
-    participant M as browsentic-mcp (child)
+    participant M as browsentic mcp (child)
 
     S->>B: instruction + the tab it was typed on
     B->>B: resolve tab → session, tryFastPath() — grammar
@@ -64,7 +64,7 @@ sequenceDiagram
 ```
 
 **The loop closes on itself.** The daemon spawns the agent CLI, which spawns *another*
-`browsentic-mcp`, which connects back to the same daemon. That indirection is what lets an agent run
+`browsentic mcp`, which connects back to the same daemon. That indirection is what lets an agent run
 reuse the exact tool surface an external client gets, while still being gated differently.
 
 `BROWSENTIC_AGENT_RUN` is the whole mechanism. The child MCP server reads it, stamps `runId` on every

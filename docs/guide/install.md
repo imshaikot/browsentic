@@ -1,7 +1,7 @@
 # Install
 
-Browsentic is two halves — a browser extension and a local daemon. This page builds both and loads
-the extension. Then [pair them](pair.md).
+Browsentic is two halves: a browser extension and a local daemon. One command installs both. Then
+[pair them](pair.md).
 
 There is no account, no API key and no cloud service. Browsentic drives your real browser using the
 AI agent you already run locally.
@@ -13,25 +13,70 @@ AI agent you already run locally.
 | | Requirement | Check |
 | --- | --- | --- |
 | **Node** | 20 or newer | `node --version` |
-| **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc). Firefox has a build target. | — |
+| **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc) | — |
 | **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version` |
-| **git** | To clone the repository | `git --version` |
 
-Four things worth knowing before you start:
+Two things worth knowing before you start:
 
 - **An agent CLI is only needed for the side panel.** It is what the daemon spawns to reason about
   an instruction. If you only ever drive the browser from an MCP client, the daemon spawns nothing
   and no agent CLI is required. See [Choosing an agent](agents.md).
 - **Only one of the three is needed.** Browsentic checks all three and tells you in the popup which
   are installed. Switching is a click.
-- **Yarn is not a prerequisite.** The pinned Yarn 4 release ships inside the repository and the
-  setup script invokes it through Node. No global install, no Corepack.
-- **`@browsentic/mcp` is not published to npm.** Install from source; `npx -y @browsentic/mcp`
-  will not resolve.
 
 ---
 
-## 1. Clone and build
+## Install
+
+```sh
+npx browsentic setup
+```
+
+That installs the extension to `~/browsentic/extension/chrome-mv3`, starts the daemon, and prints a
+pairing code. The npm package carries the extension build, so nothing is compiled and nothing is
+downloaded beyond the one package.
+
+Two steps are left. Both happen inside the browser, so only you can do them.
+
+**1. Load the extension.** Open `chrome://extensions`, turn on **Developer mode** (top right),
+press **Load unpacked**, and choose the folder the command printed. On macOS you can press ⇧⌘G in
+the folder picker and paste the path.
+
+Pin Browsentic to the toolbar so the popup is one click away.
+
+**2. Paste the pairing code** into the popup and press Connect. It is single use and lives for ten
+minutes. `browsentic pair` issues another.
+
+To install the command permanently rather than through `npx`:
+
+```sh
+npm i -g browsentic
+```
+
+### Updating
+
+```sh
+npx browsentic@latest update
+```
+
+That refreshes the installed extension in place and restarts the daemon. The install path never
+changes, so your browser stays paired. Press ↻ on the Browsentic card at `chrome://extensions` to
+pick up the new build. See [Maintenance](maintenance.md).
+
+### Firefox
+
+Not yet. Release Firefox refuses unsigned extensions, and an add-on loaded through
+`about:debugging` is discarded when the browser restarts, so there is nothing durable to install. A
+signed build distributed through addons.mozilla.org is the fix and it is not ready.
+
+Developer Edition and Nightly can load `dist/firefox-mv2` from a source checkout with
+`xpinstall.signatures.required` set to `false`.
+
+---
+
+## From source
+
+Use this if you are working on Browsentic itself, or want to run an unreleased commit.
 
 ```sh
 git clone https://github.com/imshaikot/browsentic.git
@@ -41,7 +86,8 @@ node scripts/setup.mjs
 
 That runs four steps: extension dependencies, extension build, daemon dependencies, daemon build.
 `mcp/` is a separate Yarn project with its own lockfile, which is why the root install does not
-cover it. Once dependencies exist, `yarn setup` re-runs the same thing.
+cover it. Yarn itself is not a prerequisite: the pinned Yarn 4 release ships inside the repository
+and the setup script invokes it through Node.
 
 When it finishes you have:
 
@@ -50,21 +96,9 @@ dist/chrome-mv3     the unpacked extension
 mcp/dist            the daemon and MCP server
 ```
 
-## 2. Load the extension
-
-1. Open `chrome://extensions`
-2. Turn on **Developer mode** (top right)
-3. **Load unpacked** → select `dist/chrome-mv3`
-
-Pin Browsentic to the toolbar so the popup is one click away.
-
-**Firefox:** `yarn build:firefox`, then load `dist/firefox-mv2` through `about:debugging` →
-**This Firefox** → **Load Temporary Add-on**. Firefox is a supported build target, but Chromium is
-what Browsentic is developed against.
-
-Installing from source means Chrome will not auto-update the extension, and will not auto-reload it
-after a rebuild — press ↻ on the Browsentic card at `chrome://extensions` yourself. See
-[Maintenance](maintenance.md).
+Load `dist/chrome-mv3` directly through **Load unpacked**, or put the CLI on your `PATH` with
+`yarn mcp:link` and let `browsentic setup` install from the checkout. Either way Chrome will not
+auto-reload the extension after a rebuild, so press ↻ on its card yourself.
 
 ---
 

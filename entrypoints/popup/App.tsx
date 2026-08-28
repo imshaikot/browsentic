@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 const BLOCKED: Record<StatusBlocker, string> = {
   unpaired: 'Pair this browser to start',
-  offline: 'The daemon isn’t answering — start browsentic-mcp',
+  offline: 'The daemon isn’t answering — start browsentic',
   agent: 'That agent cannot run — pick another below',
 };
 

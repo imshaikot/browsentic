@@ -26,9 +26,9 @@ those are the ones you are not meant to be able to click past. The button is hid
 no single site to attach a grant to.
 
 ```sh
-browsentic-mcp approvals              # what no longer asks
-browsentic-mcp approvals clear        # forget all of them
-browsentic-mcp approvals clear a.com  # forget one site's
+browsentic approvals              # what no longer asks
+browsentic approvals clear        # forget all of them
+browsentic approvals clear a.com  # forget one site's
 ```
 
 ---

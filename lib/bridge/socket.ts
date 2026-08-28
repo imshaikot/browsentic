@@ -331,7 +331,7 @@ export async function connectDaemon(): Promise<void> {
 
 export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; error?: string }> {
   const code = pairingToken.replace(/[\s-]/g, '').toUpperCase();
-  if (!code) return { ok: false, error: 'Enter the pairing code from "browsentic-mcp pair".' };
+  if (!code) return { ok: false, error: 'Enter the pairing code from "browsentic pair".' };
 
   disconnectSocket();
   clearTimeout(reconnectTimer);
@@ -340,7 +340,7 @@ export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; e
     pairingResult = resolve;
     dial({ kind: 'pair', secret: code }, 0);
     setTimeout(
-      () => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic-mcp pair".' }),
+      () => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic pair".' }),
       PAIRING_TIMEOUT_MS,
     );
   });

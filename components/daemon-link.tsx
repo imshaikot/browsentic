@@ -50,7 +50,7 @@ export function DaemonLink() {
           <p className="text-[11px] leading-relaxed text-ink-dim">
             {connected
               ? 'The daemon is driving this browser. Disconnecting revokes the key — you will need a new pairing code.'
-              : 'Paired, but the daemon is not answering. Start it with browsentic-mcp, or disconnect to pair again.'}
+              : 'Paired, but the daemon is not answering. Start it with browsentic, or disconnect to pair again.'}
           </p>
           <Button variant="outline" size="sm" className="w-full" onClick={disconnect} disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <Link2Off />} Disconnect
@@ -59,7 +59,7 @@ export function DaemonLink() {
       ) : (
         <>
           <p className="text-[11px] leading-relaxed text-ink-dim">
-            Run <code className="rounded bg-surface px-1 py-px font-mono text-ink">browsentic-mcp pair</code> in a
+            Run <code className="rounded bg-surface px-1 py-px font-mono text-ink">browsentic pair</code> in a
             terminal and paste the code it prints.
           </p>
           <form
@@ -73,7 +73,7 @@ export function DaemonLink() {
               value={code}
               onChange={(event) => setCode(event.target.value)}
               placeholder="Pairing code"
-              aria-label="Pairing code from browsentic-mcp pair"
+              aria-label="Pairing code from browsentic pair"
               className="h-8 font-mono text-xs tracking-widest uppercase"
               autoComplete="off"
               spellCheck={false}

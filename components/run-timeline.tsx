@@ -189,7 +189,7 @@ function ToolRow({
               size="sm"
               variant="ghost"
               onClick={() => onDecide(item.id, true, true)}
-              title={`Stop asking for ${name} on ${item.site}. Undo with “browsentic-mcp approvals clear”.`}
+              title={`Stop asking for ${name} on ${item.site}. Undo with “browsentic approvals clear”.`}
             >
               Always on {item.site}
             </Button>

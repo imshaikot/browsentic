@@ -101,7 +101,7 @@ Notes live outside the repository, are re-read on every run so an edit applies t
 ask, and hand-written ones take precedence over generated ones.
 
 ```sh
-browsentic-mcp skills    # everything currently in scope, and where it came from
+browsentic skills    # everything currently in scope, and where it came from
 ```
 
 ---

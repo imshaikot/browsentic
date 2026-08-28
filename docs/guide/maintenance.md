@@ -13,14 +13,14 @@ Then reload the extension at `chrome://extensions` (↻ on the Browsentic card) 
 daemon:
 
 ```sh
-browsentic-mcp restart
+browsentic restart
 ```
 
 Both steps are needed, for the same reason in two places: **nothing reloads itself.** Chrome does
 not auto-reload an unpacked extension, and a running daemon keeps the old build in memory until it
 is replaced.
 
-**Rebuild both halves together.** If only one side is rebuilt, `browsentic-mcp status` reports
+**Rebuild both halves together.** If only one side is rebuilt, `browsentic status` reports
 `manifest: DRIFTED`. The daemon then falls back to the tools the browser actually has and tells
 your MCP clients the list changed — it degrades loudly rather than into tool calls that fail at the
 far end — but you should fix the drift rather than run on it.
@@ -30,7 +30,7 @@ Your pairing survives updates. `yarn mcp:link` only needs re-running if the link
 ### Why `yarn mcp:build` alone changes nothing
 
 The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
-until `browsentic-mcp stop` or 30 idle minutes with nothing attached. A rebuild does not touch the
+until `browsentic stop` or 30 idle minutes with nothing attached. A rebuild does not touch the
 process already running.
 
 `yarn mcp:restart` is the one that does both — it rebuilds, stops the stale daemon, and brings up
@@ -41,9 +41,9 @@ the fresh build.
 ## Uninstalling
 
 ```sh
-browsentic-mcp revoke      # unpair every browser
-browsentic-mcp stop        # stop the daemon
-yarn mcp:unlink            # remove browsentic-mcp from PATH
+browsentic revoke      # unpair every browser
+browsentic stop        # stop the daemon
+yarn mcp:unlink        # remove browsentic from PATH
 rm -rf ~/.browsentic ~/browsentic
 ```
 

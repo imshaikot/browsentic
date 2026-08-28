@@ -53,7 +53,7 @@ On stop, a one-shot [`task`-mode](guardrails.md#two-spawn-modes) agent call turn
 ordered, named steps. That call cannot reach the browser — `{"mcpServers":{}}` is asserted in its
 argv.
 
-Recordings live in **extension storage, not on disk**, which is why `browsentic-mcp skills` does not
+Recordings live in **extension storage, not on disk**, which is why `browsentic skills` does not
 list them and why `page_listRecordings` / `page_readRecording` exist as tools.
 
 ---

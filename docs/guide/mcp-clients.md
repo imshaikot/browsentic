@@ -14,14 +14,15 @@ This direction is fully agent-agnostic. Nothing here depends on which CLI you pi
 **Claude Code:**
 
 ```sh
-claude mcp add browsentic -- browsentic-mcp
+claude mcp add browsentic -- browsentic mcp
 ```
 
 **Codex CLI** — TOML, in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.browsentic]
-command = "browsentic-mcp"
+command = "browsentic"
+args = ["mcp"]
 ```
 
 **Anything else** — most clients take a JSON block of this shape:
@@ -29,13 +30,13 @@ command = "browsentic-mcp"
 ```json
 {
   "mcpServers": {
-    "browsentic": { "command": "browsentic-mcp" }
+    "browsentic": { "command": "browsentic", "args": ["mcp"] }
   }
 }
 ```
 
 Check your client's own documentation for the exact file and key. The *command* is the part that
-matters, and it is `browsentic-mcp` with no arguments everywhere.
+matters, and it is `browsentic` with the single argument `mcp` everywhere.
 
 **MCP servers are loaded at session start**, so restart the client session after registering.
 Tools missing from a session you registered mid-flight is the single most common surprise here.
@@ -76,7 +77,7 @@ changes is everything around the tool call.
 | Skills and site notes | Routed and applied automatically | Not applied |
 | Recordings, site mapping | Full access | Readable only (`page_listRecordings`, `page_readRecording`) |
 | Voice input | Yes | No |
-| Appears in `browsentic-mcp logs` | Yes | Yes |
+| Appears in `browsentic logs` | Yes | Yes |
 
 ### Consequential actions are denied, not waived
 

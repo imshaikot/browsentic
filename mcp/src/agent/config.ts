@@ -23,6 +23,12 @@ export interface AgentConfig {
   guardrails?: GuardrailConfig;
   screenshotDir?: string;
   skillsDir?: string;
+  /**
+   * Where `browsentic setup --dir` put the unpacked extension, so `update` writes to the same
+   * place. Only set when it is not the default; needed for sandboxed browsers (Flatpak, Snap)
+   * that cannot read ~/browsentic.
+   */
+  extensionDir?: string;
   siteMap?: {
     research?: boolean;
     allowClicks?: boolean;
@@ -171,4 +177,15 @@ export function writeGuardrailSetting(setting: string, value: GuardrailValue): v
 function write(config: StoredConfig): void {
   mkdirSync(stateDir, { recursive: true, mode: 0o700 });
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+}
+
+/**
+ * Remember where `setup --dir` installed, so a later `update` writes to the same directory
+ * instead of silently laying down a second copy at the default path.
+ */
+export function rememberExtensionDir(dir: string | undefined): void {
+  const stored = readStored();
+  if (dir) stored.extensionDir = dir;
+  else delete stored.extensionDir;
+  write(stored);
 }

@@ -49,7 +49,7 @@ leaked once does not open every future daemon.
 Clients re-read the lockfile before every connection, and `probeExisting()` matches the pid in
 `/health` against the lockfile so it never offers a token to a daemon that never issued it.
 
-Read it with `browsentic-mcp token`.
+Read it with `browsentic token`.
 
 ---
 
@@ -57,7 +57,7 @@ Read it with `browsentic-mcp token`.
 
 The extension connects to nothing until you pair it.
 
-1. `browsentic-mcp pair` asks the daemon for a code: 8 characters from an alphabet with the
+1. `browsentic pair` asks the daemon for a code: 8 characters from an alphabet with the
    ambiguous glyphs removed, valid **10 minutes**, single use.
 2. You paste it into the popup. The extension dials `ws://127.0.0.1:<port>/extension`, walking the
    three ports, and sends `hello` — which names *which* secret it holds and a fresh nonce, never the
@@ -73,7 +73,7 @@ The extension connects to nothing until you pair it.
 6. On pairing, the daemon mints a **session key** (32 random bytes) bound to that extension origin
    and returns it XORed with a keystream derived from the same secret, so the long-lived credential
    never crosses the wire in the clear. It survives browser and daemon restarts and dies only when
-   you `browsentic-mcp revoke`.
+   you `browsentic revoke`.
 
 ### Why the mutual half matters
 

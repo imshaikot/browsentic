@@ -51,7 +51,7 @@ How the pieces actually work, for contributors and for anyone integrating.
 | | |
 | --- | --- |
 | [Tools](reference/tools.md) | All 41 MCP tools with their parameters, plus the resources |
-| [CLI](reference/cli.md) | Every `browsentic-mcp` command |
+| [CLI](reference/cli.md) | Every `browsentic` command |
 | [Errors](reference/errors.md) | Every error code, what caused it, what to do |
 
 ---

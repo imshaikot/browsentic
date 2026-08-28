@@ -12,7 +12,7 @@ const SUGGESTIONS = [
 
 const BLOCKED: Record<StatusBlocker, string> = {
   unpaired: 'This browser isn’t paired yet, so nothing can drive it. Pairing takes one command and one code.',
-  offline: 'Paired, but the daemon isn’t answering. Start browsentic-mcp and this reconnects on its own.',
+  offline: 'Paired, but the daemon isn’t answering. Start browsentic and this reconnects on its own.',
   agent: 'The chosen agent can’t run on this machine. Pick another one, or let Browsentic fix it.',
 };
 

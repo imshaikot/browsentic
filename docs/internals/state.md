@@ -14,6 +14,7 @@ Nothing lives in the repository.
 └── skills/                    hand-written skill overrides
 
 ~/browsentic/                  (paths configurable)
+├── extension/chrome-mv3/      the unpacked extension `browsentic setup` installs
 ├── skills/                    panel uploads + activated site maps
 │   ├── acme-com/SKILL.md
 │   └── .staging/              maps awaiting review — unreadable to the loader
@@ -22,11 +23,11 @@ Nothing lives in the repository.
 
 | File | Written by | Notes |
 | --- | --- | --- |
-| `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic-mcp token` |
-| `auth.json` | Pairing | Session keys are per extension origin and survive restarts. Cleared by `browsentic-mcp revoke` |
+| `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
+| `auth.json` | Pairing | Session keys are per extension origin and survive restarts. Cleared by `browsentic revoke` |
 | `config.json` | You, and the agent picker | Re-read before every run — no restart needed. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
-| `daemon.log` | The daemon | `browsentic-mcp logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
+| `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
 ## The three exceptions
 
@@ -41,8 +42,9 @@ when the browser closes.
 
 ## Relocating
 
-`BROWSENTIC_HOME` moves `~/.browsentic` wholesale. `screenshotDir` and `skillsDir` in config move the
-two `~/browsentic` subdirectories independently.
+`BROWSENTIC_HOME` moves `~/.browsentic` wholesale. `screenshotDir` and `skillsDir` in config move
+those two `~/browsentic` subdirectories independently, and `browsentic setup --dir` installs the
+extension somewhere else.
 
 ---
 
