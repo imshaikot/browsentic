@@ -1,36 +1,54 @@
 {
-  "name": "@browsentic/mcp",
+  "name": "browsentic",
   "version": "0.3.1",
-  "description": "MCP server and local daemon that drive the Browsentic browser extension",
+  "description": "Hand your real, logged-in browser to the AI agent you already run. Installs the browser extension, runs the local daemon, and speaks MCP.",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@4.17.1",
+  "homepage": "https://browsentic.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imshaikot/browsentic.git",
+    "directory": "mcp"
+  },
+  "bugs": "https://github.com/imshaikot/browsentic/issues",
+  "keywords": [
+    "browser-automation",
+    "chrome-extension",
+    "ai-agent",
+    "agentic-browsing",
+    "mcp",
+    "model-context-protocol",
+    "claude-code"
+  ],
   "engines": {
     "node": ">=20"
   },
   "bin": {
+    "browsentic": "dist/cli.js",
     "browsentic-mcp": "dist/cli.js",
     "browsentic-mcpd": "dist/daemon-main.js"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "extension",
     "skills",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "compile": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "ws": "^8.21.1",
-    "zod": "^4.4.3"
+    "compile": "tsc --noEmit",
+    "prepack": "node scripts/stage-extension.mjs"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^26.1.1",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "ws": "^8.21.1",
+    "zod": "^4.4.3"
   }
 }

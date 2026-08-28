@@ -24,9 +24,16 @@ export const RUNNERS: Record<AgentKind, Runner> = {
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');
 
-/** The stdio MCP server every agent talks to — this same package, pointed back at the daemon. */
+/**
+ * The stdio MCP server every agent talks to — this same package, pointed back at the daemon.
+ *
+ * The `mcp` argument is load-bearing. Bare invocation only serves MCP when the binary was
+ * called as `browsentic-mcp`; called any other way it prints help, which an agent would read
+ * as a broken handshake. BROWSENTIC_AGENT_RUN separately forces serving, so this is belt and
+ * braces, but the explicit argument is the one that says what is meant.
+ */
 export function mcpServerFor(runId: string): McpServer {
-  return { command: process.execPath, args: [cliPath], env: { BROWSENTIC_AGENT_RUN: runId } };
+  return { command: process.execPath, args: [cliPath, 'mcp'], env: { BROWSENTIC_AGENT_RUN: runId } };
 }
 
 export interface SelectedRunner {

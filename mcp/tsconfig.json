@@ -15,7 +15,13 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["../*"]
+      "@/*": ["../*"],
+      // lib/actions/** lives at the repository root and would otherwise resolve the root's
+      // own zod, putting two copies of the same 4.4.3 release (~450 KB) into the bundle.
+      // Pin both halves at the copy that actually runs. Verify with `esbuild --analyze`:
+      // only `node_modules/zod/...` should appear, never `../node_modules/zod/...`.
+      "zod": ["./node_modules/zod"],
+      "zod/*": ["./node_modules/zod/*"]
     }
   },
   "include": ["src/**/*", "../lib/actions/**/*", "../lib/skills/**/*"]

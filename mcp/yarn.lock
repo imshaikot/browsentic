@@ -5,23 +5,6 @@ __metadata:
   version: 10
   cacheKey: 10c0
 
-"@browsentic/mcp@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "@browsentic/mcp@workspace:."
-  dependencies:
-    "@modelcontextprotocol/sdk": "npm:^1.29.0"
-    "@types/node": "npm:^26.1.1"
-    "@types/ws": "npm:^8.18.1"
-    tsup: "npm:^8.5.1"
-    typescript: "npm:^7.0.2"
-    ws: "npm:^8.21.1"
-    zod: "npm:^4.4.3"
-  bin:
-    browsentic-mcp: dist/cli.js
-    browsentic-mcpd: dist/daemon-main.js
-  languageName: unknown
-  linkType: soft
-
 "@esbuild/aix-ppc64@npm:0.27.7":
   version: 0.27.7
   resolution: "@esbuild/aix-ppc64@npm:0.27.7"
@@ -718,6 +701,24 @@ __metadata:
   checksum: 10c0/2a8fbbdc471b588338555a3e1a597d1eb0ad0c21cf20fdc3bac5d3f8d9c3a4b19b4163575ab852a43a5dfc0df7770ced5284f979e561f1a24c2f851ce89e695a
   languageName: node
   linkType: hard
+
+"browsentic@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "browsentic@workspace:."
+  dependencies:
+    "@modelcontextprotocol/sdk": "npm:^1.29.0"
+    "@types/node": "npm:^26.1.1"
+    "@types/ws": "npm:^8.18.1"
+    tsup: "npm:^8.5.1"
+    typescript: "npm:^7.0.2"
+    ws: "npm:^8.21.1"
+    zod: "npm:^4.4.3"
+  bin:
+    browsentic: dist/cli.js
+    browsentic-mcp: dist/cli.js
+    browsentic-mcpd: dist/daemon-main.js
+  languageName: unknown
+  linkType: soft
 
 "bundle-require@npm:^5.1.0":
   version: 5.1.0

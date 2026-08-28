@@ -32,6 +32,12 @@ web-ext.config.ts.timestamp-*
 mcp/bin/
 mcp/lib/
 
+# Staged by mcp/scripts/stage-extension.mjs at prepack time: a copy of the root
+# dist/chrome-mv3 build, because npm's `files` cannot reference paths above the package
+# root. Regenerated on every pack, never committed. `files` still packs it, the same way
+# mcp/dist packs despite the `dist/` rule above.
+mcp/extension/
+
 # Secrets & environment
 .env
 .env.*

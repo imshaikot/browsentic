@@ -1,8 +1,10 @@
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { stateDir } from './paths.js';
 
-export const stateDir = process.env.BROWSENTIC_HOME ?? join(homedir(), '.browsentic');
+// stateDir moved to paths.ts once the extension install needed a second root. Re-exported
+// here because most of the package already imports it from this module.
+export { stateDir };
 export const lockfilePath = join(stateDir, 'daemon.json');
 export const logPath = join(stateDir, 'daemon.log');
 
