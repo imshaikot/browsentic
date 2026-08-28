@@ -54,5 +54,5 @@ console.log(`
 Two steps are left. Both reach outside this directory, so they stay separate:
 
   yarn daemon:link         puts \`browsentic\` on your PATH (writes to the global npm prefix)
-  browsentic pair       prints a single use code, valid for 10 minutes
+  browsentic pair          prints a single use code, valid for 10 minutes
 `);

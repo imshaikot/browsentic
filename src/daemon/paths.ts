@@ -51,13 +51,14 @@ export interface InstallStamp {
  *     `npm i` or `npx` install has, and it mirrors how bundled skills already resolve
  *     (see agent/skills.ts).
  *  2. `<repo>/dist/chrome-mv3` — a source checkout, i.e. `yarn daemon:link` or running
- *     `node mcp/dist/cli.js` directly.
+ *     `node src/daemon/dist/cli.js` directly. Count the levels from the *bundle*, not from
+ *     this source file: cli.js sits at `<repo>/src/daemon/dist/`, so the repo root is three up.
  */
 export function packagedExtension(): { dir: string; source: 'package' | 'repo' } | null {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
     { dir: join(here, '..', 'extension', 'chrome-mv3'), source: 'package' as const },
-    { dir: join(here, '..', '..', '..', '..', 'dist', 'chrome-mv3'), source: 'repo' as const },
+    { dir: join(here, '..', '..', '..', 'dist', 'chrome-mv3'), source: 'repo' as const },
   ];
   return candidates.find((c) => existsSync(join(c.dir, 'manifest.json'))) ?? null;
 }

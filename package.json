@@ -25,7 +25,7 @@
     "daemon:restart": "yarn daemon:build && node src/daemon/dist/cli.js restart",
     "daemon:manifest": "yarn daemon:build && node src/daemon/dist/cli.js tools",
     "daemon:link": "cd src/daemon && npm link",
-    "daemon:unlink": "npm rm -g browsentic"
+    "daemon:unlink": "npm rm -g browsentic @browsentic/mcp"
   },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.16",

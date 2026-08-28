@@ -2,7 +2,7 @@
 // Copies the built extension into the package so it can ship in the npm tarball.
 //
 // npm's `files` allowlist cannot reference paths above the package root, and the extension
-// builds to <repo>/dist/chrome-mv3 — a sibling of mcp/, not a descendant. So it has to be
+// builds to <repo>/dist/chrome-mv3 — a sibling of src/daemon/, not a descendant. So it has to be
 // staged inward before packing.
 //
 // This runs as `prepack`, which means it runs for `npm pack` and `npm publish` alike, so a
