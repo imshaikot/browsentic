@@ -68,7 +68,9 @@ const count = (dir) =>
     0,
   )
 
-console.log(
+// stderr, not stdout: this runs as prepack, and `npm pack` prints the tarball name to
+// stdout for `$(npm pack)` to capture. A line of ours there makes that capture two lines.
+console.error(
   `stage-extension: extension/chrome-mv3 — ${count(TARGET)} files, ` +
     `${(bytes(TARGET) / 1024 / 1024).toFixed(2)} MB, manifest v${built}`,
 )

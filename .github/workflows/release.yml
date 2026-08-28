@@ -120,7 +120,11 @@ jobs:
         # tarball rather than the working tree, and it runs before anything is published,
         # because an npm version cannot be taken back.
         run: |
-          tarball="$(cd src/daemon && npm pack --silent)"
+          # tail -1 because npm pack prints the tarball name to stdout and anything a
+          # prepack script logs there lands ahead of it. Kept as a belt on top of
+          # stage-extension.mjs logging to stderr: a two-line capture here poisons every
+          # path below it, and the failure reads as "the tarball carries no extension".
+          tarball="$(cd src/daemon && npm pack --silent | tail -1)"
           echo "TARBALL=$GITHUB_WORKSPACE/src/daemon/$tarball" >> "$GITHUB_ENV"
 
           tar -tzf "src/daemon/$tarball" | grep -q 'package/extension/chrome-mv3/manifest.json' \
