@@ -15,11 +15,11 @@ permalink: "/docs/reference/tools/"
 sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/reference/tools.md"
 ---
 The page tools are generated from the shared action registry
-([lib/actions/registry.ts](https://github.com/imshaikot/browsentic/blob/main/lib/actions/registry.ts)) — one module per action under
-[lib/actions/page/](https://github.com/imshaikot/browsentic/tree/main/lib/actions/page/), one entry in the registry, and the daemon publishes it.
+([src/lib/actions/registry.ts](https://github.com/imshaikot/browsentic/blob/main/src/lib/actions/registry.ts)) — one module per action under
+[src/lib/actions/page/](https://github.com/imshaikot/browsentic/tree/main/src/lib/actions/page/), one entry in the registry, and the daemon publishes it.
 Because the extension and the MCP server are built from the same registry, a tool can never
 describe something the browser cannot do. This page is the human-readable copy; the machine
-listing is always `yarn mcp:manifest` (see [Keeping this page honest](#keeping-this-page-honest)).
+listing is always `yarn daemon:manifest` (see [Keeping this page honest](#keeping-this-page-honest)).
 
 **Names.** An action is namespaced with dots, a tool with underscores: action `page.fillInput` is
 published as tool `page_fillInput`. The mapping is mechanical, so this page names each tool once
@@ -811,7 +811,7 @@ words, which is why no MCP client gets a tool for it.
 The machine-readable listing is always one command away:
 
 ```sh
-yarn mcp:manifest
+yarn daemon:manifest
 ```
 
 It builds the MCP server and prints every page tool with its full JSON Schema. If you add or
@@ -819,7 +819,7 @@ change an action, regenerate and update this page to match.
 
 At runtime, drift cannot hide: the extension sends a hash of its manifest when it connects, the
 daemon compares it against its own, logs `DRIFTED` if they differ, adopts the browser's listing as
-the truth, and notifies connected MCP clients that the tool list changed. `browsentic-mcp status`
+the truth, and notifies connected MCP clients that the tool list changed. `browsentic status`
 reports whether the two halves are in sync.
 
 ---

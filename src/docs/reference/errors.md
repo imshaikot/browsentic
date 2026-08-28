@@ -65,7 +65,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | Code | Origin | Meaning and next move |
 | --- | --- | --- |
 | `AGENT_MISSING` | Runner | The chosen agent's binary is not on the *daemon's* `PATH`. Set `agents.<name>.bin` to an absolute path |
-| `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools. `browsentic-mcp agent setup antigravity` |
+| `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools. `browsentic agent fix antigravity` |
 | `AGENT_UNUSABLE` | Runner | The CLI is present but cannot run — usually too old for the flags Browsentic passes |
 
 ## Guardrails

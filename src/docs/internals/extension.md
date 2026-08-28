@@ -78,13 +78,13 @@ can size.
 
 | | |
 | --- | --- |
-| `lib/rail/events.ts` | The channel, the `RailView` the background computes, the tab list with its Lucide paths copied out, and the palette spelled in `oklch` |
-| `lib/rail/host.ts` | `exposeRail()` in the content script — builds the rail in a **closed** shadow root on `documentElement` |
-| `lib/bridge/rail.ts` | `serveRail()` and `syncRail()` in the background — what to paint, and when |
-| `lib/bridge/panel-view.ts` | `browsentic/panelCollapsed` and `browsentic/panelTab`, read by `use-panel-view.ts` in the panel |
+| `src/lib/rail/events.ts` | The channel, the `RailView` the background computes, the tab list with its Lucide paths copied out, and the palette spelled in `oklch` |
+| `src/lib/rail/host.ts` | `exposeRail()` in the content script — builds the rail in a **closed** shadow root on `documentElement` |
+| `src/lib/bridge/rail.ts` | `serveRail()` and `syncRail()` in the background — what to paint, and when |
+| `src/lib/bridge/panel-view.ts` | `browsentic/panelCollapsed` and `browsentic/panelTab`, read by `use-panel-view.ts` in the panel |
 
 The content script carries no React and no icon package, which is why the paths and colours are
-copied rather than imported — `components/` would drag the whole panel bundle onto every page.
+copied rather than imported — `src/extension/components/` would drag the whole panel bundle onto every page.
 
 **A closed shadow root on `documentElement` is load-bearing.** It keeps the rail out of
 `body.innerText` (so `extractText` never returns it), out of the page's `querySelectorAll`, and out

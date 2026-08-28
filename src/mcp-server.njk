@@ -75,12 +75,12 @@ keywords:
 
   <div class="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for client in [
-      { name: "Claude Code", cmd: "claude mcp add browsentic -- browsentic-mcp", href: "/docs/guide/mcp-clients/" },
-      { name: "Codex", cmd: "browsentic-mcp agent codex", href: "/docs/guide/agents/" },
-      { name: "Antigravity", cmd: "browsentic-mcp agent antigravity", href: "/docs/guide/agents/" },
-      { name: "Cursor", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" },
-      { name: "Zed", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" },
-      { name: "Claude Desktop", cmd: "browsentic-mcp", href: "/docs/guide/mcp-clients/" }
+      { name: "Claude Code", cmd: "claude mcp add browsentic -- browsentic mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Codex", cmd: "browsentic agent codex", href: "/docs/guide/agents/" },
+      { name: "Antigravity", cmd: "browsentic agent antigravity", href: "/docs/guide/agents/" },
+      { name: "Cursor", cmd: "browsentic mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Zed", cmd: "browsentic mcp", href: "/docs/guide/mcp-clients/" },
+      { name: "Claude Desktop", cmd: "browsentic mcp", href: "/docs/guide/mcp-clients/" }
     ] %}
     <a href="{{ client.href }}" class="card px-5 py-5 transition-colors hover:border-line-strong">
       <h3 class="font-display text-[1rem] font-semibold text-ink">{{ client.name }}</h3>
@@ -107,7 +107,7 @@ keywords:
 {{ m.nextUp([
   { href: "/docs/guide/mcp-clients/", title: "Register it with your client", body: "Claude Code, Cursor, Zed, Codex and Gemini CLI, one at a time." },
   { href: "/orchestration/", title: "Several clients at once", body: "How multiple agents share a single browser without colliding." },
-  { href: "/docs/reference/cli/", title: "CLI reference", body: "Every browsentic-mcp command, including pair and revoke." }
+  { href: "/docs/reference/cli/", title: "CLI reference", body: "Every browsentic command, including setup, pair and revoke." }
 ]) }}
 
 {{ m.cta(copy) }}

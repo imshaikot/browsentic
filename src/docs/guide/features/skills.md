@@ -92,7 +92,7 @@ bundled one:
 no restart.
 
 ```sh
-browsentic-mcp skills    # everything the router can see, tagged with where it came from
+browsentic skills    # everything the router can see, tagged with where it came from
 ```
 
 ---

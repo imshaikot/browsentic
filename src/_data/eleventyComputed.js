@@ -19,7 +19,7 @@ const softwareApplication = {
   operatingSystem: 'macOS, Linux, Windows',
   softwareVersion: VERSION.replace(/^v/, ''),
   softwareRequirements:
-    'Node.js 20 or newer, Chrome or Firefox, one agent CLI on PATH (Claude Code, Codex or Antigravity)',
+    'Node.js 20 or newer, Chrome or another Chromium browser, one agent CLI on PATH (Claude Code, Codex or Antigravity)',
   url: abs('/'),
   codeRepository: REPO,
   downloadUrl: `${REPO}/releases`,

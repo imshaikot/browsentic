@@ -41,7 +41,7 @@ export const HERO = {
   title: { lead: 'Every tab,', tail: 'its own ', accent: 'AI agent' },
   lede: 'No new browser. No new subscription. Hand any tab to the AI agent you already run: it senses what is on the page, works out what you asked for, and carries the job through in the session you are already signed in to. Anything you would otherwise do by hand, it can automate for you.',
   voice: 'or open the side panel and speak it aloud',
-  command: 'claude mcp add browsentic -- browsentic-mcp',
+  command: 'claude mcp add browsentic -- browsentic mcp',
 }
 
 /**
@@ -54,7 +54,8 @@ export const HERO_PATHS = [
     id: 'extension',
     kicker: 'The product',
     title: 'Install the browser extension',
-    body: 'A side panel in Chrome or Firefox. Speak to it, type at it, or press record and show it a job once, and it works the tab in front of you inside the session you are already signed in to. This is Browsentic.',
+    body: 'A side panel in Chrome or any Chromium browser. Speak to it, type at it, or press record and show it a job once, and it works the tab in front of you inside the session you are already signed in to. This is Browsentic.',
+    command: 'npx browsentic setup',
     cta: { href: '/install/', label: 'Install the extension' },
     accent: 'brand',
   },
@@ -137,8 +138,8 @@ export const SECTIONS = {
   },
   start: {
     kicker: 'Quickstart',
-    title: 'Four steps, about five minutes',
-    lede: 'You need Chrome or another Chromium browser, Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy. Yarn is pinned inside the repository, so whichever yarn you have re-executes into the right one. There is no global install or Corepack setup.',
+    title: 'One command, then two things only you can do',
+    lede: 'You need Chrome or another Chromium browser, Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy. The npm package carries the extension build, so there is nothing to clone and nothing to compile.',
   },
   faq: {
     kicker: 'FAQ',
@@ -149,7 +150,7 @@ export const SECTIONS = {
 export const CTA = {
   title: { lead: 'Stop describing the page.', accent: 'Hand it over.' },
   lede: 'Free and MIT licensed. Nothing to sign up for, no key to paste, and a fresh install connects to nothing until you redeem a pairing code yourself.',
-  command: 'git clone https://github.com/imshaikot/browsentic.git',
+  command: 'npx browsentic setup',
 }
 
 /** What the side panel actually is, in the space the integration cards used to hold. */
@@ -197,7 +198,7 @@ export const MCP_POINTS = [
   {
     id: 'extend',
     title: 'Create your own action in one file',
-    body: 'A module under lib/actions/page/ plus one line in the registry, and it publishes as an MCP tool at the same time. No second place to remember.',
+    body: 'A module under src/lib/actions/page/ plus one line in the registry, and it publishes as an MCP tool at the same time. No second place to remember.',
   },
 ]
 
@@ -311,7 +312,7 @@ export const PIPELINE = [
   {
     id: 'extension',
     title: 'Extension',
-    sub: 'Manifest V3, Chrome & Firefox',
+    sub: 'Manifest V3, Chrome and Chromium',
     body: 'Weighs your instruction against a local grammar before anyone spends a token. Confident one-step commands fire right here, in milliseconds. Everything else travels on untouched.',
   },
   {
@@ -597,35 +598,39 @@ export const LIMITS = [
 export const QUICKSTART = [
   {
     n: '01',
-    title: 'Clone and build both halves',
-    body: 'The extension and the daemon are separate packages. One command installs and builds both. It needs nothing on your PATH but Node 20+, because the pinned Yarn release ships in the repository.',
-    code: 'git clone https://github.com/imshaikot/browsentic.git\ncd browsentic\nnode scripts/setup.mjs',
+    title: 'Install both halves with one command',
+    body: 'The npm package carries the extension build, so nothing is cloned, nothing is compiled, and nothing is downloaded beyond the one package. It writes the extension to ~/browsentic/extension/chrome-mv3, starts the local daemon and prints a pairing code.',
+    code: 'npx browsentic setup',
     lang: 'sh',
   },
   {
     n: '02',
-    title: 'Load the unpacked extension',
-    body: 'Open chrome://extensions, enable Developer mode, choose Load unpacked and select the build output. Firefox builds work too.',
-    code: 'dist/chrome-mv3',
+    title: 'Load the extension',
+    body: 'Open chrome://extensions, turn on Developer mode, press Load unpacked and choose the folder the command printed. On macOS you can press Shift Command G in the picker and paste the path. Pin Browsentic to the toolbar so the popup is one click away.',
+    code: '~/browsentic/extension/chrome-mv3',
     lang: 'path',
   },
   {
     n: '03',
-    title: 'Put the daemon on your PATH and pair',
-    body: 'The pairing code is single-use and lives for ten minutes. Paste it into the popup and press Connect. The daemon then issues a long-lived session key that survives browser and daemon restarts, and dies only when you revoke it.',
-    code: 'yarn mcp:link        # global npm prefix, so it stays a separate step\nbrowsentic-mcp pair  # prints a single-use code, valid for 10 minutes',
+    title: 'Paste the pairing code',
+    body: 'Setup already printed a code. It is single use and lives for ten minutes, and the command here issues a fresh one if it expired. Paste it into the popup and press Connect. The daemon then hands back a long-lived session key that survives browser and daemon restarts, and dies only when you revoke it.',
+    code: 'npx browsentic pair',
     lang: 'sh',
   },
   {
     n: '04',
     title: 'Optional: hand the same browser to an MCP client',
     body: 'The side panel already works at this point. If you also live in a terminal, one more command gives your client the same tab, with 41 page tools plus browsentic_status and three read-only resources.',
-    code: 'claude mcp add browsentic -- browsentic-mcp',
+    code: 'claude mcp add browsentic -- browsentic mcp',
     lang: 'sh',
   },
 ]
 
 export const FAQ = [
+  {
+    q: 'How do I install it?',
+    a: 'One command: npx browsentic setup. It installs the extension to ~/browsentic/extension/chrome-mv3, starts the local daemon and prints a pairing code, with Node.js 20 or newer as the only prerequisite. Two steps are left and both happen inside the browser, so only you can do them: load that folder at chrome://extensions with Developer mode on, and paste the code into the popup. Later, npx browsentic@latest update refreshes the extension in place. The install path never changes, so your browser stays paired.',
+  },
   {
     q: 'Do I need an API key?',
     a: 'No. Browsentic runs on the agent CLI login you already have: Claude Code, Codex or Antigravity. There is no API client anywhere in the repository and nothing to paste into a settings field. The daemon spawns your chosen CLI locally, as you.',
@@ -640,7 +645,7 @@ export const FAQ = [
   },
   {
     q: 'Can I use it from something other than Claude Code?',
-    a: 'Yes. The side panel itself is switchable: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click, and for most people that is the whole answer. Beyond the panel the daemon also speaks MCP over stdio, so an external client drives the same browser: Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic-mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do.',
+    a: 'Yes. The side panel itself is switchable: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click, and for most people that is the whole answer. Beyond the panel the daemon also speaks MCP over stdio, so an external client drives the same browser: Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do.',
   },
   {
     q: 'Can it automate several tabs at the same time?',
@@ -652,7 +657,7 @@ export const FAQ = [
   },
   {
     q: 'Which browsers work?',
-    a: 'Chrome or any Chromium browser via Manifest V3, and Firefox builds work too. You will need Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy.',
+    a: 'Chrome, or another Chromium browser such as Edge, Brave or Arc, via Manifest V3. Firefox is not there yet: release Firefox refuses unsigned extensions, and an add-on loaded through about:debugging is discarded on restart, so a signed build distributed through addons.mozilla.org is the fix and it is not ready. Developer Edition and Nightly can load a Firefox build from a source checkout. You will need Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy.',
   },
   {
     q: 'What does it cost?',
@@ -660,7 +665,7 @@ export const FAQ = [
   },
   {
     q: 'How do I add a capability?',
-    a: 'One module in lib/actions/page/ and one line in the registry, which publishes it as an MCP tool at the same time. That is the whole of creating your own browsing action. Four conventions in an action module are load-bearing at runtime: touch document and window only inside execute(), keep underscores out of action names, describe() every input field, and validate with ActionError inside execute() rather than a zod refine or transform.',
+    a: 'One module in src/lib/actions/page/ and one line in the registry, which publishes it as an MCP tool at the same time. That is the whole of creating your own browsing action. Four conventions in an action module are load-bearing at runtime: touch document and window only inside execute(), keep underscores out of action names, describe() every input field, and validate with ActionError inside execute() rather than a zod refine or transform.',
   },
 ]
 

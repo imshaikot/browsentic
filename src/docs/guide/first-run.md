@@ -72,9 +72,9 @@ effect. [Approvals](/docs/guide/approvals/) covers the whole gate.
 
 Check in this order:
 
-1. `browsentic-mcp status` — is the extension `connected`?
-2. `browsentic-mcp agent` — is the agent CLI installed and ready?
-3. `browsentic-mcp logs` — run starts, routed skills, every tool call
+1. `browsentic status` — is the extension `connected`?
+2. `browsentic agent` — is the agent CLI installed and ready?
+3. `browsentic logs` — run starts, routed skills, every tool call
 
 [Troubleshooting](/docs/guide/troubleshooting/) maps symptoms to fixes.
 

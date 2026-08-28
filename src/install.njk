@@ -1,32 +1,33 @@
 ---
 layout: layouts/page.njk
 pageKey: install
-title: "Install Browsentic: four steps, about five minutes"
-seoTitle: "Install: clone, build, load the extension, pair | Browsentic"
-description: "Clone and build both halves with one command, load the unpacked extension in Chrome or Firefox, then redeem a pairing code. About five minutes, no API key."
+title: "Install Browsentic: one command, about two minutes"
+seoTitle: "Install: npx browsentic setup, load the extension, pair | Browsentic"
+description: "One command installs the extension and starts the local daemon. Load the printed folder in Chrome, paste the pairing code. About two minutes, no API key."
 keywords:
   - install browsentic
+  - npx browsentic setup
   - browser automation setup
   - install AI browser extension
   - load unpacked extension
   - pair browser extension daemon
-  - browsentic-mcp pair
 howToSteps:
-  - title: "Clone and build both halves"
-    body: "The extension and the daemon are separate packages. One command installs and builds both. It needs nothing on your PATH but Node 20 or newer."
-  - title: "Load the unpacked extension"
-    body: "Open chrome://extensions, enable Developer mode, choose Load unpacked and select the build output. Firefox builds work too."
-  - title: "Put the daemon on your PATH and pair"
-    body: "The pairing code is single-use and lives for ten minutes. Paste it into the popup and press Connect."
+  - title: "Install both halves with one command"
+    body: "The npm package carries the extension build, so nothing is cloned and nothing is compiled. It installs the extension, starts the local daemon and prints a pairing code."
+  - title: "Load the extension"
+    body: "Open chrome://extensions, turn on Developer mode, press Load unpacked and choose the folder the command printed."
+  - title: "Paste the pairing code"
+    body: "The code is single use and lives for ten minutes. Paste it into the popup and press Connect."
   - title: "Optional: hand the same browser to an MCP client"
     body: "The side panel already works. If you also live in a terminal, one more command gives your client the same tab and its 41 page tools."
 ---
 {% import "partials/macros.njk" as m with context %}
 
 {% call m.pageHero(copy.SECTIONS.start.kicker, copy.SECTIONS.start.title, copy.SECTIONS.start.lede) %}
-<div class="mt-9 flex flex-wrap gap-3">
-  {{ m.button(site.repo, "Source on GitHub", "primary", true) }}
-  {{ m.button("/docs/guide/install/", "The long-form install guide", "ghost") }}
+<div class="mt-9 max-w-lg">{{ m.command("npx browsentic setup") }}</div>
+<div class="mt-6 flex flex-wrap gap-3">
+  {{ m.button("/docs/guide/install/", "The long-form install guide", "primary") }}
+  {{ m.button(site.repo, "Source on GitHub", "ghost", true) }}
 </div>
 {% endcall %}
 
@@ -36,8 +37,8 @@ howToSteps:
 
   <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     {%- for req in [
-      { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc via Manifest V3. Firefox builds work too.", accent: "brand" },
-      { name: "Node.js 20 or newer", body: "Yarn is pinned inside the repository, so whichever yarn you have re-executes into the right one. No Corepack setup.", accent: "lime" },
+      { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc via Manifest V3. Firefox is not supported yet: release Firefox refuses unsigned extensions.", accent: "brand" },
+      { name: "Node.js 20 or newer", body: "That is the whole toolchain. npx fetches the package, which already carries the built extension, so there is nothing to compile.", accent: "lime" },
       { name: "One agent CLI", body: "claude, codex or agy on your PATH: the one you already signed in to. There is no API key to paste anywhere.", accent: "amber" }
     ] %}
     {%- set a = m.ACCENT[req.accent] %}
@@ -51,8 +52,8 @@ howToSteps:
 {% endcall %}
 
 {% call m.section("steps", "bg-ground-2/30") %}
-  {{ m.kicker("The four steps") }}
-  {{ m.heading("From clone to a connected browser") }}
+  {{ m.kicker("The steps") }}
+  {{ m.heading("From one command to a connected browser") }}
 
   <ol class="mt-12 space-y-4" data-reveal data-stagger>
     {%- for step in copy.QUICKSTART %}
@@ -77,7 +78,7 @@ howToSteps:
   {{ m.heading("Ask your agent what it can see") }}
   {{ m.lede("If the daemon is up and the browser is paired, this comes back with the active tab's title and URL rather than an error.") }}
 
-  <div class="mt-8 max-w-lg">{{ m.command("browsentic-mcp status") }}</div>
+  <div class="mt-8 max-w-lg">{{ m.command("browsentic status") }}</div>
 
   <div class="mt-10 grid gap-4 md:grid-cols-3" data-reveal data-stagger>
     {%- for row in [

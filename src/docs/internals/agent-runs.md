@@ -22,7 +22,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/internals/age
 
 ## The intent funnel
 
-[`lib/intent/`](https://github.com/imshaikot/browsentic/tree/main/lib/intent/) scores the utterance against a local grammar first. Rules carry a
+[`src/lib/intent/`](https://github.com/imshaikot/browsentic/tree/main/src/lib/intent/) scores the utterance against a local grammar first. Rules carry a
 `certainty`, slot extraction returns a `confidence`, and the product must clear **0.75** to act
 locally.
 
@@ -38,7 +38,7 @@ A matched rule flagged `risky` — the label contains *buy*, *pay*, *delete*, *s
 
 A confident match runs straight through `invokeForHarness` in the background and emits a
 `source: 'local'` timeline entry with a bolt. It never reaches the daemon, so it leaves no trace in
-`browsentic-mcp logs`. If a local command runs and *fails*, it escalates rather than reporting the
+`browsentic logs`. If a local command runs and *fails*, it escalates rather than reporting the
 failure.
 
 The bias is deliberate: escalating something the browser could have handled costs a round trip;
@@ -56,7 +56,7 @@ sequenceDiagram
     participant B as Background SW
     participant D as Daemon
     participant K as claude -p
-    participant M as browsentic-mcp (child)
+    participant M as browsentic mcp (child)
 
     S->>B: instruction + the tab it was typed on
     B->>B: resolve tab → session, tryFastPath() — grammar
@@ -75,7 +75,7 @@ sequenceDiagram
 ```
 
 **The loop closes on itself.** The daemon spawns the agent CLI, which spawns *another*
-`browsentic-mcp`, which connects back to the same daemon. That indirection is what lets an agent run
+`browsentic mcp`, which connects back to the same daemon. That indirection is what lets an agent run
 reuse the exact tool surface an external client gets, while still being gated differently.
 
 `BROWSENTIC_AGENT_RUN` is the whole mechanism. The child MCP server reads it, stamps `runId` on every
@@ -87,7 +87,7 @@ of `invokeExternal()`. It also causes `browsentic_saveSiteMap` to be published a
 ## Runners
 
 `runInstruction()` hands the request to one **runner** —
-[`mcp/src/agent/runners/`](https://github.com/imshaikot/browsentic/tree/main/mcp/src/agent/runners/) — which turns it into an argv, a working
+[`src/daemon/agent/runners/`](https://github.com/imshaikot/browsentic/tree/main/src/daemon/agent/runners/) — which turns it into an argv, a working
 directory and any files that CLI reads from disk. A shared driver (`runners/drive.ts`) does the
 spawning, the abort wiring and the line reading; the runner only decides *what to say* and *how to
 read the answer back*.
@@ -159,7 +159,7 @@ earlier by name:
 
 | Directory | Source | Contents |
 | --- | --- | --- |
-| `mcp/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
+| `src/daemon/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
 | `~/.browsentic/skills/` | `user` | Hand-written overrides |
 | `~/browsentic/skills/` (or `skillsDir`) | `uploaded` | Panel uploads and generated site maps |
 

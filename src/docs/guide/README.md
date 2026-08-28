@@ -20,7 +20,7 @@ Three short steps, about five minutes in total. There is no account, no API key 
 service.
 
 1. **[Install](/docs/guide/install/)** — clone, build, load the extension
-2. **[Pair](/docs/guide/pair/)** — put `browsentic-mcp` on your `PATH` and connect your browser to it
+2. **[Pair](/docs/guide/pair/)** — put `browsentic` on your `PATH` and connect your browser to it
 3. **[First run](/docs/guide/first-run/)** — a tour of the side panel, and your first instruction
 
 ## Using it

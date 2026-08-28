@@ -28,9 +28,9 @@ rather than after.
 The same thing from a terminal:
 
 ```sh
-browsentic-mcp agent                  # what is installed, and what runs the side panel
-browsentic-mcp agent codex            # switch
-browsentic-mcp agent setup antigravity
+browsentic agent                  # what is installed, and what runs the side panel
+browsentic agent codex            # switch
+browsentic agent fix antigravity
 ```
 
 Switching takes effect on the next instruction. It also drops the conversation being held open:
@@ -63,7 +63,7 @@ uncontained.
 Headless `agy` soft-denies any MCP tool it has no rule for, which would refuse every browser action.
 The popup shows this as *needs setup*.
 
-Pressing the button — or `browsentic-mcp agent setup antigravity` — appends exactly one entry,
+Pressing the button — or `browsentic agent fix antigravity` — appends exactly one entry,
 `mcp(browsentic/*)`, to `permissions.allow` in `~/.gemini/antigravity-cli/settings.json`, leaving
 the rest of that file alone. Nothing is written until you press it. If you have a `deny` rule
 covering the same tools, Browsentic will not overrule it — remove it yourself.
@@ -104,10 +104,10 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools. Press the button, or `browsentic-mcp agent setup antigravity`. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools. Press the button, or `browsentic agent fix antigravity`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
-| Antigravity answers but never touches the page | Its permission rule was removed. `browsentic-mcp agent` reports *needs setup* again. |
+| Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
 
 ---
 

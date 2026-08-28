@@ -3,8 +3,8 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "Guardrails"
 seoTitle: "Guardrails — Browsentic internals"
-description: "mcp/src/guardrails/ — four mechanisms, all declarative. The daemon closes a loop that is normally kept open: untrusted text comes in from a page, the browser…"
-deck: "mcp/src/guardrails/ — four mechanisms, all declarative."
+description: "src/daemon/guardrails/ — four mechanisms, all declarative. The daemon closes a loop that is normally kept open: untrusted text comes in from a page, the…"
+deck: "src/daemon/guardrails/ — four mechanisms, all declarative."
 docsPath: "internals/guardrails.md"
 section: "internals"
 sectionLabel: "Internals"
@@ -109,7 +109,7 @@ the consequential actions. `unattended: 'allow'` goes back to waiving them.
 
 ### The settings screen
 
-`guardrailSettings()` in [settings.ts](https://github.com/imshaikot/browsentic/blob/main/mcp/src/guardrails/settings.ts) describes the policy to
+`guardrailSettings()` in [settings.ts](https://github.com/imshaikot/browsentic/blob/main/src/daemon/guardrails/settings.ts) describes the policy to
 the side panel's Settings tab. Everything it returns is derived from `DEFAULT_RULES` and the live
 config, so a rule added to the policy appears in the screen with no second edit, and a rule whose
 title or reason changes says the new thing in both places.
@@ -221,7 +221,7 @@ No model, no scoring, no dependence on what was asked — the same text always y
 findings. That is not a stylistic preference: the client seals and the daemon seals again, and the
 second pass can only leave the first one's work alone if both agree about what a secret is.
 
-Three passes, in `lib/secrets/`:
+Three passes, in `src/lib/secrets/`:
 
 | Pass | Finds | Example |
 | --- | --- | --- |

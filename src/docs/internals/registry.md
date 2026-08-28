@@ -3,7 +3,7 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "The action registry"
 seoTitle: "The action registry — Browsentic internals"
-description: "One definition, compiled into two bundles. There are 41 page capabilities. They are defined once, in lib/actions/registry.ts, and that array is compiled into…"
+description: "One definition, compiled into two bundles. There are 41 page capabilities. They are defined once, in src/lib/actions/registry.ts, and that array is compiled…"
 deck: "One definition, compiled into two bundles."
 docsPath: "internals/registry.md"
 section: "internals"
@@ -21,7 +21,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/internals/reg
 ## One array, two consumers
 
 There are **41 page capabilities**. They are defined once, in
-[`lib/actions/registry.ts`](https://github.com/imshaikot/browsentic/blob/main/lib/actions/registry.ts), and that array is compiled into **both**
+[`src/lib/actions/registry.ts`](https://github.com/imshaikot/browsentic/blob/main/src/lib/actions/registry.ts), and that array is compiled into **both**
 the extension and the daemon.
 
 Each action is a small module — a name, a description, a zod input schema, and an `execute()`:
@@ -57,7 +57,7 @@ underscores** — `page.get_info` would come back as `page.get.info`.
 The extension hashes its bundled manifest and sends the hash in `hello`. If it differs from the
 daemon's, the daemon:
 
-1. flags `manifestInSync: false` — visible in `browsentic-mcp status` and `browsentic_status`;
+1. flags `manifestInSync: false` — visible in `browsentic status` and `browsentic_status`;
 2. asks the extension for its actual descriptor list over a `describe` frame and **adopts it** — the
    browser is the authority on what the browser can do;
 3. broadcasts `manifest-changed` to control clients, which makes each MCP server emit
@@ -93,7 +93,7 @@ combining daemon state with a one-element `page.getPageInfo` and the current mon
 ## Verifying
 
 ```sh
-yarn mcp:manifest
+yarn daemon:manifest
 ```
 
 Builds the MCP server and prints every tool with its full JSON Schema. No browser needed. This is

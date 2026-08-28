@@ -17,12 +17,12 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/reference/REA
 | | |
 | --- | --- |
 | [Tools](/docs/reference/tools/) | All 41 MCP tools with their parameters, the three read-only resources, and the reserved actions that never become tools |
-| [CLI](/docs/reference/cli/) | Every `browsentic-mcp` command |
+| [CLI](/docs/reference/cli/) | Every `browsentic` command |
 | [Errors](/docs/reference/errors/) | Every error code, where it comes from, and what to do about it |
 
-The tool list is generated from [`lib/actions/registry.ts`](https://github.com/imshaikot/browsentic/blob/main/lib/actions/registry.ts). The
+The tool list is generated from [`src/lib/actions/registry.ts`](https://github.com/imshaikot/browsentic/blob/main/src/lib/actions/registry.ts). The
 machine-readable copy is always one command away:
 
 ```sh
-yarn mcp:manifest
+yarn daemon:manifest
 ```

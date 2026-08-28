@@ -23,7 +23,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/internals/req
 ```mermaid
 sequenceDiagram
     participant C as MCP client
-    participant M as browsentic-mcp
+    participant M as browsentic mcp
     participant D as Daemon
     participant B as Background SW
     participant P as Content script
@@ -45,10 +45,10 @@ sequenceDiagram
 
 ## Details worth knowing
 
-**`browsentic-mcp` starts the daemon if needed.** `ensureDaemon()` reads the lockfile, checks the
+**`browsentic mcp` starts the daemon if needed.** `ensureDaemon()` reads the lockfile, checks the
 pid is alive and `/health` answers, and otherwise spawns a detached `daemon-main.js`, polling for up
 to 8 seconds. It never compares versions, so a running daemon keeps serving an old build until
-`browsentic-mcp restart`.
+`browsentic restart`.
 
 **External calls are visible.** The daemon emits a `tool`/`toolResult` pair tagged
 `source: 'external'` on the run channel, so anything an MCP client does appears on the user's

@@ -3,7 +3,7 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "Subsystems"
 seoTitle: "Subsystems — Browsentic internals"
-description: "The five things that are more than a single action. lib/monitor/, lib/bridge/monitor.ts"
+description: "The five things that are more than a single action. src/lib/monitor/, src/lib/bridge/monitor.ts"
 deck: "The five things that are more than a single action."
 docsPath: "internals/subsystems.md"
 section: "internals"
@@ -20,7 +20,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/internals/sub
 
 ## Monitors
 
-[`lib/monitor/`](https://github.com/imshaikot/browsentic/tree/main/lib/monitor/), [`lib/bridge/monitor.ts`](https://github.com/imshaikot/browsentic/blob/main/lib/bridge/monitor.ts)
+[`src/lib/monitor/`](https://github.com/imshaikot/browsentic/tree/main/src/lib/monitor/), [`src/lib/bridge/monitor.ts`](https://github.com/imshaikot/browsentic/blob/main/src/lib/bridge/monitor.ts)
 
 Watch a pinned tab in the background for a completion condition — an element appearing or vanishing,
 text or title matching a regex, a progress bar reaching a threshold.
@@ -45,7 +45,7 @@ and the daemon going away.
 
 ## Recordings
 
-[`lib/recordings/`](https://github.com/imshaikot/browsentic/tree/main/lib/recordings/)
+[`src/lib/recordings/`](https://github.com/imshaikot/browsentic/tree/main/src/lib/recordings/)
 
 The reverse of a monitor: the content script observes what *you* do in one pinned tab — clicks,
 fills, selects, keys, submits, scrolls, navigations — and batches the events to the background.
@@ -65,15 +65,15 @@ On stop, a one-shot [`task`-mode](/docs/internals/guardrails/#two-spawn-modes) a
 ordered, named steps. That call cannot reach the browser — `{"mcpServers":{}}` is asserted in its
 argv.
 
-Recordings live in **extension storage, not on disk**, which is why `browsentic-mcp skills` does not
+Recordings live in **extension storage, not on disk**, which is why `browsentic skills` does not
 list them and why `page_listRecordings` / `page_readRecording` exist as tools.
 
 ---
 
 ## Site maps
 
-[`lib/skills/site-map.ts`](https://github.com/imshaikot/browsentic/blob/main/lib/skills/site-map.ts),
-[`mcp/src/agent/site-map-store.ts`](https://github.com/imshaikot/browsentic/blob/main/mcp/src/agent/site-map-store.ts)
+[`src/lib/skills/site-map.ts`](https://github.com/imshaikot/browsentic/blob/main/src/lib/skills/site-map.ts),
+[`src/daemon/agent/site-map-store.ts`](https://github.com/imshaikot/browsentic/blob/main/src/daemon/agent/site-map-store.ts)
 
 Generated skills. A mapping run crawls one host read-only under the
 [mapping gate](/docs/internals/guardrails/#the-mapping-gate) and finishes by calling `browsentic_saveSiteMap`

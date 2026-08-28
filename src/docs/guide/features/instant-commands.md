@@ -65,7 +65,7 @@ A local command that runs and **fails** also escalates, rather than reporting th
 
 ## Two things this explains
 
-**Local commands leave no trace in `browsentic-mcp logs`.** They never reach the daemon. That is
+**Local commands leave no trace in `browsentic logs`.** They never reach the daemon. That is
 expected, not a bug — the ⚡ is where they show up.
 
 **Explaining any single routing decision:**

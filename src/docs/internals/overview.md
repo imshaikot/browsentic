@@ -32,7 +32,7 @@ You ──speak or type──> Extension ──local WebSocket──> Daemon ─
                             ▲                                        (claude │ codex │ agy)
                             └──────────────── page actions ─────────────────────┘
 
-Any MCP client ──stdio──> browsentic-mcp ──> the same daemon ──> the same browser
+Any MCP client ──stdio──> browsentic mcp ──> the same daemon ──> the same browser
 ```
 
 Everything binds to `127.0.0.1`. Nothing listens on a public interface, and there is no cloud
@@ -46,7 +46,7 @@ component.
 | --- | --- | --- | --- |
 | **Extension** | The browser | As long as the browser runs | Owns the tabs. Runs the side panel, the popup, the background service worker and one content script per page |
 | **Daemon** (`daemon-main.js`) | Auto-spawned by the first CLI or MCP client that needs it | Until 30 minutes idle with no extension and no control clients | Owns the browser link, authorization, agent runs, screenshot writes, skill and site-map storage |
-| **MCP server** (`browsentic-mcp`) | The MCP client, over stdio | The client's session | Translates MCP tool calls into daemon control frames. One process per client |
+| **MCP server** (`browsentic mcp`) | The MCP client, over stdio | The client's session | Translates MCP tool calls into daemon control frames. One process per client |
 | **Agent** (`claude -p` and friends) | The daemon, per side-panel instruction | One instruction | Reasons about the instruction and calls page tools. Contained to Browsentic's own MCP server |
 
 The MCP server is deliberately thin: it holds **no browser state**. Kill it and the browser link is
@@ -68,7 +68,7 @@ Everything in this section is one of two request shapes:
 | **[Path B](/docs/internals/agent-runs/)** | You type into the side panel. Goes through the intent funnel, then possibly spawns an agent CLI which loops back through Path A |
 
 Path B closing back onto Path A is the central trick: the agent the daemon spawns runs *another*
-`browsentic-mcp`, which connects back to the same daemon. That is what lets an agent run reuse the
+`browsentic mcp`, which connects back to the same daemon. That is what lets an agent run reuse the
 exact tool surface an external client gets while still being [gated differently](/docs/internals/guardrails/).
 
 ---

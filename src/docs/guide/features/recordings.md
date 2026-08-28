@@ -74,7 +74,7 @@ between, because replaying the wrong workflow spends real clicks on your real ac
 
 ## Where they live
 
-In the extension's own storage, not on disk. That is why `browsentic-mcp skills` does not list them,
+In the extension's own storage, not on disk. That is why `browsentic skills` does not list them,
 and why `page_listRecordings` and `page_readRecording` exist as tools.
 
 Removing the extension removes them.

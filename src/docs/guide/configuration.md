@@ -99,6 +99,7 @@ Every rule id and what it does, plus the three that the panel shows but will not
 | --- | --- | --- |
 | `screenshotDir` | `~/browsentic/screenshot` | Where captures taken with `save: true` are written, mode `0600` |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live |
+| `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup` installed the unpacked extension. Written for you by `setup --dir`, and read back by `update` so it refreshes the copy the browser actually loaded. Changing it by hand means loading the new folder in the browser again, because the extension ID follows the path |
 
 ## Site mapping
 
