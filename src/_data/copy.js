@@ -2,19 +2,19 @@
 // and docs/. Templates hold no copy of their own.
 
 export const REPO = 'https://github.com/imshaikot/browsentic'
-export const VERSION = 'v0.3.1'
+export const VERSION = 'v0.4.0'
 
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
   description:
-    'No new browser, no new subscription. A browser extension that hands any tab to the AI agent you already run, inside the logged-in session you already use.',
+    'No new browser, no API key. A browser extension that hands your tabs to the AI agent you already run, inside the logged-in session you already use.',
   social: {
-    title: 'Browsentic: every tab, its own AI agent',
+    title: 'Browsentic: no new browser, no API key',
     description:
-      'Hand any tab to Claude Code, Codex or Antigravity. 41 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key.',
+      'Like Claude Code for your browser, except it can see the page. Record and replay, autonomous site maps, several tabs at once. Local only, MIT.',
   },
   imageAlt:
-    'Browsentic. Every tab, its own AI agent. 41 page tools, three runs at once, record and replay, site maps, no API key.',
+    'Browsentic. No new browser, no API key. Your tabs, your own AI agent. Record and replay, autonomous site maps, several tabs at once, MIT licensed.',
   author: 'imshaikot',
   summary:
     'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, by voice, by typing, or by replaying a session you recorded once. It also speaks MCP, so an external client can drive the same browser.',
@@ -37,9 +37,9 @@ export const SEO = {
 }
 
 export const HERO = {
-  badge: 'MIT licensed, and it runs on the agent CLI you already pay for: Claude Code, Codex or Antigravity',
-  title: { lead: 'Every tab,', tail: 'its own ', accent: 'AI agent' },
-  lede: 'No new browser. No new subscription. Hand any tab to the AI agent you already run: it senses what is on the page, works out what you asked for, and carries the job through in the session you are already signed in to. Anything you would otherwise do by hand, it can automate for you.',
+  badge: 'Open source, MIT licensed. It runs on the agent you already pay for: Claude Code, Codex or Antigravity.',
+  title: { lead: 'No new browser. No API key.', tail: 'Your tabs, ', accent: 'your own AI agent' },
+  lede: 'Like Claude Code for your browser, except it can see the page. Say what you want in the side panel and the agent you already run drives the tab in front of you, inside the session you are already signed in to. It shows its work, asks before anything consequential, and nothing leaves your machine.',
   voice: 'or open the side panel and speak it aloud',
   command: 'claude mcp add browsentic -- browsentic mcp',
 }
@@ -103,7 +103,7 @@ export const SECTIONS = {
   },
   capabilities: {
     kicker: 'Capabilities',
-    title: ['41 page tools: sense a page,', 'act on it, and wait it out'],
+    title: ['Sense the page, act on it,', 'and wait out the slow parts'],
     lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it, or working to a clock when the page offers nothing to watch. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors. Or hand it the lens and point at the thing yourself.',
   },
   orchestrate: {
@@ -130,6 +130,11 @@ export const SECTIONS = {
     kicker: 'Optional integration',
     title: ['The browser MCP server, for when', 'you already live in a terminal'],
     lede: 'The extension is the product and the side panel needs none of this. But the daemon also speaks MCP, so Claude Code, Codex, Antigravity, Cursor or Zed can take the wheel of the same real tab. Headless automation wakes up with amnesia, no session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.',
+  },
+  highlights: {
+    kicker: 'What it does',
+    title: ['What handing over a tab', 'actually gets you'],
+    lede: 'Everything below ships in the extension, works on the sites you are already signed in to, and stops for your approval at anything consequential.',
   },
   security: {
     kicker: 'Security model',
@@ -203,10 +208,10 @@ export const MCP_POINTS = [
 ]
 
 export const STATS = [
-  { value: 41, suffix: '', label: 'page tools', note: 'read, act, navigate, wait' },
-  { value: 3, suffix: '', label: 'read-only resources', note: 'page context, zero tool calls' },
+  { value: 41, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
+  { value: 3, suffix: '', label: 'tabs worked at once', note: 'independent sessions, up to eight' },
   { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
-  { value: 10, suffix: ' min', label: 'pairing code lifetime', note: 'single use, then a session key' },
+  { value: 1, suffix: '', label: 'command to install', note: 'npx browsentic setup, MIT licensed' },
 ]
 
 export const TOOL_GROUPS = [
@@ -557,6 +562,52 @@ export const MODES = [
   },
 ]
 
+/** The home page highlights: six outcomes in the launch voice, each owning a deep page. */
+export const HIGHLIGHTS = [
+  {
+    id: 'record',
+    title: 'Show it a job once and it remembers',
+    body: 'Press record, work through the job yourself, press stop. From then on “do it like last time” is the whole instruction. Replay is a plan, not a script: every step is re-checked against the live page before it acts.',
+    accent: 'amber',
+    link: { href: '/skills/', label: 'Record and replay' },
+  },
+  {
+    id: 'maps',
+    title: 'It learns a site before it works it',
+    body: 'Point it at a site and it explores on its own: reads the sitemap, walks the pages, screenshots as it goes, then writes itself notes. Every later session on that domain already knows its way around.',
+    accent: 'lime',
+    link: { href: '/skills/', label: 'Automated site maps' },
+  },
+  {
+    id: 'orchestrate',
+    title: 'Several tabs, several agents, one browser',
+    body: 'Each tab holds its own conversation and carries on while you read something else. Three sessions work at once by default, up to eight, and stopping one leaves the rest alone.',
+    accent: 'magenta',
+    link: { href: '/orchestration/', label: 'Orchestration' },
+  },
+  {
+    id: 'lens',
+    title: 'Point at what you mean',
+    body: 'Press the lens and click the element you are talking about, and it rides along with your next message. When words are not enough, the agent hands the lens back and asks you to point.',
+    accent: 'brand',
+    link: { href: '/capabilities/', label: 'Targeting and the lens' },
+  },
+  {
+    id: 'captcha',
+    title: 'It does not stall at “verify you are human”',
+    body: 'It recognises the widget, ticks the checkbox with a real browser-level click once you approve, and hands anything that needs a person straight to you instead of failing in silence.',
+    accent: 'ember',
+    link: { href: '/capabilities/', label: 'What it can read' },
+  },
+  {
+    id: 'skills',
+    title: 'Teach it your own moves',
+    body: 'Write a skill in plain markdown and drop it in, or let a mapped site or a recording become one. Skills route by trigger words, and nothing arms itself until you have read it.',
+    accent: 'brand-deep',
+    link: { href: '/skills/', label: 'Skills' },
+  },
+]
+
 export const SECURITY = [
   {
     title: 'Off by default',
@@ -620,7 +671,7 @@ export const QUICKSTART = [
   {
     n: '04',
     title: 'Optional: hand the same browser to an MCP client',
-    body: 'The side panel already works at this point. If you also live in a terminal, one more command gives your client the same tab, with 41 page tools plus browsentic_status and three read-only resources.',
+    body: 'The side panel already works at this point. If you also live in a terminal, one more command gives your client the same tab, with every page capability plus browsentic_status and three read-only resources.',
     code: 'claude mcp add browsentic -- browsentic mcp',
     lang: 'sh',
   },
@@ -671,10 +722,7 @@ export const FAQ = [
 
 export const NAV_LINKS = [
   { href: '#how', label: 'Architecture' },
-  { href: '#capabilities', label: 'Capabilities' },
-  { href: '#orchestrate', label: 'Orchestration' },
-  { href: '#automations', label: 'Automations' },
-  { href: '#teach', label: 'Skills' },
+  { href: '#highlights', label: 'What it does' },
   { href: '#security', label: 'Security' },
   { href: '#start', label: 'Quickstart' },
 ]

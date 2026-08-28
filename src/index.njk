@@ -3,9 +3,9 @@ layout: layouts/page.njk
 pageKey: home
 title: "Browsentic: AI browser automation in the browser you already use"
 seoTitle: "Browsentic: the AI browser extension for your logged-in browser"
-description: "A browser extension that hands any tab to the AI agent you already run. 41 page tools in the logged-in session you already use. No API key, no headless browser."
-socialTitle: "Browsentic: every tab, its own AI agent"
-socialDescription: "Hand any tab to Claude Code, Codex or Antigravity. 41 page tools, three tabs automated at once, record and replay, site maps. Local only, no API key."
+description: "No new browser, no API key. A Chrome extension that hands your tabs to the AI agent you already run, inside the logged-in session you already use. Open source, MIT."
+socialTitle: "Browsentic: no new browser, no API key"
+socialDescription: "Like Claude Code for your browser, except it can see the page. Record and replay, autonomous site maps, several tabs at once. Local only, MIT."
 keywords:
   - AI browser automation
   - browser AI agent
@@ -104,190 +104,29 @@ showFaq: true
   <div class="mt-8">{{ m.button("/how-it-works/", "Read the architecture", "ghost") }}</div>
 {% endcall %}
 
-<!-- Capabilities -->
-{% call m.section("capabilities") %}
-  {{ m.kicker(copy.SECTIONS.capabilities.kicker, "ember") }}
-  {{ m.heading(copy.SECTIONS.capabilities.title) }}
-  {{ m.lede("Perceiving the page as structure rather than pixels, acting with a human hand, and remembering enough to run the whole thing again unprompted.") }}
+<!-- Highlights: six outcomes, each owning a deep page -->
+{% call m.section("highlights") %}
+  {{ m.kicker(copy.SECTIONS.highlights.kicker, "ember") }}
+  {{ m.heading(copy.SECTIONS.highlights.title) }}
+  {{ m.lede(copy.SECTIONS.highlights.lede) }}
 
   <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
-    {%- for group in copy.TOOL_GROUPS %}
-    {%- set a = m.ACCENT[group.accent] %}
-    <article class="card spotlight px-5 py-6">
-      <div class="flex items-center gap-2.5">
-        <span class="size-2 rounded-full {{ a.dot }}"></span>
-        <h3 class="font-display text-[1.05rem] font-semibold text-ink">{{ group.label }}</h3>
-        <span class="ml-auto font-mono text-[0.72rem] text-ink-faint">{{ group.tools.length }}</span>
-      </div>
-      <p class="mt-3 line-clamp-4 text-[0.86rem] leading-relaxed text-ink-faint">{{ group.blurb }}</p>
-      <div class="mt-4 flex flex-wrap gap-1.5">
-        {%- for tool in group.tools | take(4) %}{{ m.toolChip(tool) }}{% endfor %}
-        {%- if group.tools.length > 4 %}<span class="self-center font-mono text-[0.72rem] text-ink-faint">+{{ group.tools.length - 4 }}</span>{% endif %}
-      </div>
+    {%- for h in copy.HIGHLIGHTS %}
+    {%- set a = m.ACCENT[h.accent] %}
+    <article class="card spotlight flex flex-col px-5 py-6">
+      <span class="size-2 rounded-full {{ a.dot }} block"></span>
+      <h3 class="mt-3.5 font-display text-[1.05rem] font-semibold leading-snug text-ink">{{ h.title }}</h3>
+      <p class="mt-2.5 flex-1 text-[0.87rem] leading-relaxed text-ink-faint">{{ h.body }}</p>
+      <a href="{{ h.link.href }}" class="mt-4 border-t border-line pt-3 text-[0.8rem] font-medium {{ a.text }} transition-opacity hover:opacity-80">{{ h.link.label }} &rarr;</a>
     </article>
     {%- endfor %}
   </div>
 
   <div class="mt-8 flex flex-wrap gap-3">
-    {{ m.button("/capabilities/", "All 41 tools, grouped") }}
-    {{ m.button("/docs/reference/tools/", "Full tool reference", "ghost") }}
+    {{ m.button("/capabilities/", "Every capability, grouped") }}
+    {{ m.button("/automations/", "What people hand over", "ghost") }}
   </div>
 {% endcall %}
-
-<!-- Tool marquee -->
-<section class="marquee overflow-hidden border-b border-line bg-ground-2/30 py-6">
-  <div class="mask-x">
-    <div class="marquee-track flex w-max gap-2.5">
-      {%- for pass in [1, 2] %}{% for tool in copy.ALL_TOOLS %}
-      <code class="whitespace-nowrap rounded-md border border-line bg-surface/30 px-2.5 py-1.5 font-mono text-[0.74rem] text-ink-faint">{{ tool }}</code>
-      {%- endfor %}{% endfor %}
-    </div>
-  </div>
-</section>
-
-<!-- Orchestration -->
-{% call m.section("orchestrate") %}
-  {{ m.kicker(copy.SECTIONS.orchestrate.kicker, "magenta") }}
-  {{ m.heading(copy.SECTIONS.orchestrate.title) }}
-  {{ m.lede(copy.SECTIONS.orchestrate.lede) }}
-
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4" data-reveal data-stagger>
-    {%- for s in copy.ORCHESTRATION_SESSIONS %}
-    <article class="card spotlight px-5 py-5">
-      <div class="flex items-center justify-between gap-2">
-        <span class="truncate font-mono text-[0.72rem] text-ink-faint">{{ s.host }}</span>
-        <span class="shrink-0 rounded-full px-2 py-0.5 font-mono text-[0.65rem] {% if s.status == 'working' %}bg-lime/10 text-lime{% elif s.status == 'approval' %}bg-amber/10 text-amber{% else %}bg-surface text-ink-faint{% endif %}">
-          {%- if s.status == 'working' %}<span class="pulse relative mr-1 inline-block size-1.5 rounded-full bg-lime align-middle text-lime"></span>{% endif -%}
-          {{ s.status }}</span>
-      </div>
-      <h3 class="mt-3 font-display text-[0.98rem] font-medium leading-snug text-ink">{{ s.title }}</h3>
-      <ul class="mt-3 space-y-1.5">
-        {%- for line in s.timeline %}
-        <li class="flex gap-2 text-[0.8rem] leading-relaxed text-ink-faint"><span class="mt-1.5 size-1 shrink-0 rounded-full bg-ink-faint/60"></span>{{ line }}</li>
-        {%- endfor %}
-      </ul>
-      <p class="mt-4 border-t border-line pt-3 font-mono text-[0.7rem] text-ink-faint">{{ s.agent }}</p>
-    </article>
-    {%- endfor %}
-  </div>
-
-  <div class="mt-8">{{ m.button("/orchestration/", "How several agents share one browser", "ghost") }}</div>
-{% endcall %}
-
-<!-- Automations -->
-{% call m.section("automations") %}
-  {{ m.kicker(copy.SECTIONS.automations.kicker, "amber") }}
-  {{ m.heading(copy.SECTIONS.automations.title) }}
-  {{ m.lede(copy.SECTIONS.automations.lede) }}
-
-  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
-    {%- for a in copy.AUTOMATIONS %}
-    {%- set ac = m.ACCENT[a.accent] %}
-    <article class="card spotlight px-5 py-6">
-      <span class="size-2 rounded-full {{ ac.dot }} block"></span>
-      <h3 class="mt-3.5 font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ a.title }}</h3>
-      <p class="mt-2.5 text-[0.86rem] leading-relaxed text-ink-faint">{{ a.body }}</p>
-      <p class="mt-4 border-t border-line pt-3 text-[0.78rem] {{ ac.text }}">{{ a.gate }}</p>
-    </article>
-    {%- endfor %}
-  </div>
-
-  <div class="mt-8">{{ m.button("/automations/", "See what people hand over", "ghost") }}</div>
-{% endcall %}
-
-<!-- Skills -->
-{% call m.section("teach") %}
-  {{ m.kicker(copy.SECTIONS.teach.kicker, "lime") }}
-  {{ m.heading(copy.SECTIONS.teach.title) }}
-  {{ m.lede(copy.SECTIONS.teach.lede) }}
-
-  {%- set TAB_ACCENT = { "site-maps": "lime", recordings: "amber", instant: "brand" } %}
-
-  <div class="mt-12" data-tabs data-reveal>
-    <div class="relative border-b border-line">
-      <div class="flex gap-6 overflow-x-auto" role="tablist" aria-label="How you teach it">
-        {%- for mode in copy.MODES %}
-        <button type="button" role="tab" id="tab-{{ mode.id }}" aria-controls="panel-{{ mode.id }}"
-                aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ '0' if loop.first else '-1' }}"
-                class="tab-label shrink-0 whitespace-nowrap pb-3 font-display text-[0.95rem] transition-colors {% if loop.first %}text-ink{% else %}text-ink-faint{% endif %}">{{ mode.tab }}</button>
-        {%- endfor %}
-      </div>
-      <span class="tab-underline" aria-hidden="true"></span>
-    </div>
-
-    {%- for mode in copy.MODES %}
-    {%- set acc = m.ACCENT[TAB_ACCENT[mode.id]] %}
-    <div role="tabpanel" id="panel-{{ mode.id }}" aria-labelledby="tab-{{ mode.id }}" class="pt-9" {% if not loop.first %}hidden{% endif %}>
-      <div class="grid gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
-        <div>
-          <p class="font-display text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint">{{ mode.kicker }}</p>
-          <h3 class="mt-2.5 max-w-xl font-display text-[1.5rem] font-semibold leading-snug text-ink">{{ mode.title }}</h3>
-          <p class="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-ink-dim">{{ mode.body }}</p>
-          <code class="mt-5 inline-block rounded-lg border border-line bg-surface/40 px-3 py-2 font-mono text-[0.8rem] {{ acc.text }}">{{ mode.invocation }}</code>
-
-          <ul class="mt-7 space-y-4">
-            {%- for point in mode.points %}
-            <li>
-              <h4 class="font-display text-[0.94rem] font-medium text-ink">{{ point[0] }}</h4>
-              <p class="mt-1 text-[0.86rem] leading-relaxed text-ink-faint">{{ point[1] }}</p>
-            </li>
-            {%- endfor %}
-          </ul>
-        </div>
-
-        <div class="card overflow-hidden">
-          <div class="border-b border-line px-4 py-2.5">
-            <span class="font-mono text-[0.7rem] uppercase tracking-wider text-ink-faint">{{ mode.tab }}</span>
-          </div>
-          <ul class="divide-y divide-line font-mono text-[0.78rem]">
-            {%- for row in mode.tree %}
-            <li class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5">
-              <span class="{{ acc.text }}">{{ row[0] }}</span>
-              {%- if row[1] %}<span class="text-ink-faint">{{ row[1] }}</span>{% endif %}
-            </li>
-            {%- endfor %}
-          </ul>
-        </div>
-      </div>
-    </div>
-    {%- endfor %}
-  </div>
-
-  <div class="mt-10">{{ m.button("/skills/", "Site maps, recordings and instant commands", "ghost") }}</div>
-{% endcall %}
-
-<!-- The extension itself: what the side panel does -->
-{% call m.section("panel", "bg-ground-2/30") %}
-  <div class="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
-    <div>
-      {{ m.kicker(copy.SECTIONS.panel.kicker) }}
-      {{ m.heading(copy.SECTIONS.panel.title) }}
-      {{ m.lede(copy.SECTIONS.panel.lede) }}
-      <div class="mt-8 flex flex-wrap gap-3">
-        {{ m.button("/install/", "Install the extension") }}
-        {{ m.button("/skills/", "Teach it your own jobs", "ghost") }}
-      </div>
-    </div>
-    <div class="space-y-4" data-reveal data-stagger>
-      {%- for point in copy.PANEL_POINTS %}
-      <div class="card px-5 py-5">
-        <h3 class="font-display text-[1rem] font-semibold text-ink">{{ point.title }}</h3>
-        <p class="mt-2 text-[0.86rem] leading-relaxed text-ink-faint">{{ point.body }}</p>
-      </div>
-      {%- endfor %}
-    </div>
-  </div>
-{% endcall %}
-
-<!-- One integration path gets a band, not a section -->
-{%- set bandAccent = m.ACCENT["brand-deep"] %}
-<section id="mcp" class="border-b border-line">
-  <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-5 py-8 sm:px-8" data-reveal>
-    <span class="rounded-full border {{ bandAccent.border }} {{ bandAccent.soft }} px-3 py-1 font-display text-[0.7rem] font-medium uppercase tracking-[0.11em] {{ bandAccent.text }}">{{ copy.MCP_BAND.chip }}</span>
-    <p class="min-w-[18rem] flex-1 text-[0.92rem] leading-relaxed text-ink-dim">{{ copy.MCP_BAND.body }}</p>
-    <a href="{{ copy.MCP_BAND.cta.href }}" class="text-[0.92rem] font-medium text-ink-dim transition-colors hover:text-ink">{{ copy.MCP_BAND.cta.label }} &rarr;</a>
-  </div>
-</section>
 
 <!-- Security -->
 {% call m.section("security") %}
