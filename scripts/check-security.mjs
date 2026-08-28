@@ -19,19 +19,19 @@ async function bundle(entry, name) {
     format: 'esm',
     platform: 'node',
     logLevel: 'warning',
-    alias: { '@': root },
+    alias: { '@': join(root, 'src') },
   });
   return import(pathToFileURL(outfile).href);
 }
 
-const sitemap = await bundle('mcp/src/agent/sitemap.ts', 'sitemap');
-const guardrails = await bundle('mcp/src/guardrails/index.ts', 'guardrails');
-const redact = await bundle('lib/bridge/redact.ts', 'redact');
-const secrets = await bundle('lib/secrets/index.ts', 'secrets');
-const handshake = await bundle('lib/actions/handshake.ts', 'handshake');
-const reserved = await bundle('lib/actions/reserved.ts', 'reserved');
-const runners = await bundle('mcp/src/agent/runners/index.ts', 'runners');
-const lockfile = await bundle('mcp/src/lockfile.ts', 'lockfile');
+const sitemap = await bundle('src/daemon/agent/sitemap.ts', 'sitemap');
+const guardrails = await bundle('src/daemon/guardrails/index.ts', 'guardrails');
+const redact = await bundle('src/lib/bridge/redact.ts', 'redact');
+const secrets = await bundle('src/lib/secrets/index.ts', 'secrets');
+const handshake = await bundle('src/lib/actions/handshake.ts', 'handshake');
+const reserved = await bundle('src/lib/actions/reserved.ts', 'reserved');
+const runners = await bundle('src/daemon/agent/runners/index.ts', 'runners');
+const lockfile = await bundle('src/daemon/lockfile.ts', 'lockfile');
 
 let failed = 0;
 let ran = 0;

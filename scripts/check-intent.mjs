@@ -122,13 +122,13 @@ const CASES = [
 const outfile = join(root, 'node_modules/.cache/browsentic/intent-check.mjs');
 await mkdir(dirname(outfile), { recursive: true });
 await build({
-  entryPoints: [join(root, 'lib/intent/index.ts')],
+  entryPoints: [join(root, 'src/lib/intent/index.ts')],
   outfile,
   bundle: true,
   format: 'esm',
   platform: 'node',
   logLevel: 'warning',
-  alias: { '@': root },
+  alias: { '@': join(root, 'src') },
 });
 
 const { routeIntent, ACT_THRESHOLD } = await import(pathToFileURL(outfile).href);

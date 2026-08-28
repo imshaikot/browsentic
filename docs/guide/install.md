@@ -85,7 +85,7 @@ node scripts/setup.mjs
 ```
 
 That runs four steps: extension dependencies, extension build, daemon dependencies, daemon build.
-`mcp/` is a separate Yarn project with its own lockfile, which is why the root install does not
+`src/daemon/` is a separate Yarn project with its own lockfile, which is why the root install does not
 cover it. Yarn itself is not a prerequisite: the pinned Yarn 4 release ships inside the repository
 and the setup script invokes it through Node.
 
@@ -93,11 +93,11 @@ When it finishes you have:
 
 ```
 dist/chrome-mv3     the unpacked extension
-mcp/dist            the daemon and MCP server
+src/daemon/dist     the daemon and MCP server
 ```
 
 Load `dist/chrome-mv3` directly through **Load unpacked**, or put the CLI on your `PATH` with
-`yarn mcp:link` and let `browsentic setup` install from the checkout. Either way Chrome will not
+`yarn daemon:link` and let `browsentic setup` install from the checkout. Either way Chrome will not
 auto-reload the extension after a rebuild, so press ↻ on its card yourself.
 
 ---

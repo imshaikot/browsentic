@@ -14,11 +14,11 @@ Separate lockfiles.
 | --- | --- | --- |
 | Root | `/` | `/mcp` |
 | Bundler | WXT (Vite) | tsup |
-| Output | `dist/chrome-mv3` | `mcp/dist` |
+| Output | `dist/chrome-mv3` | `src/daemon/dist` |
 | Stack | React 19, Tailwind v4, shadcn/ui, zod | Node ≥20, `@modelcontextprotocol/sdk`, `ws`, zod |
-| Build | `yarn build` | `yarn mcp:build` |
+| Build | `yarn build` | `yarn daemon:build` |
 
-`mcp/` imports `lib/` through the `@/` alias, which is how [one registry](registry.md) ends up in two
+`src/daemon/` imports `src/lib/` through the `@/` alias, which is how [one registry](registry.md) ends up in two
 bundles.
 
 `node scripts/setup.mjs` (`yarn setup`) runs all four steps — both installs, both builds — using the
@@ -34,17 +34,17 @@ yarn dev:firefox
 yarn build            # production build
 yarn zip              # store-ready archive
 yarn compile          # type check the extension
-yarn mcp:compile      # type check the daemon
-yarn mcp:dev          # rebuild the daemon on change
-yarn mcp:restart      # rebuild, then swap the running daemon for the fresh build
-yarn mcp:manifest     # print the tool manifest, no browser needed
+yarn daemon:compile      # type check the daemon
+yarn daemon:dev          # rebuild the daemon on change
+yarn daemon:restart      # rebuild, then swap the running daemon for the fresh build
+yarn daemon:manifest     # print the tool manifest, no browser needed
 yarn check:intent     # route a fixture table of utterances through the local grammar
 yarn check:security
 yarn check            # both type checks plus both fixture suites
 ```
 
 **Run `yarn check` before opening a pull request.** If you touched the action registry, also run
-`yarn mcp:manifest` and keep [reference/tools.md](../reference/tools.md) in step with what it prints.
+`yarn daemon:manifest` and keep [reference/tools.md](../reference/tools.md) in step with what it prints.
 
 ### The daemon keeps the old build in memory
 
@@ -52,14 +52,14 @@ The daemon has no start command: the first CLI or MCP client that needs it spawn
 until `browsentic stop` or 30 idle minutes with nothing attached.
 
 The flip side is that **a rebuild alone changes nothing while a daemon is running**. That is what
-`yarn mcp:restart` is for: it rebuilds, stops the stale daemon and brings up the fresh build. The
+`yarn daemon:restart` is for: it rebuilds, stops the stale daemon and brings up the fresh build. The
 extension cannot spawn the daemon; it only reconnects to one.
 
 ---
 
 ## Adding a capability
 
-Write `lib/actions/page/<name>.ts` and add it to the array in `lib/actions/registry.ts`. That single
+Write `src/lib/actions/page/<name>.ts` and add it to the array in `src/lib/actions/registry.ts`. That single
 edit publishes it as an MCP tool, because the daemon bundles the same registry.
 
 Four conventions are load-bearing at runtime rather than at compile time:
@@ -77,13 +77,13 @@ auto-reload unpacked extensions, and a stale service worker is the usual cause o
 
 ### If the capability is consequential
 
-Add a rule to [`mcp/src/guardrails/policy.ts`](../../mcp/src/guardrails/policy.ts) rather than a
+Add a rule to [`src/daemon/guardrails/policy.ts`](../../src/daemon/guardrails/policy.ts) rather than a
 check inside the action — the policy is meant to be printable and diffable in one place. If it needs
 a new predicate, add it to `CONDITIONS`; the vocabulary is closed on purpose.
 
 ### If it should be reachable from the side panel without an agent
 
-Add a rule to [`lib/intent/grammar.ts`](../../lib/intent/grammar.ts) and a fixture to the
+Add a rule to [`src/lib/intent/grammar.ts`](../../src/lib/intent/grammar.ts) and a fixture to the
 `yarn check:intent` table. Bias toward escalating — see
 [the intent funnel](agent-runs.md#the-intent-funnel).
 
@@ -91,12 +91,12 @@ Add a rule to [`lib/intent/grammar.ts`](../../lib/intent/grammar.ts) and a fixtu
 
 ## Adding an agent runner
 
-One file in [`mcp/src/agent/runners/`](../../mcp/src/agent/runners/) plus one line in
+One file in [`src/daemon/agent/runners/`](../../src/daemon/agent/runners/) plus one line in
 `runners/index.ts`. The shared driver does the spawning, abort wiring and line reading; your runner
 decides what to say and how to read the answer back.
 
 You must also add a `CONTAINMENT` entry in
-[`mcp/src/guardrails/spawn.ts`](../../mcp/src/guardrails/spawn.ts) declaring which containment mode
+[`src/daemon/guardrails/spawn.ts`](../../src/daemon/guardrails/spawn.ts) declaring which containment mode
 that CLI supports and what its plan must carry. `vetPlan()` refuses to spawn a runner whose plan does
 not match — that is the point, and it is asserted in tests without spawning anything.
 

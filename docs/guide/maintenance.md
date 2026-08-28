@@ -25,15 +25,15 @@ is replaced.
 your MCP clients the list changed — it degrades loudly rather than into tool calls that fail at the
 far end — but you should fix the drift rather than run on it.
 
-Your pairing survives updates. `yarn mcp:link` only needs re-running if the link is broken.
+Your pairing survives updates. `yarn daemon:link` only needs re-running if the link is broken.
 
-### Why `yarn mcp:build` alone changes nothing
+### Why `yarn daemon:build` alone changes nothing
 
 The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
 until `browsentic stop` or 30 idle minutes with nothing attached. A rebuild does not touch the
 process already running.
 
-`yarn mcp:restart` is the one that does both — it rebuilds, stops the stale daemon, and brings up
+`yarn daemon:restart` is the one that does both — it rebuilds, stops the stale daemon, and brings up
 the fresh build.
 
 ---
@@ -43,7 +43,7 @@ the fresh build.
 ```sh
 browsentic revoke      # unpair every browser
 browsentic stop        # stop the daemon
-yarn mcp:unlink        # remove browsentic from PATH
+yarn daemon:unlink        # remove browsentic from PATH
 rm -rf ~/.browsentic ~/browsentic
 ```
 
@@ -63,9 +63,9 @@ yarn dev              # build, launch a throwaway Chrome profile, hot reload
 yarn dev:firefox
 yarn build            # production build
 yarn zip              # store-ready archive
-yarn mcp:dev          # rebuild the daemon on change
-yarn mcp:restart      # rebuild, then swap the running daemon for the fresh build
-yarn mcp:manifest     # print the tool manifest, no browser needed
+yarn daemon:dev          # rebuild the daemon on change
+yarn daemon:restart      # rebuild, then swap the running daemon for the fresh build
+yarn daemon:manifest     # print the tool manifest, no browser needed
 yarn check            # both type checks plus both fixture suites
 ```
 

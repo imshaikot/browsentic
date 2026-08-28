@@ -16,12 +16,12 @@ function yarn() {
   return ['yarn', []];
 }
 
-// mcp/ is a separate Yarn project (its own lockfile), so the root install does not cover it.
+// src/daemon is a separate Yarn project (its own lockfile), so the root install does not cover it.
 const STEPS = [
   ['extension dependencies', ['install']],
   ['extension build', ['build']],
-  ['daemon dependencies', ['--cwd', 'mcp', 'install']],
-  ['daemon build', ['--cwd', 'mcp', 'build']],
+  ['daemon dependencies', ['--cwd', 'src/daemon', 'install']],
+  ['daemon build', ['--cwd', 'src/daemon', 'build']],
 ];
 
 const [bin, prefix] = yarn();
@@ -49,10 +49,10 @@ STEPS.forEach(([label, args], i) => {
 
 console.log(`
 \x1b[32m✓ Extension built\x1b[0m  dist/chrome-mv3 — load it unpacked at chrome://extensions, Developer mode on
-\x1b[32m✓ Daemon built\x1b[0m     mcp/dist
+\x1b[32m✓ Daemon built\x1b[0m     src/daemon/dist
 
 Two steps are left. Both reach outside this directory, so they stay separate:
 
-  yarn mcp:link         puts \`browsentic\` on your PATH (writes to the global npm prefix)
+  yarn daemon:link         puts \`browsentic\` on your PATH (writes to the global npm prefix)
   browsentic pair       prints a single use code, valid for 10 minutes
 `);

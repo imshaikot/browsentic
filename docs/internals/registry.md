@@ -9,7 +9,7 @@ One definition, compiled into two bundles.
 ## One array, two consumers
 
 There are **41 page capabilities**. They are defined once, in
-[`lib/actions/registry.ts`](../../lib/actions/registry.ts), and that array is compiled into **both**
+[`src/lib/actions/registry.ts`](../../src/lib/actions/registry.ts), and that array is compiled into **both**
 the extension and the daemon.
 
 Each action is a small module — a name, a description, a zod input schema, and an `execute()`:
@@ -81,7 +81,7 @@ combining daemon state with a one-element `page.getPageInfo` and the current mon
 ## Verifying
 
 ```sh
-yarn mcp:manifest
+yarn daemon:manifest
 ```
 
 Builds the MCP server and prints every tool with its full JSON Schema. No browser needed. This is

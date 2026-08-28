@@ -8,7 +8,7 @@ The five things that are more than a single action.
 
 ## Monitors
 
-[`lib/monitor/`](../../lib/monitor/), [`lib/bridge/monitor.ts`](../../lib/bridge/monitor.ts)
+[`src/lib/monitor/`](../../src/lib/monitor/), [`src/lib/bridge/monitor.ts`](../../src/lib/bridge/monitor.ts)
 
 Watch a pinned tab in the background for a completion condition — an element appearing or vanishing,
 text or title matching a regex, a progress bar reaching a threshold.
@@ -33,7 +33,7 @@ and the daemon going away.
 
 ## Recordings
 
-[`lib/recordings/`](../../lib/recordings/)
+[`src/lib/recordings/`](../../src/lib/recordings/)
 
 The reverse of a monitor: the content script observes what *you* do in one pinned tab — clicks,
 fills, selects, keys, submits, scrolls, navigations — and batches the events to the background.
@@ -60,8 +60,8 @@ list them and why `page_listRecordings` / `page_readRecording` exist as tools.
 
 ## Site maps
 
-[`lib/skills/site-map.ts`](../../lib/skills/site-map.ts),
-[`mcp/src/agent/site-map-store.ts`](../../mcp/src/agent/site-map-store.ts)
+[`src/lib/skills/site-map.ts`](../../src/lib/skills/site-map.ts),
+[`src/daemon/agent/site-map-store.ts`](../../src/daemon/agent/site-map-store.ts)
 
 Generated skills. A mapping run crawls one host read-only under the
 [mapping gate](guardrails.md#the-mapping-gate) and finishes by calling `browsentic_saveSiteMap`

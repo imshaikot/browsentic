@@ -9,9 +9,9 @@ Lookup tables. Nothing here explains a workflow — see the [user guide](../guid
 | [CLI](cli.md) | Every `browsentic` command |
 | [Errors](errors.md) | Every error code, where it comes from, and what to do about it |
 
-The tool list is generated from [`lib/actions/registry.ts`](../../lib/actions/registry.ts). The
+The tool list is generated from [`src/lib/actions/registry.ts`](../../src/lib/actions/registry.ts). The
 machine-readable copy is always one command away:
 
 ```sh
-yarn mcp:manifest
+yarn daemon:manifest
 ```

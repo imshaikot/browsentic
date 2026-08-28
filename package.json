@@ -1,7 +1,7 @@
 {
   "name": "browsentic",
   "version": "0.3.1",
-  "description": "Browsentic — agentic browsing driven by the AI agent you already run",
+  "description": "Browsentic \u2014 agentic browsing driven by the AI agent you already run",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -16,16 +16,16 @@
     "zip": "wxt zip",
     "icons": "node scripts/generate-icons.mjs",
     "compile": "tsc --noEmit",
-    "check": "yarn compile && yarn mcp:compile && yarn check:intent && yarn check:security",
+    "check": "yarn compile && yarn daemon:compile && yarn check:intent && yarn check:security",
     "check:intent": "node scripts/check-intent.mjs",
     "check:security": "node scripts/check-security.mjs",
-    "mcp:compile": "yarn --cwd mcp compile",
-    "mcp:build": "yarn --cwd mcp build",
-    "mcp:dev": "yarn --cwd mcp dev",
-    "mcp:restart": "yarn mcp:build && node mcp/dist/cli.js restart",
-    "mcp:manifest": "yarn mcp:build && node mcp/dist/cli.js tools",
-    "mcp:link": "cd mcp && npm link",
-    "mcp:unlink": "npm rm -g @browsentic/mcp"
+    "daemon:compile": "yarn --cwd src/daemon compile",
+    "daemon:build": "yarn --cwd src/daemon build",
+    "daemon:dev": "yarn --cwd src/daemon dev",
+    "daemon:restart": "yarn daemon:build && node src/daemon/dist/cli.js restart",
+    "daemon:manifest": "yarn daemon:build && node src/daemon/dist/cli.js tools",
+    "daemon:link": "cd src/daemon && npm link",
+    "daemon:unlink": "npm rm -g browsentic"
   },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.16",

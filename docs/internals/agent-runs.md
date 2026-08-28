@@ -11,7 +11,7 @@ the browser.
 
 ## The intent funnel
 
-[`lib/intent/`](../../lib/intent/) scores the utterance against a local grammar first. Rules carry a
+[`src/lib/intent/`](../../src/lib/intent/) scores the utterance against a local grammar first. Rules carry a
 `certainty`, slot extraction returns a `confidence`, and the product must clear **0.75** to act
 locally.
 
@@ -76,7 +76,7 @@ of `invokeExternal()`. It also causes `browsentic_saveSiteMap` to be published a
 ## Runners
 
 `runInstruction()` hands the request to one **runner** —
-[`mcp/src/agent/runners/`](../../mcp/src/agent/runners/) — which turns it into an argv, a working
+[`src/daemon/agent/runners/`](../../src/daemon/agent/runners/) — which turns it into an argv, a working
 directory and any files that CLI reads from disk. A shared driver (`runners/drive.ts`) does the
 spawning, the abort wiring and the line reading; the runner only decides *what to say* and *how to
 read the answer back*.
@@ -148,7 +148,7 @@ earlier by name:
 
 | Directory | Source | Contents |
 | --- | --- | --- |
-| `mcp/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
+| `src/daemon/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
 | `~/.browsentic/skills/` | `user` | Hand-written overrides |
 | `~/browsentic/skills/` (or `skillsDir`) | `uploaded` | Panel uploads and generated site maps |
 

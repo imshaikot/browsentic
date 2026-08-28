@@ -36,7 +36,7 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | Tools missing from a session | The server was registered mid-session | Restart the client session — MCP servers load at start |
 | A tool call is refused as needing approval | External callers cannot answer a prompt, so `confirm` becomes deny | Do it from the side panel, or set `guardrails.unattended: "allow"` — [read this first](approvals.md#callers-with-nobody-to-ask) |
 | `page_extractText` with `format: "html"` is denied | `raw-html-read` is denied by default | Use the default text format, or `{"guardrails":{"rules":{"raw-html-read":"allow"}}}` |
-| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn mcp:restart`, then reload the extension |
+| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn daemon:restart`, then reload the extension |
 
 ## Agents
 

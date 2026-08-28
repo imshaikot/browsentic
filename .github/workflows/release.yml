@@ -59,7 +59,7 @@ jobs:
             echo "::error::'$tag' is not a vX.Y.Z tag"
             exit 1
           fi
-          for file in package.json mcp/package.json; do
+          for file in package.json src/daemon/package.json; do
             found=$(node -p "require('./$file').version")
             if [ "$found" != "$version" ]; then
               echo "::error::$file says $found but the tag is $tag"
@@ -77,14 +77,14 @@ jobs:
       - name: Install dependencies
         # Yarn is vendored at the path .yarnrc.yml pins, so this does not depend on whichever
         # yarn the runner image ships (its classic 1.x cannot read yarnPath at all). Running
-        # the release through node needs nothing but node. mcp/ is a separate project with its
+        # the release through node needs nothing but node. src/daemon is a separate project with its
         # own lockfile, so the root install does not cover it.
         run: |
           yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
           test -f "$yarn_bin" || { echo "::error::no vendored Yarn at '$yarn_bin'"; exit 1; }
           echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
           node "$yarn_bin" install --immutable
-          node "$yarn_bin" --cwd mcp install --immutable
+          node "$yarn_bin" --cwd src/daemon install --immutable
 
       - name: Check
         # The same gate the README asks for before a pull request: both type checks, the intent
@@ -98,7 +98,7 @@ jobs:
         run: |
           node "$YARN" zip
           node "$YARN" zip -b firefox
-          node "$YARN" mcp:build
+          node "$YARN" daemon:build
 
       - name: Verify the build carries the tagged version
         run: |
@@ -115,22 +115,22 @@ jobs:
           done
 
       - name: Pack and smoke-test the npm tarball
-        # `npm pack` runs mcp/scripts/stage-extension.mjs through prepack, so this exercises
+        # `npm pack` runs src/daemon/scripts/stage-extension.mjs through prepack, so this exercises
         # the same path a maintainer gets locally. Everything below runs against the real
         # tarball rather than the working tree, and it runs before anything is published,
         # because an npm version cannot be taken back.
         run: |
-          tarball="$(cd mcp && npm pack --silent)"
-          echo "TARBALL=$GITHUB_WORKSPACE/mcp/$tarball" >> "$GITHUB_ENV"
+          tarball="$(cd src/daemon && npm pack --silent)"
+          echo "TARBALL=$GITHUB_WORKSPACE/src/daemon/$tarball" >> "$GITHUB_ENV"
 
-          tar -tzf "mcp/$tarball" | grep -q 'package/extension/chrome-mv3/manifest.json' \
+          tar -tzf "src/daemon/$tarball" | grep -q 'package/extension/chrome-mv3/manifest.json' \
             || { echo "::error::the tarball carries no extension"; exit 1; }
-          if tar -tzf "mcp/$tarball" | grep -q '\.map$'; then
+          if tar -tzf "src/daemon/$tarball" | grep -q '\.map$'; then
             echo "::error::sourcemaps leaked into the tarball"; exit 1
           fi
 
           mkdir -p /tmp/smoke && cd /tmp/smoke && npm init -y >/dev/null
-          npm i --no-audit --no-fund "$GITHUB_WORKSPACE/mcp/$tarball"
+          npm i --no-audit --no-fund "$GITHUB_WORKSPACE/src/daemon/$tarball"
 
           # Zero runtime dependencies. This is the guard that catches someone moving a
           # package back into `dependencies` and quietly restoring the 33 MB install.
@@ -203,7 +203,7 @@ jobs:
   # ---------------------------------------------------------------------------------------
       - name: Publish to npm
         if: false
-        working-directory: mcp
+        working-directory: src/daemon
         env:
           NPM_CONFIG_PROVENANCE: true
         run: |

@@ -105,7 +105,7 @@ function renderNotes(version, commits, prevTag) {
     '',
     '```sh',
     `git clone --branch v${version} https://github.com/${REPO}.git`,
-    'cd browsentic && yarn setup && yarn mcp:link',
+    'cd browsentic && yarn setup && yarn daemon:link',
     'browsentic setup',
     '```',
     '',

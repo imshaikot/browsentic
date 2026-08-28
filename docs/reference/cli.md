@@ -88,7 +88,7 @@ configurations written against the older name keep working.
 | `browsentic help` / `--help` / `-h` | Usage |
 
 **A rebuild does not replace a running daemon.** It keeps the old code in memory until `stop` or
-`restart`. In the repository, `yarn mcp:restart` chains the rebuild with the restart.
+`restart`. In the repository, `yarn daemon:restart` chains the rebuild with the restart.
 
 ---
 
@@ -99,10 +99,10 @@ Not the CLI, but frequently wanted alongside it:
 | Command | Does |
 | --- | --- |
 | `yarn setup` | Install and build both halves |
-| `yarn mcp:link` | Put `browsentic` on your `PATH` from a source checkout |
-| `yarn mcp:unlink` | Take it off again |
-| `yarn mcp:restart` | Rebuild the daemon, then swap the running one for it |
-| `yarn mcp:manifest` | Build and print the tool manifest |
+| `yarn daemon:link` | Put `browsentic` on your `PATH` from a source checkout |
+| `yarn daemon:unlink` | Take it off again |
+| `yarn daemon:restart` | Rebuild the daemon, then swap the running one for it |
+| `yarn daemon:manifest` | Build and print the tool manifest |
 | `yarn check` | Both type checks plus both fixture suites |
 | `yarn check:intent "<utterance>"` | Explain how one instruction would be routed |
 

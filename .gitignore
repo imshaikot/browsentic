@@ -1,5 +1,5 @@
-# Dependencies. Both yarn.lock files (root and mcp/) are committed — mcp/yarn.lock is also
-# what keeps `yarn --cwd mcp` a separate project rather than part of the root install.
+# Dependencies. Both yarn.lock files (root and src/daemon/) are committed — the daemon's is also
+# what keeps `yarn --cwd src/daemon` a separate project rather than part of the root install.
 node_modules/
 
 # Yarn 4 keeps per-project state in .yarn/, and there are two projects here. install-state.gz
@@ -11,7 +11,7 @@ node_modules/
 !**/.yarn/patches
 .pnp.*
 
-# Build output — WXT writes to `dist/` (see outDir in wxt.config.ts); tsup writes to mcp/dist/.
+# Build output — WXT writes to `dist/` (see outDir in wxt.config.ts); tsup writes to src/daemon/dist/.
 # The bare `dist/` pattern matches at any depth, so it covers both.
 dist/
 .output/
@@ -26,17 +26,17 @@ stats-*.json
 web-ext.config.ts
 web-ext.config.ts.timestamp-*
 
-# Stray `npm link` artifacts. `yarn mcp:link` links into the real npm prefix and writes
-# nothing here, but the `npm --prefix mcp link` it used to run treated mcp/ as the *global*
-# prefix and left self-referential symlinks (mcp/bin -> mcp/lib/node_modules) behind.
-mcp/bin/
-mcp/lib/
+# Stray `npm link` artifacts. `yarn daemon:link` links into the real npm prefix and writes
+# nothing here, but the `npm --prefix` form it used to run treated the package directory as
+# the *global* prefix and left self-referential bin/ -> lib/node_modules symlinks behind.
+src/daemon/bin/
+src/daemon/lib/
 
-# Staged by mcp/scripts/stage-extension.mjs at prepack time: a copy of the root
+# Staged by src/daemon/scripts/stage-extension.mjs at prepack time: a copy of the root
 # dist/chrome-mv3 build, because npm's `files` cannot reference paths above the package
 # root. Regenerated on every pack, never committed. `files` still packs it, the same way
-# mcp/dist packs despite the `dist/` rule above.
-mcp/extension/
+# src/daemon/dist packs despite the `dist/` rule above.
+src/daemon/extension/
 
 # Secrets & environment
 .env
