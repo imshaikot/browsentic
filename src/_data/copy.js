@@ -150,6 +150,11 @@ export const SECTIONS = {
     kicker: 'FAQ',
     title: 'The ones people ask first',
   },
+  compare: {
+    kicker: 'Comparison',
+    title: ['Claude in Chrome extends Claude.', 'Browsentic extends your browser.'],
+    lede: 'Anthropic ships an extension that puts Claude in a Chrome side panel. Browsentic starts from the other end: the browser you already use, handed to whichever agent you already run. Same idea, different owner. Here is the honest version of where they overlap, where each one wins, and how to pick.',
+  },
 }
 
 export const CTA = {
@@ -208,7 +213,7 @@ export const MCP_POINTS = [
 ]
 
 export const STATS = [
-  { value: 41, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
+  { value: 45, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
   { value: 3, suffix: '', label: 'tabs worked at once', note: 'independent sessions, up to eight' },
   { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
   { value: 1, suffix: '', label: 'command to install', note: 'npx browsentic setup, MIT licensed' },
@@ -280,6 +285,14 @@ export const TOOL_GROUPS = [
       'page_timerStatus',
       'page_stopTimer',
     ],
+  },
+  {
+    id: 'diagnose',
+    label: 'Diagnose',
+    accent: 'ember',
+    blurb:
+      'Reads what the page reports rather than what it shows: console messages, uncaught exceptions, failed requests and their timings, captured over Chrome’s debugger while a diagnostics session is open. Open one, act, read what actually broke, close it. The difference between “the button did nothing” and “the POST behind it returned a 500”.',
+    tools: ['page_startDiagnostics', 'page_readConsole', 'page_readNetwork', 'page_stopDiagnostics'],
   },
   {
     id: 'files',
@@ -645,6 +658,115 @@ export const LIMITS = [
     body: 'An agent reading one is susceptible to prompt injection. Treat page content as data, never as instructions.',
   },
 ]
+
+/**
+ * /vs-claude-in-chrome/. Every claim about Claude in Chrome comes from
+ * Anthropic’s own announcement and help center, last checked August 2026.
+ * Their product moves; when it does, this is the file to fix.
+ */
+export const COMPARISON = {
+  checked: 'August 2026',
+  axis: {
+    them: {
+      title: 'Claude in Chrome',
+      tagline: 'Claude, extended into your browser',
+      points: [
+        'Anthropic’s agent, thinking in Anthropic’s cloud, acting through a Chrome side panel',
+        'Included with the paid Claude plans: Pro, Max, Team and Enterprise',
+        'One click to install from the Chrome Web Store',
+        'At home if you already live in claude.ai and want the same Claude everywhere',
+      ],
+    },
+    us: {
+      title: 'Browsentic',
+      tagline: 'Your browser, extended into the agent you already run',
+      points: [
+        'Runs on the agent CLI you already pay for: Claude Code, Codex or Antigravity, switchable in one click',
+        'No account, no API key, no cloud service, no telemetry',
+        'Doubles as an MCP server, so Claude Code, Cursor or Zed drives the same logged-in tab',
+        'MIT licensed and source available, on Chrome and every Chromium browser',
+      ],
+    },
+  },
+
+  // Rows with only `group` render as subheads. `us` is always ours, `them` is always theirs.
+  table: [
+    { group: 'The shape of it' },
+    { label: 'The agent', us: 'Claude Code, Codex or Antigravity, your pick', them: 'Claude' },
+    { label: 'Where it thinks', us: 'On your machine; the daemon binds to loopback', them: 'In Anthropic’s cloud' },
+    { label: 'What it costs', us: 'Nothing beyond the agent subscription you already have', them: 'A paid Claude plan' },
+    { label: 'Browsers', us: 'Chrome, Edge, Brave, Arc: any Chromium browser', them: 'Google Chrome only' },
+    { label: 'Source', us: 'MIT licensed, source available', them: 'Proprietary' },
+    { label: 'Who else can drive', us: 'Any MCP client: Claude Code, Cursor, Zed share one browser', them: 'Claude apps only' },
+    { group: 'On the page' },
+    { label: 'Read, click, type, submit', us: 'Yes, and anything consequential asks first', them: 'Yes, with vendor safeguards' },
+    { label: 'Console and network', us: 'Yes: errors, failed requests and timings, read over Chrome’s debugger', them: 'Yes' },
+    { label: 'Files', us: 'Both directions, each gated: downloads land sealed, uploads ask first', them: 'Both directions' },
+    { label: 'Show it a job once', us: 'Recordings: do it yourself, later say “do it like last time”', them: 'Workflow recording, in the classic panel' },
+    { label: 'Site knowledge', us: 'Site maps: it explores any site and keeps notes, intranets included', them: 'Built in for Gmail, Slack, Calendar, Docs and GitHub' },
+    { group: 'While you are elsewhere' },
+    { label: 'Scheduled jobs', us: 'Kept in the extension; survives the agent, the client and the daemon', them: 'Kept in Claude’s cloud' },
+    { label: 'Long jobs', us: 'Background monitors track progress without an agent or a token', them: 'An agent has to keep looking' },
+    { label: 'The obvious commands', us: '“Go back” and “open github.com” run locally, in milliseconds', them: 'Every instruction is a model round trip' },
+    { label: 'Voice', us: 'Dictate in the panel, press to talk in the popup', them: 'Type' },
+    { group: 'Trust' },
+    { label: 'Credentials', us: 'Sealed into placeholders; the agent never sees plaintext', them: '1Password integration; declines sensitive entry' },
+    { label: 'Approvals', us: 'A declarative policy, every rule tunable, per-site grants', them: 'Ask before acting, or autonomous with fixed safeguards' },
+    { label: 'Prompt injection', us: 'Containment: scoped runs, a sealed agent, page text marked untrusted', them: 'Detection: trained classifiers watch for suspicious patterns' },
+  ],
+
+  ours: [
+    {
+      title: 'Bring your own agent',
+      body: 'It runs on the CLI you already pay for and are already signed in to, and switching between Claude Code, Codex and Antigravity is one click in the popup. No second subscription, and no bet on a single vendor.',
+    },
+    {
+      title: 'An MCP server, not just a panel',
+      body: 'The daemon speaks MCP over stdio, so Claude Code, Cursor and Zed can take the wheel of the same real, logged-in tab. One browser, shared by every client you use.',
+    },
+    {
+      title: 'The obvious commands cost nothing',
+      body: '“Go back”, “scroll to the top” and “open github.com” are scored against a local grammar first and run in the browser in milliseconds. No model is woken for the things a model adds nothing to.',
+    },
+    {
+      title: 'Monitors that outlive everything',
+      body: 'Watching an upload or a deploy runs in the extension itself. It keeps going when the agent finishes, the MCP client disconnects, or the daemon goes away, and it burns no tokens while it waits.',
+    },
+    {
+      title: 'Dark mode with a measurement behind it',
+      body: 'It reads what a page paints, scores contrast against WCAG, and rethemes on the page’s own terms, preferring the dark hook the site already defines over inverting everything.',
+    },
+    {
+      title: 'Credentials the agent cannot read',
+      body: 'A deterministic sanitizer runs on both sides of the socket. Passwords, keys, tokens and card numbers become sealed placeholders before the agent sees them, and turn back into plaintext only inside the field they are typed into.',
+    },
+  ],
+
+  theirs: [
+    {
+      title: 'One click to install',
+      body: 'The Chrome Web Store, versus our npx command plus a trip through chrome://extensions. Their funnel is genuinely smoother, and we know it.',
+    },
+    {
+      title: 'Reach beyond the browser',
+      body: 'Through Claude Desktop it can touch local files and computer control. Browsentic deliberately stops at the tab: the spawned agent gets browser tools and nothing else.',
+    },
+    {
+      title: 'Injection classifiers',
+      body: 'Anthropic runs trained classifiers that watch for suspicious instruction patterns. We do not. Our answer is containment: scoped runs, a sealed agent, page text marked untrusted. Both are partial; theirs detects, ours limits the blast radius.',
+    },
+    {
+      title: 'Enterprise administration',
+      body: 'Team and Enterprise admins get org-wide allowlists and blocklists. Browsentic has per-site grants on one machine, and nothing fleet-wide.',
+    },
+  ],
+
+  choose: {
+    them: 'Pick Claude in Chrome if you live in claude.ai, want one-click installation, and are happy inside Anthropic’s walls. It is a polished product with real safety work behind it.',
+    us: 'Pick Browsentic if you already run an agent CLI, want the same browser reachable from your terminal and your editor, browse in Edge, Brave or Arc, or want the whole thing local, inspectable and MIT licensed.',
+    both: 'Nothing stops you running both. They drive different tabs and answer to different masters.',
+  },
+}
 
 export const QUICKSTART = [
   {

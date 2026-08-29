@@ -1,0 +1,136 @@
+---
+layout: layouts/page.njk
+pageKey: vs-claude-in-chrome
+title: "Browsentic vs Claude in Chrome: two ways to put an agent in your browser"
+seoTitle: "Browsentic vs Claude in Chrome: the local, open alternative"
+description: "Claude in Chrome puts Anthropic's agent in your browser. Browsentic hands your browser to the agent you already run: local, open source, any Chromium browser."
+keywords:
+  - claude for chrome alternative
+  - browsentic vs claude in chrome
+  - claude browser extension comparison
+  - open source browser agent
+  - local browser automation agent
+  - bring your own agent browser
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.SECTIONS.compare.kicker, copy.SECTIONS.compare.title, copy.SECTIONS.compare.lede, "magenta") %}
+<div class="mt-6 flex flex-wrap gap-3">
+  {{ m.button("/install/", "Try Browsentic") }}
+  {{ m.button("/how-it-works/", "How it is built", "ghost") }}
+  {{ m.button("/security/", "The security model", "ghost") }}
+</div>
+{% endcall %}
+
+{% call m.section("axis") %}
+  {{ m.kicker("Different owners", "magenta") }}
+  {{ m.heading("The same idea, pointed in opposite directions") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    <article class="card spotlight px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-ink-dim">{{ copy.COMPARISON.axis.them.title }}</h3>
+      <p class="mt-1 text-[0.85rem] text-ink-faint">{{ copy.COMPARISON.axis.them.tagline }}</p>
+      <ul class="mt-4 space-y-2.5 text-[0.9rem] text-ink-faint">
+        {%- for point in copy.COMPARISON.axis.them.points %}
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-ink-faint/60"></span>{{ point }}</li>
+        {%- endfor %}
+      </ul>
+    </article>
+    <article class="card border-brand/25 px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-brand">{{ copy.COMPARISON.axis.us.title }}</h3>
+      <p class="mt-1 text-[0.85rem] text-ink-faint">{{ copy.COMPARISON.axis.us.tagline }}</p>
+      <ul class="mt-4 space-y-2.5 text-[0.9rem] text-ink-faint">
+        {%- for point in copy.COMPARISON.axis.us.points %}
+        <li class="flex gap-2.5"><span class="mt-2 size-1 shrink-0 rounded-full bg-brand/70"></span>{{ point }}</li>
+        {%- endfor %}
+      </ul>
+    </article>
+  </div>
+{% endcall %}
+
+{% call m.section("table", "bg-ground-2/30") %}
+  {{ m.kicker("Side by side", "brand") }}
+  {{ m.heading("The whole thing, in one table") }}
+  {{ m.lede("Checked against Anthropic's own announcement and help center, " + copy.COMPARISON.checked + ". Their product moves; when this table drifts, an issue is the fastest fix.") }}
+
+  <div class="table-scroll card mt-10 px-0 py-0" data-reveal>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col" class="w-[22%]"></th>
+          <th scope="col" class="text-brand">Browsentic</th>
+          <th scope="col">Claude in Chrome</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- for row in copy.COMPARISON.table %}
+        {%- if row.group %}
+        <tr>
+          <th colspan="3" scope="colgroup" class="bg-ground-2/60 font-display text-[0.7rem] font-medium uppercase tracking-[0.11em] text-ink-faint">{{ row.group }}</th>
+        </tr>
+        {%- else %}
+        <tr>
+          <th scope="row" class="font-display text-[0.85rem] font-medium text-ink-dim">{{ row.label }}</th>
+          <td class="text-ink">{{ row.us }}</td>
+          <td class="text-ink-faint">{{ row.them }}</td>
+        </tr>
+        {%- endif %}
+        {%- endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endcall %}
+
+{% call m.section("only-here") %}
+  {{ m.kicker("No equivalent over there", "brand") }}
+  {{ m.heading("What only Browsentic does") }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
+    {%- for card in copy.COMPARISON.ours %}
+    <article class="card spotlight px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold leading-snug text-ink">{{ card.title }}</h3>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ card.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("credit", "bg-ground-2/30") %}
+  {{ m.kicker("Credit where it is due", "amber") }}
+  {{ m.heading("What Claude in Chrome does that we do not") }}
+  {{ m.lede("A comparison you cannot lose is not a comparison. These four are real, and two of them are why some people should pick their product over ours.") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    {%- for card in copy.COMPARISON.theirs %}
+    <article class="card border-amber/25 bg-amber/5 px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold leading-snug text-amber">{{ card.title }}</h3>
+      <p class="mt-3 text-[0.92rem] leading-relaxed text-ink-dim">{{ card.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+{% call m.section("choose") %}
+  {{ m.kicker("The short version", "lime") }}
+  {{ m.heading("How to pick") }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    <article class="card spotlight px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-ink-dim">Pick theirs</h3>
+      <p class="mt-3 text-[0.92rem] leading-relaxed text-ink-faint">{{ copy.COMPARISON.choose.them }}</p>
+    </article>
+    <article class="card border-brand/25 px-6 py-6">
+      <h3 class="font-display text-[1.05rem] font-semibold text-brand">Pick ours</h3>
+      <p class="mt-3 text-[0.92rem] leading-relaxed text-ink-faint">{{ copy.COMPARISON.choose.us }}</p>
+    </article>
+  </div>
+  <p class="mt-6 max-w-2xl text-[0.9rem] leading-relaxed text-ink-faint" data-reveal>{{ copy.COMPARISON.choose.both }}</p>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/how-it-works/", title: "How it works", body: "Four hops, every one of them on your machine, and why there is a daemon at all." },
+  { href: "/security/", title: "The security model", body: "Two transport gates, sealed credentials, and the two limits stated plainly." },
+  { href: "/install/", title: "Install it", body: "One command, a pairing code, and the browser you already have open." }
+]) }}
+
+{{ m.cta(copy) }}
