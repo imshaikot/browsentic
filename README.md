@@ -1,4 +1,4 @@
-![Browsentic: your real browser, as an MCP server](docs/assets/social-card.png)
+![Browsentic: agentic browsing, in the browser you already use](docs/assets/social-card.png)
 
 # Browsentic – Agentic Browsing in the Browser You Already Use
 
