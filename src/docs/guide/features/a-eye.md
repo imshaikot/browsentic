@@ -9,7 +9,7 @@ docsPath: "guide/features/a-eye.md"
 section: "guide/features"
 sectionLabel: "Features"
 sectionOrder: 2
-order: 11
+order: 12
 isIndex: false
 permalink: "/docs/guide/features/a-eye/"
 sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/guide/features/a-eye.md"

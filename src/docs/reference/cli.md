@@ -3,7 +3,7 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "CLI reference"
 seoTitle: "CLI reference — Browsentic reference"
-description: "With no command it prints usage. Most commands start the daemon if one is not already running; status, stop, logs, token, tools, skills and approvals do not."
+description: "With no command it prints usage. Most commands start the daemon if one is not already running; status, stop, logs, token, tools, skills, approvals and…"
 deck: ""
 docsPath: "reference/cli.md"
 section: "reference"
@@ -19,7 +19,7 @@ browsentic <command>
 ```
 
 With no command it prints usage. Most commands start the daemon if one is not already running;
-`status`, `stop`, `logs`, `token`, `tools`, `skills` and `approvals` do not.
+`status`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals` and `downloads` do not.
 
 ---
 
@@ -90,6 +90,8 @@ configurations written against the older name keep working.
 | `browsentic skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
 | `browsentic approvals` | The "always on this site" grants |
 | `browsentic approvals clear [host]` | Forget them, all or one site's |
+| `browsentic downloads` | Files captured from pages, with notes and where they landed |
+| `browsentic downloads clear` | Delete all of them |
 | `browsentic token` | The control token, for MCP clients. Not for the browser |
 
 ## Lifecycle

@@ -30,11 +30,12 @@ first.
 
 | | |
 | --- | --- |
-| [Page actions](/docs/guide/features/page-actions/) | The 41 things it can do to a page, grouped by what you would want |
+| [Page actions](/docs/guide/features/page-actions/) | The 45 things it can do to a page, grouped by what you would want |
 | [Screenshots](/docs/guide/features/screenshots/) | Viewport, full page, or one element — and when a capture touches disk |
 | [Theming](/docs/guide/features/theming/) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](/docs/guide/features/captcha/) | What it will and will not do at a "verify you are human" block |
-| [Files](/docs/guide/features/files/) | Attaching a file and putting it into a file input |
+| [Diagnostics](/docs/guide/features/diagnostics/) | Console errors and failed requests — why the page broke, not just what it shows |
+| [Files](/docs/guide/features/files/) | Putting a file into a page, and capturing one a page hands back |
 
 ## Doing things over time
 

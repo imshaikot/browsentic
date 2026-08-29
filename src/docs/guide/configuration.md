@@ -42,6 +42,8 @@ Nothing here is required; this shows every key in one place.
     "fence": true
   },
   "screenshotDir": "~/browsentic/screenshot",
+  "downloadDir": "~/browsentic/download",
+  "downloadTtlDays": 14,
   "skillsDir": "~/browsentic/skills",
   "siteMap": {
     "research": true,
@@ -98,6 +100,8 @@ Every rule id and what it does, plus the three that the panel shows but will not
 | Key | Default | Notes |
 | --- | --- | --- |
 | `screenshotDir` | `~/browsentic/screenshot` | Where captures taken with `save: true` are written, mode `0600` |
+| `downloadDir` | `~/browsentic/download` | Where files captured with `page_captureDownload` are written, mode `0600` |
+| `downloadTtlDays` | `14` | How long a captured download is kept before the daemon sweeps it. Fractions allowed — `0.5` is twelve hours |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live |
 | `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup` installed the unpacked extension. Written for you by `setup --dir`, and read back by `update` so it refreshes the copy the browser actually loaded. Changing it by hand means loading the new folder in the browser again, because the extension ID follows the path |
 

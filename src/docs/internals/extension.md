@@ -26,6 +26,7 @@ Not every capability can run in the page. The background service worker splits t
 | --- | --- |
 | `listFiles`, `attachFile`, `listRecordings`, `readRecording` | The data lives in extension storage |
 | `startMonitor`, `monitorStatus`, `awaitMonitor`, `stopMonitor` | Monitors outlive any single page |
+| `startDiagnostics`, `readConsole`, `readNetwork`, `stopDiagnostics` | The debugger attaches to a tab, and the buffers outlive any single page |
 | `openTab`, `switchTab`, `closeTab`, `screenshot`, `navigate` | Need the `tabs`/`scripting` APIs |
 | Everything else | Forwarded to the content script |
 

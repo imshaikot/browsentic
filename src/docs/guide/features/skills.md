@@ -9,7 +9,7 @@ docsPath: "guide/features/skills.md"
 section: "guide/features"
 sectionLabel: "Features"
 sectionOrder: 2
-order: 12
+order: 13
 isIndex: false
 permalink: "/docs/guide/features/skills/"
 sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/guide/features/skills.md"

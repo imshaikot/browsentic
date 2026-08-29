@@ -39,7 +39,7 @@ const SECTIONS = {
 /** Explicit reading order within a section; anything unlisted sorts alphabetically after. */
 const ORDER = {
   guide: ['install', 'pair', 'first-run', 'agents', 'mcp-clients', 'configuration', 'approvals', 'limits', 'troubleshooting', 'maintenance'],
-  'guide/features': ['conversations', 'instant-commands', 'page-actions', 'screenshots', 'theming', 'captcha', 'monitoring', 'scheduling', 'site-maps', 'recordings', 'files', 'a-eye', 'skills'],
+  'guide/features': ['conversations', 'instant-commands', 'page-actions', 'screenshots', 'theming', 'captcha', 'monitoring', 'scheduling', 'site-maps', 'recordings', 'diagnostics', 'files', 'a-eye', 'skills'],
   reference: ['tools', 'cli', 'errors'],
   internals: ['overview', 'transport', 'registry', 'request-path', 'extension', 'agent-runs', 'guardrails', 'subsystems', 'state', 'contributing'],
 }

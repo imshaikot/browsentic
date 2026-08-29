@@ -3,8 +3,8 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "Page actions"
 seoTitle: "Page actions — Browsentic features"
-description: "The 41 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what…"
-deck: "The 41 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what is worth asking for."
+description: "The 47 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what…"
+deck: "The 47 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what is worth asking for."
 docsPath: "guide/features/page-actions.md"
 section: "guide/features"
 sectionLabel: "Features"
@@ -78,9 +78,10 @@ pinned tab, a browser page, and a tab being [recorded](/docs/guide/features/reco
 | --- | --- | --- |
 | Theming and accessibility | `page_readTheme`, `page_auditContrast`, `page_applyTheme` | [Theming](/docs/guide/features/theming/) |
 | Captchas | `page_findCaptcha`, `page_solveCaptcha` | [Captchas](/docs/guide/features/captcha/) |
+| Diagnostics | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` | [Diagnostics](/docs/guide/features/diagnostics/) |
 | Background watching | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` | [Monitoring](/docs/guide/features/monitoring/) |
 | Scheduled jobs | `page_startTimer`, `page_timerStatus`, `page_stopTimer` | [Scheduling](/docs/guide/features/scheduling/) |
-| Files | `page_listFiles`, `page_attachFile` | [Files](/docs/guide/features/files/) |
+| Files | `page_listFiles`, `page_attachFile`, `page_captureDownload`, `page_listDownloads` | [Files](/docs/guide/features/files/) |
 | Recordings | `page_listRecordings`, `page_readRecording` | [Recordings](/docs/guide/features/recordings/) |
 
 ---

@@ -36,9 +36,10 @@ The surface, at a glance:
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
+| [Diagnostics](#diagnostics) | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Scheduling](#scheduling) | `page_startTimer`, `page_timerStatus`, `page_stopTimer` |
-| [Files](#files) | `page_listFiles`, `page_attachFile` |
+| [Files](#files) | `page_listFiles`, `page_attachFile`, `page_captureDownload`, `page_listDownloads` |
 | [Recordings](#recordings) | `page_listRecordings`, `page_readRecording` |
 | [Mapping runs only](#mapping-runs-only) | `browsentic_saveSiteMap` |
 | [Resources](#resources) | `browsentic://page/diagram`, `browsentic://page/current`, `browsentic://page/text` |
@@ -612,6 +613,75 @@ Calls do not stack — each replaces the last, so re-applying with adjusted numb
 
 ---
 
+## Diagnostics
+
+What the page **reports** rather than what it renders: `page_startDiagnostics` attaches Chrome's
+debugger and starts buffering, `page_readConsole` and `page_readNetwork` read the buffers, and
+`page_stopDiagnostics` detaches. Chrome only — all four return `UNSUPPORTED` on Firefox.
+
+Console and network events are delivered only while attached and are not kept anywhere otherwise, so
+**start the recording before the thing you are diagnosing happens**. Chrome shows a "Browsentic is
+debugging this browser" bar for as long as one runs; it detaches on its own at the timeout, when the
+side-panel turn that started it ends, or when the tab closes. See
+[Diagnostics](/docs/guide/features/diagnostics/) for the whole shape.
+
+### page_startDiagnostics
+
+Start recording a tab's console messages, uncaught exceptions and requests. Returns a
+`diagnosticsId`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `capture` | array of `"console"` \| `"network"` | `["console","network"]` | What to record. Narrow it to one when the other would only add noise |
+| `reload` | boolean | `false` | Reload the page once recording has started, so errors thrown during load are caught |
+| `tabId` | integer | — | Tab to record, from `page_openTab` or `page_switchTab`. Defaults to the active tab |
+| `timeoutMs` | integer | `300000` | Detach on its own after this long. Minimum 30 s, maximum 30 min |
+
+### page_readConsole
+
+Read the console messages and uncaught exceptions collected so far — level, text, the file and line
+that logged it, and a stack for errors. Newest last. Each entry carries a `kind` of `console`,
+`exception` or `browser` (Chrome's own reports: CSP violations, mixed content, resources that failed
+to load).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `contains` | string | — | Case-insensitive substring the message must contain |
+| `diagnosticsId` | string | — | Which recording to read. Omit when only one is running |
+| `drain` | boolean | `false` | Forget the messages returned, so the next call reports only what happened since |
+| `level` | `"all"` \| `"debug"` \| `"info"` \| `"warn"` \| `"error"` | `"all"` | Lowest level to report |
+| `limit` | integer | `50` | Most recent messages to return once the filters have been applied |
+
+### page_readNetwork
+
+Read the requests the tab has made — method, URL, status, resource type, timing, size, and the
+browser's error text for the ones that failed. Newest last.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `diagnosticsId` | string | — | Which recording to read. Omit when only one is running |
+| `drain` | boolean | `false` | Forget the requests returned, so the next call reports only what happened since |
+| `includeBodies` | boolean | `false` | Fetch response bodies, truncated, for the 5 most recent requests returned. **Denied by the `network-body-read` rule** unless the user allows it, and only available while the recording is still attached |
+| `includeHeaders` | boolean | `false` | Include request and response headers |
+| `limit` | integer | `50` | Most recent requests to return once the filters have been applied |
+| `method` | string | — | Only requests with this HTTP method, e.g. `"POST"` |
+| `status` | `"all"` \| `"problems"` \| `"failed"` \| `"pending"` | `"all"` | `"problems"` is anything that failed or came back 4xx/5xx; `"pending"` is requests with no response yet |
+| `urlContains` | string | — | Case-insensitive substring the URL must contain, e.g. `"/api/"` |
+
+Both reads report `droppedConsole` / `droppedNetwork`: the rings hold 500 console entries and 1,000
+requests, and a non-zero count means older entries were evicted.
+
+### page_stopDiagnostics
+
+Detach the debugger and take Chrome's bar away. What was collected stays readable afterwards —
+response bodies do not, since Chrome keeps those only while attached.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `diagnosticsId` | string | — | Omit when only one recording is running; with several running, an omitted id stops nothing and the candidates are listed |
+
+---
+
 ## Monitoring
 
 The background-watch lifecycle: `page_findProgress` picks a signal, `page_startMonitor` starts the
@@ -726,13 +796,43 @@ List the files the user has stored in Browsentic, with their AI-generated summar
 
 ### page_attachFile
 
-Attach a stored Browsentic file (by id, from `page_listFiles`) to a file input on the page.
+Attach a file to a file input on the page: either one the user stored in Browsentic (`fileId`) or
+one you captured off another page (`downloadId`). Give exactly one of the two.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `fileId` | string | required | Id of a stored file, taken from `page_listFiles` |
+| `fileId` | string | — | Id of a stored file, taken from `page_listFiles` |
+| `downloadId` | string | — | Id of a captured download, from `page_captureDownload` or `page_listDownloads` |
 | `target` | [target](#element-targets) | required | The file input (`<input type="file">`) to attach the file to |
-| `name`, `mime`, `content` | string | — | Internal — the extension fills these in; never pass them yourself |
+| `name`, `mime`, `content` | string | — | Internal — Browsentic fills these in; never pass them yourself |
+
+[Gated](/docs/guide/approvals/) by `file-upload`, which confirms by default.
+
+### page_captureDownload
+
+Make the page download a file and keep it. Either click something that produces a download, or give
+a direct url, which is fetched in the browser's own logged-in session rather than anonymously. The
+file lands in `~/browsentic/download/` at mode `0600`; the result reports `savedTo`, a `downloadId`
+for `page_attachFile`, and `notes` about what arrived — never the bytes.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `target` | [target](#element-targets) | — | The link or button whose click starts the download. Give this or `url`, not both |
+| `url` | string | — | Direct http(s) url of the file, fetched with the browser's cookies |
+| `timeoutMs` | integer | `60000` | How long to wait for the download to finish |
+
+[Gated](/docs/guide/approvals/) by `file-download`, which confirms by default. Executables, files over
+100 MB, and downloads from a host outside the run's scope are refused outright and deleted — see
+[Files](/docs/guide/features/files/#what-it-will-not-keep).
+
+### page_listDownloads
+
+List the files captured with `page_captureDownload`, newest first, with notes about each and where
+it was saved.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `nameContains` | string | — | Only return downloads whose filename contains this text (case-insensitive) |
 
 ---
 

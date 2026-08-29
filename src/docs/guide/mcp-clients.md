@@ -55,7 +55,7 @@ Tools missing from a session you registered mid-flight is the single most common
 
 ## What the client gets
 
-- **41 page tools** — every one listed with its parameters in [reference/tools.md](/docs/reference/tools/)
+- **45 page tools** — every one listed with its parameters in [reference/tools.md](/docs/reference/tools/)
 - **`browsentic_status`** — whether the extension is connected, its version, the active tab, any
   running monitors, and a `hint` naming the fix when something is wrong. Call it first when a page
   tool fails.

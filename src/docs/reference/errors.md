@@ -34,7 +34,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `NO_ACTIVE_TAB` | Extension | No focused tab in the current window |
 | `TARGET_NOT_FOUND` | Content script | Nothing matched. The page changed — take a fresh snapshot |
 | `INVALID_TARGET` | Content script | A target with neither `selector` nor `text`. `role`/`nth` only narrow |
-| `DEBUGGER_UNAVAILABLE` | Extension | Chrome's debugger could not attach — usually DevTools is open on that tab. Close it, or use `page_clickElement` |
+| `DEBUGGER_UNAVAILABLE` | Extension | Chrome's debugger could not attach — usually DevTools is open on that tab. Close it, or use `page_clickElement` instead of `page_trustedClick` |
 | `CAPTCHA_NOT_FOUND` | Extension | No known captcha widget, so whatever is blocking the run is something else |
 
 ## Input and dispatch
@@ -47,6 +47,17 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `ACTION_FAILED` | Action | `execute()` threw — e.g. `back` with no history |
 | `PICK_CANCELLED` | Content script | The user dismissed A-Eye without pointing at anything. **Terminal** — ask in words rather than asking them to point again |
 | `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, or a reserved action reached from outside |
+
+## Diagnostics
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `DIAGNOSTICS_NOT_FOUND` | Extension | Nothing is recording, or that `diagnosticsId` is unknown. Console and network events exist only while attached — call `page_startDiagnostics` **before** reproducing the problem |
+| `DIAGNOSTICS_IN_PROGRESS` | Extension | That tab is already being recorded. Read it, or stop it first |
+| `DIAGNOSTICS_LIMIT` | Extension | Two tabs are already being recorded — stop one |
+| `DEBUGGER_UNAVAILABLE` | Extension | Chrome refused the attach, usually because DevTools is open on that tab. Close it and retry |
+| `UNSUPPORTED` | Extension | Firefox exposes no CDP, so the diagnostics tools do not exist there — and there is no fallback |
+| `BLOCKED` | Policy | `includeBodies: true` without the `network-body-read` rule allowed. Metadata and headers are still available |
 
 ## Runs and sessions
 
@@ -80,6 +91,24 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `MAPPING_OFF_SITE` | Mapping gate | Navigation must be an absolute URL on the mapped origin — `back` and `forward` included |
 | `MAPPING_BUDGET` | Mapping gate | The page or screenshot budget is spent |
 | `MAPPING_TAB_CHANGED` | Mapping gate | The tab the run was pinned to is gone |
+
+## Downloads
+
+Every refusal here also **deletes the file the browser already wrote**, so none of them leaves
+anything behind to clean up. All four are terminal for that file — retrying downloads it again and
+refuses it again.
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `NO_DOWNLOAD_STARTED` | Extension | The click produced no download. It probably opened a page instead — check where the tab landed, or pass the file's url directly |
+| `DOWNLOAD_FAILED` | Extension | The browser stopped the transfer. The message carries its reason |
+| `DOWNLOADS_UNAVAILABLE` | Extension | The loaded extension predates the `downloads` permission. Reload it and accept the prompt |
+| `DOWNLOAD_OFF_SCOPE` | Daemon | The file came from a host this run was never pointed at. Ask the user, or start a run that names that site |
+| `DOWNLOAD_REFUSED` | Daemon | An executable. Not overridable, by design |
+| `DOWNLOAD_TOO_LARGE` | Daemon | Over 100 MB to capture, or over 25 MB to attach to a page |
+| `DOWNLOAD_NOT_FOUND` | Daemon | No captured download with that id. Call `page_listDownloads` |
+| `DOWNLOAD_MISSING` | Daemon | It was captured but is no longer on disk — swept, or deleted. Capture it again |
+| `DOWNLOAD_SAVE_FAILED` | Daemon | The file could not be moved into the download folder. The message carries the reason |
 
 ---
 

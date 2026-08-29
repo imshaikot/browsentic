@@ -56,10 +56,12 @@ depend on declaration order.
 | `reserved-action` | An internal `browsentic.*` verb is called from outside | **deny** |
 | `non-http-navigation` | A `javascript:`, `data:` or `file:` URL dressed up as a navigation | **deny** |
 | `raw-html-read` | `page_extractText` with `format: "html"` | **deny** |
+| `network-body-read` | `page_readNetwork` with `includeBodies: true` | **deny** |
 | `off-scope-navigation` | Navigating off the sites this run is about | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
 | `file-upload` | `page_attachFile` — putting one of your files into a page | confirm |
+| `file-download` | `page_captureDownload` — letting a page write a file to your disk | confirm |
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
 | `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
 | `secret-in-url` | A saved secret placed in a navigation URL | **deny** |
@@ -67,16 +69,28 @@ depend on declaration order.
 | `secret-off-scope` | …and it was read on a site outside this run's scope | confirm |
 | `config-require-approval` | The action is named in your `requireApproval` list | confirm |
 
-Two of these are less obvious than they look:
+Three of these are less obvious than they look:
 
 **`form-submission` is smarter than a name match.** It also catches `page_fillInput` and
 `page_typeText` with `pressEnter: true`, and `page_pressKey` with `Enter` — because those submit
 forms too.
 
+**`file-download` is not the whole download story.** The rule decides whether the capture happens.
+What may be *kept* is not a preference: executables, files over 100 MB, and downloads from a host
+outside the run's scope are refused whatever this is set to, and the file the browser already wrote
+is deleted. See [Files](/docs/guide/features/files/#what-it-will-not-keep).
+
 **`raw-html-read` is denied by default** because `outerHTML` carries comments, `aria-hidden` nodes
 and off-screen text: everything a page can hide from the person looking at it but still hand to the
 model. The default rendered-text format has already dropped those. Set it to `allow` if a run
 genuinely needs markup.
+
+**`network-body-read` is denied by default** because a response body is the richest credential
+surface a page has: session tokens, API keys and other people's personal data, wholesale. Request and
+response *metadata* — method, URL, status, timing — is free, and headers come back
+[sanitized](/docs/internals/guardrails/) when asked for, which between them answer nearly every real
+"why did that fail?". The body is the read that goes well past diagnosing. Set it to `allow` if a run
+genuinely needs payloads. See [Diagnostics](/docs/guide/features/diagnostics/).
 
 ### Scope: which sites a run may reach
 

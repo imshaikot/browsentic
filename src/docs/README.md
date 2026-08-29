@@ -61,7 +61,7 @@ How the pieces actually work, for contributors and for anyone integrating.
 
 | | |
 | --- | --- |
-| [Tools](/docs/reference/tools/) | All 41 MCP tools with their parameters, plus the resources |
+| [Tools](/docs/reference/tools/) | All 45 MCP tools with their parameters, plus the resources |
 | [CLI](/docs/reference/cli/) | Every `browsentic` command |
 | [Errors](/docs/reference/errors/) | Every error code, what caused it, what to do |
 

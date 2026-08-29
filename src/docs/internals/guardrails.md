@@ -54,6 +54,7 @@ The condition vocabulary is closed on purpose: a rule cannot express anything th
 | `reserved-action` | `reservedAction` | **deny** | The action starts with `browsentic.` |
 | `non-http-navigation` | `nonHttpNavigation` | **deny** | `javascript:`, `data:`, `file:` and friends dressed up as a navigation |
 | `raw-html-read` | `readsRawHtml` | **deny** | `page.extractText` with `format: 'html'` |
+| `network-body-read` | `readsResponseBodies` | **deny** | `page.readNetwork` with `includeBodies: true` |
 | `off-scope-navigation` | `navigatesOffScope` | confirm | The target host is not in the run's scope |
 | `url-payload` | `carriesUrlPayload` | confirm | Query string + fragment exceed `urlPayloadBytes` (512) |
 | `form-submission` | `submitsForm` | confirm | Anything that commits a form, however spelled |
@@ -65,12 +66,18 @@ The condition vocabulary is closed on purpose: a rule cannot express anything th
 | `secret-off-scope` | `releasesSecretOffScope` | confirm | …and it was read on a site outside the run's scope |
 | `config-require-approval` | `listedInConfig` | confirm | The action is named in `requireApproval` |
 
-Two are worth the annotation they carry in source:
+Three are worth the annotation they carry in source:
 
 **`raw-html-read` is denied, not confirmed.** `outerHTML` carries comments, `aria-hidden` nodes and
 off-screen text: everything a page can hide from the person looking at it but still hand to the
 model. `page.extractText`'s rendered text is what a reader actually sees, and `innerText` has already
 dropped the hidden nodes.
+
+**`network-body-read` is denied for the same reason.** A response body carries session tokens, API
+keys and other people's personal data wholesale, and the deterministic sanitizer seals shapes it
+recognises — a JSON blob of somebody's account is not one. Metadata (method, URL, status, timing)
+answers the diagnostic question; headers, sanitized, answer nearly all the rest. The body is the read
+that goes past diagnosing.
 
 **`submitsForm` is a policy judgement, not a fact about an action**, which is why it lives here rather
 than with the action definitions. It covers `page.submitForm`, `page.fillInput`/`page.typeText` with

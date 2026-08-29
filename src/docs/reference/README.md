@@ -16,7 +16,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/reference/REA
 ---
 | | |
 | --- | --- |
-| [Tools](/docs/reference/tools/) | All 41 MCP tools with their parameters, the three read-only resources, and the reserved actions that never become tools |
+| [Tools](/docs/reference/tools/) | All 45 MCP tools with their parameters, the three read-only resources, and the reserved actions that never become tools |
 | [CLI](/docs/reference/cli/) | Every `browsentic` command |
 | [Errors](/docs/reference/errors/) | Every error code, where it comes from, and what to do about it |
 
