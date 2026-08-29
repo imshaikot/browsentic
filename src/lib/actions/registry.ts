@@ -5,6 +5,7 @@ import { applyTheme } from './page/apply-theme';
 import { attachFile } from './page/attach-file';
 import { auditContrast } from './page/audit-contrast';
 import { awaitMonitor } from './page/await-monitor';
+import { captureDownload } from './page/capture-download';
 import { clickElement } from './page/click-element';
 import { closeTab } from './page/close-tab';
 import { dragElement } from './page/drag-element';
@@ -17,6 +18,7 @@ import { focusInput } from './page/focus-input';
 import { getPageInfo } from './page/get-page-info';
 import { highlightElement } from './page/highlight-element';
 import { hoverElement } from './page/hover-element';
+import { listDownloads } from './page/list-downloads';
 import { listFiles } from './page/list-files';
 import { listRecordings } from './page/list-recordings';
 import { monitorStatus } from './page/monitor-status';
@@ -93,6 +95,8 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       screenshot,
       listFiles,
       attachFile,
+      captureDownload,
+      listDownloads,
       listRecordings,
       readRecording,
     ] as AnyAction[]

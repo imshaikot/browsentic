@@ -28,7 +28,7 @@ The surface, at a glance:
 | [Diagnostics](#diagnostics) | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Scheduling](#scheduling) | `page_startTimer`, `page_timerStatus`, `page_stopTimer` |
-| [Files](#files) | `page_listFiles`, `page_attachFile` |
+| [Files](#files) | `page_listFiles`, `page_attachFile`, `page_captureDownload`, `page_listDownloads` |
 | [Recordings](#recordings) | `page_listRecordings`, `page_readRecording` |
 | [Mapping runs only](#mapping-runs-only) | `browsentic_saveSiteMap` |
 | [Resources](#resources) | `browsentic://page/diagram`, `browsentic://page/current`, `browsentic://page/text` |
@@ -785,13 +785,43 @@ List the files the user has stored in Browsentic, with their AI-generated summar
 
 ### page_attachFile
 
-Attach a stored Browsentic file (by id, from `page_listFiles`) to a file input on the page.
+Attach a file to a file input on the page: either one the user stored in Browsentic (`fileId`) or
+one you captured off another page (`downloadId`). Give exactly one of the two.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `fileId` | string | required | Id of a stored file, taken from `page_listFiles` |
+| `fileId` | string | — | Id of a stored file, taken from `page_listFiles` |
+| `downloadId` | string | — | Id of a captured download, from `page_captureDownload` or `page_listDownloads` |
 | `target` | [target](#element-targets) | required | The file input (`<input type="file">`) to attach the file to |
-| `name`, `mime`, `content` | string | — | Internal — the extension fills these in; never pass them yourself |
+| `name`, `mime`, `content` | string | — | Internal — Browsentic fills these in; never pass them yourself |
+
+[Gated](../guide/approvals.md) by `file-upload`, which confirms by default.
+
+### page_captureDownload
+
+Make the page download a file and keep it. Either click something that produces a download, or give
+a direct url, which is fetched in the browser's own logged-in session rather than anonymously. The
+file lands in `~/browsentic/download/` at mode `0600`; the result reports `savedTo`, a `downloadId`
+for `page_attachFile`, and `notes` about what arrived — never the bytes.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `target` | [target](#element-targets) | — | The link or button whose click starts the download. Give this or `url`, not both |
+| `url` | string | — | Direct http(s) url of the file, fetched with the browser's cookies |
+| `timeoutMs` | integer | `60000` | How long to wait for the download to finish |
+
+[Gated](../guide/approvals.md) by `file-download`, which confirms by default. Executables, files over
+100 MB, and downloads from a host outside the run's scope are refused outright and deleted — see
+[Files](../guide/features/files.md#what-it-will-not-keep).
+
+### page_listDownloads
+
+List the files captured with `page_captureDownload`, newest first, with notes about each and where
+it was saved.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `nameContains` | string | — | Only return downloads whose filename contains this text (case-insensitive) |
 
 ---
 

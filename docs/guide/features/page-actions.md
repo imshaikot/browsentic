@@ -1,6 +1,6 @@
 # Page actions
 
-The 45 things Browsentic can do to a page. You never have to name these — you say what you want and
+The 47 things Browsentic can do to a page. You never have to name these — you say what you want and
 the agent picks — but knowing what exists tells you what is worth asking for.
 
 Exact parameters for every one: [reference/tools.md](../../reference/tools.md).
@@ -70,7 +70,7 @@ pinned tab, a browser page, and a tab being [recorded](recordings.md).
 | Diagnostics | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` | [Diagnostics](diagnostics.md) |
 | Background watching | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` | [Monitoring](monitoring.md) |
 | Scheduled jobs | `page_startTimer`, `page_timerStatus`, `page_stopTimer` | [Scheduling](scheduling.md) |
-| Files | `page_listFiles`, `page_attachFile` | [Files](files.md) |
+| Files | `page_listFiles`, `page_attachFile`, `page_captureDownload`, `page_listDownloads` | [Files](files.md) |
 | Recordings | `page_listRecordings`, `page_readRecording` | [Recordings](recordings.md) |
 
 ---

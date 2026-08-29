@@ -27,6 +27,16 @@ far end — but you should fix the drift rather than run on it.
 
 Your pairing survives updates. `yarn daemon:link` only needs re-running if the link is broken.
 
+### When an update adds a permission
+
+An update that widens the extension's permissions — the `downloads` permission that file capture
+needs, for instance — makes Chrome **disable the extension** on reload until you accept the new one. The card at `chrome://extensions`
+says so and offers the prompt; Firefox asks the same question in its own way. Until you accept, the
+browser is unpaired and every page tool answers `EXTENSION_OFFLINE`, and the tool that needed the
+permission answers `DOWNLOADS_UNAVAILABLE` if it is reached first.
+
+Nothing is lost by it — accepting reconnects the pairing you already had.
+
 ### Why `yarn daemon:build` alone changes nothing
 
 The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives

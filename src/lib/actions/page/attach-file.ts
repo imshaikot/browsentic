@@ -4,17 +4,22 @@ import { describeElement, resolveTarget, targetSchema } from './dom';
 
 export const attachFile = defineAction({
   name: 'page.attachFile',
-  description: 'Attach a stored Browsentic file (by id, from page.listFiles) to a file input on the page.',
+  description:
+    'Attach a file to a file input on the page: either one the user stored in Browsentic (fileId, from page.listFiles) or one you captured off another page (downloadId, from page.captureDownload). The second closes the loop — download here, upload there — without the bytes ever passing through you.',
   input: z.object({
-    fileId: z.string().describe('Id of a stored file, taken from page.listFiles.'),
+    fileId: z.string().optional().describe('Id of a stored file, taken from page.listFiles.'),
+    downloadId: z
+      .string()
+      .optional()
+      .describe('Id of a captured download, taken from page.captureDownload or page.listDownloads.'),
     target: targetSchema.describe('The file input (<input type="file">) to attach the file to.'),
-    name: z.string().optional().describe('Internal: original filename. The extension fills this in.'),
-    mime: z.string().optional().describe('Internal: file MIME type. The extension fills this in.'),
-    content: z.string().optional().describe('Internal: base64 file bytes. The extension fills this in.'),
+    name: z.string().optional().describe('Internal: original filename. Browsentic fills this in.'),
+    mime: z.string().optional().describe('Internal: file MIME type. Browsentic fills this in.'),
+    content: z.string().optional().describe('Internal: base64 file bytes. Browsentic fills this in.'),
   }),
   execute({ target, name, mime, content }) {
     if (!content) {
-      throw new ActionError('No file bytes were supplied — call with a valid fileId.', 'INVALID_INPUT');
+      throw new ActionError('No file bytes were supplied — call with a valid fileId or downloadId.', 'INVALID_INPUT');
     }
     const el = resolveTarget(target, { includeHidden: true });
     if (!(el instanceof HTMLInputElement) || el.type !== 'file') {

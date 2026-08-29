@@ -51,7 +51,7 @@ export interface AgentSessionDeps {
   invoke: (
     action: string,
     input?: unknown,
-    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string },
+    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string; hosts?: readonly string[] },
   ) => Promise<ActionResult>;
   emit: (runId: string, event: RunEvent) => void;
   draft: (runId: string, draft: import('@/lib/skills/site-map').SiteMapDraft) => void;
@@ -158,7 +158,7 @@ export class AgentSession {
       if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
     }
 
-    const result = await this.deps.invoke(action, input, { runId });
+    const result = await this.deps.invoke(action, input, { runId, hosts: scope.hosts });
     if (action === openTab.name && result.ok) {
       const opened = (result.data as { tabId?: unknown } | null)?.tabId;
       if (typeof opened === 'number') run.ownedTabIds.push(opened);

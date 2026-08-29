@@ -20,6 +20,7 @@ import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
 import { saveScreenshot } from './screenshots';
+import { adoptDownload, listDownloads, resolveAttachment, sweepDownloads, type CapturedItem } from './downloads';
 import {
   clientProof,
   isNonce,
@@ -109,7 +110,28 @@ function persistScreenshot(
   }
 }
 
+/**
+ * The capture's other half. The extension can point at the file the browser just wrote but
+ * cannot move it, judge it, or see the run's scope, so everything that decides whether a
+ * download is kept happens here — and a refusal deletes what the browser already wrote.
+ */
+function persistDownload(action: string, result: ActionResult, hosts?: readonly string[]): ActionResult {
+  if (action !== 'page.captureDownload' || !result.ok) return result;
+  const item = (result.data as { item?: CapturedItem } | null)?.item;
+  if (!item) return result;
+  const adopted = adoptDownload(item, hosts);
+  if (!adopted.ok) {
+    log(`download refused: ${adopted.error.code}: ${adopted.error.message}`);
+    return adopted;
+  }
+  const { id, name, mime, size, host, notes, savedTo } = adopted.data;
+  return { ok: true, data: { downloadId: id, name, mime, size, host, notes, savedTo } };
+}
+
 export async function startDaemon({ version, idleExit = true }: DaemonOptions): Promise<Daemon> {
+  const swept = sweepDownloads();
+  if (swept) log(`swept ${swept} expired download${swept === 1 ? '' : 's'}`);
+
   const bundled = describeActions();
   const bundledHash = hashManifest(bundled);
 
@@ -567,19 +589,22 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   async function invoke(
     action: string,
     input?: unknown,
-    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string },
+    opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string; hosts?: readonly string[] },
   ) {
     if (action.startsWith(RESERVED_PREFIX)) {
       return failure('UNKNOWN_ACTION', `Unknown action "${action}".`);
     }
+    if (action === 'page.listDownloads') return listDownloads(input);
+    const resolved = resolveAttachment(action, input);
+    if (!resolved.ok) return resolved;
     if (!link?.isOpen) {
       return failure(
         'EXTENSION_OFFLINE',
         'The Browsentic extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
-    const result = await link.invoke(action, input, { tabId: opts?.tabId, runId: opts?.runId });
-    return persistScreenshot(action, input, result, opts?.saveTo);
+    const result = await link.invoke(action, resolved.data, { tabId: opts?.tabId, runId: opts?.runId });
+    return persistDownload(action, persistScreenshot(action, input, result, opts?.saveTo), opts?.hosts);
   }
 
   async function invokeExternal(action: string, input: unknown, client: string): Promise<ActionResult> {

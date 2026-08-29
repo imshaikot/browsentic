@@ -7,7 +7,7 @@
  * instruction can still be obeyed, but it has nowhere to send what it stole.
  */
 
-const NAVIGATIONS = new Set(['page.navigate', 'page.openTab']);
+const NAVIGATIONS = new Set(['page.navigate', 'page.openTab', 'page.captureDownload']);
 const TAB_MOVES = new Set(['page.switchTab', 'page.closeTab']);
 
 /** Endings that look like a host but are almost always a filename in prose. */
@@ -94,7 +94,7 @@ function hostOf(url: string | undefined): string | null {
 }
 
 /**
- * The absolute URL an action would open, or null when there is none to judge.
+ * The absolute URL an action would open or fetch, or null when there is none to judge.
  * A relative URL resolves against the tab the run is already on, so it cannot
  * change host and is not a navigation decision worth gating.
  */

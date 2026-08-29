@@ -23,7 +23,7 @@ export default defineConfig({
   manifest: {
     name: 'Browsentic',
     description: 'Reimagine browsing as agentic — driven by the AI agent you already run, in your own logged-in browser.',
-    permissions: ['storage', 'unlimitedStorage', 'activeTab', 'sidePanel', 'contextMenus', 'alarms', 'scripting', 'notifications', 'debugger'],
+    permissions: ['storage', 'unlimitedStorage', 'activeTab', 'sidePanel', 'contextMenus', 'alarms', 'scripting', 'notifications', 'debugger', 'downloads'],
     host_permissions: ['<all_urls>'],
   },
 });

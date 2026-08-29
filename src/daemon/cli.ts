@@ -7,6 +7,7 @@ import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names'
 import { basename, join } from 'node:path';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
+import { clearDownloads, downloadDir, storedDownloads } from './downloads';
 import { readAgentConfig, rememberExtensionDir } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting } from './ensure-daemon';
@@ -34,6 +35,8 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
   browsentic approvals clear [host]   forget them, all of them or one site's
+  browsentic downloads        list the files captured from pages, and where they were saved
+  browsentic downloads clear  delete all of them
   browsentic tools            print the bundled tool manifest (no browser needed)
   browsentic logs             print the daemon log
   browsentic stop             stop the background daemon
@@ -100,6 +103,9 @@ switch (command) {
     break;
   case 'approvals':
     manageApprovals(process.argv[3], process.argv[4]);
+    break;
+  case 'downloads':
+    manageDownloads(process.argv[3]);
     break;
   case 'logs':
     showLogs();
@@ -434,6 +440,30 @@ async function revoke(origin?: string): Promise<void> {
 async function connect(): Promise<RemoteBridge> {
   const lock = await ensureDaemon();
   return RemoteBridge.connect(lock.port, lock.token);
+}
+
+function manageDownloads(sub?: string): void {
+  if (sub === 'clear') {
+    const dropped = clearDownloads();
+    console.log(dropped ? `Deleted ${dropped} captured download${dropped === 1 ? '' : 's'}.` : 'Nothing captured to delete.');
+    return;
+  }
+  if (sub) {
+    console.log(`Unknown command "downloads ${sub}". Use "downloads" or "downloads clear".`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const downloads = storedDownloads();
+  if (!downloads.length) {
+    console.log(`Nothing captured. Files land in ${downloadDir()} when an agent uses page.captureDownload.`);
+    return;
+  }
+  console.log(`${downloads.length} captured download${downloads.length === 1 ? '' : 's'} in ${downloadDir()}:\n`);
+  for (const download of downloads) {
+    console.log(`  ${download.name.padEnd(32)} ${download.notes.padEnd(34)} ${download.capturedAt.slice(0, 10)}`);
+  }
+  console.log('\nDelete them all with "browsentic downloads clear".');
 }
 
 function manageApprovals(sub?: string, host?: string): void {

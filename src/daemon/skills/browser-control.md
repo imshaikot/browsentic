@@ -2,7 +2,7 @@
 name: browser-control
 default: true
 description: Drive the open tab — click, type, submit, navigate, and verify the result.
-triggers: [click, tap, press, fill, type, enter, submit, form, log in, sign in, search for, search this site, find on this site, look for, navigate, go to, open, scroll, select, choose, button, link, field, checkout, add to cart, screenshot, capture, snapshot, save the page, save a picture]
+triggers: [click, tap, press, fill, type, enter, submit, form, log in, sign in, search for, search this site, find on this site, look for, navigate, go to, open, scroll, select, choose, button, link, field, checkout, add to cart, screenshot, capture, snapshot, save the page, save a picture, download, export, save the file, get the csv, download the invoice, attach it, upload it]
 ---
 
 You are acting on the page, not just reading it. Work in a loop: snapshot, target, act, verify.
@@ -118,6 +118,16 @@ Content behind a hover — dropdowns, tooltips — needs `page_hoverElement` bef
 
 Pass `save: true` when the user asked for a picture they can keep. Then the result carries `savedTo`, and you must **relay that path**: the side panel renders your reply as text and turns images into links, so the path is the only way they can open it. Pass `filename` when they name one. If the result carries `saveError` instead, the capture worked but the write did not — say so rather than naming a file that is not there.
 
-## 10. Multi-step tasks
+## 10. Downloads
+
+`page_captureDownload` is how a file gets *out* of a page. Give it a `target` and it clicks that and keeps whatever the click downloads — an "Export CSV" button, a "Download invoice" link. That is the normal case, and it is the only one that works for an export, because the file does not exist until the click makes it. Give it a `url` instead only when you have a direct link to the file itself; it is fetched with the user's own cookies, so it works on pages behind a login.
+
+You get **notes**, not the file: its name, its type, its size, and its shape (`42 rows × 6 columns`). That is enough to know what you captured and to say so. You cannot read it, and there is no filesystem here to read it from. Relay `savedTo` in your reply the way you relay a saved screenshot's path — it is the only way the user can open the file.
+
+The result also carries `downloadId`, and `page_attachFile { downloadId, target }` puts that file into a file input on another page. That closes the loop: **download here, upload there**, with the file never passing through you. `page_listDownloads` re-reads what this browser has captured, when you need an id you did not keep.
+
+Expect a confirm prompt — writing a file to someone's disk is gated the same way uploading one is. Four refusals are final and none of them is worth routing around: an executable (`DOWNLOAD_REFUSED`), anything over 100 MB (`DOWNLOAD_TOO_LARGE`), a file from a host this run was not about (`DOWNLOAD_OFF_SCOPE`), and a click that downloaded nothing (`NO_DOWNLOAD_STARTED` — it probably opened a page instead, so check where the tab landed). Say what happened and stop.
+
+## 11. Multi-step tasks
 
 Do the whole task, not the first step of it. If the user says "search for X and open the first result", that is a fill, a submit, a wait, a snapshot, and a click — finish all of it, then report once at the end. Stop early only when you are blocked on something the user must decide.

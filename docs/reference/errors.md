@@ -81,6 +81,24 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `MAPPING_BUDGET` | Mapping gate | The page or screenshot budget is spent |
 | `MAPPING_TAB_CHANGED` | Mapping gate | The tab the run was pinned to is gone |
 
+## Downloads
+
+Every refusal here also **deletes the file the browser already wrote**, so none of them leaves
+anything behind to clean up. All four are terminal for that file — retrying downloads it again and
+refuses it again.
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `NO_DOWNLOAD_STARTED` | Extension | The click produced no download. It probably opened a page instead — check where the tab landed, or pass the file's url directly |
+| `DOWNLOAD_FAILED` | Extension | The browser stopped the transfer. The message carries its reason |
+| `DOWNLOADS_UNAVAILABLE` | Extension | The loaded extension predates the `downloads` permission. Reload it and accept the prompt |
+| `DOWNLOAD_OFF_SCOPE` | Daemon | The file came from a host this run was never pointed at. Ask the user, or start a run that names that site |
+| `DOWNLOAD_REFUSED` | Daemon | An executable. Not overridable, by design |
+| `DOWNLOAD_TOO_LARGE` | Daemon | Over 100 MB to capture, or over 25 MB to attach to a page |
+| `DOWNLOAD_NOT_FOUND` | Daemon | No captured download with that id. Call `page_listDownloads` |
+| `DOWNLOAD_MISSING` | Daemon | It was captured but is no longer on disk — swept, or deleted. Capture it again |
+| `DOWNLOAD_SAVE_FAILED` | Daemon | The file could not be moved into the download folder. The message carries the reason |
+
 ---
 
 ## See also
