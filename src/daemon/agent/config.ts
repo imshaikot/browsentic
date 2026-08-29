@@ -22,6 +22,9 @@ export interface AgentConfig {
   /** Overrides for the declared guardrail policy. See guardrails/policy.ts. */
   guardrails?: GuardrailConfig;
   screenshotDir?: string;
+  downloadDir?: string;
+  /** Days a captured download is kept before the daemon sweeps it. Fractions allowed. Defaults to 14. */
+  downloadTtlDays?: number;
   skillsDir?: string;
   /**
    * Where `browsentic setup --dir` put the unpacked extension, so `update` writes to the same

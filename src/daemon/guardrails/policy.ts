@@ -30,6 +30,7 @@ import { hostAllowed, targetUrl, targetsAnotherTab, urlPayloadBytes, type Scope 
 
 export const SUBMIT_ACTION = 'page.submitForm';
 export const UPLOAD_ACTION = 'page.attachFile';
+export const DOWNLOAD_ACTION = 'page.captureDownload';
 export const EXTRACT_ACTION = 'page.extractText';
 export const CAPTCHA_ACTION = 'page.solveCaptcha';
 export const NETWORK_ACTION = 'page.readNetwork';
@@ -74,8 +75,13 @@ export const CONDITIONS = {
     return !!url && !hostAllowed(url.hostname, request.scope.hosts);
   },
 
-  /** A navigation whose query string or fragment is large enough to be a payload. */
+  /**
+   * A navigation whose query string or fragment is large enough to be a payload. Downloads
+   * are exempt: a signed file url is mostly query string by design, and gating those would
+   * mean a prompt on every export.
+   */
   carriesUrlPayload: (request, policy) => {
+    if (request.action === DOWNLOAD_ACTION) return false;
     const url = targetUrl(request.action, request.input);
     return !!url && urlPayloadBytes(url) > policy.urlPayloadBytes;
   },
@@ -85,6 +91,9 @@ export const CONDITIONS = {
 
   /** Putting one of the user's files into a page. */
   uploadsFile: (request) => request.action === UPLOAD_ACTION,
+
+  /** Letting a page write a file to the user's disk. `file-upload` pointing the other way. */
+  downloadsFile: (request) => request.action === DOWNLOAD_ACTION,
 
   /** Moving to a tab the run was not pointed at — someone else's logged-in session. */
   leavesPinnedTab: (request) => targetsAnotherTab(request.action, request.input, request.scope),
@@ -186,6 +195,16 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Uploads one of the user’s files',
     reason: 'Putting a file into a page hands it to whoever runs that site.',
+  },
+  {
+    // Symmetric with file-upload: a download is a page-initiated write to the user's disk,
+    // reached through an agent that may be reading an injected instruction. The daemon
+    // refuses executables and anything over the size cap outright, whatever this says.
+    id: 'file-download',
+    when: 'downloadsFile',
+    effect: 'confirm',
+    title: 'Saves a file from the page to disk',
+    reason: 'That writes a file the page chose into the user’s download folder.',
   },
   {
     id: 'leaves-pinned-tab',

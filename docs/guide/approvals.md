@@ -49,6 +49,7 @@ depend on declaration order.
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
 | `file-upload` | `page_attachFile` — putting one of your files into a page | confirm |
+| `file-download` | `page_captureDownload` — letting a page write a file to your disk | confirm |
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
 | `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
 | `secret-in-url` | A saved secret placed in a navigation URL | **deny** |
@@ -61,6 +62,11 @@ Three of these are less obvious than they look:
 **`form-submission` is smarter than a name match.** It also catches `page_fillInput` and
 `page_typeText` with `pressEnter: true`, and `page_pressKey` with `Enter` — because those submit
 forms too.
+
+**`file-download` is not the whole download story.** The rule decides whether the capture happens.
+What may be *kept* is not a preference: executables, files over 100 MB, and downloads from a host
+outside the run's scope are refused whatever this is set to, and the file the browser already wrote
+is deleted. See [Files](features/files.md#what-it-will-not-keep).
 
 **`raw-html-read` is denied by default** because `outerHTML` carries comments, `aria-hidden` nodes
 and off-screen text: everything a page can hide from the person looking at it but still hand to the

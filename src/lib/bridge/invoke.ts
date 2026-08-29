@@ -4,6 +4,7 @@ import { invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
+import { captureDownload } from '@/lib/actions/page/capture-download';
 import { closeTab } from '@/lib/actions/page/close-tab';
 import { dragElement } from '@/lib/actions/page/drag-element';
 import { findCaptcha } from '@/lib/actions/page/find-captcha';
@@ -31,6 +32,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
 import { releaseForAction, sealForPage } from '@/lib/bridge/secret-vault';
 import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
+import { captureFromPage } from '@/lib/bridge/downloads';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import {
   readConsoleFor,
@@ -122,6 +124,7 @@ async function dispatch(
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input, runId);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
+  if (action === captureDownload.name) return captureFromPage(tab.id, input);
   if (action === trustedClick.name) return trustedClickInTab(tab.id, input);
   if (action === dragElement.name && isTrustedDrag(input)) return dragInTab(tab.id, input);
   if (action === findCaptcha.name) return findCaptchaInTab(tab.id);
@@ -311,10 +314,18 @@ async function readStoredRecording(input: unknown): Promise<ActionResult> {
   });
 }
 
+/** A captured download arrives with its bytes already filled in by the daemon, which is the
+ * only side that has them; a stored file is resolved here, where the store lives. */
 async function attachStoredFile(tabId: number, input: unknown): Promise<ActionResult> {
-  const { fileId, target } = (input ?? {}) as { fileId?: unknown; target?: unknown };
+  const args = (input ?? {}) as { fileId?: unknown; target?: unknown; content?: unknown };
+  if (typeof args.content === 'string' && args.content) return invokeInTab(tabId, attachFile.name, input);
+
+  const { fileId, target } = args;
   if (typeof fileId !== 'string' || !fileId) {
-    return failure('INVALID_INPUT', 'attachFile needs a "fileId" from page.listFiles.');
+    return failure(
+      'INVALID_INPUT',
+      'attachFile needs a "fileId" from page.listFiles or a "downloadId" from page.captureDownload.',
+    );
   }
   const bytes = await readBytes(fileId);
   if (!bytes) {

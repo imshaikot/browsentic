@@ -23,6 +23,7 @@ export type { Scope, ScopeSeed } from './scope';
 export {
   CONDITIONS,
   DEFAULT_RULES,
+  DOWNLOAD_ACTION,
   EXTRACT_ACTION,
   POLICY,
   SUBMIT_ACTION,

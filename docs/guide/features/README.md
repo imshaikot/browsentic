@@ -23,7 +23,7 @@ first.
 | [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |
 | [Diagnostics](diagnostics.md) | Console errors and failed requests — why the page broke, not just what it shows |
-| [Files](files.md) | Attaching a file and putting it into a file input |
+| [Files](files.md) | Putting a file into a page, and capturing one a page hands back |
 
 ## Doing things over time
 
