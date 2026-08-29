@@ -36,7 +36,7 @@ export default {
       title: 'Product',
       links: [
         { href: '/how-it-works/', label: 'How it works' },
-        { href: '/capabilities/', label: '45 page tools' },
+        { href: '/capabilities/', label: '47 page tools' },
         { href: '/orchestration/', label: 'Agent orchestration' },
         { href: '/automations/', label: 'Automations' },
         { href: '/skills/', label: 'Skills and recordings' },

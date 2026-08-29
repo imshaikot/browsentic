@@ -2,7 +2,7 @@
 // and docs/. Templates hold no copy of their own.
 
 export const REPO = 'https://github.com/imshaikot/browsentic'
-export const VERSION = 'v0.4.0'
+export const VERSION = 'v0.4.6'
 
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
@@ -213,7 +213,7 @@ export const MCP_POINTS = [
 ]
 
 export const STATS = [
-  { value: 45, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
+  { value: 47, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
   { value: 3, suffix: '', label: 'tabs worked at once', note: 'independent sessions, up to eight' },
   { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
   { value: 1, suffix: '', label: 'command to install', note: 'npx browsentic setup, MIT licensed' },
@@ -299,8 +299,8 @@ export const TOOL_GROUPS = [
     label: 'Files',
     accent: 'amber',
     blurb:
-      'Reaches for the files you keep in Browsentic and hands one to a file input on the page, so an upload flow stops waiting on a human at the file picker.',
-    tools: ['page_listFiles', 'page_attachFile'],
+      'Moves files in both directions. Hands one you attached to a file input on the page, and captures the file a click produces, sealed on disk with notes the agent can read, ready to upload somewhere else.',
+    tools: ['page_listFiles', 'page_attachFile', 'page_captureDownload', 'page_listDownloads'],
   },
   {
     id: 'recordings',

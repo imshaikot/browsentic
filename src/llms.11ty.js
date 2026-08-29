@@ -25,7 +25,7 @@ ${TOOL_GROUPS.map((g) => `- **${g.label}** (${g.tools.length} tools): ${g.blurb}
 ## Pages
 
 ${link('How it works', u('/how-it-works/'), 'the four hops, and why a Manifest V3 extension forces a daemon')}
-${link('Capabilities', u('/capabilities/'), 'all 45 page tools, grouped, plus the three read-only resources')}
+${link('Capabilities', u('/capabilities/'), 'all 47 page tools, grouped, plus the three read-only resources')}
 ${link('Agent orchestration', u('/orchestration/'), 'several tabs, several agents, one browser, all at once')}
 ${link('Automations', u('/automations/'), 'the jobs people hand over, and where each one stops for you')}
 ${link('Skills', u('/skills/'), 'automatic site maps, record and replay, local intent routing')}
