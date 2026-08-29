@@ -18,10 +18,11 @@ first.
 
 | | |
 | --- | --- |
-| [Page actions](page-actions.md) | The 41 things it can do to a page, grouped by what you would want |
+| [Page actions](page-actions.md) | The 45 things it can do to a page, grouped by what you would want |
 | [Screenshots](screenshots.md) | Viewport, full page, or one element — and when a capture touches disk |
 | [Theming](theming.md) | Dark mode on a site that has none, and a real WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |
+| [Diagnostics](diagnostics.md) | Console errors and failed requests — why the page broke, not just what it shows |
 | [Files](files.md) | Attaching a file and putting it into a file input |
 
 ## Doing things over time

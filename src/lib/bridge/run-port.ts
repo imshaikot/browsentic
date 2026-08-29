@@ -11,6 +11,7 @@ import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
 import { tryFastPath } from './fast-path';
+import { dropDiagnosticsForSession } from './diagnostics';
 import { listMeta } from './file-store';
 import { invokeForHarness } from './invoke';
 import {
@@ -289,6 +290,7 @@ async function absorb(runId: string, event: RunEvent): Promise<void> {
 async function settle(sessionId: string): Promise<void> {
   clearTimeout(cancelTimers.get(sessionId));
   cancelTimers.delete(sessionId);
+  await dropDiagnosticsForSession(sessionId);
   await patchSession(sessionId, { runId: null, pendingApproval: undefined });
   await syncRunIndicator();
 
@@ -426,6 +428,7 @@ async function endRun(sessionId: string, message: string): Promise<void> {
 async function endSession(sessionId: string): Promise<void> {
   const session = (await readTabSessions())[sessionId];
   if (session?.runId) cancelRun(session.runId);
+  await dropDiagnosticsForSession(sessionId);
   await dropTimersForSession(sessionId);
   clearTimeout(cancelTimers.get(sessionId));
   cancelTimers.delete(sessionId);

@@ -25,6 +25,7 @@ The surface, at a glance:
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
+| [Diagnostics](#diagnostics) | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` |
 | [Monitoring](#monitoring) | `page_startMonitor`, `page_monitorStatus`, `page_awaitMonitor`, `page_stopMonitor` |
 | [Scheduling](#scheduling) | `page_startTimer`, `page_timerStatus`, `page_stopTimer` |
 | [Files](#files) | `page_listFiles`, `page_attachFile` |
@@ -598,6 +599,75 @@ Calls do not stack — each replaces the last, so re-applying with adjusted numb
 | `saturation` | number | — | Colour intensity multiplier, 0–3: `0` greyscale, `1` unchanged, above `1` more vivid |
 | `contrast` | number | — | Contrast multiplier, 0–3: `1` unchanged, above `1` pushes lights and darks apart |
 | `transitionMs` | integer | `200` | Cross-fade duration, max 2000; `0` switches instantly |
+
+---
+
+## Diagnostics
+
+What the page **reports** rather than what it renders: `page_startDiagnostics` attaches Chrome's
+debugger and starts buffering, `page_readConsole` and `page_readNetwork` read the buffers, and
+`page_stopDiagnostics` detaches. Chrome only — all four return `UNSUPPORTED` on Firefox.
+
+Console and network events are delivered only while attached and are not kept anywhere otherwise, so
+**start the recording before the thing you are diagnosing happens**. Chrome shows a "Browsentic is
+debugging this browser" bar for as long as one runs; it detaches on its own at the timeout, when the
+side-panel turn that started it ends, or when the tab closes. See
+[Diagnostics](../guide/features/diagnostics.md) for the whole shape.
+
+### page_startDiagnostics
+
+Start recording a tab's console messages, uncaught exceptions and requests. Returns a
+`diagnosticsId`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `capture` | array of `"console"` \| `"network"` | `["console","network"]` | What to record. Narrow it to one when the other would only add noise |
+| `reload` | boolean | `false` | Reload the page once recording has started, so errors thrown during load are caught |
+| `tabId` | integer | — | Tab to record, from `page_openTab` or `page_switchTab`. Defaults to the active tab |
+| `timeoutMs` | integer | `300000` | Detach on its own after this long. Minimum 30 s, maximum 30 min |
+
+### page_readConsole
+
+Read the console messages and uncaught exceptions collected so far — level, text, the file and line
+that logged it, and a stack for errors. Newest last. Each entry carries a `kind` of `console`,
+`exception` or `browser` (Chrome's own reports: CSP violations, mixed content, resources that failed
+to load).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `contains` | string | — | Case-insensitive substring the message must contain |
+| `diagnosticsId` | string | — | Which recording to read. Omit when only one is running |
+| `drain` | boolean | `false` | Forget the messages returned, so the next call reports only what happened since |
+| `level` | `"all"` \| `"debug"` \| `"info"` \| `"warn"` \| `"error"` | `"all"` | Lowest level to report |
+| `limit` | integer | `50` | Most recent messages to return once the filters have been applied |
+
+### page_readNetwork
+
+Read the requests the tab has made — method, URL, status, resource type, timing, size, and the
+browser's error text for the ones that failed. Newest last.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `diagnosticsId` | string | — | Which recording to read. Omit when only one is running |
+| `drain` | boolean | `false` | Forget the requests returned, so the next call reports only what happened since |
+| `includeBodies` | boolean | `false` | Fetch response bodies, truncated, for the 5 most recent requests returned. **Denied by the `network-body-read` rule** unless the user allows it, and only available while the recording is still attached |
+| `includeHeaders` | boolean | `false` | Include request and response headers |
+| `limit` | integer | `50` | Most recent requests to return once the filters have been applied |
+| `method` | string | — | Only requests with this HTTP method, e.g. `"POST"` |
+| `status` | `"all"` \| `"problems"` \| `"failed"` \| `"pending"` | `"all"` | `"problems"` is anything that failed or came back 4xx/5xx; `"pending"` is requests with no response yet |
+| `urlContains` | string | — | Case-insensitive substring the URL must contain, e.g. `"/api/"` |
+
+Both reads report `droppedConsole` / `droppedNetwork`: the rings hold 500 console entries and 1,000
+requests, and a non-zero count means older entries were evicted.
+
+### page_stopDiagnostics
+
+Detach the debugger and take Chrome's bar away. What was collected stays readable afterwards —
+response bodies do not, since Chrome keeps those only while attached.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `diagnosticsId` | string | — | Omit when only one recording is running; with several running, an omitted id stops nothing and the candidates are listed |
 
 ---
 

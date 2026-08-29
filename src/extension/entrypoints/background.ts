@@ -3,6 +3,7 @@ import { describeActions } from '@/lib/actions/registry';
 import { injectContentScript } from '@/lib/actions/client';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { serveDebuggerEvents } from '@/lib/bridge/cdp';
+import { serveDiagnostics } from '@/lib/bridge/diagnostics';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
@@ -175,6 +176,7 @@ export default defineBackground(() => {
     void openSidePanel(tab.windowId);
   });
 
+  serveDiagnostics();
   serveRecorder();
   serveMonitor();
   serveTimers();

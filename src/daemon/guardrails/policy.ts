@@ -32,6 +32,7 @@ export const SUBMIT_ACTION = 'page.submitForm';
 export const UPLOAD_ACTION = 'page.attachFile';
 export const EXTRACT_ACTION = 'page.extractText';
 export const CAPTCHA_ACTION = 'page.solveCaptcha';
+export const NETWORK_ACTION = 'page.readNetwork';
 
 /** One definition, shared with the settings screen that renders it. */
 export type Effect = RuleEffect;
@@ -116,6 +117,10 @@ export const CONDITIONS = {
   /** Raw outerHTML: comments, aria-hidden nodes and off-screen text, the classic carrier. */
   readsRawHtml: (request) =>
     request.action === EXTRACT_ACTION && (request.input as { format?: unknown } | undefined)?.format === 'html',
+
+  /** Whole response payloads: session tokens, API keys and other people's PII, wholesale. */
+  readsResponseBodies: (request) =>
+    request.action === NETWORK_ACTION && (request.input as { includeBodies?: unknown } | undefined)?.includeBodies === true,
 
   /**
    * Named by the user in the legacy `requireApproval` config key. Submits are excluded
@@ -230,6 +235,20 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Listed in requireApproval',
     reason: 'The user asked to approve this action every time.',
+  },
+  {
+    // Metadata and headers answer “why did that fail?”; a body answers it too, and hands
+    // over everything else the response carried on the way. The sanitizer seals what it
+    // recognises, and a JSON blob of somebody's account data is not a shape it can
+    // recognise. Denied by default for the same reason raw HTML is: the read that
+    // diagnoses is narrower than the read that empties the page. Set this to "allow"
+    // when a run genuinely needs payloads.
+    id: 'network-body-read',
+    when: 'readsResponseBodies',
+    effect: 'deny',
+    title: 'Reads response bodies',
+    reason:
+      'Reading response bodies is disabled by policy — they carry session tokens and personal data wholesale. Status, timing and headers are available without it.',
   },
   {
     // outerHTML carries comments, aria-hidden nodes and off-screen text: everything a

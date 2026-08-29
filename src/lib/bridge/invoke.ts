@@ -12,12 +12,16 @@ import { listRecordings } from '@/lib/actions/page/list-recordings';
 import { monitorStatus } from '@/lib/actions/page/monitor-status';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
+import { readConsole } from '@/lib/actions/page/read-console';
+import { readNetwork } from '@/lib/actions/page/read-network';
 import { readRecording } from '@/lib/actions/page/read-recording';
 import { screenshot } from '@/lib/actions/page/screenshot';
 import { searchSite } from '@/lib/actions/page/search-site';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
+import { startDiagnostics } from '@/lib/actions/page/start-diagnostics';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { startTimer } from '@/lib/actions/page/start-timer';
+import { stopDiagnostics } from '@/lib/actions/page/stop-diagnostics';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { stopTimer } from '@/lib/actions/page/stop-timer';
 import { switchTab } from '@/lib/actions/page/switch-tab';
@@ -28,6 +32,12 @@ import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
 import { releaseForAction, sealForPage } from '@/lib/bridge/secret-vault';
 import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
+import {
+  readConsoleFor,
+  readNetworkFor,
+  startTabDiagnostics,
+  stopTabDiagnostics,
+} from '@/lib/bridge/diagnostics';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { startJobTimer, stopJobTimer, timerStatusFor } from '@/lib/bridge/timer';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
@@ -85,6 +95,10 @@ async function dispatch(
 
   const owner = runId ? await sessionForRun(runId) : null;
   if (action === openTab.name) return openSessionTab(input, owner);
+  if (action === startDiagnostics.name) return beginDiagnostics(input, tabId ?? owner?.currentTabId, owner?.sessionId);
+  if (action === readConsole.name) return readPageConsole(input);
+  if (action === readNetwork.name) return readPageNetwork(input);
+  if (action === stopDiagnostics.name) return stopRequestedDiagnostics(input);
   if (action === startMonitor.name) return beginMonitor(input, tabId ?? owner?.currentTabId);
   if (action === monitorStatus.name) return statusOfMonitors(input);
   if (action === stopMonitor.name) return stopRequestedMonitor(input);
@@ -167,6 +181,30 @@ async function switchSessionTab(current: TabRef, input: unknown, owner: TabSessi
   if (owner.tabIds.includes(landed)) await setCurrentTab(owner.sessionId, landed);
   else if (!(await sessionForTab(landed))) await adoptSubtab(owner.sessionId, landed, true);
   return result;
+}
+
+async function beginDiagnostics(input: unknown, tabId?: number, owner?: string): Promise<ActionResult> {
+  const parsed = startDiagnostics.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return startTabDiagnostics(parsed.data, tabId, owner);
+}
+
+async function readPageConsole(input: unknown): Promise<ActionResult> {
+  const parsed = readConsole.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return readConsoleFor(parsed.data);
+}
+
+async function readPageNetwork(input: unknown): Promise<ActionResult> {
+  const parsed = readNetwork.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return readNetworkFor(parsed.data);
+}
+
+async function stopRequestedDiagnostics(input: unknown): Promise<ActionResult> {
+  const parsed = stopDiagnostics.input.safeParse(input ?? {});
+  if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
+  return stopTabDiagnostics(parsed.data.diagnosticsId);
 }
 
 async function beginMonitor(input: unknown, tabId?: number): Promise<ActionResult> {

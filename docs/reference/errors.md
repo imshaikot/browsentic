@@ -23,7 +23,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `NO_ACTIVE_TAB` | Extension | No focused tab in the current window |
 | `TARGET_NOT_FOUND` | Content script | Nothing matched. The page changed — take a fresh snapshot |
 | `INVALID_TARGET` | Content script | A target with neither `selector` nor `text`. `role`/`nth` only narrow |
-| `DEBUGGER_UNAVAILABLE` | Extension | Chrome's debugger could not attach — usually DevTools is open on that tab. Close it, or use `page_clickElement` |
+| `DEBUGGER_UNAVAILABLE` | Extension | Chrome's debugger could not attach — usually DevTools is open on that tab. Close it, or use `page_clickElement` instead of `page_trustedClick` |
 | `CAPTCHA_NOT_FOUND` | Extension | No known captcha widget, so whatever is blocking the run is something else |
 
 ## Input and dispatch
@@ -36,6 +36,17 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `ACTION_FAILED` | Action | `execute()` threw — e.g. `back` with no history |
 | `PICK_CANCELLED` | Content script | The user dismissed A-Eye without pointing at anything. **Terminal** — ask in words rather than asking them to point again |
 | `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, or a reserved action reached from outside |
+
+## Diagnostics
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `DIAGNOSTICS_NOT_FOUND` | Extension | Nothing is recording, or that `diagnosticsId` is unknown. Console and network events exist only while attached — call `page_startDiagnostics` **before** reproducing the problem |
+| `DIAGNOSTICS_IN_PROGRESS` | Extension | That tab is already being recorded. Read it, or stop it first |
+| `DIAGNOSTICS_LIMIT` | Extension | Two tabs are already being recorded — stop one |
+| `DEBUGGER_UNAVAILABLE` | Extension | Chrome refused the attach, usually because DevTools is open on that tab. Close it and retry |
+| `UNSUPPORTED` | Extension | Firefox exposes no CDP, so the diagnostics tools do not exist there — and there is no fallback |
+| `BLOCKED` | Policy | `includeBodies: true` without the `network-body-read` rule allowed. Metadata and headers are still available |
 
 ## Runs and sessions
 

@@ -98,6 +98,24 @@ Full-page capture stitches viewport tiles, capped at 48 tiles and a 16 384 px ca
 that the bottom is cut off and the result reports `truncated: true`, rather than silently returning
 a partial image.
 
+## Six tools need Chrome's debugger, and Firefox has none
+
+`page_trustedClick`, the two captcha tools and the four
+[diagnostics](features/diagnostics.md) tools are built on the Chrome DevTools Protocol, which
+Firefox does not expose. They return `UNSUPPORTED` there, with a hint, and there is no fallback for
+the diagnostics ones — a page's console and network activity are not reachable any other way.
+
+On Chrome they carry two visible costs: Chrome shows a **"Browsentic is debugging this browser"**
+bar for as long as a debugger is attached, and attaching **fails while DevTools is open** on that
+tab, since Chrome allows one debugger per tab. A trusted click holds the attach for about 250 ms; a
+diagnostics recording holds it until it is stopped or its timeout fires.
+
+## Diagnostics only see what happened while attached
+
+Console and network events are delivered live and buffered nowhere else, so `page_readConsole` on a
+failure that happened before `page_startDiagnostics` returns nothing. The buffers are bounded too —
+500 console entries, 1,000 requests — and every read reports how many were evicted.
+
 ## Themes do not survive a reload
 
 `page_applyTheme` changes the live document. A navigation or a reload puts the page back the way it

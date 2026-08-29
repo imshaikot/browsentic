@@ -24,6 +24,8 @@ import { navigate } from './page/navigate';
 import { openTab } from './page/open-tab';
 import { pickElement } from './page/pick-element';
 import { pressKey } from './page/press-key';
+import { readConsole } from './page/read-console';
+import { readNetwork } from './page/read-network';
 import { readRecording } from './page/read-recording';
 import { readTheme } from './page/read-theme';
 import { screenshot } from './page/screenshot';
@@ -32,8 +34,10 @@ import { searchSite } from './page/search-site';
 import { selectOption } from './page/select-option';
 import { selectText } from './page/select-text';
 import { solveCaptcha } from './page/solve-captcha';
+import { startDiagnostics } from './page/start-diagnostics';
 import { startMonitor } from './page/start-monitor';
 import { startTimer } from './page/start-timer';
+import { stopDiagnostics } from './page/stop-diagnostics';
 import { stopMonitor } from './page/stop-monitor';
 import { stopTimer } from './page/stop-timer';
 import { submitForm } from './page/submit-form';
@@ -69,6 +73,10 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       readTheme,
       auditContrast,
       applyTheme,
+      startDiagnostics,
+      readConsole,
+      readNetwork,
+      stopDiagnostics,
       startMonitor,
       monitorStatus,
       awaitMonitor,

@@ -44,6 +44,7 @@ depend on declaration order.
 | `reserved-action` | An internal `browsentic.*` verb is called from outside | **deny** |
 | `non-http-navigation` | A `javascript:`, `data:` or `file:` URL dressed up as a navigation | **deny** |
 | `raw-html-read` | `page_extractText` with `format: "html"` | **deny** |
+| `network-body-read` | `page_readNetwork` with `includeBodies: true` | **deny** |
 | `off-scope-navigation` | Navigating off the sites this run is about | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
@@ -55,7 +56,7 @@ depend on declaration order.
 | `secret-off-scope` | …and it was read on a site outside this run's scope | confirm |
 | `config-require-approval` | The action is named in your `requireApproval` list | confirm |
 
-Two of these are less obvious than they look:
+Three of these are less obvious than they look:
 
 **`form-submission` is smarter than a name match.** It also catches `page_fillInput` and
 `page_typeText` with `pressEnter: true`, and `page_pressKey` with `Enter` — because those submit
@@ -65,6 +66,13 @@ forms too.
 and off-screen text: everything a page can hide from the person looking at it but still hand to the
 model. The default rendered-text format has already dropped those. Set it to `allow` if a run
 genuinely needs markup.
+
+**`network-body-read` is denied by default** because a response body is the richest credential
+surface a page has: session tokens, API keys and other people's personal data, wholesale. Request and
+response *metadata* — method, URL, status, timing — is free, and headers come back
+[sanitized](../internals/guardrails.md) when asked for, which between them answer nearly every real
+"why did that fail?". The body is the read that goes well past diagnosing. Set it to `allow` if a run
+genuinely needs payloads. See [Diagnostics](features/diagnostics.md).
 
 ### Scope: which sites a run may reach
 

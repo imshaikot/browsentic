@@ -38,7 +38,8 @@ after two hours and emptied by the browser on restart. The daemon never receives
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
 
 **Tab sessions** live in `browser.storage.session` under `browsentic/tabSessions`, so they are gone
-when the browser closes.
+when the browser closes. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
+timers — none of what a page reported about itself outlives the browser that reported it.
 
 ## Relocating
 

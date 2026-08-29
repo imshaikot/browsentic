@@ -1,8 +1,8 @@
 # Subsystems
 
-The five things that are more than a single action.
+The things that are more than a single action.
 
-![The five subsystems, each as its own short pipeline](../assets/subsystems.png)
+![Five of the subsystems, each as its own short pipeline](../assets/subsystems.png)
 
 ---
 
@@ -28,6 +28,39 @@ mutating still gets checked.
 
 The watch lives in the extension, so it survives the agent finishing, the MCP client disconnecting,
 and the daemon going away.
+
+---
+
+## Diagnostics
+
+[`src/lib/diagnostics/`](../../src/lib/diagnostics/), [`src/lib/bridge/diagnostics.ts`](../../src/lib/bridge/diagnostics.ts)
+
+The only debugger attach that outlives the action which opened it. `withDebugger` in
+[`cdp.ts`](../../src/lib/bridge/cdp.ts) attaches, runs one action and detaches in a `finally` —
+correct for a click, useless for "what errored?", because `Runtime.consoleAPICalled` and
+`Network.responseReceived` arrive only while attached.
+
+| | |
+| --- | --- |
+| Concurrent | 2 (`MAX_SESSIONS`), one per tab |
+| Duration | 5 minutes default, 30 maximum, 30 s minimum (Chrome's alarm floor) |
+| Console ring | 500 entries |
+| Network ring | 1,000 requests |
+| Per-entry cap | 2,000 chars; headers 30 × 400 chars |
+
+Holding a session open means owning every way it has to close, since nothing else will: the explicit
+`page.stopDiagnostics`, the timeout alarm, the end of the side-panel run that opened it, the tab
+closing, and Chrome's own `onDetach` when DevTools takes the session. A recording started by an
+external MCP client has no run to end with, so the timeout is its only ceiling.
+
+Events land in in-memory rings behind a **debounced write** to `storage.session`, because a chatty
+SPA produces thousands of them and the service worker can die between any two. Evictions are counted
+and reported with every read.
+
+Nothing here sanitizes. `invokeForHarness` seals every result on its way out, and a `Cookie` header,
+a bearer token and a token in a query string are ordinary strings in an ordinary result object by
+then. What this subsystem owns is what is ever *returned*: headers only when asked for, bodies only
+when the [`network-body-read`](guardrails.md) rule has let the call through.
 
 ---
 

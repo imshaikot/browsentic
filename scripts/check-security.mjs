@@ -158,6 +158,13 @@ check('rendered text is still the way in', agent('page.extractText', { format: '
 check('raw html re-allowable by config', decide({ action: 'page.extractText', input: { format: 'html' }, caller: 'agent', scope }, policyFrom({ rules: { 'raw-html-read': 'allow' } })).effect, 'allow');
 check('raw html stays denied under the strict policy', decide({ action: 'page.extractText', input: { format: 'html' }, caller: 'agent', scope }, strict).effect, 'deny');
 check('off-scope escalates to deny by config', decide({ action: 'page.navigate', input: { url: 'https://evil.com' }, caller: 'agent', scope }, strict).effect, 'deny');
+check('response bodies denied by default', agent('page.readNetwork', { includeBodies: true }).effect, 'deny');
+check('the body denial names its rule', agent('page.readNetwork', { includeBodies: true }).matched.map((r) => r.id), ['network-body-read']);
+check('response bodies denied for external callers too', external('page.readNetwork', { includeBodies: true }).effect, 'deny');
+check('request metadata is still readable', agent('page.readNetwork', { includeBodies: false }).effect, 'allow');
+check('headers are readable without the body rule firing', agent('page.readNetwork', { includeHeaders: true }).effect, 'allow');
+check('reading the console is not a network read', agent('page.readConsole', {}).effect, 'allow');
+check('response bodies re-allowable by config', decide({ action: 'page.readNetwork', input: { includeBodies: true }, caller: 'agent', scope }, policyFrom({ rules: { 'network-body-read': 'allow' } })).effect, 'allow');
 check('legacy requireApproval:[] still ungates forms', decide({ action: 'page.submitForm', input: {}, caller: 'agent', scope }, policyFrom({}, [])).effect, 'allow');
 check('legacy requireApproval gates a listed action', decide({ action: 'page.clickElement', input: {}, caller: 'agent', scope }, policyFrom({}, ['page.clickElement'])).effect, 'confirm');
 check('every rule names a real condition', policyFrom().rules.every((rule) => rule.when in guardrails.CONDITIONS), true);

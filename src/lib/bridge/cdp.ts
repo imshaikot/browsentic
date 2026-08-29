@@ -18,6 +18,9 @@ interface SessionDebugger {
   onEvent: {
     addListener: (listener: (source: DebuggerSession, method: string, params?: object) => void) => void;
   };
+  onDetach: {
+    addListener: (listener: (source: DebuggerSession, reason: string) => void) => void;
+  };
 }
 
 type EventListener = (source: DebuggerSession, method: string, params?: object) => void;
@@ -40,9 +43,38 @@ export function serveDebuggerEvents(): void {
   });
 }
 
-function onDebuggerEvent(listener: EventListener): () => void {
+export function onDebuggerEvent(listener: EventListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/**
+ * Attaching for longer than one action. `withDebugger` is right for a click and wrong
+ * for a diagnostic: `Runtime.consoleAPICalled` and `Network.responseReceived` only
+ * arrive while attached, so anything that reads them has to hold the session open and
+ * own the detach itself — including the paths where nobody asks for it, which is what
+ * `serveDetachEvents` and the caller's own timeout are for.
+ */
+export async function attachToTab(tabId: number): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await cdp.attach({ tabId }, PROTOCOL_VERSION);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: attachHint(error) };
+  }
+}
+
+export async function detachFromTab(tabId: number): Promise<void> {
+  const session: DebuggerSession = { tabId };
+  await send(session, 'Target.setAutoAttach', AUTO_ATTACH_OFF).catch(() => {});
+  await cdp.detach(session).catch(() => {});
+}
+
+export function serveDetachEvents(listener: (tabId: number, reason: string) => void): void {
+  if (import.meta.env.FIREFOX) return;
+  cdp.onDetach.addListener((source, reason) => {
+    if (source.tabId != null) listener(source.tabId, reason);
+  });
 }
 
 export function send<T = unknown>(
