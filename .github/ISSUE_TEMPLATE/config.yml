@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/imshaikot/browsentic/security/advisories/new
+    about: Report privately. A public issue on a tool that holds live browser sessions puts every user at risk before a fix exists.
+  - name: Documentation
+    url: https://browsentic.com/docs/
+    about: Guides, the tool reference, and the internals — including troubleshooting.

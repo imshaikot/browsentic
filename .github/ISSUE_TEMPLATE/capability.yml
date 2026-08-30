@@ -1,0 +1,44 @@
+name: Capability proposal
+description: An idea for something Browsentic should be able to do to a page — or any feature
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A capability ships as an MCP tool the moment it lands in the registry, so its name, shape
+        and guardrails are API decisions. Two paragraphs here beat a rejected diff — and
+        [adding one](https://browsentic.com/docs/internals/contributing/) is one file plus one
+        line in the registry once the shape is agreed.
+  - type: textarea
+    id: job
+    attributes:
+      label: The job
+      description: What would a user say to the panel, and what should happen? Real scenario over abstract capability.
+      placeholder: '"Download the CSV export and attach it to the ticket" — today the run stops at …'
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: Where it stops today
+      description: What you tried with the existing tools, and where it fell short.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed shape
+      description: Optional. Tool name(s), inputs, what comes back — and whether anything needs an approval gate.
+      placeholder: 'page_captureDownload(target) → { path, summary }; gated as confirm under a file-download rule'
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where it lives
+      options:
+        - A page tool (src/lib/actions)
+        - The extension UI (panel, popup)
+        - The daemon / MCP server
+        - Skills / agent behaviour
+        - Not sure
+    validations:
+      required: true

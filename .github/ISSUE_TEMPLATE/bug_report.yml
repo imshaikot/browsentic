@@ -1,0 +1,59 @@
+name: Bug report
+description: Something misbehaved — a tool failed, a run stalled, the panel did the wrong thing
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things before the form:
+        - **Security problems are not issues.** A vulnerability in a tool that holds live browser
+          sessions goes through a [private advisory](https://github.com/imshaikot/browsentic/security/advisories/new).
+        - The [troubleshooting guide](https://browsentic.com/docs/guide/troubleshooting/) resolves
+          the common failures — worth two minutes first.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you asked for, what you got instead. Error codes verbatim if there were any.
+      placeholder: 'Asked the panel to fill a form on …; the run stopped with TAB_UNREACHABLE after …'
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: Steps, and the site or page type it happens on if that matters.
+      placeholder: |
+        1. Open …
+        2. Say/run …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `browsentic status`
+      description: It names the daemon state, both versions, manifest sync and pairings — most reports are answered by it.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      description: Which agent CLI runs your side panel, if the bug involves a run.
+      placeholder: claude / codex / agy, and its version
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser and version, OS, Node version.
+      placeholder: Chrome 139, macOS 15.5, Node 22
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant `browsentic logs` lines
+      description: Optional. The lines around the failure — tool calls and their outcomes. Trim anything private.
+      render: text
