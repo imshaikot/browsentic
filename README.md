@@ -81,7 +81,7 @@ Browsentic is provided as is, without warranty — you are responsible for what 
 
 ## Contributing
 
-Found a bug 🐛 or have an idea for a capability ✨? Adding a page capability is one file plus one line in the registry, which publishes it as an MCP tool at the same time. See the [contributing guide](docs/internals/contributing.md) for the setup, the checks, and the four conventions that are load-bearing at runtime.
+Found a bug 🐛 or have an idea for a capability ✨? Adding a page capability is one file plus one line in the registry, which publishes it as an MCP tool at the same time. Start at [CONTRIBUTING.md](CONTRIBUTING.md); the [internals guide](docs/internals/contributing.md) covers the setup, the checks, and the four conventions that are load-bearing at runtime.
 
 ## License
 
