@@ -227,12 +227,16 @@ export function chooseAgent(agent: AgentKind): Promise<ActionResult<AgentState>>
   return agentOp({ t: 'setAgent', id: crypto.randomUUID(), agent });
 }
 
+export function chooseAgentModel(agent: AgentKind, model: string | null): Promise<ActionResult<AgentState>> {
+  return agentOp({ t: 'setAgentModel', id: crypto.randomUUID(), agent, model });
+}
+
 export function setUpAgent(agent: AgentKind): Promise<ActionResult<AgentState>> {
   return agentOp({ t: 'grantAgent', id: crypto.randomUUID(), agent });
 }
 
 function agentOp(
-  frame: Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'grantAgent' }>,
+  frame: Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>,
 ): Promise<ActionResult<AgentState>> {
   if (!post(frame)) {
     return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));

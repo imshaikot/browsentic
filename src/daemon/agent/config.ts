@@ -148,6 +148,27 @@ export function writeActiveAgent(kind: AgentKind): void {
 }
 
 /**
+ * Sets or clears one agent's model, leaving every other key in config.json untouched. Claude's
+ * pre-0.2 top-level `model` spelling is removed alongside, so a cleared pick cannot resurface it.
+ */
+export function writeAgentModel(kind: AgentKind, model: string | null): void {
+  const stored = readStored();
+  const agents = { ...(stored.agents ?? {}) };
+  const scoped = { ...(agents[kind] ?? {}) };
+  const value = text(model);
+  if (value) scoped.model = value;
+  else delete scoped.model;
+  if (Object.keys(scoped).length) agents[kind] = scoped;
+  else delete agents[kind];
+
+  const next = { ...stored };
+  if (Object.keys(agents).length) next.agents = agents;
+  else delete next.agents;
+  if (kind === 'claude') delete next.model;
+  write(next);
+}
+
+/**
  * Write one guardrail override, leaving every other key in config.json alone. `null`
  * removes the override rather than writing a value equal to the default — so a config
  * file only ever names the decisions someone actually made, and a change to a shipped

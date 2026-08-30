@@ -18,6 +18,7 @@ import { isAgentKind } from '@/lib/agents/catalog';
 import {
   RECONNECT_ALARM,
   chooseAgent,
+  chooseAgentModel,
   connectDaemon,
   disconnectDaemon,
   onWelcome,
@@ -111,6 +112,12 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
+    if (message.op === 'setAgentModel' && isAgentKind(message.agent)) {
+      chooseAgentModel(message.agent, typeof message.model === 'string' && message.model.trim() ? message.model : null)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'grantAgent' && isAgentKind(message.agent)) {
       setUpAgent(message.agent)
         .then(sendResponse)
@@ -151,7 +158,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;

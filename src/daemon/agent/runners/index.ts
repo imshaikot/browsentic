@@ -82,6 +82,7 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
     return {
       kind: runner.kind,
       bin: settings.bin,
+      model: settings.model,
       ready: false,
       problem: {
         code: 'AGENT_MISSING',
@@ -94,6 +95,7 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
     return {
       kind: runner.kind,
       bin: settings.bin,
+      model: settings.model,
       ready: false,
       problem: {
         code: 'AGENT_UNUSABLE',
@@ -104,7 +106,14 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
   }
 
   const problem = (await runner.check?.(settings)) ?? null;
-  return { kind: runner.kind, bin: settings.bin, ready: !problem, version: found.detail, problem: problem ?? undefined };
+  return {
+    kind: runner.kind,
+    bin: settings.bin,
+    model: settings.model,
+    ready: !problem,
+    version: found.detail,
+    problem: problem ?? undefined,
+  };
 }
 
 function version(bin: string, args: string[]): Promise<{ ok: boolean; code?: string; detail?: string }> {

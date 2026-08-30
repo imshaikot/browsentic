@@ -10,7 +10,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 14;
+export const SOCKET_PROTOCOL_VERSION = 15;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -40,6 +40,7 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'listSkills'; refresh?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'agentState'; refresh?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgent'; agent: AgentKind }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'setAgentModel'; agent: AgentKind; model: string | null }
   | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind }
   | { channel: typeof BRIDGE_CHANNEL; op: 'guardrails' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'setGuardrail'; setting: string; value: GuardrailValue };
@@ -189,6 +190,7 @@ export type SocketFrame =
   | { t: 'recordingWorkflow'; id: string; result: ActionResult<RecordingAnalysis> }
   | { t: 'agentState'; id: string; refresh?: boolean }
   | { t: 'setAgent'; id: string; agent: AgentKind }
+  | { t: 'setAgentModel'; id: string; agent: AgentKind; model: string | null }
   | { t: 'grantAgent'; id: string; agent: AgentKind }
   | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> }
   | { t: 'listSkills'; id: string; refresh?: boolean }
@@ -223,6 +225,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'analyzeRecording',
   'agentState',
   'setAgent',
+  'setAgentModel',
   'grantAgent',
   'listSkills',
   'guardrails',

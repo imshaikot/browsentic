@@ -51,7 +51,7 @@ Nothing here is required; this shows every key in one place.
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex` or `antigravity` |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary |
-| `agents.<name>.model` | `claude-sonnet-5` for Claude, else the CLI's default | Passed as `--model` |
+| `agents.<name>.model` | `claude-sonnet-5` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it |
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |
 
 Full detail, including the Antigravity permission rule: [Choosing an agent](agents.md).

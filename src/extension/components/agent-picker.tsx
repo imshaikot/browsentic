@@ -12,7 +12,11 @@ import { cn } from '@/lib/utils';
 type Request =
   | { op: 'agentState'; refresh?: boolean }
   | { op: 'setAgent'; agent: AgentKind }
+  | { op: 'setAgentModel'; agent: AgentKind; model: string | null }
   | { op: 'grantAgent'; agent: AgentKind };
+
+const busyKey = (request: Request): string =>
+  request.op === 'agentState' ? 'refresh' : request.op === 'setAgentModel' ? `${request.agent}:model` : request.agent;
 
 export function AgentPicker() {
   const daemon = useDaemonState();
@@ -27,7 +31,7 @@ export function AgentPicker() {
   }, [connected, state]);
 
   async function ask(request: Request): Promise<void> {
-    setBusy(request.op === 'agentState' ? 'refresh' : request.agent);
+    setBusy(busyKey(request));
     setError(null);
     const result = (await browser.runtime
       .sendMessage({ channel: BRIDGE_CHANNEL, ...request })
@@ -65,8 +69,10 @@ export function AgentPicker() {
             runner={runner}
             active={runner.kind === active}
             busy={busy === runner.kind}
+            modelBusy={busy === `${runner.kind}:model`}
             disabled={!connected || busy !== null}
             onSelect={() => void ask({ op: 'setAgent', agent: runner.kind })}
+            onModel={(model) => void ask({ op: 'setAgentModel', agent: runner.kind, model })}
           />
         ))}
       </div>
@@ -103,35 +109,71 @@ function AgentRow({
   runner,
   active,
   busy,
+  modelBusy,
   disabled,
   onSelect,
+  onModel,
 }: {
   runner: RunnerStatus;
   active: boolean;
   busy: boolean;
+  modelBusy: boolean;
   disabled: boolean;
   onSelect: () => void;
+  onModel: (model: string | null) => void;
 }) {
   const agent = AGENTS[runner.kind];
+  const models =
+    runner.model && !agent.models.includes(runner.model) ? [runner.model, ...agent.models] : agent.models;
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      disabled={disabled || active}
-      aria-pressed={active}
+    <div
       className={cn(
-        'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors',
-        active
-          ? 'border-brand/45 bg-brand/10 text-brand'
-          : 'border-line text-ink-dim enabled:hover:border-line-strong enabled:hover:bg-surface/60 enabled:hover:text-ink',
+        'rounded-lg border transition-colors',
+        active ? 'border-brand/45 bg-brand/10' : 'border-line',
+        !active && !disabled && 'hover:border-line-strong hover:bg-surface/60',
         disabled && !active && 'opacity-50',
       )}
     >
-      <StatusDot tone={runner.ready ? 'live' : 'warn'} />
-      <span className="min-w-0 flex-1 truncate text-xs">{agent.label}</span>
-      <span className="font-mono text-[10px] tracking-wider uppercase opacity-70">{describe(runner)}</span>
-      {busy ? <Loader2 className="size-3 animate-spin" /> : active && <Check className="size-3" />}
-    </button>
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled || active}
+        aria-pressed={active}
+        className={cn(
+          'flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors',
+          active ? 'text-brand' : 'text-ink-dim enabled:hover:text-ink',
+        )}
+      >
+        <StatusDot tone={runner.ready ? 'live' : 'warn'} />
+        <span className="min-w-0 flex-1 truncate text-xs">{agent.label}</span>
+        <span className="font-mono text-[10px] tracking-wider uppercase opacity-70">{describe(runner)}</span>
+        {busy ? <Loader2 className="size-3 animate-spin" /> : active && <Check className="size-3" />}
+      </button>
+      {runner.ready && models.length > 0 && (
+        <label
+          className={cn(
+            'flex items-center gap-2 border-t px-2.5 py-1.5',
+            active ? 'border-brand/25' : 'border-line',
+          )}
+        >
+          <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Model</span>
+          <select
+            value={runner.model ?? ''}
+            onChange={(event) => onModel(event.target.value || null)}
+            disabled={disabled}
+            className="min-w-0 flex-1 cursor-pointer truncate bg-transparent text-right font-mono text-[10px] text-ink-dim outline-none disabled:cursor-default"
+          >
+            <option value="">Default</option>
+            {models.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+          {modelBusy && <Loader2 className="size-3 animate-spin text-ink-faint" />}
+        </label>
+      )}
+    </div>
   );
 }
 

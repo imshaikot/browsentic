@@ -46,7 +46,7 @@ import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
-import { configPath, readAgentConfig, writeActiveAgent, writeGuardrailSetting } from './agent/config';
+import { configPath, readAgentConfig, writeActiveAgent, writeAgentModel, writeGuardrailSetting } from './agent/config';
 import { agentSkills } from './agent/agent-skills';
 import { agentState, grantRunner } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
@@ -68,7 +68,7 @@ import {
 import { log } from './log';
 import { readLockfile, writeLockfile, clearLockfile, type Lockfile } from './lockfile';
 
-type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'grantAgent' }>;
+type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
 type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
@@ -346,7 +346,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
             );
           return;
         }
-        if (request.t === 'agentState' || request.t === 'setAgent' || request.t === 'grantAgent') {
+        if (
+          request.t === 'agentState' ||
+          request.t === 'setAgent' ||
+          request.t === 'setAgentModel' ||
+          request.t === 'grantAgent'
+        ) {
           void settleAgent(request).then((state) => {
             source.send({ t: 'agentInfo', id: request.id, result: state });
             // The catalog's agent-skill half belongs to the agent that just took over.
@@ -407,6 +412,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       // The held conversation belongs to the agent that just left; the next turn starts fresh.
       agent?.handle({ t: 'reset' });
       log(`agent set to ${AGENTS[request.agent].label}`);
+    }
+    if (request.t === 'setAgentModel') {
+      // A model change keeps held conversations — every CLI resumes a session under a new model.
+      const model = typeof request.model === 'string' ? request.model : null;
+      writeAgentModel(request.agent, model);
+      log(`${AGENTS[request.agent].label} model set to ${model?.trim() || 'the default'}`);
     }
     if (request.t === 'grantAgent') await grantRunner(request.agent);
     const refresh = request.t !== 'agentState' || request.refresh === true;

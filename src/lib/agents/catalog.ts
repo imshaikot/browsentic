@@ -11,6 +11,8 @@ export interface AgentDescriptor {
   bin: string;
   install: string;
   docs: string;
+  /** Model ids the picker offers, strongest first. Curated, not queried — the CLIs have no list command. */
+  models: string[];
 }
 
 export const AGENTS: Record<AgentKind, AgentDescriptor> = {
@@ -21,6 +23,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     bin: 'claude',
     install: 'npm i -g @anthropic-ai/claude-code',
     docs: 'https://claude.com/claude-code',
+    models: ['claude-fable-5', 'claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
   },
   codex: {
     kind: 'codex',
@@ -29,6 +32,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     bin: 'codex',
     install: 'npm i -g @openai/codex',
     docs: 'https://developers.openai.com/codex/cli',
+    models: ['gpt-5.6-terra', 'gpt-5.1-codex-max', 'gpt-5.1-codex', 'gpt-5.1-codex-mini'],
   },
   antigravity: {
     kind: 'antigravity',
@@ -37,6 +41,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     bin: 'agy',
     install: 'https://antigravity.google/docs/cli/install',
     docs: 'https://antigravity.google/docs/cli',
+    models: ['gemini-3-pro', 'gemini-3-flash'],
   },
 };
 
@@ -60,6 +65,8 @@ export interface RunnerStatus {
   bin: string;
   ready: boolean;
   version?: string;
+  /** The model this runner will be spawned with; unset means the CLI's own default. */
+  model?: string;
   problem?: AgentProblem;
 }
 

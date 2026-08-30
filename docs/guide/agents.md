@@ -14,6 +14,11 @@ In the extension popup, or behind the side panel's status pill. Each is listed w
 *ready*, *not installed*, *needs setup* — so a missing CLI is visible before you send an instruction
 rather than after.
 
+Each installed agent also carries a model select. *Default* runs whatever that CLI would run on its
+own; picking a model is remembered per agent and applies from the next instruction. Unlike switching
+agents, changing the model keeps the conversation being held open — every CLI resumes a session
+under a new model.
+
 The same thing from a terminal:
 
 ```sh
@@ -78,7 +83,7 @@ In `~/.browsentic/config.json`:
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on. The agent picker writes this. |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. |
-| `agents.<name>.model` | `claude-sonnet-5` for Claude, otherwise the CLI's own default | Passed as `--model`. |
+| `agents.<name>.model` | `claude-sonnet-5` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. |
 | `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
 Changes apply to the next run — the config is re-read each time, no daemon restart needed.
