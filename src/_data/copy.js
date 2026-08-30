@@ -2,7 +2,7 @@
 // and docs/. Templates hold no copy of their own.
 
 export const REPO = 'https://github.com/imshaikot/browsentic'
-export const VERSION = 'v0.4.6'
+export const VERSION = 'v0.4.7'
 
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
@@ -183,7 +183,7 @@ export const PANEL_POINTS = [
   {
     id: 'agent',
     title: 'Your agent, switched with one click',
-    body: 'The panel runs on Claude Code, Codex or Antigravity, picked from the popup. No key to paste, because it spawns the CLI you already signed in to, as you.',
+    body: 'The panel runs on Claude Code, Codex or Antigravity, picked from the popup, down to which model each one runs. No key to paste, because it spawns the CLI you already signed in to, as you.',
   },
 ]
 
@@ -343,7 +343,7 @@ export const PIPELINE = [
     id: 'agent',
     title: 'Your agent CLI',
     sub: 'claude, codex or agy',
-    body: 'Reasons locally, spawned against the login you already have. Claude Code, Codex or Antigravity, switched with one click. No API client in the repository, no key to configure, no third-party relay.',
+    body: 'Reasons locally, spawned against the login you already have. Claude Code, Codex or Antigravity, switched with one click, each on the model you pick. No API client in the repository, no key to configure, no third-party relay.',
   },
 ]
 
@@ -692,7 +692,7 @@ export const COMPARISON = {
   // Rows with only `group` render as subheads. `us` is always ours, `them` is always theirs.
   table: [
     { group: 'The shape of it' },
-    { label: 'The agent', us: 'Claude Code, Codex or Antigravity, your pick', them: 'Claude' },
+    { label: 'The agent', us: 'Claude Code, Codex or Antigravity, your pick, down to the model', them: 'Claude' },
     { label: 'Where it thinks', us: 'On your machine; the daemon binds to loopback', them: 'In Anthropic’s cloud' },
     { label: 'What it costs', us: 'Nothing beyond the agent subscription you already have', them: 'A paid Claude plan' },
     { label: 'Browsers', us: 'Chrome, Edge, Brave, Arc: any Chromium browser', them: 'Google Chrome only' },
