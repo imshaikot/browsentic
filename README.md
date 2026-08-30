@@ -1,4 +1,4 @@
-![Browsentic: agentic browsing, in the browser you already use](docs/assets/social-card.png)
+![Browsentic: agentic browsing, in the browser you already use](docs/assets/social-card.png?v=0.4.6)
 
 # Browsentic – Agentic Browsing in the Browser You Already Use
 
