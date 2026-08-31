@@ -343,6 +343,10 @@ export default function App() {
             focus={focus}
             picking={picking}
             onAttachSkill={setAttachedSkill}
+            onCommand={(command) => {
+              open('chat');
+              run.send(command);
+            }}
             onSend={handleSend}
             onStop={run.cancel}
             onToggleVoice={toggleVoice}

@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { ContextCard } from '@/extension/components/context-card';
 import { Markdown } from '@/extension/components/markdown';
 import { Button } from '@/extension/components/ui/button';
 import { openScreenshot } from '@/lib/bridge/screenshot-preview';
@@ -50,6 +51,8 @@ export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
           <ToolRow key={item.id} item={item} onDecide={onDecide} />
         ) : item.kind === 'notice' ? (
           <Notice key={item.id} item={item} />
+        ) : item.kind === 'context' ? (
+          <ContextCard key={item.id} breakdown={item.breakdown} />
         ) : item.kind === 'user' ? (
           <UserBubble key={item.id} text={item.text} focus={item.focus} />
         ) : (

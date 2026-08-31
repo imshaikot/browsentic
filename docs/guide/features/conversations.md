@@ -88,6 +88,22 @@ attempting it returns `TAB_IN_USE`.
 
 ---
 
+## What a conversation carries — `/context`
+
+Type `/context` (or pick **context** from the `/` menu) and a **Session context** card appears in
+the transcript: the message mix so far, the attached files and ready recordings that will ride
+along with your next message, the tabs the session spans, and which agent holds the conversation —
+plus whether it can resume where it left off.
+
+The card also shows token counts, straight from the agent CLI's own reporting: roughly how many
+tokens the model's context window held after its last reply, and how many it generated on the last
+run. Claude Code and Codex report these; Antigravity does not, and the card says so.
+
+It is answered by the extension itself, without waking an agent, so it also works mid-run. The card
+describes what this browser holds; the agent's own working memory lives with the agent.
+
+---
+
 ## History
 
 Conversations are saved and named automatically. The **History** tab reopens any of them, on any

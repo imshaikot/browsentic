@@ -1,26 +1,42 @@
-import { BookOpen, Globe, Sparkles } from 'lucide-react';
+import { BookOpen, Globe, Sparkles, SquareSlash } from 'lucide-react';
 
 import type { SkillCatalog } from '@/lib/actions/protocol';
 import { AGENTS } from '@/lib/agents/catalog';
+import { CONTEXT_COMMAND, CONTEXT_COMMAND_DESCRIPTION } from '@/lib/bridge/commands';
 import { hostMatchesDomains, hostnameOf } from '@/lib/skills/format';
 import { cn } from '@/lib/utils';
 
 export interface SkillMenuItem {
   key: string;
-  group: 'site' | 'general' | 'agent' | 'other-site';
+  group: 'command' | 'site' | 'general' | 'agent' | 'other-site';
   name: string;
   description: string;
   /** Set on agent skills — choosing one attaches this id to the message instead of a text prefix. */
   agentSkillId?: string;
+  /** Set on typed commands — choosing one sends this text right away instead of inserting a prefix. */
+  command?: string;
 }
 
-const GROUP_ORDER: Record<SkillMenuItem['group'], number> = { site: 0, general: 1, agent: 2, 'other-site': 3 };
+const GROUP_ORDER: Record<SkillMenuItem['group'], number> = {
+  command: 0,
+  site: 1,
+  general: 2,
+  agent: 3,
+  'other-site': 4,
+};
 
 export function skillMenuItems(catalog: SkillCatalog | undefined, tabUrl: string, query: string): SkillMenuItem[] {
-  if (!catalog) return [];
   const host = hostnameOf(tabUrl);
-  const items: SkillMenuItem[] = [];
-  for (const skill of catalog.skills) {
+  const items: SkillMenuItem[] = [
+    {
+      key: 'command:context',
+      group: 'command',
+      name: 'context',
+      description: CONTEXT_COMMAND_DESCRIPTION,
+      command: CONTEXT_COMMAND,
+    },
+  ];
+  for (const skill of catalog?.skills ?? []) {
     const group =
       skill.category !== 'site-exploration'
         ? 'general'
@@ -29,7 +45,7 @@ export function skillMenuItems(catalog: SkillCatalog | undefined, tabUrl: string
           : 'other-site';
     items.push({ key: `${group}:${skill.name}`, group, name: skill.name, description: skill.description });
   }
-  for (const skill of catalog.agentSkills) {
+  for (const skill of catalog?.agentSkills ?? []) {
     items.push({ key: `agent:${skill.id}`, group: 'agent', name: skill.name, description: skill.description, agentSkillId: skill.id });
   }
   const needle = query.trim().toLowerCase();
@@ -55,6 +71,7 @@ export function SkillMenu({
   onSelect: (item: SkillMenuItem) => void;
 }) {
   const labels: Record<SkillMenuItem['group'], string> = {
+    command: 'Commands',
     site: 'On this site',
     general: 'Browsentic skills',
     agent: `${agent ? AGENTS[agent].label : 'Agent'} skills`,
@@ -64,11 +81,11 @@ export function SkillMenu({
   return (
     <div
       role="listbox"
-      aria-label="Skills"
+      aria-label="Skills and commands"
       className="enters absolute inset-x-0 bottom-full z-20 mb-2 max-h-64 overflow-y-auto rounded-xl border border-line bg-surface shadow-lg"
     >
       {items.length === 0 ? (
-        <p className="px-3 py-2.5 text-[11px] text-ink-faint">No skills match — keep typing, or press Escape.</p>
+        <p className="px-3 py-2.5 text-[11px] text-ink-faint">Nothing matches — keep typing, or press Escape.</p>
       ) : (
         items.map((item, index) => (
           <div key={item.key}>
@@ -91,7 +108,9 @@ export function SkillMenu({
                 index === highlight ? 'bg-brand/12' : 'hover:bg-ground/40',
               )}
             >
-              {item.group === 'agent' ? (
+              {item.group === 'command' ? (
+                <SquareSlash className="mt-0.5 size-3 shrink-0 text-amber" />
+              ) : item.group === 'agent' ? (
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-brand" />
               ) : item.group === 'general' ? (
                 <BookOpen className="mt-0.5 size-3 shrink-0 text-ink-faint" />

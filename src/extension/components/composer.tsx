@@ -30,6 +30,7 @@ export function Composer({
   focus,
   picking,
   onAttachSkill,
+  onCommand,
   onSend,
   onStop,
   onToggleVoice,
@@ -51,6 +52,7 @@ export function Composer({
   focus: FocusedElement | null;
   picking: boolean;
   onAttachSkill: (skill: AttachedSkill | null) => void;
+  onCommand: (command: string) => void;
   onSend: () => void;
   onStop: () => void;
   onToggleVoice: () => void;
@@ -79,7 +81,10 @@ export function Composer({
   }, [menuOpen, cancelPending]);
 
   function choose(item: SkillMenuItem) {
-    if (item.agentSkillId) {
+    if (item.command) {
+      voice.setInput('');
+      onCommand(item.command);
+    } else if (item.agentSkillId) {
       onAttachSkill({ id: item.agentSkillId, name: item.name });
       voice.setInput('');
     } else {
@@ -258,7 +263,7 @@ export function Composer({
       <p className="mt-2 text-center font-mono text-[10px] text-ink-faint">
         {voiceEnabled && voice.supported
           ? 'Speak and pause to send · Enter sends now'
-          : 'Enter to send · Shift + Enter for a new line · / for skills'}
+          : 'Enter to send · Shift + Enter for a new line · / for skills and commands'}
       </p>
     </>
   );

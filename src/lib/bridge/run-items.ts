@@ -1,6 +1,7 @@
 import { screenshot } from '@/lib/actions/page/screenshot';
 import type { RunEvent } from '@/lib/actions/protocol';
 import type { MonitorState } from '@/lib/monitor/events';
+import type { ContextBreakdown } from './commands';
 import { redactInput } from './redact';
 import type { ScreenshotPreview } from './screenshot-preview';
 
@@ -8,6 +9,7 @@ export type RunItem =
   | { kind: 'user'; id: string; text: string; focus?: string }
   | { kind: 'assistant'; id: string; text: string }
   | { kind: 'notice'; id: string; tone: 'info' | 'error'; text: string }
+  | { kind: 'context'; id: string; breakdown: ContextBreakdown }
   | {
       kind: 'tool';
       id: string;

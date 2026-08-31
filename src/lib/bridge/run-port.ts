@@ -10,6 +10,7 @@ import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
+import { CONTEXT_COMMAND, isContextCommand, type ContextBreakdown } from './commands';
 import { tryFastPath } from './fast-path';
 import { dropDiagnosticsForSession } from './diagnostics';
 import { listMeta } from './file-store';
@@ -24,7 +25,7 @@ import {
 import { currentRecording, onRecordingState, startActiveTabRecording, stopRecording } from './recorder';
 import { asSavedRecording, listRecordings } from './recording-store';
 import { forgetTab, syncRunIndicator } from './run-indicator';
-import { attachPreview, monitorNotice, notice, patchTool, reduce, type RunItem } from './run-items';
+import { attachPreview, monitorNotice, nextId, notice, patchTool, reduce, type RunItem } from './run-items';
 import { onScreenshotPreview, type ScreenshotPreview } from './screenshot-preview';
 import {
   listSessions,
@@ -324,6 +325,14 @@ async function instruct(
     return;
   }
 
+  if (isContextCommand(text)) {
+    const { sessionId } = ensured.session;
+    const breakdown = await contextBreakdown(ensured.session, await bufferFor(sessionId));
+    await append(sessionId, { kind: 'user', id: nextId(), text: CONTEXT_COMMAND });
+    await append(sessionId, { kind: 'context', id: nextId(), breakdown });
+    return;
+  }
+
   const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, fastPath: true });
   if (outcome !== 'busy') return;
   await append(
@@ -618,6 +627,38 @@ async function attachedRecordings(): Promise<SavedRecording[]> {
   } catch {
     return [];
   }
+}
+
+async function contextBreakdown(session: TabSession, items: RunItem[]): Promise<ContextBreakdown> {
+  const messages = { user: 0, assistant: 0, tools: 0, notices: 0, chars: 0 };
+  for (const item of items) {
+    if (item.kind === 'user') {
+      messages.user += 1;
+      messages.chars += item.text.length;
+    } else if (item.kind === 'assistant') {
+      messages.assistant += 1;
+      messages.chars += item.text.length;
+    } else if (item.kind === 'tool') messages.tools += 1;
+    else if (item.kind === 'notice') messages.notices += 1;
+  }
+  const files = await listMeta().catch(() => []);
+  const ready = (await listRecordings().catch(() => [])).filter((recording) => recording.status === 'ready');
+  return {
+    agent: session.agent,
+    resumes: session.agentSessionId !== undefined,
+    usage: session.usage,
+    turns: session.turns,
+    tabCount: session.tabIds.length,
+    host: session.host,
+    messages,
+    files: files.slice(0, MAX_CONTEXT_FILES).map((file) => ({ name: file.name, size: file.size, status: file.status })),
+    filesOmitted: Math.max(0, files.length - MAX_CONTEXT_FILES),
+    recordings: ready
+      .slice(0, MAX_CONTEXT_RECORDINGS)
+      .map((recording) => ({ name: recording.name, steps: recording.steps })),
+    recordingsOmitted: Math.max(0, ready.length - MAX_CONTEXT_RECORDINGS),
+    capturedAt: Date.now(),
+  };
 }
 
 const noticeOf = (state: MonitorState): ['info' | 'error', string] => {
