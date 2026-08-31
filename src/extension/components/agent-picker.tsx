@@ -4,6 +4,13 @@ import { browser } from 'wxt/browser';
 
 import { StatusDot } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/extension/components/ui/select';
 import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
 import { AGENTS, AGENT_LIST, type AgentKind, type AgentState, type RunnerStatus } from '@/lib/agents/catalog';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
@@ -17,6 +24,8 @@ type Request =
 
 const busyKey = (request: Request): string =>
   request.op === 'agentState' ? 'refresh' : request.op === 'setAgentModel' ? `${request.agent}:model` : request.agent;
+
+const CLI_DEFAULT = '__default__';
 
 export function AgentPicker() {
   const daemon = useDaemonState();
@@ -150,28 +159,32 @@ function AgentRow({
         {busy ? <Loader2 className="size-3 animate-spin" /> : active && <Check className="size-3" />}
       </button>
       {runner.ready && models.length > 0 && (
-        <label
+        <div
           className={cn(
             'flex items-center gap-2 border-t px-2.5 py-1.5',
             active ? 'border-brand/25' : 'border-line',
           )}
         >
           <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Model</span>
-          <select
-            value={runner.model ?? ''}
-            onChange={(event) => onModel(event.target.value || null)}
+          <Select
+            value={runner.model ?? CLI_DEFAULT}
+            onValueChange={(value) => onModel(value === CLI_DEFAULT ? null : value)}
             disabled={disabled}
-            className="min-w-0 flex-1 cursor-pointer truncate bg-transparent text-right font-mono text-[10px] text-ink-dim outline-none disabled:cursor-default"
           >
-            <option value="">Default</option>
-            {models.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-6 min-w-0 flex-1 py-0 font-mono text-[10px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end" className="font-mono text-[10px]">
+              <SelectItem value={CLI_DEFAULT}>Default</SelectItem>
+              {models.map((model) => (
+                <SelectItem key={model} value={model}>
+                  {model}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {modelBusy && <Loader2 className="size-3 animate-spin text-ink-faint" />}
-        </label>
+        </div>
       )}
     </div>
   );
