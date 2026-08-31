@@ -190,23 +190,17 @@ jobs:
           gh release view "$TAG" --json url -q '"released: " + .url' >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------------------
-  # Publishing to npm is written but not enabled yet. Two things have to happen first, in
-  # this order, and neither can be done from CI:
-  #
-  #   1. Publish one version by hand from a maintainer's machine. That claims the name and
-  #      forces someone to install and run the real tarball once before any automation does.
-  #   2. Configure the trusted publisher on npmjs.com for imshaikot/browsentic, workflow
-  #      release.yml. That is what makes `npm publish` work here with no NODE_AUTH_TOKEN.
-  #
-  # Then delete the `if: false` below. Note that a tag runs this workflow as it existed at
-  # the tagged commit, so the change takes effect from the next tag cut after it lands.
+  # Publishes with no NODE_AUTH_TOKEN: npmjs.com trusts this repo's release.yml as the
+  # package's publisher (package Settings → Trusted Publisher), and the id-token permission
+  # above is what npm exchanges for its short-lived credential. The same exchange signs the
+  # release — npm generates and uploads a Sigstore provenance attestation, shown on the
+  # package page. Removing the trusted publisher on npmjs.com is what turns this off.
   #
   # This is deliberately the LAST step. A GitHub release can be deleted; an npm version
   # cannot — unpublish is restricted to 72 hours and burns the number permanently. Anything
   # that can still fail should have failed by now.
   # ---------------------------------------------------------------------------------------
       - name: Publish to npm
-        if: false
         working-directory: src/daemon
         env:
           NPM_CONFIG_PROVENANCE: true
