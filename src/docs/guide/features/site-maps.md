@@ -55,7 +55,9 @@ A map in flight is written to a staging directory the skill loader **cannot read
 map is not merely unused — it is never opened.
 
 The panel shows you the exact markdown as plain text, never rendered, along with the domain it will
-match. **Activate** arms it; **Discard** deletes it.
+match. **Activate** arms it; **Discard** deletes it. The review appears on the conversation that
+mapped the site — switch back to that tab to decide. If that tab closes first, the review follows
+you so an unsaved map is never lost.
 
 > A map is written from pages an agent read, so read it before activating, as you would any
 > generated content.

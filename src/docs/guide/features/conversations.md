@@ -68,7 +68,11 @@ reopen it.
 
 The rail is drawn into the page, so it cannot appear on pages Browsentic is not allowed into —
 `chrome://` pages, the Chrome Web Store and the new tab page. The toolbar icon and the right-click
-**Open Browsentic** item always work.
+**Open Browsentic** item always work; while the panel is open, that item reads **Close Browsentic**
+and closes it instead.
+
+The rail belongs to the minimized state alone. Closing the panel with the browser's own close
+button removes any rail from every page — only the header's collapse button leaves one behind.
 
 ### Knowing something is running when you are elsewhere
 
@@ -97,6 +101,22 @@ attempting it returns `TAB_IN_USE`.
 | Tab sessions open at once | 8 (`SESSION_LIMIT` beyond that) |
 | Running at once | 3, raise with `maxConcurrentRuns`, ceiling 8 (`RUN_LIMIT`) |
 | Runs per tab session | 1 (`RUN_IN_PROGRESS`) |
+
+---
+
+## What a conversation carries — `/context`
+
+Type `/context` (or pick **context** from the `/` menu) and a **Session context** card appears in
+the transcript: the message mix so far, the attached files and ready recordings that will ride
+along with your next message, the tabs the session spans, and which agent holds the conversation —
+plus whether it can resume where it left off.
+
+The card also shows token counts, straight from the agent CLI's own reporting: roughly how many
+tokens the model's context window held after its last reply, and how many it generated on the last
+run. Claude Code and Codex report these; Antigravity does not, and the card says so.
+
+It is answered by the extension itself, without waking an agent, so it also works mid-run. The card
+describes what this browser holds; the agent's own working memory lives with the agent.
 
 ---
 

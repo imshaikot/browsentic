@@ -71,7 +71,7 @@ sequenceDiagram
     D-->>M: result
     M-->>K: tool result
     K-->>D: stream-json deltas
-    D-->>S: run events (text, tool, toolResult, approval, done)
+    D-->>S: run events (text, tool, toolResult, approval, usage, done)
 ```
 
 **The loop closes on itself.** The daemon spawns the agent CLI, which spawns *another*
