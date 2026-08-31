@@ -124,6 +124,7 @@ export function runStream(
       session: (id) => {
         if (id) sessionId = id;
       },
+      usage: (usage) => emit({ kind: 'usage', usage }),
       done: (stopReason) =>
         settle(() => {
           flush();

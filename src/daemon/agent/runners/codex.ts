@@ -21,10 +21,19 @@ interface Item {
   command?: string;
 }
 
+/** Codex counts cached input inside `input_tokens`; it is a subset, not an addition. */
+interface TokenCounts {
+  input_tokens?: number;
+  cached_input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+}
+
 interface TypedEvent {
   type?: string;
   thread_id?: string;
   item?: Item;
+  usage?: TokenCounts;
   error?: { message?: string };
   message?: string;
 }
@@ -37,6 +46,7 @@ interface LegacyEvent {
     session_id?: string;
     query?: string;
     error?: string;
+    info?: { total_token_usage?: TokenCounts; last_token_usage?: TokenCounts };
   };
 }
 
@@ -114,6 +124,17 @@ export const codexRunner: Runner = {
             return finish(msg.message, sink);
           case 'web_search_begin':
             return sink.tool(randomUUID(), WEB_TOOL);
+          case 'token_count': {
+            const last = msg.info?.last_token_usage ?? msg.info?.total_token_usage;
+            const total = msg.info?.total_token_usage ?? last;
+            if (last) {
+              sink.usage({
+                contextTokens: (last.input_tokens ?? 0) + (last.output_tokens ?? 0),
+                outputTokens: total?.output_tokens ?? 0,
+              });
+            }
+            return;
+          }
           case 'task_complete':
             return sink.done('end_turn');
           case 'error':
@@ -141,8 +162,16 @@ export const codexRunner: Runner = {
           return;
         }
 
-        case 'turn.completed':
+        case 'turn.completed': {
+          const usage = frame.usage;
+          if (usage) {
+            sink.usage({
+              contextTokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+              outputTokens: usage.output_tokens ?? 0,
+            });
+          }
           return sink.done('end_turn');
+        }
 
         case 'turn.failed':
           return sink.fail('AGENT_FAILED', frame.error?.message || 'Codex could not finish the turn');

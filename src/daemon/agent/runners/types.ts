@@ -1,3 +1,4 @@
+import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind, AgentProblem } from '@/lib/agents/catalog';
 import type { AgentSettings } from '../config';
 
@@ -48,6 +49,8 @@ export interface StreamSink {
   /** A tool the daemon cannot see itself — web search and the like. MCP calls report themselves. */
   tool(toolId: string, name: string): void;
   session(id: string): void;
+  /** Token counts this CLI reported, normalized to the shared shape. Optional — not every CLI reports them. */
+  usage(usage: TokenUsage): void;
   done(stopReason: string): void;
   fail(code: string, message: string): void;
 }

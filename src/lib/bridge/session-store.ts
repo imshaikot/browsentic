@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind } from '@/lib/agents/catalog';
 import type { RunItem } from './run-items';
 import { nameSession } from './socket';
@@ -21,6 +22,8 @@ export interface StoredSessionMeta {
   /** The agent CLI that owns `agentSessionId` — another agent cannot resume it. */
   agent?: AgentKind;
   agentSessionId?: string;
+  /** The agent's own token counts, as of its most recent report. */
+  usage?: TokenUsage;
   turns: number;
   titledAtTurn?: number;
   namingAt?: number;

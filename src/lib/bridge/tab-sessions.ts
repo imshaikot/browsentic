@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind } from '@/lib/agents/catalog';
 
 export const TAB_SESSIONS_KEY = 'browsentic/tabSessions';
@@ -26,6 +27,8 @@ export interface TabSession {
   runId: string | null;
   agent?: AgentKind;
   agentSessionId?: string;
+  /** The agent's own token counts, as of its most recent report. */
+  usage?: TokenUsage;
   turns: number;
   createdAt: number;
   lastActivityAt: number;
@@ -118,7 +121,15 @@ export async function ensureSessionForTab(anchor: TabAnchor): Promise<Ensured> {
 }
 
 export function bindStoredSession(
-  fields: { sessionId: string; turns: number; agent?: AgentKind; agentSessionId?: string; url?: string; title?: string },
+  fields: {
+    sessionId: string;
+    turns: number;
+    agent?: AgentKind;
+    agentSessionId?: string;
+    usage?: TokenUsage;
+    url?: string;
+    title?: string;
+  },
   anchor: TabAnchor,
 ): Promise<TabSession> {
   return mutateTabSessions((map) => {
@@ -138,6 +149,7 @@ export function bindStoredSession(
       runId: null,
       agent: fields.agent,
       agentSessionId: fields.agentSessionId,
+      usage: fields.usage,
       turns: fields.turns,
       createdAt: now,
       lastActivityAt: now,

@@ -61,6 +61,7 @@ export function reduce(items: RunItem[], event: RunEvent): RunItem[] {
       return patchTool(items, event.toolId, { ok: event.ok, summary: event.summary, awaiting: false });
 
     case 'session':
+    case 'usage':
       return items;
 
     case 'done':

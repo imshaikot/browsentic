@@ -281,6 +281,8 @@ async function absorb(runId: string, event: RunEvent): Promise<void> {
     });
   } else if (event.kind === 'toolResult') {
     await patchSession(sessionId, { pendingApproval: undefined });
+  } else if (event.kind === 'usage') {
+    await patchSession(sessionId, { usage: event.usage });
   }
 
   if (event.kind === 'done' || event.kind === 'error') await settle(sessionId);
@@ -472,6 +474,7 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
       turns: meta.turns,
       agent: meta.agent,
       agentSessionId: meta.agentSessionId,
+      usage: meta.usage,
       url: meta.url,
       title: titleOf(meta) ?? anchor.title,
     },
@@ -523,6 +526,7 @@ async function persist(sessionId: string): Promise<void> {
       host: session?.host ?? stored?.host,
       agent: session?.agent ?? stored?.agent,
       agentSessionId: session?.agentSessionId ?? stored?.agentSessionId,
+      usage: session?.usage ?? stored?.usage,
       createdAt: session?.createdAt ?? stored?.createdAt ?? now,
       updatedAt: now,
     },

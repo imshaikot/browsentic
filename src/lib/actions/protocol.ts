@@ -10,7 +10,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 15;
+export const SOCKET_PROTOCOL_VERSION = 16;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -56,8 +56,17 @@ export type RunEvent =
   | { kind: 'approval'; toolId: string; action: string; input: unknown; site?: string }
   | { kind: 'toolResult'; toolId: string; ok: boolean; summary: string }
   | { kind: 'session'; agent: AgentKind; agentSessionId: string | null }
+  | { kind: 'usage'; usage: TokenUsage }
   | { kind: 'done'; stopReason: string }
   | { kind: 'error'; code: string; message: string };
+
+/** Token counts as the agent CLI reported them, normalized by its runner. */
+export interface TokenUsage {
+  /** Tokens occupying the model's context window after its last call — prompt, cache and reply together. */
+  contextTokens: number;
+  /** Tokens the model generated over the run that reported this. */
+  outputTokens: number;
+}
 
 /** Which secret the extension is about to prove it holds. The secret itself never crosses the wire. */
 export type SocketAuth = { kind: 'pair' } | { kind: 'session' };

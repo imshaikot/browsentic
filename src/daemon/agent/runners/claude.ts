@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { effortOf, parseJsonLine } from './util';
-import type { JsonContext, Plan, Runner, StreamContext, StreamReader } from './types';
+import type { JsonContext, Plan, Runner, StreamContext, StreamReader, StreamSink } from './types';
 
 export const MCP_SERVER_NAME = 'browsentic';
 
@@ -43,6 +43,13 @@ const ONE_SHOT_DENIED = [...BUILTIN_DENIED, ...WEB_TOOLS];
 
 const OLD_CLAUDE = /unknown option|unrecognized option/i;
 
+interface UsageLine {
+  input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+  output_tokens?: number;
+}
+
 type StreamLine =
   | { type: 'system'; subtype?: string; session_id?: string; tools?: string[] }
   | {
@@ -54,7 +61,15 @@ type StreamLine =
         content_block?: { type?: string; id?: string; name?: string };
       };
     }
-  | { type: 'result'; is_error?: boolean; subtype?: string; stop_reason?: string | null; result?: string };
+  | { type: 'assistant'; parent_tool_use_id?: string | null; message?: { usage?: UsageLine } }
+  | {
+      type: 'result';
+      is_error?: boolean;
+      subtype?: string;
+      stop_reason?: string | null;
+      result?: string;
+      usage?: UsageLine;
+    };
 
 export const claudeRunner: Runner = {
   kind: 'claude',
@@ -99,6 +114,21 @@ export const claudeRunner: Runner = {
   },
 
   reader(): StreamReader {
+    let generated = 0;
+
+    const report = (usage: UsageLine | undefined, sink: StreamSink) => {
+      if (!usage) return;
+      generated += usage.output_tokens ?? 0;
+      sink.usage({
+        contextTokens:
+          (usage.input_tokens ?? 0) +
+          (usage.cache_read_input_tokens ?? 0) +
+          (usage.cache_creation_input_tokens ?? 0) +
+          (usage.output_tokens ?? 0),
+        outputTokens: generated,
+      });
+    };
+
     return (line, sink) => {
       const message = parseJsonLine<StreamLine>(line);
       if (!message) return;
@@ -125,10 +155,15 @@ export const claudeRunner: Runner = {
           return;
         }
 
+        case 'assistant':
+          if (!message.parent_tool_use_id) report(message.message?.usage, sink);
+          return;
+
         case 'result':
           if (message.is_error) {
             return sink.fail('AGENT_FAILED', message.result || message.subtype || 'Claude Code reported an error');
           }
+          if (!generated) report(message.usage, sink);
           return sink.done(message.stop_reason || 'end_turn');
       }
     };
