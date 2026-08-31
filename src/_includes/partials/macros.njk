@@ -25,6 +25,23 @@
 <p class="mt-5 max-w-2xl text-[1.05rem] leading-relaxed text-ink-dim" data-reveal style="--reveal-delay: 120ms">{{ text }}</p>
 {%- endmacro -%}
 
+{#- A hero title, one span per word so each lands on its own beat. Takes a
+    string or a list of lines, keeps the word index running across lines. -#}
+{%- macro heroWords(title, offset=0) -%}
+{%- set lines = [title] if title is string else title -%}
+{%- set starts = [offset] -%}
+{%- for line in lines -%}
+{%- set _ = starts.push(starts[loop.index0] + line.split(" ").length) -%}
+{%- endfor -%}
+{%- for line in lines -%}
+{%- set base = starts[loop.index0] -%}
+{%- for w in line.split(" ") %}
+<span class="hero-word" style="--wi:{{ base + loop.index0 }}">{{ w }}</span>
+{%- endfor %}
+{%- if not loop.last %}<br class="hidden md:block">{% endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
 {#- Page hero. Every segment page opens with one, so the H1 and the lede are
     always the first two things a crawler meets. -#}
 {%- macro pageHero(kickerText, title, ledeText, accent="brand") -%}
@@ -33,11 +50,11 @@
   <div class="pointer-events-none absolute -top-40 left-1/2 size-[38rem] -translate-x-1/2 rounded-full bg-brand/8 blur-[120px]"></div>
   <div class="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-24">
     <p class="font-display text-[0.72rem] font-medium uppercase tracking-[0.11em] {{ ACCENT[accent].text }}" data-enter>{{ kickerText }}</p>
-    <h1 class="mt-3 max-w-4xl font-display text-[2.3rem] font-semibold leading-[1.1] text-ink sm:text-[3.3rem]" data-enter style="--enter-delay: 70ms">
-      {%- if title is string %}{{ title }}{% else %}{% for line in title %}{{ line }}{% if not loop.last %}<br class="hidden md:block"> {% endif %}{% endfor %}{% endif -%}
+    <h1 class="mt-3 max-w-4xl font-display text-[2.3rem] font-semibold leading-[1.1] text-ink sm:text-[3.3rem]">
+      {{- heroWords(title, 1) -}}
     </h1>
-    <p class="mt-6 max-w-2xl text-[1.1rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 140ms">{{ ledeText }}</p>
-    <div data-enter style="--enter-delay: 210ms">{{ caller() if caller }}</div>
+    <p class="mt-6 max-w-2xl text-[1.1rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 260ms">{{ ledeText }}</p>
+    <div data-enter style="--enter-delay: 360ms">{{ caller() if caller }}</div>
   </div>
 </section>
 {%- endmacro -%}

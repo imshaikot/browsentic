@@ -1,0 +1,14 @@
+{#- Lattice pixels: a few squares snapped to the 28px dot grid, riding the
+    hero's edges. They enter with the headline cascade (--wi is the beat) and
+    then each breathes on its own slow flicker cycle. Decoration only, so they
+    hide below xl where the margins get thin, and screen readers never meet
+    them. -#}
+<div class="pointer-events-none absolute inset-0 hidden xl:block" aria-hidden="true">
+  <span class="pixel size-7 bg-surface-2" style="--wi: 2; --flicker-duration: 6.4s; --flicker-to: 0.35; top: 84px; right: 28px;"></span>
+  <span class="pixel size-7 bg-brand/20" style="--wi: 4; --flicker-duration: 7.6s; --flicker-to: 0.3; top: 112px; right: 0;"></span>
+  <span class="pixel size-14 bg-surface/70" style="--wi: 6; --flicker-duration: 9.2s; --flicker-to: 0.5; top: 196px; right: 56px;"></span>
+  <span class="pixel size-7 bg-ember/15" style="--wi: 8; --flicker-duration: 5.8s; --flicker-to: 0.25; top: 336px; right: 28px;"></span>
+  <span class="pixel size-7 bg-amber/15" style="--wi: 5; --flicker-duration: 8.4s; --flicker-to: 0.3; top: 56px; left: 28px;"></span>
+  <span class="pixel size-7 bg-surface-2/80" style="--wi: 7; --flicker-duration: 7.1s; --flicker-to: 0.4; top: 84px; left: 0;"></span>
+  <span class="pixel size-7 bg-ink/5" style="--wi: 9; --flicker-duration: 6.7s; --flicker-to: 0.45; top: 168px; left: 56px;"></span>
+</div>

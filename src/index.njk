@@ -23,26 +23,38 @@ showFaq: true
 <section class="relative overflow-hidden border-b border-line">
   <div class="dot-grid mask-radial pointer-events-none absolute inset-0"></div>
   <div class="pointer-events-none absolute -top-48 left-1/2 size-[46rem] -translate-x-1/2 rounded-full bg-brand/10 blur-[140px] animate-drift"></div>
+  {% include "partials/hero-pixels.njk" %}
 
   <div class="relative mx-auto max-w-7xl px-5 pb-20 pt-24 sm:px-8 sm:pt-32">
     <div class="grid items-center gap-14 lg:grid-cols-[0.88fr_1.12fr]">
       <div>
         <p class="inline-flex max-w-xl rounded-full border border-line bg-surface/40 px-3.5 py-1.5 text-[0.78rem] leading-snug text-ink-dim" data-enter style="--enter-delay: 0ms">{{ copy.HERO.badge }}</p>
 
-        <h1 class="mt-6 font-display text-[2.85rem] font-semibold leading-[1.03] tracking-[-0.03em] text-ink sm:text-[4rem]" data-enter style="--enter-delay: 70ms">
-          {{ copy.HERO.title.lead }}<br>{{ copy.HERO.title.tail }}<span class="text-gradient">{{ copy.HERO.title.accent }}</span>
+        {#- One span per word, so the headline lands word by word, and the
+            gradient phrase drops in last, on its own held beat. -#}
+        {%- set leadWords = copy.HERO.title.lead.split(" ") %}
+        {%- set tailWords = copy.HERO.title.tail.trim().split(" ") %}
+        <h1 class="mt-6 font-display text-[2.85rem] font-semibold leading-[1.03] tracking-[-0.03em] text-ink sm:text-[4rem]">
+          {%- for w in leadWords %}
+          <span class="hero-word" style="--wi:{{ loop.index }}">{{ w }}</span>
+          {%- endfor %}
+          <br>
+          {%- for w in tailWords %}
+          <span class="hero-word" style="--wi:{{ leadWords.length + loop.index }}">{{ w }}</span>
+          {%- endfor %}
+          <span class="text-gradient hero-phrase" style="--wi:{{ leadWords.length + tailWords.length + 3 }}">{{ copy.HERO.title.accent }}</span>
         </h1>
 
-        <p class="mt-7 max-w-xl text-[1.08rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 140ms">{{ copy.HERO.lede }}</p>
+        <p class="mt-7 max-w-xl text-[1.08rem] leading-relaxed text-ink-dim" data-enter style="--enter-delay: 620ms">{{ copy.HERO.lede }}</p>
 
-        <div class="mt-9 flex flex-wrap items-center gap-3" data-enter style="--enter-delay: 210ms">
+        <div class="mt-9 flex flex-wrap items-center gap-3" data-enter style="--enter-delay: 720ms">
           {{ m.button("/install/", "Install the extension") }}
           {{ m.button("/how-it-works/", "See how it works", "ghost") }}
         </div>
-        <p class="mt-3 text-[0.82rem] text-ink-faint" data-enter style="--enter-delay: 250ms">Chrome and Chromium &middot; {{ copy.HERO.voice }}</p>
+        <p class="mt-3 text-[0.82rem] text-ink-faint" data-enter style="--enter-delay: 800ms">Chrome and Chromium &middot; {{ copy.HERO.voice }}</p>
       </div>
 
-      <div data-enter style="--enter-delay: 300ms">
+      <div data-enter="scale" style="--enter-delay: 350ms">
         {% include "partials/hero-demo.njk" %}
       </div>
     </div>
@@ -53,7 +65,7 @@ showFaq: true
       {%- set a = m.ACCENT[path.accent] %}
       <article class="card spotlight flex flex-col px-6 py-6">
         <div class="flex items-center gap-2.5">
-          <span class="size-2 rounded-full {{ a.dot }}"></span>
+          <span class="size-2 rounded-full {{ a.dot }}" data-pop></span>
           <p class="font-display text-[0.7rem] uppercase tracking-[0.11em] {{ a.text }}">{{ path.kicker }}</p>
         </div>
         <h2 class="mt-3 font-display text-[1.25rem] font-semibold text-ink">{{ path.title }}</h2>
@@ -93,7 +105,7 @@ showFaq: true
       {%- if not loop.last %}
       <span class="rail pointer-events-none absolute left-full top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 lg:block" style="--rail-delay: {{ loop.index0 * 0.7 }}s" aria-hidden="true"></span>
       {%- endif %}
-      <span class="font-mono text-[0.7rem] text-ink-faint">0{{ loop.index }}</span>
+      <span class="font-mono text-[0.7rem] text-ink-faint" data-pop>0{{ loop.index }}</span>
       <h3 class="mt-2.5 font-display text-[1.12rem] font-semibold text-ink">{{ node.title }}</h3>
       <p class="mt-1 text-[0.8rem] font-medium text-brand">{{ node.sub }}</p>
       <p class="mt-3 text-[0.88rem] leading-relaxed text-ink-faint">{{ node.body }}</p>

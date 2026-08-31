@@ -36,6 +36,8 @@
 
   --radius-card: 1rem;
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap: cubic-bezier(0.45, 0.25, 0, 1);
 
   --animate-marquee: marquee 42s linear infinite;
   --animate-drift: drift 24s ease-in-out infinite;
@@ -47,7 +49,6 @@
 @keyframes drift { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(2%,-3%,0) scale(1.07); } }
 @keyframes dash { to { stroke-dashoffset: -32; } }
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
-@keyframes reveal { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
 
 @layer base {
   html {
@@ -145,14 +146,6 @@
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-
-  /* Scroll reveal without JavaScript. Falls back to fully visible where
-     animation-timeline is unsupported, so content is never hidden. */
-  .reveal {
-    animation: reveal linear both;
-    animation-timeline: view();
-    animation-range: entry 10% cover 26%;
   }
 
   .table-scroll {
@@ -347,7 +340,6 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .reveal { animation: none; opacity: 1; transform: none; }
 }
 
 @media print {
@@ -387,21 +379,33 @@
 /* ---- Scroll reveals ------------------------------------------------------ */
 
 @keyframes rise {
-  from { opacity: 0; transform: translate3d(0, 18px, 0); }
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
   to { opacity: 1; transform: none; }
 }
 
 /* A lone element reveals itself. A [data-stagger] container stays put and
-   reveals its children instead, one after another. */
+   reveals its children instead, one after another. Short travel and a hard
+   expo-out, so things land rather than drift in. */
 .js [data-reveal]:not([data-stagger]),
 .js [data-stagger] > * {
   opacity: 0;
-  transform: translate3d(0, 18px, 0);
+  transform: translate3d(0, var(--reveal-distance, 16px), 0);
   transition:
-    opacity 0.72s var(--ease-out-expo) var(--reveal-delay, 0ms),
-    transform 0.72s var(--ease-out-expo) var(--reveal-delay, 0ms);
+    opacity 0.55s var(--ease-out-expo) var(--reveal-delay, 0ms),
+    transform 0.55s var(--ease-out-expo) var(--reveal-delay, 0ms);
   will-change: opacity, transform;
 }
+
+/* Directional and scale starts. The value lives on data-reveal for a lone
+   element and on data-stagger for a group's children. */
+.js [data-reveal="left"]:not([data-stagger]),
+.js [data-stagger="left"] > * { transform: translate3d(calc(-1 * var(--reveal-distance, 16px)), 0, 0); }
+.js [data-reveal="right"]:not([data-stagger]),
+.js [data-stagger="right"] > * { transform: translate3d(var(--reveal-distance, 16px), 0, 0); }
+.js [data-reveal="scale"]:not([data-stagger]),
+.js [data-stagger="scale"] > * { transform: scale(0.95); }
+.js [data-reveal="fade"]:not([data-stagger]),
+.js [data-stagger="fade"] > * { transform: none; }
 
 .js [data-reveal]:not([data-stagger]).is-in,
 .js [data-stagger].is-in > * {
@@ -412,13 +416,82 @@
 
 .js [data-stagger] > * { --reveal-delay: calc(var(--i, 0) * 70ms); }
 
+/* Small accents inside a revealed block, a dot or a numeral, overshoot in a
+   beat after their parent settles. --reveal-delay is inherited, so a stagger
+   child's accent waits for that child, not for the group. */
+.js [data-reveal] [data-pop] {
+  display: inline-block;
+  opacity: 0;
+  scale: 0.25;
+  transition:
+    opacity 0.35s ease-out calc(var(--reveal-delay, 0ms) + 180ms),
+    scale 0.5s var(--ease-pop) calc(var(--reveal-delay, 0ms) + 180ms);
+}
+.js [data-reveal].is-in [data-pop] { opacity: 1; scale: 1; }
+
 /* ---- Entrance, above the fold -------------------------------------------- */
 
 .js [data-enter] {
   opacity: 0;
-  animation: rise 0.8s var(--ease-out-expo) both;
+  animation: rise 0.65s var(--ease-out-expo) both;
   animation-delay: var(--enter-delay, 0ms);
 }
+
+@keyframes rise-scale {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.965); }
+  to { opacity: 1; transform: none; }
+}
+.js [data-enter="scale"] {
+  animation-name: rise-scale;
+  animation-duration: 0.75s;
+  animation-timing-function: var(--ease-snap);
+}
+
+/* The hero headline lands word by word. Spans are inline-block even without
+   JavaScript so the layout never shifts, and the delay is capped so a long
+   subpage title does not dawdle. */
+.hero-word { display: inline-block; }
+@keyframes hero-word-in { to { opacity: 1; transform: none; } }
+.js .hero-word {
+  opacity: 0;
+  transform: translate3d(0, 0.4em, 0);
+  animation: hero-word-in 0.6s var(--ease-out-expo) both;
+  animation-delay: min(calc(var(--wi, 0) * 70ms), 700ms);
+}
+
+/* A multi-word phrase that must keep wrapping, like the gradient span, stays
+   inline and fades on its beat instead of rising. */
+@keyframes hero-phrase-in { to { opacity: 1; } }
+.js .hero-phrase {
+  opacity: 0;
+  animation: hero-phrase-in 0.7s ease-out both;
+  animation-delay: min(calc(var(--wi, 0) * 70ms), 700ms);
+}
+
+/* ---- Lattice pixels ------------------------------------------------------ */
+
+/* Decorative squares on the hero ground. They rise in with the headline, then
+   each one breathes on its own slow cycle. Without JavaScript they simply sit
+   there, which is fine, they are ground, not content. */
+@keyframes pixel-in { to { opacity: 1; transform: none; } }
+@keyframes flicker { 50% { opacity: var(--flicker-to, 0.4); } }
+
+.pixel { position: absolute; pointer-events: none; }
+.js .pixel {
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  animation:
+    pixel-in 0.5s var(--ease-snap) both,
+    flicker var(--flicker-duration, 7s) ease-in-out infinite;
+  animation-delay:
+    calc(var(--wi, 0) * 90ms + 250ms),
+    calc(var(--wi, 0) * 90ms + 1.6s);
+}
+
+/* ---- Float --------------------------------------------------------------- */
+
+@keyframes float-y { 50% { transform: translate3d(0, -5px, 0); } }
+.js .float-y { animation: float-y 9s ease-in-out 2.5s infinite; }
 
 /* ---- Hero demo ----------------------------------------------------------- */
 
@@ -441,8 +514,9 @@
     0 0 22px -4px var(--color-brand);
 }
 
-@keyframes step-in { from { opacity: 0; transform: translate3d(10px, 0, 0); } }
-.demo-step { animation: step-in 0.34s var(--ease-out-expo) both; }
+/* Steps wipe on like terminal output rather than sliding in. */
+@keyframes step-in { from { opacity: 0; clip-path: inset(0 100% 0 0); } }
+.demo-step { animation: step-in 0.5s linear both; }
 
 @keyframes cursor-hop {
   0%, 100% { transform: scale(1); opacity: 0.9; }
@@ -563,14 +637,20 @@
 
   .js [data-reveal],
   .js [data-stagger] > *,
-  .js [data-enter] {
+  .js [data-enter],
+  .js [data-pop],
+  .js .hero-word,
+  .js .hero-phrase,
+  .js .pixel {
     opacity: 1 !important;
     transform: none !important;
+    scale: 1 !important;
     animation: none !important;
     transition: none !important;
   }
   .rail::after,
   .pulse::after,
+  .js .float-y,
   .demo-cursor { animation: none; }
   .demo-cursor { opacity: 0; }
   .meter > i { transition: none; width: var(--meter, 60%); }
