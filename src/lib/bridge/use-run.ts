@@ -45,7 +45,7 @@ export interface Run {
 }
 
 export function useRun(): Run {
-  const [draft, setDraft] = useState<SiteMapDraft | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, SiteMapDraft>>({});
   const [recording, setRecording] = useState<RecordingState | null>(null);
   const [monitors, setMonitors] = useState<MonitorState[]>([]);
   const [bySession, setBySession] = useState<Record<string, RunItem[]>>({});
@@ -88,11 +88,14 @@ export function useRun(): Run {
 
       connected.onMessage.addListener((message) => {
         const runMessage = message as RunMessage;
-        if (runMessage.op === 'mapDraft') setDraft(runMessage.draft);
-        else if (runMessage.op === 'mapSettled') {
-          setDraft((current) => (current?.stagingId === runMessage.stagingId ? null : current));
+        if (runMessage.op === 'mapDraft') {
+          setDrafts((previous) => ({ ...previous, [runMessage.sessionId ?? EXTERNAL_VIEW]: runMessage.draft }));
+        } else if (runMessage.op === 'mapSettled') {
+          setDrafts((previous) =>
+            Object.fromEntries(Object.entries(previous).filter(([, held]) => held.stagingId !== runMessage.stagingId)),
+          );
           if (!runMessage.ok && runMessage.message) {
-            write(EXTERNAL_VIEW, (items) => [...items, notice('error', runMessage.message!)]);
+            write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => [...items, notice('error', runMessage.message!)]);
           }
         } else if (runMessage.op === 'recording') setRecording(runMessage.state);
         else if (runMessage.op === 'monitor') {
@@ -151,6 +154,8 @@ export function useRun(): Run {
     const external = bySession[EXTERNAL_VIEW] ?? [];
     return external.length ? [...own, ...external] : own;
   }, [sessionId, bySession]);
+
+  const draft = (sessionId ? drafts[sessionId] : undefined) ?? drafts[EXTERNAL_VIEW] ?? null;
 
   const send = useCallback(
     (text: string, opts?: SendOptions) => {

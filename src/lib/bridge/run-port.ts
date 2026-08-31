@@ -90,8 +90,8 @@ export type RunMessage =
   | { op: 'event'; sessionId?: string; runId: string; event: RunEvent }
   | { op: 'item'; sessionId?: string; item: RunItem }
   | { op: 'items'; sessionId?: string; items: RunItem[] }
-  | { op: 'mapDraft'; draft: SiteMapDraft }
-  | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string }
+  | { op: 'mapDraft'; sessionId?: string; draft: SiteMapDraft }
+  | { op: 'mapSettled'; sessionId?: string; stagingId: string; ok: boolean; message?: string }
   | { op: 'recording'; state: RecordingState | null }
   | { op: 'preview'; sessionId?: string; preview: ScreenshotPreview }
   | { op: 'monitor'; state: MonitorState }
@@ -105,7 +105,7 @@ const busy = new Set<string>();
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const cancelTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let externalItems: RunItem[] = [];
-let pendingDraft: SiteMapDraft | null = null;
+const pendingDrafts = new Map<string, { sessionId?: string; draft: SiteMapDraft }>();
 let queue: Promise<unknown> = Promise.resolve();
 
 function serialized<T>(task: () => Promise<T>): Promise<T> {
@@ -152,9 +152,17 @@ export function serveRunPorts(): void {
     }),
   );
 
-  onSiteMapDraft((_runId, draft) => {
-    pendingDraft = draft;
-    broadcast({ op: 'mapDraft', draft });
+  onSiteMapDraft((runId, draft) => {
+    void serialized(async () => {
+      const session = await sessionForRun(runId);
+      if (session) {
+        for (const [stagingId, held] of pendingDrafts) {
+          if (held.sessionId === session.sessionId) pendingDrafts.delete(stagingId);
+        }
+      }
+      pendingDrafts.set(draft.stagingId, { sessionId: session?.sessionId, draft });
+      broadcast({ op: 'mapDraft', sessionId: session?.sessionId, draft });
+    });
   });
 
   onWelcome(() => {
@@ -184,7 +192,9 @@ export function serveRunPorts(): void {
       panelPorts.add(port);
       if (panelPorts.size === 1) for (const watch of panelWatchers) watch(true);
     }
-    if (pendingDraft) post(port, { op: 'mapDraft', draft: pendingDraft });
+    for (const held of pendingDrafts.values()) {
+      post(port, { op: 'mapDraft', sessionId: held.sessionId, draft: held.draft });
+    }
     void currentRecording().then((state) => post(port, { op: 'recording', state }));
     void activeMonitorStates().then((states) => {
       for (const state of states) post(port, { op: 'monitor', state });
@@ -243,13 +253,14 @@ function handle(command: RunCommand): void {
       return;
     case 'activateMap':
     case 'discardMap': {
-      const draft = pendingDraft;
+      const held = pendingDrafts.get(command.stagingId);
       const settle =
         command.op === 'activateMap'
           ? activateSiteMap(command.stagingId, command.exactHost)
           : discardSiteMap(command.stagingId);
       void settle.then((result) => {
-        if (result.ok && command.op === 'activateMap' && draft?.stagingId === command.stagingId) {
+        if (result.ok && command.op === 'activateMap' && held) {
+          const { draft } = held;
           void recordGeneratedSkill({
             name: draft.name,
             domain: command.exactHost ? draft.host : draft.domain,
@@ -258,9 +269,10 @@ function handle(command: RunCommand): void {
             generatedAt: draft.generatedAt,
           });
         }
-        if (pendingDraft?.stagingId === command.stagingId) pendingDraft = null;
+        pendingDrafts.delete(command.stagingId);
         broadcast({
           op: 'mapSettled',
+          sessionId: held?.sessionId,
           stagingId: command.stagingId,
           ok: result.ok,
           message: result.ok ? undefined : `${result.error.code}: ${result.error.message}`,
@@ -456,6 +468,14 @@ async function endRun(sessionId: string, message: string): Promise<void> {
   await settle(sessionId);
 }
 
+function orphanDrafts(sessionId: string): void {
+  for (const held of pendingDrafts.values()) {
+    if (held.sessionId !== sessionId) continue;
+    held.sessionId = undefined;
+    broadcast({ op: 'mapDraft', draft: held.draft });
+  }
+}
+
 async function endSession(sessionId: string): Promise<void> {
   const session = (await readTabSessions())[sessionId];
   if (session?.runId) cancelRun(session.runId);
@@ -467,6 +487,7 @@ async function endSession(sessionId: string): Promise<void> {
   await dropSession(sessionId);
   buffers.delete(sessionId);
   busy.delete(sessionId);
+  orphanDrafts(sessionId);
   resetConversation(sessionId);
   await syncRunIndicator();
 }
@@ -487,6 +508,7 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
     await persist(owner.sessionId);
     await dropSession(owner.sessionId);
     buffers.delete(owner.sessionId);
+    orphanDrafts(owner.sessionId);
   }
 
   const meta = (await listSessions()).find((s) => s.id === sessionId);
@@ -579,6 +601,7 @@ export function serveTabSessions(): void {
       await persist(closed.sessionId);
       buffers.delete(closed.sessionId);
       busy.delete(closed.sessionId);
+      orphanDrafts(closed.sessionId);
       if (closed.runId) resetConversation(closed.sessionId);
       await syncRunIndicator();
     });
