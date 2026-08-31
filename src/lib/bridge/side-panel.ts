@@ -9,6 +9,11 @@ export function openSidePanel(windowId: number) {
   return browser.sidePanel.open({ windowId });
 }
 
+/** Firefox lets the background shut the sidebar, as long as a user gesture is still live. */
+export function closeSidebar(): Promise<void> {
+  return sidebarAction().close();
+}
+
 /** Only the panel itself calls this, so `window.close()` is the fallback worth having. */
 export async function closeSidePanel(windowId: number | null): Promise<void> {
   try {

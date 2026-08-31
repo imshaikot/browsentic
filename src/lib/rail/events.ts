@@ -17,11 +17,9 @@ export type RailCommand =
   | { channel: typeof RAIL_CHANNEL; op: 'show'; view: RailView }
   | { channel: typeof RAIL_CHANNEL; op: 'hide' };
 
-export interface RailRequest {
-  channel: typeof RAIL_CHANNEL;
-  op: 'open';
-  tab: PanelTab;
-}
+export type RailRequest =
+  | { channel: typeof RAIL_CHANNEL; op: 'open'; tab: PanelTab }
+  | { channel: typeof RAIL_CHANNEL; op: 'sync' };
 
 export function isRailCommand(message: unknown): message is RailCommand {
   if (typeof message !== 'object' || message === null) return false;
@@ -32,7 +30,7 @@ export function isRailCommand(message: unknown): message is RailCommand {
 export function isRailRequest(message: unknown): message is RailRequest {
   if (typeof message !== 'object' || message === null) return false;
   const frame = message as { channel?: unknown; op?: unknown };
-  return frame.channel === RAIL_CHANNEL && frame.op === 'open';
+  return frame.channel === RAIL_CHANNEL && (frame.op === 'open' || frame.op === 'sync');
 }
 
 /** Lucide paths, copied so the content script carries no React and no icon package. */

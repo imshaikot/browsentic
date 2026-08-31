@@ -94,9 +94,12 @@ export type RunMessage =
   | { op: 'mapSettled'; stagingId: string; ok: boolean; message?: string }
   | { op: 'recording'; state: RecordingState | null }
   | { op: 'preview'; sessionId?: string; preview: ScreenshotPreview }
-  | { op: 'monitor'; state: MonitorState };
+  | { op: 'monitor'; state: MonitorState }
+  | { op: 'close' };
 
 const ports = new Set<Browser.runtime.Port>();
+const panelPorts = new Set<Browser.runtime.Port>();
+const panelWatchers = new Set<(open: boolean) => void>();
 const buffers = new Map<string, RunItem[]>();
 const busy = new Set<string>();
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -177,6 +180,10 @@ export function serveRunPorts(): void {
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== RUN_PORT) return;
     ports.add(port);
+    if (port.sender?.url?.includes('sidepanel.html')) {
+      panelPorts.add(port);
+      if (panelPorts.size === 1) for (const watch of panelWatchers) watch(true);
+    }
     if (pendingDraft) post(port, { op: 'mapDraft', draft: pendingDraft });
     void currentRecording().then((state) => post(port, { op: 'recording', state }));
     void activeMonitorStates().then((states) => {
@@ -189,8 +196,21 @@ export function serveRunPorts(): void {
     });
 
     port.onMessage.addListener((message) => handle(message as RunCommand));
-    port.onDisconnect.addListener(() => ports.delete(port));
+    port.onDisconnect.addListener(() => {
+      ports.delete(port);
+      if (panelPorts.delete(port) && panelPorts.size === 0) for (const watch of panelWatchers) watch(false);
+    });
   });
+}
+
+/** Fires with `true` when the first side panel connects and `false` when the last one is gone. */
+export function onPanelPresence(watch: (open: boolean) => void): void {
+  panelWatchers.add(watch);
+}
+
+/** Chromium has no menu-side close, so each panel is told to shut itself. */
+export function closePanels(): void {
+  for (const panel of panelPorts) post(panel, { op: 'close' });
 }
 
 function handle(command: RunCommand): void {

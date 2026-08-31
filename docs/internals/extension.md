@@ -94,9 +94,22 @@ revived, which would strand a rail on a page with no way to clear it. The first 
 life always broadcasts; only a repeated *clear* is skipped. A tab that has just finished loading is
 repainted on its own rather than triggering a broadcast.
 
+**A rail only exists while the panel is minimized on purpose.** The side panel holds a run port
+open for as long as it lives, so the background knows the moment the last panel is gone. If the
+collapsed flag is not set at that moment — the panel was closed with the browser's own button, not
+the collapse button — `clearStrandedRail()` forgets what it thinks tabs are showing and forces the
+hide onto all of them, catching any tab an earlier broadcast missed. The content script heals its
+own side of the same problem: on injection it removes any rail element left by a previous extension
+life, and on a back/forward-cache restore it drops the cached rail and asks the background for the
+current state with the rail channel's `sync` op.
+
+The same panel-presence signal drives the context menu: the item reads **Open Browsentic** or
+**Close Browsentic** to match, and a click on *Close* shuts the panel — Firefox's background closes
+the sidebar inside the gesture, Chromium panels are told over the run port to close themselves.
+
 Pages that refuse content scripts — `chrome://`, the Web Store, the new-tab page — get no rail.
 That is the same `TAB_UNREACHABLE` set as everywhere else, and it is why the toolbar icon and the
-**Open Browsentic** context-menu item stay the guaranteed way back in.
+**Open/Close Browsentic** context-menu item stay the guaranteed way back in.
 
 ## Tab scoping
 

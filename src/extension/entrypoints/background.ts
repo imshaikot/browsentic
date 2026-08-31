@@ -10,10 +10,10 @@ import { nameStoredSession } from '@/lib/bridge/session-store';
 import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
-import { serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
-import { serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
+import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
+import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { serveTimers } from '@/lib/bridge/timer';
-import { openSidePanel } from '@/lib/bridge/side-panel';
+import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
   RECONNECT_ALARM,
@@ -172,14 +172,30 @@ export default defineBackground(() => {
     });
   });
 
-  void browser.contextMenus
+  const menuReady = browser.contextMenus
     .removeAll()
     .then(() =>
       browser.contextMenus.create({ id: OPEN_PANEL_MENU, title: 'Open Browsentic', contexts: ['all'] }),
     );
 
+  let panelOpen = false;
+  onPanelPresence((open) => {
+    panelOpen = open;
+    void menuReady.then(() =>
+      browser.contextMenus.update(OPEN_PANEL_MENU, {
+        title: open ? 'Close Browsentic' : 'Open Browsentic',
+      }),
+    );
+    if (!open) void clearStrandedRail();
+  });
+
   browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId !== OPEN_PANEL_MENU || tab?.windowId == null) return;
+    if (panelOpen) {
+      if (import.meta.env.FIREFOX) void closeSidebar();
+      else closePanels();
+      return;
+    }
     void openSidePanel(tab.windowId);
   });
 

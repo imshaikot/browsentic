@@ -56,7 +56,11 @@ reopen it.
 
 The rail is drawn into the page, so it cannot appear on pages Browsentic is not allowed into —
 `chrome://` pages, the Chrome Web Store and the new tab page. The toolbar icon and the right-click
-**Open Browsentic** item always work.
+**Open Browsentic** item always work; while the panel is open, that item reads **Close Browsentic**
+and closes it instead.
+
+The rail belongs to the minimized state alone. Closing the panel with the browser's own close
+button removes any rail from every page — only the header's collapse button leaves one behind.
 
 ### Knowing something is running when you are elsewhere
 

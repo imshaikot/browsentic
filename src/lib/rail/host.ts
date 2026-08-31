@@ -29,6 +29,21 @@ export function exposeRail(): void {
     return Promise.resolve({ ok: true });
   });
 
+  /* A rail drawn by a previous extension life — before a reload, or before this page went
+     into the back/forward cache — is dead markup: its click handlers reach nothing. Drop it
+     and ask the background whether a live one belongs here. */
+  document.getElementById(HOST_ID)?.remove();
+  resync();
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return;
+    remove();
+    resync();
+  });
+
+  function resync(): void {
+    void browser.runtime.sendMessage({ channel: RAIL_CHANNEL, op: 'sync' }).catch(() => undefined);
+  }
+
   function remove(): void {
     host?.remove();
     host = null;

@@ -46,6 +46,17 @@ export function syncRail(): Promise<void> {
   return inFlight;
 }
 
+/**
+ * The panel disappeared without minimizing — closed natively, so no rail should survive it.
+ * Forgetting `showing` forces the hide onto every tab, including any that missed an earlier
+ * broadcast. A collapsed panel is different: the rail is the panel then, and it stays.
+ */
+export async function clearStrandedRail(): Promise<void> {
+  if (await readPanelCollapsed()) return;
+  showing = null;
+  await syncRail();
+}
+
 async function paintRail(): Promise<void> {
   const collapsed = await readPanelCollapsed();
   if (!collapsed && showing === false) return;
@@ -122,8 +133,13 @@ async function readSide(): Promise<'left' | 'right'> {
 export function serveRail(): void {
   browser.runtime.onMessage.addListener((message, sender) => {
     if (!isRailRequest(message)) return;
-    const windowId = sender.tab?.windowId;
-    if (windowId == null) return;
+    const { id: tabId, windowId } = sender.tab ?? {};
+    if (tabId == null || windowId == null) return;
+
+    if (message.op === 'sync') {
+      void paintTab(tabId);
+      return Promise.resolve({ ok: true });
+    }
 
     /* The click that reached us is the only user gesture the panel will get — spend it
        before any await, or `open()` rejects and the rail becomes a dead button. The rail

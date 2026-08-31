@@ -107,6 +107,8 @@ export function useRun(): Run {
           write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => [...items, runMessage.item]);
         } else if (runMessage.op === 'preview') {
           write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => attachPreview(items, runMessage.preview));
+        } else if (runMessage.op === 'close') {
+          window.close();
         } else {
           write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => reduce(items, runMessage.event));
         }
