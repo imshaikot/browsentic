@@ -182,7 +182,7 @@ function fitScale(deviceW: number, deviceH: number, maxLongSide: number): number
   return Math.min(1, byLong, byArea);
 }
 
-async function captureViewport(
+export async function captureViewport(
   windowId: number | undefined,
   format: 'png' | 'jpeg',
   quality: number | undefined,
@@ -217,7 +217,7 @@ function tileStarts(start: number, size: number, step: number): number[] {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function blobToDataUrl(blob: Blob, mime: string): Promise<string> {
+export function blobToDataUrl(blob: Blob, mime: string): Promise<string> {
   return blob.arrayBuffer().then((buffer) => {
     const bytes = new Uint8Array(buffer);
     let binary = '';

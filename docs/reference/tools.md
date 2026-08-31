@@ -183,7 +183,8 @@ record where a site's search lives. `page_searchSite` is not — it navigates.
 
 Hand the page to the user and let them point at one element — **A-Eye**. Their cursor becomes a
 lens, whatever they hover is outlined, and the element they click comes back as a
-[described element](#element-targets) plus its rendered text.
+[described element](#element-targets) plus its rendered text and a screenshot of it exactly as
+they saw it. A new call dismisses a pick already waiting — only one lens can hold the page.
 
 It stops everything and waits for a person, so it costs more than any other tool here: reach for it
 only when a target is genuinely ambiguous and pointing is quicker than describing. `hint` is the

@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
+import { PICK_DEFAULT_TIMEOUT_MS, pickElement } from '@/lib/actions/page/pick-element';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { typeText, typingDurationMs } from '@/lib/actions/page/type-text';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
@@ -130,6 +131,7 @@ function timeoutFor(action: string, input: unknown): number {
   if (action === typeText.name) return typingDurationMs(input) + DEFAULT_TIMEOUT_MS;
   if (action === startMonitor.name) return DEFAULT_TIMEOUT_MS;
   if (action === awaitMonitor.name) return (declaredTimeout(input) ?? AWAIT_DEFAULT_TIMEOUT_MS) + 5_000;
+  if (action === pickElement.name) return (declaredTimeout(input) ?? PICK_DEFAULT_TIMEOUT_MS) + 5_000;
   const declared = declaredTimeout(input);
   return declared != null ? declared + 5_000 : DEFAULT_TIMEOUT_MS;
 }

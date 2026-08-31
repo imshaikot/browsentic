@@ -18,11 +18,7 @@ const CURSOR = `url("data:image/svg+xml,${encodeURIComponent(cursorSvg())}") 14 
 
 const DEFAULT_HINT = 'Click the element you mean';
 
-let picking = false;
-
-export function lensIsUp(): boolean {
-  return picking;
-}
+let dismissCurrent: (() => void) | null = null;
 
 /**
  * The page is handed to the user for one click, and the page must not be able to tell the
@@ -30,9 +26,12 @@ export function lensIsUp(): boolean {
  * propagation stopped, default left alone — because preventing `pointerdown` would stop
  * the browser generating the `click` this waits on. `click` itself is the one that is
  * fully cancelled, so picking a link never also follows it.
+ *
+ * Only one lens can hold the page: a new pick dismisses one already waiting, whose caller
+ * gets a cancellation. A lens whose caller stopped listening must never wedge the next pick.
  */
 export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: number }): Promise<LensOutcome> {
-  picking = true;
+  dismissCurrent?.();
 
   const host = document.createElement('div');
   host.id = HOST_ID;
@@ -54,6 +53,8 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
   let hovered: Element | null = null;
 
   return new Promise<LensOutcome>((resolve) => {
+    const dismiss = () => settle({ cancelled: true });
+    dismissCurrent = dismiss;
     const timer = setTimeout(() => settle({ timedOut: true }), timeoutMs);
 
     const mute = (event: Event) => {
@@ -128,7 +129,7 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
       }
       host.remove();
       cursor.remove();
-      picking = false;
+      if (dismissCurrent === dismiss) dismissCurrent = null;
       resolve(outcome);
     }
   });

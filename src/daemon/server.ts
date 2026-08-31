@@ -6,7 +6,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ActionResult } from '@/lib/actions/protocol';
-import { RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
+import { FOCUS_SHOT_ACTION, RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
 import { actionNameFor, assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { readAgentConfig } from './agent/config';
 import type { Bridge } from './control';
@@ -15,6 +15,15 @@ import { log } from './log';
 
 const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
 const SCREENSHOT_TOOL = 'page_screenshot';
+const PICK_TOOL = 'page_pickElement';
+
+const FOCUS_SHOT_TOOL = {
+  name: toolNameFor(FOCUS_SHOT_ACTION),
+  description:
+    'Show the screenshot of the element the user pointed at with A-Eye, taken at the instant they picked it. ' +
+    'Only answers when the current instruction arrived with a pick attached.',
+  inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
+};
 
 const RESOURCES = [
   {
@@ -148,7 +157,7 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
             'Report whether the Browsentic browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
           inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
         },
-        ...(opts.agentRun ? [SAVE_SITE_MAP_TOOL] : []),
+        ...(opts.agentRun ? [SAVE_SITE_MAP_TOOL, FOCUS_SHOT_TOOL] : []),
       ],
     };
   });
@@ -158,6 +167,8 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     const action = actionNameFor(params.name);
     const result = await bridge.invoke(action, params.arguments ?? {});
     if (params.name === SCREENSHOT_TOOL) return renderScreenshot(result);
+    if (params.name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
+    if (params.name === PICK_TOOL) return renderPick(result, shouldFence(action, policy) ? tag : undefined);
     return render(result, shouldFence(action, policy) ? tag : undefined);
   });
 
@@ -273,6 +284,45 @@ function renderScreenshot(result: ActionResult) {
     content: [
       { type: 'image' as const, data: base64, mimeType },
       { type: 'text' as const, text: sealSecrets(notes) },
+    ],
+  };
+}
+
+function renderPick(result: ActionResult, fenceWith?: string) {
+  if (!result.ok) return render(result, fenceWith);
+  const { shot, ...rest } = result.data as { shot?: { dataUrl?: string; width?: number; height?: number } } & Record<
+    string,
+    unknown
+  >;
+  if (typeof shot?.dataUrl !== 'string') return render(result, fenceWith);
+
+  const [mimeType, base64] = splitDataUrl(shot.dataUrl);
+  const rendered = render({ ok: true, data: rest }, fenceWith);
+  return {
+    content: [
+      ...rendered.content,
+      { type: 'image' as const, data: base64, mimeType },
+      {
+        type: 'text' as const,
+        text: `${IMAGE_NOTE} This is the picked element photographed at the instant the user clicked it.`,
+      },
+    ],
+  };
+}
+
+function renderFocusShot(result: ActionResult) {
+  if (!result.ok) return render(result);
+  const dataUrl = (result.data as { dataUrl?: unknown } | null)?.dataUrl;
+  if (typeof dataUrl !== 'string') return render(result);
+
+  const [mimeType, base64] = splitDataUrl(dataUrl);
+  return {
+    content: [
+      { type: 'image' as const, data: base64, mimeType },
+      {
+        type: 'text' as const,
+        text: `${IMAGE_NOTE} This is the element the user pointed at with A-Eye, as it stood when they picked it.`,
+      },
     ],
   };
 }

@@ -13,6 +13,7 @@ import { listRecordings } from '@/lib/actions/page/list-recordings';
 import { monitorStatus } from '@/lib/actions/page/monitor-status';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
+import { pickElement } from '@/lib/actions/page/pick-element';
 import { readConsole } from '@/lib/actions/page/read-console';
 import { readNetwork } from '@/lib/actions/page/read-network';
 import { readRecording } from '@/lib/actions/page/read-recording';
@@ -43,6 +44,7 @@ import {
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { startJobTimer, stopJobTimer, timerStatusFor } from '@/lib/bridge/timer';
 import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
+import { pickInTab } from '@/lib/bridge/pick';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
@@ -123,6 +125,7 @@ async function dispatch(
   if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input, runId);
+  if (action === pickElement.name) return pickInTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   if (action === captureDownload.name) return captureFromPage(tab.id, input);
   if (action === trustedClick.name) return trustedClickInTab(tab.id, input);

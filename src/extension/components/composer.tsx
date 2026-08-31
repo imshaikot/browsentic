@@ -283,6 +283,13 @@ function FocusChip({
         </span>
       ) : (
         <>
+          {focus.shot && (
+            <img
+              src={focus.shot}
+              alt="The element you picked"
+              className="max-h-7 max-w-14 shrink-0 rounded border border-ember/40 object-cover"
+            />
+          )}
           <span className="min-w-0 flex-1 truncate text-ink">
             A-Eye: <span className="font-medium">{focusName(focus)}</span>
           </span>

@@ -240,6 +240,7 @@ const ICONS: Record<string, LucideIcon> = {
   getPageInfo: Eye,
   extractText: Eye,
   pickElement: ScanEye,
+  'browsentic.focusShot': ScanEye,
   findProgress: Eye,
   clickElement: MousePointerClick,
   trustedClick: MousePointerClick,

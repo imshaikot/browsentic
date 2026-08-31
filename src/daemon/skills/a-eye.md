@@ -8,7 +8,7 @@ A-Eye is pointing, in both directions. The user can point at an element before t
 
 ## When they pointed first
 
-If they used A-Eye before sending, the element is already in your system prompt under **Focused element (A-Eye)** — its selector, its tag and role, and the text it held at that moment. There is nothing to call: it is the subject of the instruction.
+If they used A-Eye before sending, the element is already in your system prompt under **Focused element (A-Eye)** — its selector, its tag and role, and the text it held at that moment. There is nothing to call: it is the subject of the instruction. When that block says a screenshot is attached, `browsentic_focusShot {}` shows you the element photographed at the instant they picked it — call it once when seeing the element matters, and never re-derive it with a fresh capture.
 
 Three habits make that worth something:
 
@@ -20,7 +20,7 @@ If the selector no longer resolves, the page has changed under the pick. Say so 
 
 ## When you need them to point
 
-`page_pickElement {}` hands the page to the user: their cursor becomes a lens, whatever they hover is outlined, and the element they click comes back with its selector, its role and its rendered text.
+`page_pickElement {}` hands the page to the user: their cursor becomes a lens, whatever they hover is outlined, and the element they click comes back with its selector, its role, its rendered text and a screenshot of it exactly as they saw it.
 
 ```
 page_pickElement { hint: "Point at the price you mean" }
@@ -28,7 +28,7 @@ page_pickElement { hint: "Point at the price you mean" }
 
 Reach for it when a target is genuinely ambiguous and describing it would take longer than pointing — several rows share a label, "the second one" could mean two things, the user said "this one" about something you cannot see. Set `hint` to the question you would have asked in words.
 
-It stops everything and waits for a person, so it costs more than any other tool here. Do not call it to explore a page, do not call it when `page_getPageInfo` would have told you the same thing, and never call it twice in a row — if the first pick did not tell you what you needed, ask in words.
+It stops everything and waits for a person, so it costs more than any other tool here. Do not call it to explore a page, do not call it when `page_getPageInfo` would have told you the same thing, and never call it twice in a row — a new call dismisses a pick still waiting, and if the first pick did not tell you what you needed, ask in words.
 
 Two refusals, both terminal: `PICK_CANCELLED` means they dismissed it without choosing, and `TIMEOUT` means they never got to it. Both mean the same thing — stop asking them to point, and carry on in words or ask a plain question.
 

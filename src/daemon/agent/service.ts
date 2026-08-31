@@ -11,7 +11,8 @@ import {
   type RunEvent,
 } from '@/lib/actions/protocol';
 import { openTab } from '@/lib/actions/page/open-tab';
-import { READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
+import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
+import { toolNameFor } from '@/lib/actions/tool-names';
 import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
@@ -71,7 +72,11 @@ interface ActiveRun {
   /** Host of the tab this run started on — what "this site" means on an approval card. */
   site?: string;
   map?: MapRun;
+  /** The A-Eye pick photographed when the user attached it to this instruction. */
+  focusShot?: string;
 }
+
+const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
 
 interface Decision {
   allow: boolean;
@@ -123,6 +128,19 @@ export class AgentSession {
       }
       const result = this.submitSiteMap(run, input);
       emit({ kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
+      return result;
+    }
+
+    if (action === FOCUS_SHOT_ACTION) {
+      const result = run.focusShot
+        ? success({ dataUrl: run.focusShot })
+        : failure('NO_FOCUS_SHOT', 'No A-Eye pick came with this instruction, so nothing was photographed.');
+      emit({
+        kind: 'toolResult',
+        toolId,
+        ok: result.ok,
+        summary: result.ok ? 'the picked element, as photographed' : 'no pick attached',
+      });
       return result;
     }
 
@@ -249,6 +267,7 @@ export class AgentSession {
       abort: new AbortController(),
       pending: new Map(),
       ownedTabIds: [],
+      focusShot: context?.focus?.shot,
     };
     this.runs.set(runId, run);
 
@@ -484,6 +503,11 @@ function focusBlock(focus: FocusedElement | undefined): string | undefined {
   ];
   if (focus.label) lines.push(`- Label: ${flatten(focus.label)}`);
   lines.push(`- On: ${flatten(focus.title)} — ${flatten(focus.url)}`);
+  if (focus.shot) {
+    lines.push(
+      `- A screenshot of it, taken at the instant they picked it, is attached — call \`${FOCUS_SHOT_TOOL_NAME}\` once to see it.`,
+    );
+  }
 
   const content = focus.content.slice(0, MAX_FOCUS_CONTENT);
   const cut = focus.truncated || content.length < focus.content.length;

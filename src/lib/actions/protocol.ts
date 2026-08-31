@@ -91,6 +91,8 @@ export interface FocusedElement {
   truncated: boolean;
   url: string;
   title: string;
+  /** Data URL of the element photographed at the instant it was picked. */
+  shot?: string;
 }
 
 export interface SavedRecording {
