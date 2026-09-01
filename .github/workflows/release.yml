@@ -174,7 +174,16 @@ jobs:
       - name: Release notes
         # Prefers the text `prepare` wrote into the annotated tag, and falls back to reading
         # the conventional-commit log when the tag carries none.
-        run: node scripts/release-notes.mjs "$VERSION" --out "dist/RELEASE_NOTES-$TAG.md"
+        #
+        # actions/checkout materialises the pushed tag as a lightweight ref, so `cat-file -t`
+        # says `commit` and the annotated tag's own message is invisible — which silently
+        # published log-generated notes over hand-curated ones in v0.4.10. Re-fetching the
+        # ref restores the real tag object.
+        run: |
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          test "$(git cat-file -t "$TAG")" = tag \
+            || echo "::warning::$TAG is lightweight; notes will come from the commit log"
+          node scripts/release-notes.mjs "$VERSION" --out "dist/RELEASE_NOTES-$TAG.md"
 
       - name: Create the GitHub release
         env:
