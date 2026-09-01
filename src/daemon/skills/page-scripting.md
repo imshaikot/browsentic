@@ -48,3 +48,21 @@ Rules that keep it working:
 If the approval comes back declined, that is an answer, not an obstacle: fall back to the ordinary tools or ask, never re-submit the same code hoping for a different click. A `CODE_ERROR` result carries the page-side exception — fix the code and inject the corrected version, which is a new approval, so get it right in as few revisions as you can.
 
 `LIVE_TOOLS_OFF` means the switch went off between messages. Only the user can turn it back on; say what you would use it for and why, and carry on with the ordinary tools meanwhile.
+
+## When the user keeps it
+
+A second after an install lands, the panel offers to keep it as a named tool for that site,
+scoped to the host and the first path segment: `youtube.com:watch:darken-page-except-video-player`.
+Only a zero-argument entry point can be kept, since the user runs it by name with nothing to
+pass, so a function that takes arguments is a one-off by design.
+
+Two things follow for you.
+
+- **Write one zero-argument entry point when the job is a whole action.** "Darken this page" is
+  worth keeping and needs no input. "Create a tag called X" is not, and should take its name as
+  an argument. Shape the toolkit around which of the two you are doing rather than adding
+  parameters that only exist to look general.
+- **A kept tool is not yours to call.** It lives in the extension, it is not a page action, and
+  no `page_*` tool reaches it. If the user asks for the same effect again on that site, tell them
+  to run `/<name>` rather than writing the same code a second time. You will see a skill note for
+  each one they kept, which is how you know it exists.

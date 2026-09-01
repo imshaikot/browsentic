@@ -14,9 +14,11 @@ import { z } from 'zod';
 import { invokeInTab } from '@/lib/actions/client';
 import { injectCode } from '@/lib/actions/page/inject-code';
 import { runCode } from '@/lib/actions/page/run-code';
-import { installerSource, TOOLKIT_MISSING } from '@/lib/actions/page/toolkit';
+import { installerSource, TOOLKIT_MISSING, type ToolkitEntry } from '@/lib/actions/page/toolkit';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { scopeOf, slugFromPurpose } from '@/lib/skills/saved-tool';
 import { send, withDebugger, type DebuggerSession } from './cdp';
+import { getSavedTool, scopeMatches } from './saved-tools';
 
 const TOOLKITS_KEY = 'browsentic/codeToolkits';
 
@@ -30,8 +32,32 @@ interface StoredToolkit {
   origin: string;
   purpose: string;
   code: string;
-  functions: string[];
+  entries: ToolkitEntry[];
   installedAt: number;
+}
+
+/**
+ * What the panel is asked about a second after an install lands. Metadata only: the code
+ * stays here, and the panel already has it from the approval it just answered.
+ */
+export interface ToolOffer {
+  toolkitId: string;
+  /** The zero-argument entry point a saved tool would call. */
+  fn: string;
+  purpose: string;
+  suggestedSlug: string;
+  host: string;
+  segment: string;
+  origin: string;
+}
+
+/** How long after an install the offer appears. Long enough to see the effect land first. */
+const OFFER_DELAY_MS = 1_000;
+
+const offerListeners = new Set<(offer: ToolOffer) => void>();
+
+export function onToolOffer(listener: (offer: ToolOffer) => void): void {
+  offerListeners.add(listener);
 }
 
 type ToolkitMap = Record<string, StoredToolkit>;
@@ -86,28 +112,97 @@ export async function installToolkit(tabId: number, url: string | undefined, inp
     origin,
     purpose,
     code,
-    functions: [],
+    entries: [],
     installedAt: Date.now(),
   };
 
   const installed = await evaluateInstaller(tabId, toolkit);
   if (!installed.ok) return installed;
 
-  toolkit.functions = installed.data as string[];
+  toolkit.entries = installed.data as ToolkitEntry[];
   await writeToolkit(tabId, toolkit);
 
   const summary = {
     toolkitId: toolkit.id,
     origin,
     purpose,
-    functions: toolkit.functions,
+    functions: toolkit.entries.map((entry) => entry.name),
   };
-  if (!call) return success(summary);
 
-  const called = await runToolkit(tabId, url, { function: call.function, args: call.args });
+  const called = call ? await runToolkit(tabId, url, { function: call.function, args: call.args }) : null;
+  offerToKeep(toolkit, url, call?.function);
+
+  if (!called) return success(summary);
   return called.ok
     ? success({ ...summary, called: called.data })
     : success({ ...summary, callFailed: called.error });
+}
+
+/**
+ * Ask, once, whether this is worth keeping. Only a zero-argument entry point can be
+ * offered, because `/` invocation passes nothing: prefer the one just called, since that
+ * is the effect the user watched happen, and otherwise take a lone zero-argument function.
+ * Anything else stays a one-off, which is the honest answer for a toolkit that needs input.
+ */
+function offerToKeep(toolkit: StoredToolkit, url: string | undefined, called: string | undefined): void {
+  const zeroArg = toolkit.entries.filter((entry) => entry.arity === 0);
+  const entry = zeroArg.find((candidate) => candidate.name === called) ?? (zeroArg.length === 1 ? zeroArg[0] : null);
+  const scope = url ? scopeOf(url) : null;
+  if (!entry || !scope) return;
+
+  setTimeout(() => {
+    const offer: ToolOffer = {
+      toolkitId: toolkit.id,
+      fn: entry.name,
+      purpose: toolkit.purpose,
+      suggestedSlug: slugFromPurpose(toolkit.purpose, entry.name),
+      host: scope.host,
+      segment: scope.segment,
+      origin: toolkit.origin,
+    };
+    for (const listener of offerListeners) listener(offer);
+  }, OFFER_DELAY_MS);
+}
+
+/**
+ * The `/` path. No guardrail runs here and none should: this code was read and approved
+ * when it was saved, the user asked for it by name just now, and the daemon is not in the
+ * loop at all — which is also what keeps it out of reach of an MCP client.
+ */
+export async function runSavedTool(tabId: number, url: string | undefined, toolId: string): Promise<ActionResult> {
+  const tool = await getSavedTool(toolId);
+  if (!tool) return failure('UNKNOWN_TOOL', 'That tool is no longer saved.');
+  if (!scopeMatches(tool, url)) {
+    return failure(
+      'TOOLKIT_SCOPE',
+      `“${tool.name}” was saved for ${tool.origin}/${tool.scope.segment}, and this tab is somewhere else.`,
+    );
+  }
+
+  const staged: StoredToolkit = {
+    id: tool.id,
+    origin: tool.origin,
+    purpose: tool.description,
+    code: tool.code,
+    entries: [],
+    installedAt: Date.now(),
+  };
+  const installed = await evaluateInstaller(tabId, staged);
+  if (!installed.ok) return installed;
+
+  staged.entries = installed.data as ToolkitEntry[];
+  await writeToolkit(tabId, staged);
+  return invokeInTab(tabId, runCode.name, { function: tool.fn, args: [], timeoutMs: 10_000 });
+}
+
+/**
+ * The approved source for a toolkit still installed in this tab, by the id the offer
+ * carried. Saving reads it from here rather than from the panel, so the code makes one
+ * fewer hop and the panel never has to hold it to hand it back.
+ */
+export async function toolkitCode(tabId: number, toolkitId: string): Promise<string | null> {
+  const toolkit = (await readToolkits())[String(tabId)];
+  return toolkit && toolkit.id === toolkitId ? toolkit.code : null;
 }
 
 export async function runToolkit(tabId: number, url: string | undefined, input: unknown): Promise<ActionResult> {
@@ -131,10 +226,10 @@ export async function runToolkit(tabId: number, url: string | undefined, input: 
     );
   }
 
-  if (!toolkit.functions.includes(parsed.data.function)) {
+  if (!toolkit.entries.some((entry) => entry.name === parsed.data.function)) {
     return failure(
       'UNKNOWN_FUNCTION',
-      `This toolkit has no function named “${parsed.data.function}”. It defines: ${toolkit.functions.join(', ')}.`,
+      `This toolkit has no function named “${parsed.data.function}”. It defines: ${toolkit.entries.map((entry) => entry.name).join(', ')}.`,
     );
   }
 
@@ -153,11 +248,11 @@ function evaluateInstaller(tabId: number, toolkit: StoredToolkit): Promise<Actio
     if (thrown) {
       return failure('CODE_ERROR', `The code failed while installing: ${describeThrow(thrown)}`);
     }
-    const names = reply.result?.value;
-    if (!Array.isArray(names)) {
+    const entries = reply.result?.value;
+    if (!Array.isArray(entries)) {
       return failure('CODE_ERROR', 'The code installed but reported no functions.');
     }
-    return success(names as string[]);
+    return success(entries as ToolkitEntry[]);
   });
 }
 

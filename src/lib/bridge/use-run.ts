@@ -4,6 +4,8 @@ import type { FocusedElement } from '@/lib/actions/protocol';
 import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
+import type { ToolOffer } from './code-toolkit';
+import type { SavedToolMeta } from './saved-tools';
 import { attachPreview, notice, reduce, type RunItem } from './run-items';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
 import { useActiveTab } from './use-active-tab';
@@ -43,12 +45,22 @@ export interface Run {
   stopRecording: () => void;
   monitors: MonitorState[];
   stopMonitor: (monitorId: string) => void;
+  /** Tools the user kept, for the `/` menu and `/remove-tools`. Metadata only, never code. */
+  tools: SavedToolMeta[];
+  /** Raised a second after an approved toolkit lands, asking whether to keep it. */
+  toolOffer: ToolOffer | null;
+  keepTool: (slug?: string) => void;
+  dismissTool: () => void;
+  forgetTool: (id: string) => void;
+  runTool: (id: string) => void;
 }
 
 export function useRun(): Run {
   const [drafts, setDrafts] = useState<Record<string, SiteMapDraft>>({});
   const [recording, setRecording] = useState<RecordingState | null>(null);
   const [monitors, setMonitors] = useState<MonitorState[]>([]);
+  const [offer, setOffer] = useState<ToolOffer | null>(null);
+  const [tools, setTools] = useState<SavedToolMeta[]>([]);
   const [bySession, setBySession] = useState<Record<string, RunItem[]>>({});
   const port = useRef<Browser.runtime.Port | null>(null);
 
@@ -111,6 +123,12 @@ export function useRun(): Run {
           write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => [...items, runMessage.item]);
         } else if (runMessage.op === 'preview') {
           write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => attachPreview(items, runMessage.preview));
+        } else if (runMessage.op === 'toolOffer') {
+          setOffer(runMessage.offer);
+        } else if (runMessage.op === 'toolOfferSettled') {
+          setOffer((held) => (held?.toolkitId === runMessage.toolkitId ? null : held));
+        } else if (runMessage.op === 'tools') {
+          setTools(runMessage.tools);
         } else if (runMessage.op === 'close') {
           window.close();
         } else {
@@ -224,6 +242,31 @@ export function useRun(): Run {
     stopRecording: useCallback(() => {
       post({ op: 'stopRecording' });
     }, [post]),
+    tools,
+    toolOffer: offer,
+    keepTool: useCallback(
+      (slug?: string) => {
+        if (offer && tab.tabId != null) post({ op: 'keepTool', toolkitId: offer.toolkitId, tabId: tab.tabId, slug });
+      },
+      [offer, post, tab.tabId],
+    ),
+    dismissTool: useCallback(() => {
+      if (offer) post({ op: 'dismissTool', toolkitId: offer.toolkitId });
+    }, [offer, post]),
+    forgetTool: useCallback(
+      (id: string) => {
+        post({ op: 'forgetTool', id });
+      },
+      [post],
+    ),
+    runTool: useCallback(
+      (id: string) => {
+        if (tab.tabId != null) {
+          post({ op: 'runTool', id, tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title } });
+        }
+      },
+      [post, tab],
+    ),
     monitors,
     stopMonitor: useCallback(
       (monitorId: string) => {

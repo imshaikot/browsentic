@@ -33,6 +33,16 @@ interface ToolkitReply {
   error?: string;
 }
 
+/**
+ * What the installer reports back. Arity comes from `Function.length`, which is what
+ * decides whether a function can become a saved tool: `/` invocation passes no arguments,
+ * so only a zero-argument entry point can be offered for saving.
+ */
+export interface ToolkitEntry {
+  name: string;
+  arity: number;
+}
+
 export function installerSource(toolkitId: string, code: string): string {
   const key = JSON.stringify(TOOLKIT_GLOBAL);
   const attribute = JSON.stringify(TOOLKIT_ATTRIBUTE);
@@ -45,8 +55,10 @@ export function installerSource(toolkitId: string, code: string): string {
 ${code}
   })(tools);
 
-  const names = Object.keys(tools).filter((name) => typeof tools[name] === 'function');
-  if (!names.length) {
+  const entries = Object.keys(tools)
+    .filter((name) => typeof tools[name] === 'function')
+    .map((name) => ({ name: name, arity: tools[name].length }));
+  if (!entries.length) {
     throw new Error('The code defined no functions on "tools" — assign each entry point, e.g. tools.addTag = (name) => {…}.');
   }
 
@@ -89,7 +101,7 @@ ${code}
   store.tools = tools;
   store.id = ${JSON.stringify(toolkitId)};
   document.documentElement.setAttribute(${attribute}, ${JSON.stringify(toolkitId)});
-  return names;
+  return entries;
 })()`;
 }
 

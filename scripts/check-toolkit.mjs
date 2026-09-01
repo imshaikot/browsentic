@@ -71,7 +71,18 @@ const names = install('kit-1', `
   tools.cyclic = () => { const o = {}; o.self = o; return o; };
   const helper = 1;
 `);
-check('install reports only the functions', names.sort(), ['add', 'boom', 'cyclic', 'echo', 'nothing', 'slow']);
+check(
+  'install reports only the functions',
+  names.map((entry) => entry.name).sort(),
+  ['add', 'boom', 'cyclic', 'echo', 'nothing', 'slow'],
+);
+// Arity is what decides whether a function can become a saved tool: `/` passes no
+// arguments, so only a zero-argument entry point is ever offered.
+check(
+  'install reports each arity',
+  Object.fromEntries(names.map((entry) => [entry.name, entry.arity])),
+  { echo: 1, add: 2, slow: 1, boom: 0, nothing: 0, cyclic: 0 },
+);
 check('install stamps the attribute', world.attributes.get('data-browsentic-toolkit'), 'kit-1');
 
 // ── calling across the bridge ────────────────────────────────────────────────
@@ -98,7 +109,7 @@ check('the abandoned call did not corrupt the next one', await toolkit.callToolk
 
 // ── re-installing over a live toolkit ────────────────────────────────────────
 const second = install('kit-2', `tools.echo = () => 'replaced';`);
-check('re-install swaps the toolkit', second, ['echo']);
+check('re-install swaps the toolkit', second.map((entry) => entry.name), ['echo']);
 check('re-install restamps the id', world.attributes.get('data-browsentic-toolkit'), 'kit-2');
 check('the new function answers', await toolkit.callToolkit('echo', [], 1000), 'replaced');
 const gone = await toolkit.callToolkit('add', [1, 1], 1000).catch((e) => e);
@@ -158,6 +169,50 @@ check('with the switch off the base skill is unaffected', route({}).base.name, '
 check('with the switch on it rides along as an overlay', route({ liveTools: true }).overlays.map((s) => s.name), [SCRIPTING_SKILL]);
 check('it never replaces the base skill it advises against', route({ liveTools: true }).base.name, 'browser-control');
 check('no context at all means off', routeSkill(library, 'create 20 tags').overlays.map((s) => s.name), []);
+
+// ── saved tools: naming and scope ────────────────────────────────────────────────
+//
+// Scope is host plus the first path segment, and the display name is never a filename.
+// Both matter: the first decides where a tool is offered, the second keeps a user-shaped
+// string out of `join(skillsDir, name + '.md')`.
+
+const savedOut = join(root, 'node_modules/.cache/browsentic-toolkit/saved-tool.mjs');
+await build({
+  entryPoints: [join(root, 'src/lib/skills/saved-tool.ts')],
+  outfile: savedOut,
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  logLevel: 'warning',
+  alias: { '@': join(root, 'src') },
+});
+const saved = await import(pathToFileURL(savedOut).href);
+
+const watch = saved.scopeOf('https://www.youtube.com/watch?v=abc');
+check('scope takes host and first segment', watch, { host: 'youtube.com', segment: 'watch' });
+check('www is not part of the host', saved.scopeOf('https://www.github.com/pulls').host, 'github.com');
+check('a bare origin scopes to root', saved.scopeOf('https://example.com/').segment, 'root');
+check('a non-http url has no scope', saved.scopeOf('file:///etc/passwd'), null);
+check('a chrome page has no scope', saved.scopeOf('chrome://extensions'), null);
+
+check('the display name reads host first', saved.displayName(watch, 'darken-page'), 'youtube.com:watch:darken-page');
+
+check('another id under the same segment matches', saved.toolMatchesUrl(watch, 'https://youtube.com/watch?v=zzz'), true);
+check('a deeper path under the segment matches', saved.toolMatchesUrl(watch, 'https://youtube.com/watch/live'), true);
+check('a different segment does not', saved.toolMatchesUrl(watch, 'https://youtube.com/results?q=cats'), false);
+check('the site root does not', saved.toolMatchesUrl(watch, 'https://youtube.com/'), false);
+check('a subdomain does not', saved.toolMatchesUrl(watch, 'https://music.youtube.com/watch?v=abc'), false);
+
+// The daemon half becomes a path, so it goes through SKILL_NAME_RE like every other skill.
+const skillName = saved.skillNameFor(watch, 'darken-page-except-video-player');
+check('the skill name is path-safe', /^[a-z0-9][a-z0-9-]{0,47}$/.test(skillName), true);
+check('the skill name is recognisable as a tool', saved.isSavedToolSkill(skillName), true);
+const hostile = saved.skillNameFor({ host: '../../etc', segment: '..' }, 'x/../../y');
+check('traversal cannot survive into a skill name', /^[a-z0-9][a-z0-9-]{0,47}$/.test(hostile), true);
+check('and it carries no separators', /[/.]/.test(hostile), false);
+
+check('a purpose becomes a slug', saved.slugFromPurpose('Darken the page except the video player', 'fn'), 'darken-page-except-video-player');
+check('a purpose of only stop words falls back', saved.slugFromPurpose('the a of', 'darkenPage'), 'darkenpage');
 
 console.log(failed ? `\n${failed} of ${ran} failed` : `\n${ran}/${ran} toolkit checks passed`);
 process.exit(failed ? 1 : 0);

@@ -1,31 +1,52 @@
-import { BookOpen, Globe, Sparkles, SquareSlash } from 'lucide-react';
+import { BookOpen, Globe, Sparkles, SquareSlash, Zap } from 'lucide-react';
 
 import type { SkillCatalog } from '@/lib/actions/protocol';
 import { AGENTS } from '@/lib/agents/catalog';
-import { CONTEXT_COMMAND, CONTEXT_COMMAND_DESCRIPTION } from '@/lib/bridge/commands';
+import {
+  CONTEXT_COMMAND,
+  CONTEXT_COMMAND_DESCRIPTION,
+  REMOVE_TOOLS_COMMAND,
+  REMOVE_TOOLS_DESCRIPTION,
+} from '@/lib/bridge/commands';
+import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
 import { hostMatchesDomains, hostnameOf } from '@/lib/skills/format';
+import { toolMatchesUrl } from '@/lib/skills/saved-tool';
 import { cn } from '@/lib/utils';
 
 export interface SkillMenuItem {
   key: string;
-  group: 'command' | 'site' | 'general' | 'agent' | 'other-site';
+  group: 'tool' | 'command' | 'site' | 'general' | 'agent' | 'other-site';
   name: string;
   description: string;
   /** Set on agent skills — choosing one attaches this id to the message instead of a text prefix. */
   agentSkillId?: string;
   /** Set on typed commands — choosing one sends this text right away instead of inserting a prefix. */
   command?: string;
+  /**
+   * Set on a tool the user saved. Choosing one runs its approved code in the tab there and
+   * then: no agent, no daemon, no prompt, because all three already had their say when it
+   * was saved.
+   */
+  savedToolId?: string;
 }
 
+// Saved tools sort first: they are the only entries that do something on their own, and
+// the user named them, so they are the ones being looked for.
 const GROUP_ORDER: Record<SkillMenuItem['group'], number> = {
-  command: 0,
-  site: 1,
-  general: 2,
-  agent: 3,
-  'other-site': 4,
+  tool: 0,
+  command: 1,
+  site: 2,
+  general: 3,
+  agent: 4,
+  'other-site': 5,
 };
 
-export function skillMenuItems(catalog: SkillCatalog | undefined, tabUrl: string, query: string): SkillMenuItem[] {
+export function skillMenuItems(
+  catalog: SkillCatalog | undefined,
+  tabUrl: string,
+  query: string,
+  tools: readonly SavedToolMeta[] = [],
+): SkillMenuItem[] {
   const host = hostnameOf(tabUrl);
   const items: SkillMenuItem[] = [
     {
@@ -36,6 +57,27 @@ export function skillMenuItems(catalog: SkillCatalog | undefined, tabUrl: string
       command: CONTEXT_COMMAND,
     },
   ];
+  if (tools.length) {
+    items.push({
+      key: 'command:remove-tools',
+      group: 'command',
+      name: 'remove-tools',
+      description: REMOVE_TOOLS_DESCRIPTION,
+      command: REMOVE_TOOLS_COMMAND,
+    });
+  }
+  // Only the ones that belong on this page. A tool saved for youtube.com/watch is noise
+  // on the homepage, and offering it there would only produce a scope refusal.
+  for (const tool of tools) {
+    if (!toolMatchesUrl(tool.scope, tabUrl)) continue;
+    items.push({
+      key: `tool:${tool.id}`,
+      group: 'tool',
+      name: tool.name,
+      description: tool.description,
+      savedToolId: tool.id,
+    });
+  }
   for (const skill of catalog?.skills ?? []) {
     const group =
       skill.category !== 'site-exploration'
@@ -71,6 +113,7 @@ export function SkillMenu({
   onSelect: (item: SkillMenuItem) => void;
 }) {
   const labels: Record<SkillMenuItem['group'], string> = {
+    tool: 'Your tools',
     command: 'Commands',
     site: 'On this site',
     general: 'Browsentic skills',
@@ -108,7 +151,9 @@ export function SkillMenu({
                 index === highlight ? 'bg-brand/12' : 'hover:bg-ground/40',
               )}
             >
-              {item.group === 'command' ? (
+              {item.group === 'tool' ? (
+                <Zap className="mt-0.5 size-3 shrink-0 text-lime" />
+              ) : item.group === 'command' ? (
                 <SquareSlash className="mt-0.5 size-3 shrink-0 text-amber" />
               ) : item.group === 'agent' ? (
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-brand" />

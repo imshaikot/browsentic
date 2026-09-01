@@ -4,6 +4,13 @@ import type { FileStatus } from './file-store';
 
 export const CONTEXT_COMMAND = '/context';
 
+export const REMOVE_TOOLS_COMMAND = '/remove-tools';
+
+export const REMOVE_TOOLS_DESCRIPTION = 'Review the tools you saved, and delete any you are done with.';
+
+export const isRemoveToolsCommand = (text: string): boolean =>
+  text.trim().toLowerCase() === REMOVE_TOOLS_COMMAND;
+
 export const CONTEXT_COMMAND_DESCRIPTION =
   'See what this conversation carries — messages, files, recordings, tabs.';
 

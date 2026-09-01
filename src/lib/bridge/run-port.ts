@@ -10,7 +10,10 @@ import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
+import { onToolOffer, runSavedTool, toolkitCode, type ToolOffer } from './code-toolkit';
 import { CONTEXT_COMMAND, isContextCommand, type ContextBreakdown } from './commands';
+import { listSavedTools, withoutCode, type SavedToolMeta } from './saved-tools';
+import { dropTool, keepTool } from './tool-registry';
 import { tryFastPath } from './fast-path';
 import { dropDiagnosticsForSession } from './diagnostics';
 import { listMeta } from './file-store';
@@ -84,7 +87,12 @@ export type RunCommand =
   | { op: 'discardMap'; stagingId: string }
   | { op: 'startRecording'; captureValues: boolean }
   | { op: 'stopRecording' }
-  | { op: 'stopMonitor'; monitorId: string };
+  | { op: 'stopMonitor'; monitorId: string }
+  | { op: 'keepTool'; toolkitId: string; tabId: number; slug?: string }
+  | { op: 'dismissTool'; toolkitId: string }
+  | { op: 'forgetTool'; id: string }
+  | { op: 'runTool'; id: string; tab: TabAnchor }
+  | { op: 'listTools' };
 
 export type RunMessage =
   | { op: 'event'; sessionId?: string; runId: string; event: RunEvent }
@@ -95,6 +103,9 @@ export type RunMessage =
   | { op: 'recording'; state: RecordingState | null }
   | { op: 'preview'; sessionId?: string; preview: ScreenshotPreview }
   | { op: 'monitor'; state: MonitorState }
+  | { op: 'toolOffer'; offer: ToolOffer }
+  | { op: 'toolOfferSettled'; toolkitId: string }
+  | { op: 'tools'; tools: SavedToolMeta[] }
   | { op: 'close' };
 
 const ports = new Set<Browser.runtime.Port>();
@@ -106,6 +117,8 @@ const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const cancelTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let externalItems: RunItem[] = [];
 const pendingDrafts = new Map<string, { sessionId?: string; draft: SiteMapDraft }>();
+/** Offers raised but not yet answered, so a stale panel cannot save a toolkit twice. */
+const pendingOffers = new Map<string, ToolOffer>();
 let queue: Promise<unknown> = Promise.resolve();
 
 function serialized<T>(task: () => Promise<T>): Promise<T> {
@@ -128,6 +141,11 @@ export function serveRunPorts(): void {
       }
       broadcast({ op: 'preview', sessionId: session?.sessionId, preview });
     });
+  });
+
+  onToolOffer((offer) => {
+    pendingOffers.set(offer.toolkitId, offer);
+    broadcast({ op: 'toolOffer', offer });
   });
 
   onMonitorState((state) => {
@@ -196,6 +214,7 @@ export function serveRunPorts(): void {
       post(port, { op: 'mapDraft', sessionId: held.sessionId, draft: held.draft });
     }
     void currentRecording().then((state) => post(port, { op: 'recording', state }));
+    void listSavedTools().then((tools) => post(port, { op: 'tools', tools: tools.map(withoutCode) }));
     void activeMonitorStates().then((states) => {
       for (const state of states) post(port, { op: 'monitor', state });
     });
@@ -289,7 +308,47 @@ function handle(command: RunCommand): void {
     case 'stopMonitor':
       void stopTabMonitor(command.monitorId);
       return;
+    case 'keepTool':
+      void serialized(async () => {
+        const offer = pendingOffers.get(command.toolkitId);
+        const code = offer ? await toolkitCode(command.tabId, command.toolkitId) : null;
+        if (offer && code) await keepTool({ offer, code, slug: command.slug }).catch(() => undefined);
+        pendingOffers.delete(command.toolkitId);
+        broadcast({ op: 'toolOfferSettled', toolkitId: command.toolkitId });
+        await publishTools();
+      });
+      return;
+    case 'dismissTool':
+      pendingOffers.delete(command.toolkitId);
+      broadcast({ op: 'toolOfferSettled', toolkitId: command.toolkitId });
+      return;
+    case 'forgetTool':
+      void serialized(async () => {
+        await dropTool(command.id);
+        await publishTools();
+      });
+      return;
+    case 'runTool':
+      void serialized(async () => {
+        const result = await runSavedTool(command.tab.tabId, command.tab.url, command.id);
+        broadcast({ op: 'item', item: toolRunItem(command.id, result) });
+      });
+      return;
+    case 'listTools':
+      void publishTools();
+      return;
   }
+}
+
+/** A saved-tool run shows on the timeline like any other step, marked local since it was. */
+function toolRunItem(id: string, result: { ok: boolean; error?: { code: string; message: string } }): RunItem {
+  return result.ok
+    ? { kind: 'tool', id: nextId(), action: 'savedTool', input: { tool: id }, ok: true, source: 'local' }
+    : notice('error', `${result.error?.code}: ${result.error?.message}`);
+}
+
+async function publishTools(): Promise<void> {
+  broadcast({ op: 'tools', tools: (await listSavedTools()).map(withoutCode) });
 }
 
 async function absorb(runId: string, event: RunEvent): Promise<void> {

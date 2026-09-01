@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/components/skill-menu';
+import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
 import { Button } from '@/extension/components/ui/button';
 import { Textarea } from '@/extension/components/ui/textarea';
 import type { FocusedElement, SkillCatalog } from '@/lib/actions/protocol';
@@ -33,6 +34,8 @@ export function Composer({
   onToggleLiveTools,
   onAttachSkill,
   onCommand,
+  tools,
+  onRunTool,
   onSend,
   onStop,
   onToggleVoice,
@@ -57,6 +60,8 @@ export function Composer({
   onToggleLiveTools: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onCommand: (command: string) => void;
+  tools: SavedToolMeta[];
+  onRunTool: (id: string) => void;
   onSend: () => void;
   onStop: () => void;
   onToggleVoice: () => void;
@@ -73,8 +78,8 @@ export function Composer({
   const menuOpen = slash !== null && connected;
   const [highlight, setHighlight] = useState(0);
   const menuItems = useMemo(
-    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '') : []),
-    [menuOpen, catalog, tabUrl, slash],
+    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools) : []),
+    [menuOpen, catalog, tabUrl, slash, tools],
   );
 
   useEffect(() => setHighlight(0), [slash]);
@@ -85,7 +90,10 @@ export function Composer({
   }, [menuOpen, cancelPending]);
 
   function choose(item: SkillMenuItem) {
-    if (item.command) {
+    if (item.savedToolId) {
+      voice.setInput('');
+      onRunTool(item.savedToolId);
+    } else if (item.command) {
       voice.setInput('');
       onCommand(item.command);
     } else if (item.agentSkillId) {

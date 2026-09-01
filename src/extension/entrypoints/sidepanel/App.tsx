@@ -3,6 +3,7 @@ import { ArrowDown, PanelRightClose, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
+import { isRemoveToolsCommand } from '@/lib/bridge/commands';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { Wordmark } from '@/extension/components/brand';
@@ -14,6 +15,7 @@ import { PanelNav, type PanelTab } from '@/extension/components/panel-nav';
 import { RecordingBar } from '@/extension/components/recording-bar';
 import { RecordingPanel } from '@/extension/components/recording-panel';
 import { RunTimeline } from '@/extension/components/run-timeline';
+import { KeepToolPrompt, SavedToolList } from '@/extension/components/saved-tools';
 import { SessionList } from '@/extension/components/session-list';
 import { SessionRail } from '@/extension/components/session-rail';
 import { SettingsPanel } from '@/extension/components/settings-panel';
@@ -53,6 +55,7 @@ export default function App() {
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
+  const [showTools, setShowTools] = useState(false);
   const [picking, setPicking] = useState(false);
   const [liveTools, setLiveTools] = useState(false);
   const [tab, setTab] = usePanelTab();
@@ -329,8 +332,15 @@ export default function App() {
         )}
       </div>
 
+      {showTools && (
+        <SavedToolList tools={run.tools} onForget={run.forgetTool} onClose={() => setShowTools(false)} />
+      )}
+
       {tab === 'chat' && (
         <footer className="shrink-0 border-t border-line p-3">
+          {run.toolOffer && (
+            <KeepToolPrompt offer={run.toolOffer} onKeep={run.keepTool} onDismiss={run.dismissTool} />
+          )}
           <Composer
             voice={voice}
             voiceEnabled={voiceEnabled}
@@ -347,8 +357,17 @@ export default function App() {
             onToggleLiveTools={() => setLiveTools((on) => !on)}
             onAttachSkill={setAttachedSkill}
             onCommand={(command) => {
+              if (isRemoveToolsCommand(command)) {
+                setShowTools(true);
+                return;
+              }
               open('chat');
               run.send(command);
+            }}
+            tools={run.tools}
+            onRunTool={(id) => {
+              open('chat');
+              run.runTool(id);
             }}
             onSend={handleSend}
             onStop={run.cancel}
