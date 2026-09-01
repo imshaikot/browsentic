@@ -127,9 +127,17 @@ export interface RoutedSkill {
   text: string;
 }
 
+/**
+ * Guidance for writing page code, which is only ever an add-on: it rides along with
+ * whatever skill the instruction actually routed to, and only when the user has turned
+ * the composer's “Live tool” switch on. As a base skill it would replace the very
+ * clicking and typing advice the code is meant to be weighed against.
+ */
+export const SCRIPTING_SKILL = 'page-scripting';
+
 export function routeSkill(skills: Skill[], instruction: string, context?: RunContext): RoutedSkill | null {
   if (!skills.length) return null;
-  const bases = skills.filter((skill) => skill.category === 'general');
+  const bases = skills.filter((skill) => skill.category === 'general' && skill.name !== SCRIPTING_SKILL);
   const fallback = bases.find((skill) => skill.isDefault) ?? bases[0] ?? skills[0];
 
   let text = instruction;
@@ -168,7 +176,10 @@ function overlaysFor(skills: Skill[], context: RunContext | undefined, forced: S
         .sort((a, b) => b.match.length - a.match.length)
         .map((entry) => entry.skill)
     : [];
-  return [...forced, ...matched];
+  const scripting = context?.liveTools
+    ? skills.filter((skill) => skill.name === SCRIPTING_SKILL && !forced.includes(skill))
+    : [];
+  return [...forced, ...matched, ...scripting];
 }
 
 function parseSkill(raw: string, fallbackName: string, source: SkillSource): Skill {

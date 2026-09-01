@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { FileText, FileUp, Loader2, Mic, MicOff, Paperclip, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
+import { Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/components/skill-menu';
 import { Button } from '@/extension/components/ui/button';
@@ -29,6 +29,8 @@ export function Composer({
   attachedSkill,
   focus,
   picking,
+  liveTools,
+  onToggleLiveTools,
   onAttachSkill,
   onCommand,
   onSend,
@@ -51,6 +53,8 @@ export function Composer({
   attachedSkill: AttachedSkill | null;
   focus: FocusedElement | null;
   picking: boolean;
+  liveTools: boolean;
+  onToggleLiveTools: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onCommand: (command: string) => void;
   onSend: () => void;
@@ -118,6 +122,24 @@ export function Composer({
             type="button"
             onClick={() => onAttachSkill(null)}
             aria-label={`Detach ${attachedSkill.name}`}
+            className="shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      )}
+
+      {liveTools && (
+        <div className="enters mb-2 flex items-center gap-2 rounded-xl border border-ember/40 bg-ember/8 px-2.5 py-1.5 text-xs">
+          <Code2 className="size-3.5 shrink-0 text-ember" />
+          <span className="min-w-0 flex-1 text-ink-dim">
+            <span className="font-medium text-ink">Live tool on</span> — the agent may write a script for this page.
+            You approve the code first.
+          </span>
+          <button
+            type="button"
+            onClick={onToggleLiveTools}
+            aria-label="Turn live tools off"
             className="shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
           >
             <X className="size-3" />
@@ -215,6 +237,23 @@ export function Composer({
             disabled={!connected}
           >
             <FileUp className="size-3.5" />
+          </Button>
+          <Button
+            variant={liveTools ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            role="switch"
+            aria-checked={liveTools}
+            aria-label={liveTools ? 'Turn live tools off' : 'Turn live tools on'}
+            title={
+              liveTools
+                ? 'Live tool is on — the agent may write a small script for this page and ask you to approve it. Turn it off to keep to the built-in tools.'
+                : 'Live tool — let the agent write a small script for repetitive work or for something no tool covers. You review and approve the code before it runs.'
+            }
+            onClick={onToggleLiveTools}
+            disabled={!connected}
+            className={cn(liveTools ? 'text-ember' : undefined)}
+          >
+            <Code2 className="size-3.5" />
           </Button>
           <Button
             variant={voiceEnabled && !voice.error ? 'subtle' : 'ghost'}

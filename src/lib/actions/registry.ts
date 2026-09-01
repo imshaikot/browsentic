@@ -18,6 +18,7 @@ import { focusInput } from './page/focus-input';
 import { getPageInfo } from './page/get-page-info';
 import { highlightElement } from './page/highlight-element';
 import { hoverElement } from './page/hover-element';
+import { injectCode } from './page/inject-code';
 import { listDownloads } from './page/list-downloads';
 import { listFiles } from './page/list-files';
 import { listRecordings } from './page/list-recordings';
@@ -30,6 +31,7 @@ import { readConsole } from './page/read-console';
 import { readNetwork } from './page/read-network';
 import { readRecording } from './page/read-recording';
 import { readTheme } from './page/read-theme';
+import { runCode } from './page/run-code';
 import { screenshot } from './page/screenshot';
 import { scrollTo } from './page/scroll-to';
 import { searchSite } from './page/search-site';
@@ -70,6 +72,8 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       pressKey,
       submitForm,
       waitForElement,
+      injectCode,
+      runCode,
       findProgress,
       findSearch,
       readTheme,

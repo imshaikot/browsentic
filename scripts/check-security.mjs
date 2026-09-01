@@ -139,6 +139,9 @@ check('the download names its rule', agent('page.captureDownload', { target: {} 
 check('an off-scope download url confirms too', agent('page.captureDownload', { url: 'https://evil.com/f.csv' }).matched.map((r) => r.id), ['off-scope-navigation', 'file-download']);
 check('a signed download url is not a payload', agent('page.captureDownload', { url: `https://example.com/f.csv?sig=${'x'.repeat(600)}` }).matched.map((r) => r.id), ['file-download']);
 check('a javascript: download is denied', agent('page.captureDownload', { url: 'javascript:alert(1)' }).effect, 'deny');
+check('injecting code confirms', agent('page.injectCode', { purpose: 'p', code: 'tools.x = () => 1;' }).effect, 'confirm');
+check('the injection names its rule', agent('page.injectCode', { purpose: 'p', code: 'x' }).matched.map((r) => r.id), ['code-injection']);
+check('calling already-approved code is not re-gated', agent('page.runCode', { function: 'x', args: [] }).effect, 'allow');
 check('switching to another tab confirms', agent('page.switchTab', { tabId: 9 }).effect, 'confirm');
 check('switching back to the pinned tab is fine', agent('page.switchTab', { tabId: 3 }).effect, 'allow');
 check('listing tabs is not a move', agent('page.switchTab', {}).effect, 'allow');
@@ -157,6 +160,13 @@ check('the waiver is still recorded', external('page.submitForm', {}, policyFrom
 check('external reserved action denied regardless', external('browsentic.saveSiteMap', {}).effect, 'deny');
 check('external never returns confirm', external('page.attachFile', { fileId: 'f' }, policyFrom({ unattended: 'deny' })).effect, 'deny');
 check('external download denied by default', external('page.captureDownload', { url: 'https://example.com/f.csv' }).effect, 'deny');
+// Nobody to show the code to, so nobody can approve it — and a toolkit a person approved
+// in the panel is not thereby available to an MCP client.
+check('external code injection denied by default', external('page.injectCode', { purpose: 'p', code: 'x' }).effect, 'deny');
+check('external code execution denied outright', external('page.runCode', { function: 'x' }).effect, 'deny');
+check('the refusal names its rule', external('page.runCode', { function: 'x' }).matched.map((r) => r.id), ['external-code-execution']);
+check('unattended=allow does not open it', external('page.runCode', { function: 'x' }, policyFrom({ unattended: 'allow' })).effect, 'deny');
+check('the panel is unaffected by that rule', agent('page.runCode', { function: 'x' }).matched.map((r) => r.id), []);
 
 // ── guardrails: policy overrides ─────────────────────────────────────────────────
 const strict = policyFrom({ rules: { 'raw-html-read': 'deny', 'off-scope-navigation': 'deny' } });
@@ -413,6 +423,10 @@ const r = redact.redactInput;
 check('fillInput value redacted', r('page.fillInput', { value: 'hunter2' }).value, '[redacted]');
 check('password key redacted', r('page.x', { password: 'p' }).password, '[redacted]');
 check('card number redacted', r('page.x', { note: '4242424242424242' }).note, '[redacted]');
+// The approval asks someone to read this, so it cannot arrive truncated.
+const longCode = `tools.x = () => {${'\n  // padding'.repeat(60)}\n};`;
+check('injected code survives redaction whole', r('page.injectCode', { purpose: 'p', code: longCode }).code, longCode);
+check('a long value elsewhere is still capped', r('page.x', { note: 'y'.repeat(400) }).note.length, 201);
 check('benign value kept', r('page.x', { target: { text: 'Sign in' } }).target.text, 'Sign in');
 check('long string clipped', r('page.x', { s: 'a'.repeat(500) }).s.length, 201);
 check('array capped', r('page.x', { a: new Array(100).fill('x') }).a.length, 21);

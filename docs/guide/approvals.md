@@ -52,12 +52,14 @@ depend on declaration order.
 | `file-download` | `page_captureDownload` — letting a page write a file to your disk | confirm |
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
 | `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
+| `code-injection` | `page_injectCode` — installing JavaScript the agent wrote into the page | confirm |
+| `external-code-execution` | `page_runCode` called by an MCP client rather than the side panel | **deny** |
 | `secret-in-url` | A saved secret placed in a navigation URL | **deny** |
 | `secret-release` | A saved secret about to be typed into the page | confirm |
 | `secret-off-scope` | …and it was read on a site outside this run's scope | confirm |
 | `config-require-approval` | The action is named in your `requireApproval` list | confirm |
 
-Three of these are less obvious than they look:
+Five of these are less obvious than they look:
 
 **`form-submission` is smarter than a name match.** It also catches `page_fillInput` and
 `page_typeText` with `pressEnter: true`, and `page_pressKey` with `Enter` — because those submit
@@ -67,6 +69,15 @@ forms too.
 What may be *kept* is not a preference: executables, files over 100 MB, and downloads from a host
 outside the run's scope are refused whatever this is set to, and the file the browser already wrote
 is deleted. See [Files](features/files.md#what-it-will-not-keep).
+
+**`code-injection` is the one prompt that shows its work** — and the one capability that is off until
+you switch it on. The composer's **Live tool** switch starts off, and with it off `page_injectCode`
+is refused outright, before this rule is ever consulted. With it on, approving means running
+JavaScript the agent wrote in the page, with your session — so the panel puts a **Review** button on
+the prompt and opens the full source before you decide. There is no "always on this site" for it: that would let
+later, unread code run on your say-so about earlier code. One approval covers every later
+`page_runCode` call into *that* toolkit, on that tab and that site, which is what makes twenty
+repetitions cheap; a different script is a fresh prompt. See [Page actions](features/page-actions.md).
 
 **`raw-html-read` is denied by default** because `outerHTML` carries comments, `aria-hidden` nodes
 and off-screen text: everything a page can hide from the person looking at it but still hand to the

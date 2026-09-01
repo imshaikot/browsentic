@@ -54,6 +54,7 @@ export default function App() {
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
   const [picking, setPicking] = useState(false);
+  const [liveTools, setLiveTools] = useState(false);
   const [tab, setTab] = usePanelTab();
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [, setCollapsed] = usePanelCollapsed();
@@ -66,7 +67,7 @@ export default function App() {
   const voice = useVoiceComposer({
     active: voiceEnabled && connected && !run.running,
     onSubmit: (text) => {
-      run.send(text, { agentSkillId: attachedSkill?.id, focus: focus ?? undefined });
+      run.send(text, { agentSkillId: attachedSkill?.id, focus: focus ?? undefined, liveTools });
       setAttachedSkill(null);
       setFocus(null);
     },
@@ -342,6 +343,8 @@ export default function App() {
             attachedSkill={attachedSkill}
             focus={focus}
             picking={picking}
+            liveTools={liveTools}
+            onToggleLiveTools={() => setLiveTools((on) => !on)}
             onAttachSkill={setAttachedSkill}
             onCommand={(command) => {
               open('chat');

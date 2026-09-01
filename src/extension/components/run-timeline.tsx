@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import {
+  Braces,
   Camera,
   Check,
   Clapperboard,
+  Code2,
   Compass,
   CornerDownLeft,
   ExternalLink,
@@ -26,9 +29,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { CodeReview } from '@/extension/components/code-review';
 import { ContextCard } from '@/extension/components/context-card';
 import { Markdown } from '@/extension/components/markdown';
 import { Button } from '@/extension/components/ui/button';
+import { injectCode } from '@/lib/actions/page/inject-code';
 import { openScreenshot } from '@/lib/bridge/screenshot-preview';
 import type { RunItem } from '@/lib/bridge/run-items';
 import { cn } from '@/lib/utils';
@@ -115,6 +120,12 @@ function ToolRow({
   const name = item.action.replace(/^page\./, '');
   const Icon = ICONS[name] ?? Wrench;
   const pending = item.ok === undefined && !item.awaiting;
+  const source = item.action === injectCode.name ? sourceOf(item.input) : null;
+  const [reviewing, setReviewing] = useState(false);
+
+  useEffect(() => {
+    if (!item.awaiting) setReviewing(false);
+  }, [item.awaiting]);
 
   return (
     <div className="enters flex min-w-0 flex-col gap-1.5">
@@ -183,11 +194,16 @@ function ToolRow({
 
       {item.awaiting && (
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-ember/45 bg-ember/10 px-2.5 py-2">
-          <p className="flex-1 text-xs text-ink">Allow this action?</p>
+          <p className="flex-1 text-xs text-ink">{source ? 'Allow this code to run?' : 'Allow this action?'}</p>
+          {source && (
+            <Button size="sm" variant="ghost" onClick={() => setReviewing(true)} title="Read the code before deciding">
+              Review
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={() => onDecide(item.id, false)}>
             Deny
           </Button>
-          {item.site && (
+          {item.site && !source && (
             <Button
               size="sm"
               variant="ghost"
@@ -202,8 +218,25 @@ function ToolRow({
           </Button>
         </div>
       )}
+
+      {reviewing && source && (
+        <CodeReview
+          purpose={source.purpose}
+          code={source.code}
+          site={item.site}
+          onAllow={() => onDecide(item.id, true)}
+          onDeny={() => onDecide(item.id, false)}
+          onClose={() => setReviewing(false)}
+        />
+      )}
     </div>
   );
+}
+
+function sourceOf(input: unknown): { purpose: string; code: string } | null {
+  const args = input as { purpose?: unknown; code?: unknown } | null;
+  if (typeof args?.code !== 'string' || !args.code) return null;
+  return { purpose: typeof args.purpose === 'string' ? args.purpose : 'No purpose given.', code: args.code };
 }
 
 function Tag({ tone, icon: Icon, label }: { tone: 'amber' | 'magenta'; icon: LucideIcon; label: string }) {
@@ -271,4 +304,6 @@ const ICONS: Record<string, LucideIcon> = {
   awaitMonitor: Radar,
   listRecordings: Clapperboard,
   readRecording: Clapperboard,
+  injectCode: Code2,
+  runCode: Braces,
 };

@@ -20,7 +20,9 @@ import {
   decide,
   declined,
   describe as describeDecision,
+  INJECT_ACTION,
   normalizeHost,
+  RUN_CODE_ACTION,
   policyFrom,
   scopeFor,
   sealSecrets,
@@ -74,6 +76,8 @@ interface ActiveRun {
   map?: MapRun;
   /** The A-Eye pick photographed when the user attached it to this instruction. */
   focusShot?: string;
+  /** The composer's “Live tool” switch, as it stood when this instruction was sent. */
+  liveTools: boolean;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
@@ -142,6 +146,14 @@ export class AgentSession {
         summary: result.ok ? 'the picked element, as photographed' : 'no pick attached',
       });
       return result;
+    }
+
+    if (!run.liveTools && (action === INJECT_ACTION || action === RUN_CODE_ACTION)) {
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'live tools are switched off' });
+      return failure(
+        'LIVE_TOOLS_OFF',
+        'Writing and running your own page code is switched off for this message. The user turns it on with the “Live tool” switch beside the message box, and only they can. Do the job with the ordinary page tools, or say that this one needs that switch and why.',
+      );
     }
 
     if (run.map) {
@@ -268,6 +280,7 @@ export class AgentSession {
       pending: new Map(),
       ownedTabIds: [],
       focusShot: context?.focus?.shot,
+      liveTools: context?.liveTools === true,
     };
     this.runs.set(runId, run);
 

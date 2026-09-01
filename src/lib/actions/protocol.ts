@@ -129,6 +129,13 @@ export interface RunContext {
   agentSkillId?: string;
   /** The element the user pointed at with A-Eye before sending this message. */
   focus?: FocusedElement;
+  /**
+   * The composer's “Live tool” switch. Off unless the user turned it on for this
+   * message, and nothing else can turn it on — it is what lets the agent write and run
+   * its own page code, so it stays a deliberate act rather than a capability that is
+   * simply there.
+   */
+  liveTools?: boolean;
 }
 
 /** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */

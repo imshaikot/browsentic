@@ -34,6 +34,8 @@ export const DOWNLOAD_ACTION = 'page.captureDownload';
 export const EXTRACT_ACTION = 'page.extractText';
 export const CAPTCHA_ACTION = 'page.solveCaptcha';
 export const NETWORK_ACTION = 'page.readNetwork';
+export const INJECT_ACTION = 'page.injectCode';
+export const RUN_CODE_ACTION = 'page.runCode';
 
 /** One definition, shared with the settings screen that renders it. */
 export type Effect = RuleEffect;
@@ -100,6 +102,20 @@ export const CONDITIONS = {
 
   /** Acting on another site's human-verification control. */
   answersCaptcha: (request) => request.action === CAPTCHA_ACTION,
+
+  /**
+   * Installing agent-written JavaScript into the page. The code is the whole of what is
+   * being authorised — `page.runCode` only ever calls back into what this approved.
+   */
+  injectsCode: (request) => request.action === INJECT_ACTION,
+
+  /**
+   * The one place a caller is named in a condition rather than left to `unattended`.
+   * A toolkit is approved by a person reading it in the side panel, for the conversation
+   * they were having; an MCP client was never in that room, and the switch the user
+   * turned off is not one it can see.
+   */
+  runsCodeOutsideThePanel: (request) => request.action === RUN_CODE_ACTION && request.caller === 'external',
 
   /**
    * Turns a sealed placeholder back into the credential it stands for. The release
@@ -205,6 +221,27 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Saves a file from the page to disk',
     reason: 'That writes a file the page chose into the user’s download folder.',
+  },
+  {
+    // The most powerful thing an agent can ask for, and the one gate that has to show
+    // its work: the panel puts the source behind a Review button, because "allow this
+    // action?" is not a question anyone can answer about code they have not read. It
+    // confirms rather than denies because a reviewed function is how twenty repetitions
+    // stop being twenty round trips — and `unattended: deny` keeps an external MCP
+    // client, which has nobody to show the code to, from installing any at all.
+    id: 'code-injection',
+    when: 'injectsCode',
+    effect: 'confirm',
+    title: 'Runs code it wrote in the page',
+    reason: 'That installs JavaScript the agent wrote into the page, with your logged-in session.',
+  },
+  {
+    id: 'external-code-execution',
+    when: 'runsCodeOutsideThePanel',
+    effect: 'deny',
+    title: 'Calls injected code from outside the panel',
+    reason:
+      'Code installed by page.injectCode was reviewed and approved for the side-panel conversation that asked for it. It is not available to an MCP client.',
   },
   {
     id: 'leaves-pinned-tab',

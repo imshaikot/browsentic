@@ -3,6 +3,7 @@ import { describeActions } from '@/lib/actions/registry';
 import { injectContentScript } from '@/lib/actions/client';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { serveDebuggerEvents } from '@/lib/bridge/cdp';
+import { serveCodeToolkits } from '@/lib/bridge/code-toolkit';
 import { serveDiagnostics } from '@/lib/bridge/diagnostics';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
@@ -200,6 +201,7 @@ export default defineBackground(() => {
   });
 
   serveDiagnostics();
+  serveCodeToolkits();
   serveRecorder();
   serveMonitor();
   serveTimers();

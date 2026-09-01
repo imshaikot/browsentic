@@ -74,7 +74,7 @@ const PERSIST_DEBOUNCE_MS = 800;
 const MAX_EXTERNAL_ITEMS = 100;
 
 export type RunCommand =
-  | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string; focus?: FocusedElement }
+  | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string; focus?: FocusedElement; liveTools?: boolean }
   | { op: 'cancel'; sessionId: string }
   | { op: 'decision'; sessionId: string; toolId: string; allow: boolean; remember?: boolean }
   | { op: 'endSession'; sessionId: string }
@@ -226,7 +226,7 @@ export function closePanels(): void {
 function handle(command: RunCommand): void {
   switch (command.op) {
     case 'instruct':
-      void serialized(() => instruct(command.text, command.tab, command.agentSkillId, command.focus));
+      void serialized(() => instruct(command.text, command.tab, command.agentSkillId, command.focus, command.liveTools));
       return;
     case 'cancel':
       void serialized(() => stopRun(command.sessionId));
@@ -346,6 +346,7 @@ async function instruct(
   anchor: TabAnchor,
   agentSkillId?: string,
   focus?: FocusedElement,
+  liveTools?: boolean,
 ): Promise<void> {
   const ensured = await ensureSessionForTab(anchor);
   if (!ensured.ok) {
@@ -365,7 +366,7 @@ async function instruct(
     return;
   }
 
-  const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, fastPath: true });
+  const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, liveTools, fastPath: true });
   if (outcome !== 'busy') return;
   await append(
     ensured.session.sessionId,
@@ -378,9 +379,9 @@ type TurnOutcome = 'started' | 'local' | 'busy' | 'offline';
 async function startTurn(
   session: TabSession,
   text: string,
-  options: { agentSkillId?: string; focus?: FocusedElement; fastPath: boolean },
+  options: { agentSkillId?: string; focus?: FocusedElement; liveTools?: boolean; fastPath: boolean },
 ): Promise<TurnOutcome> {
-  const { agentSkillId, focus, fastPath } = options;
+  const { agentSkillId, focus, liveTools, fastPath } = options;
   const { sessionId } = session;
   if (session.runId || busy.has(sessionId)) return 'busy';
 
@@ -404,6 +405,7 @@ async function startTurn(
       agentSessionId: session.agentSessionId,
       agentSkillId,
       focus,
+      liveTools,
       files: await attachedFiles(),
       recordings: await attachedRecordings(),
     });

@@ -19,6 +19,7 @@ export type { RunItem };
 export interface SendOptions {
   agentSkillId?: string;
   focus?: FocusedElement;
+  liveTools?: boolean;
 }
 
 export interface Run {
@@ -166,6 +167,7 @@ export function useRun(): Run {
         text: trimmed,
         agentSkillId: opts?.agentSkillId,
         focus: opts?.focus,
+        liveTools: opts?.liveTools,
         tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title },
       });
     },

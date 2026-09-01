@@ -33,6 +33,15 @@ const TYPED_FIELD: Record<string, string> = {
 };
 
 /**
+ * Fields the panel has to show whole. An approval that asks someone to read code cannot
+ * hand them the first two hundred characters of it, so these skip the length cap — which
+ * is also why the code must never carry a secret: this is the field that is shown.
+ */
+const VERBATIM_FIELDS: Record<string, readonly string[]> = {
+  'page.injectCode': ['purpose', 'code'],
+};
+
+/**
  * A sealed handle is safe to show and worth showing: it names the kind of credential and
  * the site it was read on, which is exactly what someone answering a `secret-release`
  * prompt needs. Anything around it is not, so the field collapses to its handles alone.
@@ -40,6 +49,10 @@ const TYPED_FIELD: Record<string, string> = {
 export function redactInput(action: string, input: unknown): unknown {
   if (!input || typeof input !== 'object') return redactValue('', input, 0);
   const redacted = redactValue('', input, 0) as Record<string, unknown>;
+  for (const field of VERBATIM_FIELDS[action] ?? []) {
+    const original = (input as Record<string, unknown>)[field];
+    if (typeof original === 'string') redacted[field] = original;
+  }
   const typed = TYPED_FIELD[action];
   if (typed && typed in redacted) {
     const typedValue = (input as Record<string, unknown>)[typed];
