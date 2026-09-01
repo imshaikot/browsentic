@@ -1,8 +1,8 @@
 ---
 layout: layouts/page.njk
 pageKey: capabilities
-title: "49 browser automation tools for AI agents"
-seoTitle: "Capabilities: all 49 page tools, grouped | Browsentic"
+title: "Browser automation tools for AI agents"
+seoTitle: "Capabilities: every page tool, grouped | Browsentic"
 description: "Every tool Browsentic gives an AI agent: read the page as structure, click, fill, type and submit, navigate, wait out long jobs, attach files, replay recordings."
 keywords:
   - browser automation tools
@@ -18,8 +18,10 @@ keywords:
 {%- set GROUP_HEADING = {
   read: "Sense the page before touching it",
   act: "Reach into the page with a human hand",
+  script: "Write its own tool, once you approve it",
   move: "Find its own way around the site",
   wait: "Sit through the slow part for you",
+  diagnose: "Read what broke, not what it shows",
   files: "Hand a file to the form asking for it",
   recordings: "Replay a job you showed it once"
 } -%}
@@ -39,7 +41,7 @@ keywords:
       <div>
         <div class="flex items-center gap-2.5">
           <span class="size-2.5 rounded-full {{ a.dot }}"></span>
-          {{ m.kicker(group.label + " · " + group.tools.length + (" tools" if group.tools.length > 1 else " tool"), group.accent) }}
+          {{ m.kicker(group.label, group.accent) }}
         </div>
         <h2 class="mt-3 font-display text-[1.75rem] font-semibold leading-tight text-ink">
           {{ GROUP_HEADING[group.id] }}
@@ -64,8 +66,8 @@ keywords:
 
 {% call m.section("resources") %}
   {{ m.kicker("Zero tool calls", "brand-deep") }}
-  {{ m.heading("Three read-only resources") }}
-  {{ m.lede("Page context the agent can read directly, without spending a tool call on it.") }}
+  {{ m.heading("Read-only resources") }}
+  {{ m.lede("Page context the agent reads directly, without spending a tool call on it.") }}
 
   <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     {%- for r in copy.RESOURCES %}
@@ -79,8 +81,8 @@ keywords:
 
 {% call m.section("targeting", "bg-ground-2/30") %}
   {{ m.kicker("Aiming", "amber") }}
-  {{ m.heading("Four ways to name the thing you mean") }}
-  {{ m.lede("Most tools that touch an element take the same target object. Visible text outlives the redesigns that break CSS selectors, so prefer it where you can. Where nothing describes it, hand over the lens and point at it yourself.") }}
+  {{ m.heading("How to name the thing you mean") }}
+  {{ m.lede("Every tool that touches an element takes the same target. Visible text outlives the redesigns that break selectors, so prefer it. Where nothing describes it, take the lens and point.") }}
 
   <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-reveal data-stagger>
     {%- for field in [

@@ -17,7 +17,7 @@ export const SEO = {
     'Browsentic. No new browser, no API key. Your tabs, your own AI agent. Record and replay, autonomous site maps, several tabs at once, MIT licensed.',
   author: 'imshaikot',
   summary:
-    'A browser extension plus a local daemon that hands your real, logged-in browser tab to the AI agent CLI you already run, by voice, by typing, or by replaying a session you recorded once. It also speaks MCP, so an external client can drive the same browser.',
+    'A browser extension and a local daemon that hand your real, logged-in tab to the AI agent you already run. It also speaks MCP, so your terminal can drive the same browser.',
   keywords: [
     'AI browser automation',
     'browser AI agent',
@@ -37,10 +37,10 @@ export const SEO = {
 }
 
 export const HERO = {
-  badge: 'Open source, MIT licensed. It runs on the agent you already pay for: Claude Code, Codex or Antigravity.',
+  badge: 'MIT licensed. It runs on the agent you already pay for: Claude Code, Codex or Antigravity.',
   title: { lead: 'No new browser. No API key.', tail: 'Your tabs, ', accent: 'your own AI agent' },
-  lede: 'Like Claude Code for your browser, except it can see the page. Say what you want in the side panel and the agent you already run drives the tab in front of you, inside the session you are already signed in to. It shows its work, asks before anything consequential, and nothing leaves your machine.',
-  voice: 'or open the side panel and speak it aloud',
+  lede: 'Say what you want in the side panel. The agent you already run drives the tab in front of you, inside the session you are signed in to. It shows its work and asks before anything that counts.',
+  voice: 'or open the panel and say it out loud',
   command: 'claude mcp add browsentic -- browsentic mcp',
 }
 
@@ -54,7 +54,7 @@ export const HERO_PATHS = [
     id: 'extension',
     kicker: 'The product',
     title: 'Install the browser extension',
-    body: 'A side panel in Chrome or any Chromium browser. Speak to it, type at it, or press record and show it a job once, and it works the tab in front of you inside the session you are already signed in to. This is Browsentic.',
+    body: 'A side panel in Chrome or any Chromium browser. Speak to it, type at it, or press record and show it a job once.',
     command: 'npx browsentic setup',
     cta: { href: '/install/', label: 'Install the extension' },
     accent: 'brand',
@@ -78,7 +78,7 @@ export const HERO_DEMO = {
   url: 'app.acme.com/billing',
   prompt: 'find the unpaid invoices and open the newest one',
   steps: [
-    { tool: 'page_getPageInfo', detail: 'snapshot · 41 interactive elements', kind: 'agent', ms: 1100 },
+    { tool: 'page_getPageInfo', detail: 'snapshot of the billing page', kind: 'agent', ms: 1100 },
     { tool: 'page_clickElement', detail: 'text: "Invoices"', kind: 'agent', focus: 'nav', ms: 1000 },
     { tool: 'page_selectOption', detail: 'status → Unpaid', kind: 'agent', focus: 'filter', ms: 1000 },
     { tool: 'page_submitForm', detail: 'waiting for your approval', kind: 'approval', focus: 'submit', ms: 1900 },
@@ -99,52 +99,52 @@ export const SECTIONS = {
   how: {
     kicker: 'Architecture',
     title: ['Four hops, and every one of them', 'is on your machine'],
-    lede: 'No relay, no hosted runner, no browser in someone else’s data centre. The extension dials out to a daemon on loopback, because a Manifest V3 service worker cannot listen for connections. One daemon owns the browser link, so several MCP clients can share one browser.',
+    lede: 'No relay, no hosted runner, no browser in someone else’s data centre. The extension dials out to a daemon on loopback, and one daemon owns the browser link.',
   },
   capabilities: {
     kicker: 'Capabilities',
     title: ['Sense the page, act on it,', 'and wait out the slow parts'],
-    lede: 'Perceiving the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Listening while you talk it through. Sensing progress and waiting out an upload or a deploy so you never have to hover over it, or working to a clock when the page offers nothing to watch. Then acting with a human hand, and remembering enough to run the whole thing again unprompted. Aim by CSS selector, visible text, ARIA role or index, because visible text outlives the redesigns that break selectors. Or hand it the lens and point at the thing yourself.',
+    lede: 'It reads the page as structure rather than pixels: a layout diagram, stable selectors, rendered text, screenshots. Then it acts with a human hand, and sits through the slow parts so you do not have to.',
   },
   orchestrate: {
     kicker: 'Agent orchestration',
     title: ['Several tabs, several agents,', 'one browser, all at once'],
-    lede: 'A conversation belongs to the tab it started in, not to whatever you happen to be looking at. Start one where an upload is running, another where support is waiting on an answer, a third watching a release, then go and read something else. The extension holds each session in its own tab and dials out to a single local daemon, which wakes one agent per session and streams the work back to the panel as it happens.',
+    lede: 'A conversation belongs to the tab it started in, not to whatever you happen to be looking at. Start one, walk away, start another. Each carries on where it began.',
   },
   automations: {
     kicker: 'In practice',
     title: ['Jobs people actually hand over,', 'and where each one stops for you'],
-    lede: 'Ordinary browsing work, in sites you are already signed in to: the negotiation, the application, the cancellation, the thing you redo every Friday. The agent senses what is in front of it, works out what the job needs and sees it through. Anything that commits something, or sends it to someone other than you, pauses first and names itself before it happens.',
+    lede: 'Ordinary work on sites you are already signed in to. The agent works out what the job needs and sees it through, then stops before anything that reaches someone else.',
   },
   teach: {
     kicker: 'Skills',
     title: ['Map any web app automatically,', 'then keep it as your own skill'],
-    lede: 'Turn it loose on a site and it maps itself. It reads robots.txt and the sitemap, explores, screenshots, writes down what it worked out, then hands you a skill to read before you arm it. Walk it through a job once and that becomes a skill of your own. And the obvious commands never bother a model at all.',
+    lede: 'Point it at a site and it maps itself. Show it a job once and it keeps the steps. Both become skills you read before you arm them.',
   },
   panel: {
     kicker: 'The extension',
     title: ['Everything happens in the side panel', 'of the browser you already have open'],
-    lede: 'Install it, pair it once, and the panel opens beside whatever tab you are on. Speak to it, type at it, or press record and show it a job once. It reads the page you are actually looking at, asks before anything commits, and keeps every conversation in the tab it started in.',
+    lede: 'Install it, pair it once, and the panel opens beside whatever tab you are on. It reads the page you are actually looking at and asks before anything commits.',
   },
   mcp: {
     kicker: 'Optional integration',
     title: ['The browser MCP server, for when', 'you already live in a terminal'],
-    lede: 'The extension is the product and the side panel needs none of this. But the daemon also speaks MCP, so Claude Code, Codex, Antigravity, Cursor or Zed can take the wheel of the same real tab. Headless automation wakes up with amnesia, no session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.',
+    lede: 'The side panel needs none of this. But the daemon also speaks MCP, so Claude Code, Codex, Cursor or Zed can take the wheel of the same real tab.',
   },
   highlights: {
     kicker: 'What it does',
     title: ['What handing over a tab', 'actually gets you'],
-    lede: 'Everything below ships in the extension, works on the sites you are already signed in to, and stops for your approval at anything consequential.',
+    lede: 'All of it ships in the extension, works on the sites you are already signed in to, and stops for you at anything that counts.',
   },
   security: {
     kicker: 'Security model',
     title: 'An agent driving your real browser has to earn it',
-    lede: 'Everything below is a property of how it is built, not a promise in a policy document. It is a local daemon, an extension that dials out to it, and no third party in between.',
+    lede: 'These are properties of how it is built, not promises in a policy document. A local daemon, an extension that dials out to it, and nobody in between.',
   },
   start: {
     kicker: 'Quickstart',
     title: 'One command, then two things only you can do',
-    lede: 'You need Chrome or another Chromium browser, Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy. The npm package carries the extension build, so there is nothing to clone and nothing to compile.',
+    lede: 'You need a Chromium browser, Node.js 20 or newer, and one agent CLI on your PATH. Nothing to clone, nothing to compile.',
   },
   faq: {
     kicker: 'FAQ',
@@ -153,37 +153,48 @@ export const SECTIONS = {
   compare: {
     kicker: 'Comparison',
     title: ['Claude in Chrome extends Claude.', 'Browsentic extends your browser.'],
-    lede: 'Anthropic ships an extension that puts Claude in a Chrome side panel. Browsentic starts from the other end: the browser you already use, handed to whichever agent you already run. Same idea, different owner. Here is the honest version of where they overlap, where each one wins, and how to pick.',
+    lede: 'Anthropic puts Claude in a Chrome side panel. Browsentic starts from the other end: your browser, handed to whichever agent you already run. Here is where each one wins.',
   },
 }
 
 export const CTA = {
   title: { lead: 'Stop describing the page.', accent: 'Hand it over.' },
-  lede: 'Free and MIT licensed. Nothing to sign up for, no key to paste, and a fresh install connects to nothing until you redeem a pairing code yourself.',
+  lede: 'Free and MIT licensed. No signup, no key to paste, and a fresh install connects to nothing until you pair it yourself.',
   command: 'npx browsentic setup',
 }
+
+/**
+ * The band under the hero. It used to be four animated numerals, which read as a
+ * pitch deck. These are the four things that are actually true about the product.
+ */
+export const PROOF = [
+  { label: 'Runs on your machine', note: 'a local daemon on loopback, nothing hosted' },
+  { label: 'No API key', note: 'it spawns the agent CLI you already signed in to' },
+  { label: 'Your logged-in session', note: 'your cookies, your two-factor, your extensions' },
+  { label: 'Open source', note: 'MIT licensed, and free' },
+]
 
 /** What the side panel actually is, in the space the integration cards used to hold. */
 export const PANEL_POINTS = [
   {
     id: 'input',
     title: 'Speak it, type it, or show it once',
-    body: 'Dictate hands-free in the side panel, hold to talk in the popup, or just type. Work a tedious job through yourself with the recorder on and it keeps every step as a skill of your own.',
+    body: 'Dictate in the side panel, hold to talk in the popup, or just type. Work a tedious job through yourself with the recorder on and it keeps every step.',
   },
   {
     id: 'sessions',
     title: 'A session per tab, working in the background',
-    body: 'The conversation belongs to the tab it started in and carries on there while you read something else. A pulsing dot on the toolbar icon and on the tab favicon marks whatever is still at work.',
+    body: 'The conversation belongs to the tab it started in and carries on there while you read something else. A pulsing dot marks whatever is still at work.',
   },
   {
     id: 'approvals',
     title: 'Approvals surface where you are looking',
-    body: 'Anything that commits something, or sends it to someone other than you, pauses in the panel and names itself first. Cancelling a run stops it mid-flight.',
+    body: 'Anything that commits, or reaches someone other than you, pauses in the panel and names itself first. Cancelling stops a run mid-flight.',
   },
   {
     id: 'agent',
     title: 'Your agent, switched with one click',
-    body: 'The panel runs on Claude Code, Codex or Antigravity, picked from the popup, down to which model each one runs. No key to paste, because it spawns the CLI you already signed in to, as you.',
+    body: 'The panel runs on Claude Code, Codex or Antigravity, picked from the popup, down to the model. No key to paste: it spawns the CLI you already signed in to.',
   },
 ]
 
@@ -198,25 +209,18 @@ export const MCP_POINTS = [
   {
     id: 'clients',
     title: 'Any MCP client, one browser',
-    body: 'The daemon speaks MCP over stdio, so Claude Code, Codex, Antigravity or anything else that speaks the protocol drives the same real, logged-in browser. Several at once, because one daemon owns the link.',
+    body: 'The daemon speaks MCP over stdio, so anything fluent in the protocol drives the same logged-in browser. Several at once, because one daemon owns the link.',
   },
   {
     id: 'manifest',
     title: 'The manifest cannot drift',
-    body: 'Tool definitions are generated from the same registry the extension ships. A tool that describes something the browser cannot do is not a bug you can write. It is a build that does not exist.',
+    body: 'Tool definitions are generated from the same registry the extension ships. A tool that describes something the browser cannot do is not a bug you can write.',
   },
   {
     id: 'extend',
     title: 'Create your own action in one file',
-    body: 'A module under src/lib/actions/page/ plus one line in the registry, and it publishes as an MCP tool at the same time. No second place to remember.',
+    body: 'A module under src/lib/actions/page/ plus one line in the registry, and it publishes as an MCP tool at the same time.',
   },
-]
-
-export const STATS = [
-  { value: 49, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
-  { value: 3, suffix: '', label: 'tabs worked at once', note: 'independent sessions, up to eight' },
-  { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
-  { value: 1, suffix: '', label: 'command to install', note: 'npx browsentic setup, MIT licensed' },
 ]
 
 export const TOOL_GROUPS = [
@@ -225,7 +229,7 @@ export const TOOL_GROUPS = [
     label: 'Read',
     accent: 'brand',
     blurb:
-      'Takes in the page as structure rather than pixels: a snapshot carrying a layout diagram and stable selectors, rendered text, patient waiting for an element to appear or vanish, the search control wherever a site hid it, a capture of the whole tab or one element, the palette and luminance a page actually paints, a WCAG contrast score, and the captcha hiding inside a closed shadow root. When it cannot name the thing you mean, it hands you the lens and you point at it.',
+      'Takes the page in as structure: a layout diagram with stable selectors, rendered text, screenshots, the search box wherever a site hid it. When it cannot name the thing you mean, it hands you the lens.',
     tools: [
       'page_getPageInfo',
       'page_extractText',
@@ -244,7 +248,7 @@ export const TOOL_GROUPS = [
     label: 'Act',
     accent: 'ember',
     blurb:
-      'Reaches into the page with a human hand. Pointing, hovering, dragging, focusing, filling inputs and contenteditables, streaming text in keystroke by keystroke at a human pace, choosing an option, selecting a passage, pressing keys with modifiers, committing a form, clicking with a genuine browser-level gesture where a synthetic one is refused, ticking a captcha checkbox, and retheming a page on its own terms.',
+      'Reaches into the page with a human hand. Point, hover, drag, focus, fill, type at a human pace, choose an option, select a passage, press keys, commit a form. Real browser gestures where a synthetic one is refused.',
     tools: [
       'page_clickElement',
       'page_trustedClick',
@@ -267,7 +271,7 @@ export const TOOL_GROUPS = [
     label: 'Script',
     accent: 'magenta',
     blurb:
-      'Writes its own tool when the fixed set is the wrong shape. A job that repeats twenty times with only the input changing, or something no tool covers (seeking a video, reading a canvas, driving an editor’s own API), becomes a small script the agent drafts for that page. You read the source in the side panel and approve it before a line of it runs, and every later call reuses what you approved without asking again. Off until you turn the Live tool switch on, bound to the tab and site you approved it for, and never available to an MCP client.',
+      'Writes its own tool when the fixed set is the wrong shape. A job that repeats twenty times becomes a small script drafted for that page, which you read and approve before a line of it runs. Off until you turn it on, and never available to an MCP client.',
     tools: ['page_injectCode', 'page_runCode'],
   },
   {
@@ -275,7 +279,7 @@ export const TOOL_GROUPS = [
     label: 'Navigate',
     accent: 'magenta',
     blurb:
-      'Finds its own way around. Opening a URL, retracing back and forward, reloading, searching a site on its own terms rather than guessing at query strings, scrolling to whatever matters, spawning a tab, surveying the ones you already have open, closing the ones it is finished with.',
+      'Finds its own way around. Open a URL, go back and forward, reload, search a site on its own terms, scroll to what matters, spawn a tab, close the ones it is finished with.',
     tools: ['page_navigate', 'page_searchSite', 'page_scrollTo', 'page_openTab', 'page_switchTab', 'page_closeTab'],
   },
   {
@@ -283,7 +287,7 @@ export const TOOL_GROUPS = [
     label: 'Wait',
     accent: 'lime',
     blurb:
-      'Senses the progress signals a page gives off, then keeps watch in the background while an upload, a build or a deploy runs its course: the tab stays pinned, percent and ETA are tracked, and an MCP client can long-poll until it lands. When a page offers nothing to watch, it works to a clock instead, waking itself in ten minutes or every two to redo the check and tell you only what changed.',
+      'Watches an upload, a build or a deploy from the background, keeping percent and ETA in view. When a page offers nothing to watch, it works to a clock instead and tells you only what changed.',
     tools: [
       'page_startMonitor',
       'page_monitorStatus',
@@ -299,7 +303,7 @@ export const TOOL_GROUPS = [
     label: 'Diagnose',
     accent: 'ember',
     blurb:
-      'Reads what the page reports rather than what it shows: console messages, uncaught exceptions, failed requests and their timings, captured over Chrome’s debugger while a diagnostics session is open. Open one, act, read what actually broke, close it. The difference between “the button did nothing” and “the POST behind it returned a 500”.',
+      'Reads what the page reports rather than what it shows: console messages, uncaught exceptions, failed requests and their timings. The difference between “the button did nothing” and “the POST behind it returned a 500”.',
     tools: ['page_startDiagnostics', 'page_readConsole', 'page_readNetwork', 'page_stopDiagnostics'],
   },
   {
@@ -307,7 +311,7 @@ export const TOOL_GROUPS = [
     label: 'Files',
     accent: 'amber',
     blurb:
-      'Moves files in both directions. Hands one you attached to a file input on the page, and captures the file a click produces, sealed on disk with notes the agent can read, ready to upload somewhere else.',
+      'Moves files both ways. Hands one you attached to a file input, and captures the file a click produces, sealed on disk and ready to upload elsewhere.',
     tools: ['page_listFiles', 'page_attachFile', 'page_captureDownload', 'page_listDownloads'],
   },
   {
@@ -315,12 +319,10 @@ export const TOOL_GROUPS = [
     label: 'Recordings',
     accent: 'brand-deep',
     blurb:
-      'Recalls the sessions you recorded and replays them as ordered, deliberate steps, re-checking every target against the live page before it commits to acting.',
+      'Recalls the sessions you recorded and replays them as ordered steps, re-checking every target against the live page before it commits to acting.',
     tools: ['page_listRecordings', 'page_readRecording'],
   },
 ]
-
-export const ALL_TOOLS = TOOL_GROUPS.flatMap((g) => g.tools)
 
 export const RESOURCES = [
   { uri: 'browsentic://page/diagram', desc: 'Layout diagram with stable selectors' },
@@ -333,25 +335,25 @@ export const PIPELINE = [
     id: 'you',
     title: 'You',
     sub: 'Speak, type, or show it once',
-    body: 'Dictate hands-free in the side panel, hold to talk in the popup, or just type. Work through a tedious job yourself once and it keeps every step.',
+    body: 'Dictate in the side panel, hold to talk in the popup, or just type. Work a tedious job through yourself once and it keeps every step.',
   },
   {
     id: 'extension',
     title: 'Extension',
     sub: 'Manifest V3, Chrome and Chromium',
-    body: 'Weighs your instruction against a local grammar before anyone spends a token. Confident one-step commands fire right here, in milliseconds. Everything else travels on untouched.',
+    body: 'Weighs your instruction against a local grammar before anyone spends a token. Confident one-step commands fire right here. Everything else travels on untouched.',
   },
   {
     id: 'daemon',
     title: 'Daemon',
     sub: 'Local WebSocket, loopback only',
-    body: 'The extension dials out, because an MV3 service worker cannot listen. One daemon owns the browser link, so several MCP clients can share one browser.',
+    body: 'The extension dials out, because an MV3 service worker cannot listen. One daemon owns the browser link, so several clients can share one browser.',
   },
   {
     id: 'agent',
     title: 'Your agent CLI',
     sub: 'claude, codex or agy',
-    body: 'Reasons locally, spawned against the login you already have. Claude Code, Codex or Antigravity, switched with one click, each on the model you pick. No API client in the repository, no key to configure, no third-party relay.',
+    body: 'Reasons locally, spawned against the login you already have. Claude Code, Codex or Antigravity, switched with one click. No key to configure, no third-party relay.',
   },
 ]
 
@@ -397,7 +399,7 @@ export const ORCHESTRATION_SESSIONS = [
     timeline: [
       'senses the progress the page gives off',
       'pinned to this tab, in the background',
-      '62 percent, about a minute to go',
+      'about a minute to go',
     ],
   },
   {
@@ -421,7 +423,7 @@ export const ORCHESTRATION_CHAIN = {
   },
   agents: {
     title: 'One agent per session',
-    sub: '3 of 3 slots in use',
+    sub: 'all slots in use',
     body: 'Woken as you, on the CLI you already signed in to, and told about this session and no other.',
   },
 }
@@ -429,36 +431,36 @@ export const ORCHESTRATION_CHAIN = {
 export const ORCHESTRATION_POINTS = [
   [
     'A session belongs to its tab, not to your attention',
-    'The conversation is bound to the tab it started in. It carries on there while you look at something else, its work stays in that tab instead of following you, and reaching into a tab it was never pointed at is a gated action.',
+    'It is bound to the tab it started in and carries on there while you look at something else. Reaching into a tab it was never pointed at is a gated action.',
   ],
   [
     'Two sessions never share a tab',
-    'A tab another conversation has claimed answers TAB_IN_USE. Tabs a session opens for itself join that same session as subtabs, so everything it did stays in one transcript.',
+    'A tab another conversation has claimed answers TAB_IN_USE. Tabs a session opens for itself join that same session, so everything it did stays in one transcript.',
   ],
   [
     'Three at a time, eight open',
-    'Three sessions work at once by default and eight can be open, so the fourth holds for a slot instead of crowding the browser. Raise maxConcurrentRuns as far as eight.',
+    'Three sessions work at once by default, so the fourth holds for a slot instead of crowding the browser. Raise maxConcurrentRuns as far as eight.',
   ],
   [
     'Stopping one leaves the rest alone',
-    'End the session you are looking at and the others carry on. Close a tab and only that one ends, with its transcript moved to History. A pulsing dot on the toolbar icon and on the tab’s own favicon marks whatever is still at work.',
+    'End the session in front of you and the others carry on. Close a tab and only that one ends, with its transcript moved to History.',
   ],
 ]
 
 export const ORCHESTRATION_SHARED = {
   chip: 'shared link',
-  body: 'The same link carries anything else you point at it. Claude Code in one terminal, Codex in another, Cursor or Zed alongside them: they all reach the browser you are already signed into, and every step they take surfaces on the timeline marked external.',
+  body: 'The same link carries anything else you point at it. Claude Code in one terminal, Cursor in another: all the same browser, and every step surfaces on the timeline marked external.',
 }
 
 export const AUTOMATION_FEATURED = {
   kicker: 'Worked example',
   title: 'Find the job, then apply as you',
-  body: 'Attach your resume once. Browsentic takes it in there and then and keeps notes on it, so the agent knows what it is offering without ever seeing your filesystem. From then on it senses the posting in front of it, weighs it against what you have actually done, answers the application in your own words, and hands over the file the form is asking for. Both of the steps that reach the employer stop and name themselves first.',
+  body: 'Attach your resume once. Browsentic reads it there and then and keeps notes, so the agent knows what it is offering without ever seeing your filesystem. It reads the posting, answers in your own words, and hands over the file the form asks for. Both steps that reach the employer stop first.',
   result: 'Submitted · 1 of 6 postings on this board',
   gates: ['file-upload · page_attachFile', 'form-submission · page_submitForm'],
   steps: [
     { tool: 'page_listFiles', note: 'resume.pdf · read once, at attach time', ms: 1500 },
-    { tool: 'page_getPageInfo', note: 'application form · 22 fields, 3 required', ms: 1600 },
+    { tool: 'page_getPageInfo', note: 'the application form, field by field', ms: 1600 },
     { tool: 'page_fillInput', note: 'experience · matched to your resume', ms: 1800 },
     { tool: 'page_attachFile', note: 'resume.pdf, where the form asks for it', ms: 2400, gate: true },
     { tool: 'page_submitForm', note: 'the step that reaches the employer', ms: 2600, gate: true },
@@ -469,7 +471,7 @@ export const AUTOMATIONS = [
   {
     id: 'support',
     title: 'Negotiate, in the chat you are already signed into',
-    body: 'Your account, your ticket history, last year’s invoice open in the next tab. It takes in what support actually said, weighs it against what you paid before, drafts the counteroffer in your own words, and holds right at the moment it would reach them.',
+    body: 'Your account, your ticket history, last year’s invoice in the next tab. It reads what support actually said, drafts the counteroffer in your own words, and holds right where it would reach them.',
     accent: 'ember',
     tools: ['page_extractText', 'page_typeText', 'page_submitForm'],
     gate: 'Pauses at Send, under the form-submission rule',
@@ -477,7 +479,7 @@ export const AUTOMATIONS = [
   {
     id: 'cancel',
     title: 'Cancel the things you stopped using',
-    body: 'Point it at a billing page and it works out where the cancellation actually lives, sees the retention offer for what it is, answers the exit survey and comes to a halt in front of the one step that cannot be undone. The consequence is the last step, so that is the step you keep for yourself.',
+    body: 'It finds where the cancellation actually lives, sees the retention offer for what it is, answers the exit survey, and halts at the one step that cannot be undone.',
     accent: 'magenta',
     tools: ['page_getPageInfo', 'page_clickElement', 'page_extractText'],
     gate: 'Name page_clickElement in requireApproval and the final step asks first',
@@ -485,7 +487,7 @@ export const AUTOMATIONS = [
   {
     id: 'watch',
     title: 'Sit through the slow part so you do not have to',
-    body: 'Start the upload, the build or the export, then hand the tab over. It senses the progress a page gives off, keeps percent and ETA in view from the background, and tells you the moment it lands. Nobody has to sit watching a bar that moves once a minute.',
+    body: 'Start the upload, the build or the export, then hand the tab over. It keeps percent and ETA in view from the background and tells you the moment it lands.',
     accent: 'lime',
     tools: ['page_startMonitor', 'page_awaitMonitor', 'page_monitorStatus'],
     gate: 'Nothing to approve. It is only watching',
@@ -493,7 +495,7 @@ export const AUTOMATIONS = [
   {
     id: 'repeat',
     title: 'Do Friday’s expense report like last time',
-    body: 'Show it once, with the recorder on. Browsentic keeps ordered steps named after what you accomplished, and whatever you typed comes back as a placeholder it asks you for. Next Friday the whole instruction is “do it like last time”.',
+    body: 'Show it once, with the recorder on. It keeps ordered steps named after what you accomplished, and whatever you typed comes back as a placeholder it asks you for.',
     accent: 'amber',
     tools: ['page_listRecordings', 'page_readRecording', 'page_fillInput'],
     gate: 'Replay is a plan, not a script. A step that no longer lands halts the run',
@@ -501,7 +503,7 @@ export const AUTOMATIONS = [
   {
     id: 'digest',
     title: 'Pull the week out of five dashboards',
-    body: 'Five tools you are logged into, one summary. It takes each one in as rendered text, the way it appears to you, rather than scraping markup full of hidden nodes and off-screen strings that never met your eyes.',
+    body: 'Five tools you are logged into, one summary. It reads each as rendered text, the way it appears to you, not as markup full of hidden nodes.',
     accent: 'brand',
     tools: ['page_extractText', 'page_screenshot', 'page_openTab'],
     gate: 'Raw HTML reads are denied by default, hidden text with them',
@@ -509,7 +511,7 @@ export const AUTOMATIONS = [
   {
     id: 'bulk',
     title: 'Work a list, one record at a time',
-    body: 'The same twelve fields across forty rows: the job nobody schedules and everybody postpones. It works each record through, checks what came back against what it expected, and moves on, stopping the moment a page stops resembling the one before it.',
+    body: 'The same twelve fields across forty rows: the job nobody schedules and everybody postpones. It checks each result against what it expected, and stops the moment a page stops resembling the one before.',
     accent: 'brand-deep',
     tools: ['page_fillInput', 'page_submitForm', 'page_waitForElement'],
     gate: 'Asks each time it commits one, until you grant Always on this host',
@@ -522,13 +524,13 @@ export const MODES = [
     tab: 'Crawl & map',
     kicker: 'Automated site discovery',
     title: 'Any web app maps itself, in a few minutes',
-    body: 'An agent that has never seen your site burns its first minutes rediscovering it: where search lives, what a button is really called, why the list looks empty until you scroll. So let it learn the place once. Browsentic reads the site’s own robots.txt and sitemap.xml, looks up public background on the domain, then explores for a few minutes, screenshotting as it goes. From then on every instruction on that domain arrives already knowing its way around. Elsewhere those notes stay inert.',
+    body: 'An agent that has never seen your site burns its first minutes rediscovering it. So let it learn the place once. It reads the site’s own robots.txt and sitemap.xml, then explores for a few minutes, screenshotting as it goes. Every later instruction on that domain arrives knowing its way around.',
     invocation: '@site-mapper map this site',
     points: [
       ['Nothing takes effect until you say so', 'A map in flight is written to a staging directory the skill loader cannot read. An unreviewed map is not merely unused, it is never opened.'],
       ['You read the exact markdown', 'The panel shows it as plain text, never rendered, alongside the domain it will match. Activate arms it, Discard deletes it.'],
-      ['Read-only and locked to one host', 'It cannot click, fill or submit, cannot leave the site, and stays pinned to the tab it started in. Switching tabs stops it rather than following you.'],
-      ['Ceilings the config can narrow but never widen', '15 pages, 10 screenshots and 10 minutes by default; 40, 24 and 30 minutes are the hard limits enforced by the daemon.'],
+      ['Read-only and locked to one host', 'It cannot click, fill or submit, cannot leave the site, and stays pinned to the tab it started in.'],
+      ['Ceilings you can narrow, never widen', 'A short page budget and a short clock by default, under hard limits the daemon enforces above them.'],
     ],
     tree: [
       ['~/browsentic/skills/acme-com/', ''],
@@ -544,16 +546,16 @@ export const MODES = [
     tab: 'Record & replay',
     kicker: 'Record once, replay later',
     title: 'A site map teaches it the site. A recording teaches it your job',
-    body: 'Press record in the composer, then work through the job yourself. Click across the pages, fill the fields, submit the form, press stop. Browsentic breaks what you did into ordered steps, names each one after what you accomplished, and keeps them in a list you can rename. That is a browsing skill of your own making. From then on, “do it like last time” is the whole instruction.',
+    body: 'Press record, then work through the job yourself. Click across the pages, fill the fields, submit, press stop. Browsentic breaks what you did into ordered steps, each named after what you accomplished. From then on, “do it like last time” is the whole instruction.',
     invocation: 'record my browsing session',
     points: [
       ['What you type is not saved by default', 'Every field you fill becomes a placeholder ({{email}}, {{invoice_number}}) and the assistant asks you for the value when it replays.'],
-      ['Some things are never stored either way', 'Passwords, hidden fields, one-time codes and anything shaped like a card number are dropped whether or not you opt in to literal values.'],
-      ['Replaying is not blind playback', 'The steps are a plan, not a script. The agent re-checks each target against the live page and prefers the visible text it recorded over the CSS selector, because selectors are what a redesign breaks first.'],
+      ['Some things are never stored either way', 'Passwords, hidden fields, one-time codes and anything shaped like a card number are dropped whether or not you opt in.'],
+      ['Replaying is not blind playback', 'The steps are a plan, not a script. The agent re-checks each target against the live page and prefers the visible text it recorded over the CSS selector.'],
       ['It stops rather than improvising', 'If a step no longer lands, the run halts and tells you which one, instead of finding a different route to the same effect.'],
     ],
     tree: [
-      ['Recording · 15 min ceiling', 'warns at 13, stops itself at the limit'],
+      ['Recording', 'stops itself at the ceiling'],
       ['✓ Step 1', 'Open the invoices list'],
       ['✓ Step 2', 'Filter to unpaid'],
       ['✓ Step 3', 'Fill {{invoice_number}}'],
@@ -565,7 +567,7 @@ export const MODES = [
     tab: 'Intent routing',
     kicker: 'Local intent classification',
     title: '“Go back” should not cost a round trip to a language model',
-    body: 'So every instruction is scored against a local grammar first. Confident single-step commands run in the browser and stop there, marked with a bolt on the timeline. Everything else goes to the agent with the text untouched. The bias is deliberately toward escalating, because the two mistakes are not symmetric: escalating something it could have handled costs a round trip, while acting on something it misread spends a wrong click on your real page.',
+    body: 'So every instruction is scored against a local grammar first. Confident single-step commands run in the browser and stop there. Everything else goes to the agent untouched. The bias is toward escalating, because acting on something it misread spends a wrong click on your real page.',
     invocation: 'yarn check:intent "take me to the checkout page"',
     points: [
       ['Runs locally, in milliseconds', 'back, forward, reload · open github.com · scroll to the top · press enter · click Sign in · google something · stop recording'],
@@ -574,63 +576,63 @@ export const MODES = [
       ['You can audit a single decision', 'Route one utterance through the grammar from the command line and see exactly why it went where it went.'],
     ],
     tree: [
-      ['⚡ go back', 'local · 4ms'],
-      ['⚡ scroll to the top', 'local · 2ms'],
+      ['⚡ go back', 'local'],
+      ['⚡ scroll to the top', 'local'],
       ['→ is there a login button?', 'agent'],
-      ['⚡ open github.com', 'local · 6ms'],
+      ['⚡ open github.com', 'local'],
       ['→ click Buy now', 'agent · consequential'],
     ],
   },
 ]
 
-/** The home page highlights: six outcomes in the launch voice, each owning a deep page. */
+/** The home page highlights: outcomes in the launch voice, each owning a deep page. */
 export const HIGHLIGHTS = [
   {
     id: 'record',
     title: 'Show it a job once and it remembers',
-    body: 'Press record, work through the job yourself, press stop. From then on “do it like last time” is the whole instruction. Replay is a plan, not a script: every step is re-checked against the live page before it acts.',
+    body: 'Press record, work through the job yourself, press stop. From then on “do it like last time” is the whole instruction, and every step is re-checked against the live page before it acts.',
     accent: 'amber',
     link: { href: '/skills/', label: 'Record and replay' },
   },
   {
     id: 'maps',
     title: 'It learns a site before it works it',
-    body: 'Point it at a site and it explores on its own: reads the sitemap, walks the pages, screenshots as it goes, then writes itself notes. Every later session on that domain already knows its way around.',
+    body: 'Point it at a site and it explores on its own: reads the sitemap, walks the pages, writes itself notes. Every later session on that domain knows its way around.',
     accent: 'lime',
     link: { href: '/skills/', label: 'Automated site maps' },
   },
   {
     id: 'orchestrate',
     title: 'Several tabs, several agents, one browser',
-    body: 'Each tab holds its own conversation and carries on while you read something else. Three sessions work at once by default, up to eight, and stopping one leaves the rest alone.',
+    body: 'Each tab holds its own conversation and carries on while you read something else. Stopping one leaves the rest alone.',
     accent: 'magenta',
     link: { href: '/orchestration/', label: 'Orchestration' },
   },
   {
     id: 'lens',
     title: 'Point at what you mean',
-    body: 'Press the lens and click the element you are talking about, and it rides along with your next message. When words are not enough, the agent hands the lens back and asks you to point.',
+    body: 'Press the lens and click the element you are talking about, and it rides along with your next message. When words are not enough, the agent hands the lens back.',
     accent: 'brand',
     link: { href: '/capabilities/', label: 'Targeting and the lens' },
   },
   {
     id: 'captcha',
     title: 'It does not stall at “verify you are human”',
-    body: 'It recognises the widget, ticks the checkbox with a real browser-level click once you approve, and hands anything that needs a person straight to you instead of failing in silence.',
+    body: 'It recognises the widget, ticks the checkbox with a real browser gesture once you approve, and hands anything that needs a person straight to you.',
     accent: 'ember',
     link: { href: '/capabilities/', label: 'What it can read' },
   },
   {
     id: 'live',
     title: 'When a job repeats twenty times, it writes a tool',
-    body: 'Twenty tags to create, every row to archive, a video to seek, a canvas to read. Flip the Live tool switch and the agent drafts a small script for that page, you read the code in the panel and approve it, then it runs as many times as the job needs. Off until you turn it on, and nothing runs unread.',
+    body: 'Every row to archive, a canvas to read. Flip the Live tool switch and the agent drafts a small script for that page, which you read and approve before it runs.',
     accent: 'magenta',
     link: { href: '/capabilities/', label: 'Live tools' },
   },
   {
     id: 'skills',
     title: 'Teach it your own moves',
-    body: 'Write a skill in plain markdown and drop it in, or let a mapped site or a recording become one. Skills route by trigger words, and nothing arms itself until you have read it.',
+    body: 'Write a skill in plain markdown and drop it in, or let a mapped site or a recording become one. Nothing arms itself until you have read it.',
     accent: 'brand-deep',
     link: { href: '/skills/', label: 'Skills' },
   },
@@ -639,27 +641,27 @@ export const HIGHLIGHTS = [
 export const SECURITY = [
   {
     title: 'Off by default',
-    body: 'A fresh install connects to nothing. An unpaired extension never contacts the daemon at all, and pairing takes a single-use code you redeem yourself.',
+    body: 'A fresh install connects to nothing. An unpaired extension never contacts the daemon, and pairing takes a single-use code you redeem yourself.',
   },
   {
     title: 'Two independent gates',
-    body: 'Any web page can open a WebSocket to loopback, so the daemon first classifies the peer by handshake Origin, which browsers set themselves and pages cannot forge, then requires a pairing token or a session key bound to that same origin. A web page can never reach the control path.',
+    body: 'Any web page can open a WebSocket to loopback, so the daemon first classifies the peer by handshake Origin, which a page cannot forge, then still requires a pairing token or an origin-bound session key.',
   },
   {
     title: 'Consequential actions ask first',
-    body: 'Approval prompts appear in the side panel with the action named. Form submission is gated by default, because it is the one effect that reaches someone other than you. Cancelling a run stops it mid-flight.',
+    body: 'Approvals appear in the panel with the action named. Form submission is gated by default, because it is the one effect that reaches someone other than you. Cancelling stops a run mid-flight.',
   },
   {
     title: 'Agent-written code is read before it runs',
-    body: 'The Live tool switch starts off, and with it off the agent is not even told the tools exist. Turned on, any script it writes arrives as an approval prompt with a Review button that shows you the full source first. What you approve is that code, on that tab and that site, so later calls can only reuse what you already read. There is no "always allow" for it, and an MCP client can neither install a script nor call one you approved.',
+    body: 'The Live tool switch starts off, and with it off the agent is not told the tools exist. Any script it writes arrives as an approval showing the full source. What you approve is that code, on that tab and that site.',
   },
   {
     title: 'Recordings capture what you do, not what you type',
-    body: 'A recording stores the identity of each field and a placeholder for its value. Keeping literal values is per-recording and off by default. Recording only ever starts from your own click or your own words.',
+    body: 'A recording stores the identity of each field and a placeholder for its value. Keeping literal values is per-recording and off by default.',
   },
   {
     title: 'Speech uses the browser’s own recognition',
-    body: 'No model is bundled and nothing is downloaded. Chrome’s Web Speech API streams audio to Google to transcribe it, and replacing the speech engine is a one-file change.',
+    body: 'No model is bundled and nothing is downloaded. Chrome’s Web Speech API does the transcription, and replacing the engine is a one-file change.',
   },
   {
     title: 'State stays outside the repository',
@@ -719,7 +721,7 @@ export const COMPARISON = {
     { label: 'Who else can drive', us: 'Any MCP client: Claude Code, Cursor, Zed share one browser', them: 'Claude apps only' },
     { group: 'On the page' },
     { label: 'Read, click, type, submit', us: 'Yes, and anything consequential asks first', them: 'Yes, with vendor safeguards' },
-    { label: 'Console and network', us: 'Yes: errors, failed requests and timings, read over Chrome’s debugger', them: 'Yes' },
+    { label: 'Console and network', us: 'Yes: errors, failed requests and timings, over Chrome’s debugger', them: 'Yes' },
     { label: 'Files', us: 'Both directions, each gated: downloads land sealed, uploads ask first', them: 'Both directions' },
     { label: 'Show it a job once', us: 'Recordings: do it yourself, later say “do it like last time”', them: 'Workflow recording, in the classic panel' },
     { label: 'Site knowledge', us: 'Site maps: it explores any site and keeps notes, intranets included', them: 'Built in for Gmail, Slack, Calendar, Docs and GitHub' },
@@ -737,7 +739,7 @@ export const COMPARISON = {
   ours: [
     {
       title: 'Bring your own agent',
-      body: 'It runs on the CLI you already pay for and are already signed in to, and switching between Claude Code, Codex and Antigravity is one click in the popup. No second subscription, and no bet on a single vendor.',
+      body: 'It runs on the CLI you already pay for, and switching between Claude Code, Codex and Antigravity is one click. No second subscription, and no bet on a single vendor.',
     },
     {
       title: 'An MCP server, not just a panel',
@@ -745,34 +747,34 @@ export const COMPARISON = {
     },
     {
       title: 'The obvious commands cost nothing',
-      body: '“Go back”, “scroll to the top” and “open github.com” are scored against a local grammar first and run in the browser in milliseconds. No model is woken for the things a model adds nothing to.',
+      body: '“Go back” and “open github.com” are scored against a local grammar and run in the browser in milliseconds. No model is woken for what a model adds nothing to.',
     },
     {
       title: 'Monitors that outlive everything',
-      body: 'Watching an upload or a deploy runs in the extension itself. It keeps going when the agent finishes, the MCP client disconnects, or the daemon goes away, and it burns no tokens while it waits.',
+      body: 'Watching an upload or a deploy runs in the extension itself. It keeps going when the agent finishes or the daemon goes away, and burns no tokens while it waits.',
     },
     {
       title: 'Dark mode with a measurement behind it',
-      body: 'It reads what a page paints, scores contrast against WCAG, and rethemes on the page’s own terms, preferring the dark hook the site already defines over inverting everything.',
+      body: 'It reads what a page paints, scores contrast against WCAG, and rethemes on the page’s own terms rather than inverting everything.',
     },
     {
       title: 'Credentials the agent cannot read',
-      body: 'A deterministic sanitizer runs on both sides of the socket. Passwords, keys, tokens and card numbers become sealed placeholders before the agent sees them, and turn back into plaintext only inside the field they are typed into.',
+      body: 'Passwords, keys, tokens and card numbers become sealed placeholders before the agent sees them, and turn back into plaintext only inside the field they are typed into.',
     },
   ],
 
   theirs: [
     {
       title: 'One click to install',
-      body: 'The Chrome Web Store, versus our npx command plus a trip through chrome://extensions. Their funnel is genuinely smoother, and we know it.',
+      body: 'The Chrome Web Store, versus our npx command plus a trip through chrome://extensions. Their funnel is smoother, and we know it.',
     },
     {
       title: 'Reach beyond the browser',
-      body: 'Through Claude Desktop it can touch local files and computer control. Browsentic deliberately stops at the tab: the spawned agent gets browser tools and nothing else.',
+      body: 'Through Claude Desktop it can touch local files and computer control. Browsentic stops at the tab on purpose: the agent it spawns gets browser tools and nothing else.',
     },
     {
       title: 'Injection classifiers',
-      body: 'Anthropic runs trained classifiers that watch for suspicious instruction patterns. We do not. Our answer is containment: scoped runs, a sealed agent, page text marked untrusted. Both are partial; theirs detects, ours limits the blast radius.',
+      body: 'Anthropic runs trained classifiers that watch for suspicious instruction patterns. We do not. Our answer is containment: theirs detects, ours limits the blast radius.',
     },
     {
       title: 'Enterprise administration',
@@ -781,8 +783,8 @@ export const COMPARISON = {
   ],
 
   choose: {
-    them: 'Pick Claude in Chrome if you live in claude.ai, want one-click installation, and are happy inside Anthropic’s walls. It is a polished product with real safety work behind it.',
-    us: 'Pick Browsentic if you already run an agent CLI, want the same browser reachable from your terminal and your editor, browse in Edge, Brave or Arc, or want the whole thing local, inspectable and MIT licensed.',
+    them: 'Pick Claude in Chrome if you live in claude.ai, want one-click installation, and are happy inside Anthropic’s walls.',
+    us: 'Pick Browsentic if you already run an agent CLI, browse in Edge, Brave or Arc, or want the whole thing local, inspectable and MIT licensed.',
     both: 'Nothing stops you running both. They drive different tabs and answer to different masters.',
   },
 }
@@ -791,28 +793,28 @@ export const QUICKSTART = [
   {
     n: '01',
     title: 'Install both halves with one command',
-    body: 'The npm package carries the extension build, so nothing is cloned, nothing is compiled, and nothing is downloaded beyond the one package. It writes the extension to ~/browsentic/extension/chrome-mv3, starts the local daemon and prints a pairing code.',
+    body: 'The npm package carries the extension build, so nothing is cloned and nothing is compiled. It writes the extension to ~/browsentic/extension/chrome-mv3, starts the local daemon and prints a pairing code.',
     code: 'npx browsentic setup',
     lang: 'sh',
   },
   {
     n: '02',
     title: 'Load the extension',
-    body: 'Open chrome://extensions, turn on Developer mode, press Load unpacked and choose the folder the command printed. On macOS you can press Shift Command G in the picker and paste the path. Pin Browsentic to the toolbar so the popup is one click away.',
+    body: 'Open chrome://extensions, turn on Developer mode, press Load unpacked and choose the folder the command printed. Pin Browsentic to the toolbar so the popup is one click away.',
     code: '~/browsentic/extension/chrome-mv3',
     lang: 'path',
   },
   {
     n: '03',
     title: 'Paste the pairing code',
-    body: 'Setup already printed a code. It is single use and lives for ten minutes, and the command here issues a fresh one if it expired. Paste it into the popup and press Connect. The daemon then hands back a long-lived session key that survives browser and daemon restarts, and dies only when you revoke it.',
+    body: 'Setup already printed one; this command issues a fresh one. It is single use and lives ten minutes. Paste it into the popup and press Connect, and the daemon hands back a session key that survives restarts.',
     code: 'npx browsentic pair',
     lang: 'sh',
   },
   {
     n: '04',
     title: 'Optional: hand the same browser to an MCP client',
-    body: 'The side panel already works at this point. If you also live in a terminal, one more command gives your client the same tab, with every page capability plus browsentic_status and three read-only resources.',
+    body: 'The side panel already works. If you also live in a terminal, one more command gives your client the same tab, every page capability and three read-only resources.',
     code: 'claude mcp add browsentic -- browsentic mcp',
     lang: 'sh',
   },
@@ -821,39 +823,39 @@ export const QUICKSTART = [
 export const FAQ = [
   {
     q: 'How do I install it?',
-    a: 'One command: npx browsentic setup. It installs the extension to ~/browsentic/extension/chrome-mv3, starts the local daemon and prints a pairing code, with Node.js 20 or newer as the only prerequisite. Two steps are left and both happen inside the browser, so only you can do them: load that folder at chrome://extensions with Developer mode on, and paste the code into the popup. Later, npx browsentic@latest update refreshes the extension in place. The install path never changes, so your browser stays paired.',
+    a: 'One command: npx browsentic setup. It installs the extension, starts the local daemon and prints a pairing code. Two steps are left, and both happen inside the browser: load the printed folder at chrome://extensions with Developer mode on, and paste the code into the popup. Later, npx browsentic@latest update refreshes it in place and your browser stays paired.',
   },
   {
     q: 'Do I need an API key?',
-    a: 'No. Browsentic runs on the agent CLI login you already have: Claude Code, Codex or Antigravity. There is no API client anywhere in the repository and nothing to paste into a settings field. The daemon spawns your chosen CLI locally, as you.',
+    a: 'No. Browsentic runs on the agent CLI login you already have: Claude Code, Codex or Antigravity. There is no API client in the repository and nothing to paste into a settings field. The daemon spawns your CLI locally, as you.',
   },
   {
     q: 'Is this a headless browser?',
-    a: 'The opposite. It drives the real, logged-in tab in front of you: your sessions, your cookies, your extensions, your two-factor state. Nothing has to be re-authenticated in a throwaway profile.',
+    a: 'The opposite. It drives the real tab in front of you: your sessions, your cookies, your extensions, your two-factor state. Nothing is re-authenticated in a throwaway profile.',
   },
   {
     q: 'What stops a random web page from driving my browser?',
-    a: 'Two gates. The daemon classifies every WebSocket peer by its handshake Origin, which the browser sets and a page cannot forge, and then still requires a pairing token or an origin-bound session key. A page fails the first gate and never reaches the second.',
+    a: 'Two gates. The daemon classifies every WebSocket peer by its handshake Origin, which the browser sets and a page cannot forge, then still requires a pairing token or an origin-bound session key. A page fails the first gate and never reaches the second.',
   },
   {
     q: 'Can I use it from something other than Claude Code?',
-    a: 'Yes. The side panel itself is switchable: it runs on Claude Code, Codex or Antigravity, picked from the popup with one click, and for most people that is the whole answer. Beyond the panel the daemon also speaks MCP over stdio, so an external client drives the same browser: Cursor, Zed, Claude Desktop. Run claude mcp add browsentic -- browsentic mcp, or the equivalent in your client. Tool definitions are generated from the same registry the extension ships, so they cannot drift from what the browser can actually do.',
+    a: 'Yes. The side panel runs on Claude Code, Codex or Antigravity, picked from the popup with one click. The daemon also speaks MCP over stdio, so Cursor, Zed or Claude Desktop drives the same browser: run claude mcp add browsentic -- browsentic mcp, or the equivalent in your client.',
   },
   {
     q: 'Can it automate several tabs at the same time?',
-    a: 'Yes. Every tab gets its own conversation, bound to the tab it started in, so a session carries on there while you look at something else instead of following whichever tab is in front. Eight sessions can be open and three work at once by default, raised as far as eight with maxConcurrentRuns. A fourth holds for a slot, ending one leaves the rest alone, and a tab another conversation has claimed answers TAB_IN_USE.',
+    a: 'Yes. Every tab gets its own conversation, bound to the tab it started in, so a session carries on there while you look at something else. Three work at once by default and eight can be open, raised with maxConcurrentRuns. A tab another conversation has claimed answers TAB_IN_USE.',
   },
   {
     q: 'What can I actually automate with it?',
-    a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat that already holds your ticket history, answering a job application from a resume you attached, taking a cancellation as far as the step that cannot be undone, watching a slow release and saying when it lands, redoing Friday’s expense report from a recording, or pulling one summary out of five dashboards. Anything that commits something, or sends it to someone other than you, pauses and names itself before it happens.',
+    a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat, answering a job application from a resume you attached, taking a cancellation to the step that cannot be undone, redoing Friday’s expense report from a recording. Anything that reaches someone other than you pauses and names itself first.',
   },
   {
     q: 'Can it write its own script for a page?',
-    a: 'Yes, once you let it. The composer has a Live tool switch that starts off, and while it is off the agent cannot reach the tools and is not told they exist. Turn it on and, for a job that repeats many times with only the input changing or for something no built-in tool covers, the agent drafts a small toolkit of JavaScript functions for that page. It arrives as an approval prompt with a Review button that shows the full source, and nothing runs until you allow it. One approval then covers every later call into that toolkit, which is what turns twenty repetitions into twenty cheap calls, and it is bound to the tab and site you approved it for. A different script asks again, there is no "always allow" for it, and an MCP client can neither install one nor call one you approved from the panel.',
+    a: 'Yes, once you let it. The Live tool switch starts off, and while it is off the agent is not told the tools exist. Turn it on and it drafts a small toolkit of JavaScript for that page, shown to you in full before a line of it runs. One approval covers every later call into it, bound to the tab and site you approved. An MCP client can neither install one nor call one.',
   },
   {
     q: 'Which browsers work?',
-    a: 'Chrome, or another Chromium browser such as Edge, Brave or Arc, via Manifest V3. Firefox is not there yet: release Firefox refuses unsigned extensions, and an add-on loaded through about:debugging is discarded on restart, so a signed build distributed through addons.mozilla.org is the fix and it is not ready. Developer Edition and Nightly can load a Firefox build from a source checkout. You will need Node.js 20 or newer, and one agent CLI on your PATH: claude, codex or agy.',
+    a: 'Chrome, or another Chromium browser such as Edge, Brave or Arc, via Manifest V3. Firefox is not there yet: it refuses unsigned extensions, and the signed build is not ready. You also need Node.js 20 or newer and one agent CLI on your PATH: claude, codex or agy.',
   },
   {
     q: 'What does it cost?',
@@ -861,7 +863,7 @@ export const FAQ = [
   },
   {
     q: 'How do I add a capability?',
-    a: 'One module in src/lib/actions/page/ and one line in the registry, which publishes it as an MCP tool at the same time. That is the whole of creating your own browsing action. Four conventions in an action module are load-bearing at runtime: touch document and window only inside execute(), keep underscores out of action names, describe() every input field, and validate with ActionError inside execute() rather than a zod refine or transform.',
+    a: 'One module in src/lib/actions/page/ and one line in the registry, which publishes it as an MCP tool at the same time. Four conventions are load-bearing: touch document and window only inside execute(), keep underscores out of action names, describe() every input field, and validate with ActionError inside execute().',
   },
 ]
 

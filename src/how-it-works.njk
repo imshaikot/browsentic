@@ -24,7 +24,7 @@ keywords:
 {% call m.section("pipeline") %}
   {{ m.kicker("The path an instruction takes") }}
   {{ m.heading("From what you said to a click on the page") }}
-  {{ m.lede("Each hop below is a separate process on your own machine. Nothing leaves it except the traffic your agent CLI already makes on its own.") }}
+  {{ m.lede("Each hop is a separate process on your own machine. Nothing leaves it but the traffic your agent CLI already makes.") }}
 
   <ol class="mt-12 space-y-4" data-reveal data-stagger>
     {%- for node in copy.PIPELINE %}
@@ -47,34 +47,34 @@ keywords:
   <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.05rem] font-semibold text-ink">A service worker cannot listen</h3>
-      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Manifest V3 replaced the persistent background page with a service worker that the browser is free to kill at any moment, and which cannot open a listening socket. So the extension dials <em class="text-ink-dim">out</em> instead: it opens the WebSocket to a daemon already running on loopback.</p>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Manifest V3 traded the persistent background page for a service worker the browser can kill at any moment, and which cannot open a listening socket. So the extension dials <em class="text-ink-dim">out</em>, to a daemon already running on loopback.</p>
     </article>
     <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.05rem] font-semibold text-ink">One owner of the browser link</h3>
-      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">Because the daemon owns the single connection, several MCP clients can share one browser without fighting over it. Claude Code in one terminal, Cursor in another, the side panel in the browser: all of them reach the same logged-in tab.</p>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">One daemon owns the connection, so several clients share one browser without fighting over it. Claude Code in one terminal, Cursor in another, the side panel in the browser: all the same logged-in tab.</p>
     </article>
     <article class="card spotlight px-6 py-6">
       <h3 class="font-display text-[1.05rem] font-semibold text-ink">Nothing to host</h3>
-      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">There is no relay to sign up for and no runner in a data centre. The daemon binds loopback, the extension is the only paired peer, and the agent CLI is the one you already installed and signed in to.</p>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">No relay to sign up for, no runner in a data centre. The daemon binds loopback, the extension is the only paired peer, and the agent CLI is the one you already signed in to.</p>
     </article>
   </div>
 {% endcall %}
 
 {% call m.section("gates") %}
   {{ m.kicker("Before any of it connects", "magenta") }}
-  {{ m.heading("Two gates stand between a web page and your browser") }}
-  {{ m.lede("Any web page can open a WebSocket to loopback. That is why classification comes first, and a credential second.") }}
+  {{ m.heading("A web page has to get past two gates") }}
+  {{ m.lede("Any page can open a WebSocket to loopback. So classification comes first, and a credential second.") }}
 
   <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
     <article class="card spotlight px-6 py-6">
       <span class="font-mono text-[0.72rem] text-magenta">gate 1</span>
       <h3 class="mt-2 font-display text-[1.05rem] font-semibold text-ink">Handshake origin</h3>
-      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">The daemon classifies every peer by the <code class="font-mono text-[0.8rem] text-amber">Origin</code> header, which the browser sets itself and a page cannot forge. A page fails here and never reaches the second gate.</p>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">The daemon classifies every peer by the <code class="font-mono text-[0.8rem] text-amber">Origin</code> header, which the browser sets and a page cannot forge. A page fails here and never reaches the second gate.</p>
     </article>
     <article class="card spotlight px-6 py-6">
       <span class="font-mono text-[0.72rem] text-magenta">gate 2</span>
       <h3 class="mt-2 font-display text-[1.05rem] font-semibold text-ink">Pairing token, then a session key</h3>
-      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">A single-use code, valid for ten minutes, that you redeem yourself. It is traded for a long-lived session key bound to that same origin, which survives restarts and dies only when you revoke it.</p>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">A single-use code you redeem yourself, traded for a session key bound to that same origin. It survives restarts and dies only when you revoke it.</p>
     </article>
   </div>
 
@@ -85,9 +85,9 @@ keywords:
 {% endcall %}
 
 {{ m.nextUp([
-  { href: "/capabilities/", title: "49 page tools", body: "What the agent can actually sense and do once it is connected." },
+  { href: "/capabilities/", title: "What it can do", body: "Everything the agent can sense and do once it is connected." },
   { href: "/mcp-server/", title: "As an MCP server", body: "Point Claude Code, Cursor or Zed at the same logged-in browser." },
-  { href: "/docs/internals/", title: "Internals, in ten chapters", body: "One request followed through all four processes, end to end." }
+  { href: "/docs/internals/", title: "Internals", body: "One request followed through all four processes, end to end." }
 ]) }}
 
 {{ m.cta(copy) }}

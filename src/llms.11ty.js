@@ -6,7 +6,7 @@ export default class {
   }
 
   render({ site, copy }) {
-    const { SEO, STATS, TOOL_GROUPS, VERSION, REPO } = copy
+    const { SEO, PROOF, TOOL_GROUPS, VERSION, REPO } = copy
     const u = (p) => site.url(p)
     const link = (label, href, note) => `- [${label}](${href}): ${note}`
 
@@ -20,16 +20,16 @@ machine: a Manifest V3 extension, a local daemon on loopback, and the AI agent y
 installed. There is no hosted relay, no API key, and no headless browser. It drives the real tab
 you are signed into. An external MCP client can drive that same browser, but nothing requires one.
 
-${TOOL_GROUPS.map((g) => `- **${g.label}** (${g.tools.length} tools): ${g.blurb}`).join('\n')}
+${TOOL_GROUPS.map((g) => `- **${g.label}**: ${g.blurb}`).join('\n')}
 
 ## Pages
 
 ${link('How it works', u('/how-it-works/'), 'the four hops, and why a Manifest V3 extension forces a daemon')}
-${link('Capabilities', u('/capabilities/'), 'all 49 page tools, grouped, plus the three read-only resources')}
+${link('Capabilities', u('/capabilities/'), 'every page tool, grouped, plus the read-only resources')}
 ${link('Agent orchestration', u('/orchestration/'), 'several tabs, several agents, one browser, all at once')}
 ${link('Automations', u('/automations/'), 'the jobs people hand over, and where each one stops for you')}
 ${link('Skills', u('/skills/'), 'automatic site maps, record and replay, local intent routing')}
-${link('Security', u('/security/'), 'the security model, and the two limits worth stating')}
+${link('Security', u('/security/'), 'the security model, and where it stops short')}
 ${link('Install', u('/install/'), 'one command, then load the extension and pair')}
 ${link('MCP server', u('/mcp-server/'), 'optional: driving the same logged-in browser from an external MCP client')}
 ${link('FAQ', u('/faq/'), 'the questions people ask first')}
@@ -53,7 +53,7 @@ ${link('Releases', `${REPO}/releases`, 'built extension archives per version')}
 
 - Install: \`npx browsentic setup\` installs the extension and starts the local daemon, then you load the printed folder at chrome://extensions and paste the single-use pairing code. The side panel is where the work happens.
 - Optional integration: an external MCP client can drive the same browser with \`claude mcp add browsentic -- browsentic mcp\`
-- ${STATS.map((s) => `${s.value}${s.suffix} ${s.label}`).join('\n- ')}
+- ${PROOF.map((p) => `${p.label}: ${p.note}`).join('\n- ')}
 - Concurrency: one conversation per tab, bound to the tab it started in. Eight tab sessions open, three runs at once by default, ceiling of eight (\`maxConcurrentRuns\`).
 - The side panel runs on Claude Code, Codex or Antigravity, switched with one click. Beyond the panel it is agent-agnostic: Cursor, Zed, Claude Desktop or any MCP client can drive the same browser.
 - Pairing is two-gated: the daemon classifies the WebSocket peer by handshake Origin, then requires a pairing token or an origin-bound session key. A web page cannot reach the control path.

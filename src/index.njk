@@ -80,14 +80,16 @@ showFaq: true
   </div>
 </section>
 
-<!-- Stats -->
+<!-- Proof: four plain truths, where four animated numerals used to be -->
 <section class="border-b border-line bg-ground-2/30">
-  <div class="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 sm:px-8 lg:grid-cols-4" data-reveal data-stagger>
-    {%- for stat in copy.STATS %}
-    <div class="px-2 py-10 sm:px-6">
-      <p class="font-display text-[2.4rem] font-semibold leading-none text-ink"><span data-count="{{ stat.value }}">{{ stat.value }}</span>{{ stat.suffix }}</p>
-      <p class="mt-2 text-[0.92rem] font-medium text-ink-dim">{{ stat.label }}</p>
-      <p class="mt-1 text-[0.8rem] text-ink-faint">{{ stat.note }}</p>
+  <div class="mx-auto grid max-w-7xl gap-x-8 gap-y-7 px-5 py-9 sm:grid-cols-2 sm:px-8 lg:grid-cols-4" data-reveal data-stagger>
+    {%- for item in copy.PROOF %}
+    <div class="flex gap-3">
+      <span class="mt-[0.45rem] size-1.5 shrink-0 rounded-full bg-brand/70"></span>
+      <div>
+        <p class="font-display text-[0.98rem] font-medium text-ink">{{ item.label }}</p>
+        <p class="mt-1 text-[0.84rem] leading-relaxed text-ink-faint">{{ item.note }}</p>
+      </div>
     </div>
     {%- endfor %}
   </div>
@@ -156,7 +158,7 @@ showFaq: true
   </div>
 
   <div class="card mt-4 border-amber/25 bg-amber/5 px-6 py-6" data-reveal>
-    <h3 class="font-display text-[1rem] font-semibold text-amber">Two limits worth stating</h3>
+    <h3 class="font-display text-[1rem] font-semibold text-amber">Where it stops short</h3>
     <div class="mt-4 grid gap-5 sm:grid-cols-2">
       {%- for l in copy.LIMITS %}
       <div>

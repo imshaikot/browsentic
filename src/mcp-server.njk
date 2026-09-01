@@ -3,7 +3,7 @@ layout: layouts/page.njk
 pageKey: mcp-server
 title: "Browser MCP server: give any MCP client a logged-in browser"
 seoTitle: "Browser MCP server for Claude Code, Cursor and Zed | Browsentic"
-description: "Browsentic speaks MCP over stdio, so Claude Code, Codex, Cursor or Zed drives your real, logged-in browser tab. 47 tools and three read-only resources."
+description: "Browsentic speaks MCP over stdio, so Claude Code, Codex, Cursor or Zed drives your real, logged-in browser tab. Every page tool, and three read-only resources."
 keywords:
   - browser MCP server
   - Model Context Protocol browser
@@ -28,7 +28,7 @@ keywords:
 {% call m.section("headless") %}
   {{ m.kicker("The difference that matters", "ember") }}
   {{ m.heading("A headless browser wakes up with amnesia") }}
-  {{ m.lede("No session, no cookies, no two-factor state, and a login wall between it and anything worth doing. Browsentic inherits the tab you are already signed into.") }}
+  {{ m.lede("No session, no cookies, no two-factor state, and a login wall in front of anything worth doing. Browsentic inherits the tab you are already signed into.") }}
 
   <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
     <article class="card spotlight px-6 py-6">
@@ -71,7 +71,7 @@ keywords:
 {% call m.section("clients") %}
   {{ m.kicker("Clients", "lime") }}
   {{ m.heading("Anything fluent in MCP takes the wheel") }}
-  {{ m.lede("One daemon owns the browser link, so several clients can drive the same browser at once. Every step they take surfaces on the side panel timeline, marked external.") }}
+  {{ m.lede("One daemon owns the browser link, so several clients drive the same browser at once. Every step surfaces on the side panel timeline, marked external.") }}
 
   <div class="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-reveal data-stagger>
     {%- for client in [
@@ -93,7 +93,7 @@ keywords:
 {% call m.section("panel-only", "bg-ground-2/30") %}
   {{ m.kicker("One difference", "magenta") }}
   {{ m.heading("Two tools stay in the side panel") }}
-  {{ m.lede("An MCP client gets 47 of the 49 page tools. The two left out are the live scripting pair, which lets the agent write a small script for a page: installing one needs a person reading the source in the side panel and approving it, and a toolkit approved there does not carry over to a client that was not in that conversation. Everything else is identical, because both surfaces are generated from the same registry.") }}
+  {{ m.lede("An MCP client gets every page tool but the live scripting pair. Installing a script needs a person reading the source in the panel and approving it, and that approval does not carry over to a client that was not in the conversation. Everything else is identical, because both surfaces come from the same registry.") }}
 {% endcall %}
 
 {% call m.section("resources") %}

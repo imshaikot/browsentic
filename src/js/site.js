@@ -79,37 +79,6 @@
     setTimeout(() => $$('[data-reveal]:not(.is-in), [data-stagger]:not(.is-in)').forEach(revealed), 4000)
   }
 
-  /* ---- Count-up -------------------------------------------------------- */
-
-  for (const el of $$('[data-count]')) {
-    const target = Number(el.dataset.count)
-    if (!Number.isFinite(target)) continue
-    if (reduced || !('IntersectionObserver' in window)) {
-      el.textContent = String(target)
-      continue
-    }
-
-    el.textContent = '0'
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting)) return
-        io.disconnect()
-        const start = performance.now()
-        const DURATION = 1100
-        const tick = (now) => {
-          const t = Math.min(1, (now - start) / DURATION)
-          // easeOutExpo, so it lands rather than crawls.
-          const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t)
-          el.textContent = String(Math.round(target * eased))
-          if (t < 1) requestAnimationFrame(tick)
-        }
-        requestAnimationFrame(tick)
-      },
-      { threshold: 0.5 },
-    )
-    io.observe(el)
-  }
-
   /* ---- Card spotlight -------------------------------------------------- */
 
   if (!reduced && matchMedia('(hover: hover)').matches) {

@@ -8,9 +8,9 @@ export default class {
 
   render({ site, copy }) {
     const {
-      ALL_TOOLS, AUTOMATIONS, AUTOMATION_FEATURED, CTA, FAQ, HERO, LIMITS, MCP_POINTS, MODES,
+      AUTOMATIONS, AUTOMATION_FEATURED, CTA, FAQ, HERO, LIMITS, MCP_POINTS, MODES,
       ORCHESTRATION_POINTS, ORCHESTRATION_SESSIONS, ORCHESTRATION_SHARED, PANEL_POINTS, PIPELINE,
-      QUICKSTART, REPO, RESOURCES, SECTIONS, SECURITY, STATS, TOOL_GROUPS, VERSION,
+      PROOF, QUICKSTART, REPO, RESOURCES, SECTIONS, SECURITY, TOOL_GROUPS, VERSION,
     } = copy
 
     const lines = (t) => (typeof t === 'string' ? t : t.join(' '))
@@ -31,7 +31,7 @@ Source: ${REPO}
 Site: ${site.url('/')}
 Version: ${VERSION} (MIT)
 
-${STATS.map((s) => `- ${s.value}${s.suffix} ${s.label}: ${s.note}`).join('\n')}
+${PROOF.map((p) => `- ${p.label}: ${p.note}`).join('\n')}
 
 ${block(
   '/how-it-works/',
@@ -44,9 +44,9 @@ ${block(
   '/capabilities/',
   SECTIONS.capabilities.title,
   SECTIONS.capabilities.lede,
-  `All ${ALL_TOOLS.length} page tools:\n\n` +
+  `Every page tool:\n\n` +
     TOOL_GROUPS.map(
-      (g) => `### ${g.label} (${g.tools.length})\n\n${g.blurb}\n\n${g.tools.map((t) => `- \`${t}\``).join('\n')}`,
+      (g) => `### ${g.label}\n\n${g.blurb}\n\n${g.tools.map((t) => `- \`${t}\``).join('\n')}`,
     ).join('\n\n') +
     `\n\n### Read-only resources\n\n${RESOURCES.map((r) => `- \`${r.uri}\`: ${r.desc}`).join('\n')}`,
 )}

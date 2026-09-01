@@ -13,13 +13,13 @@ keywords:
   - pair browser extension daemon
 howToSteps:
   - title: "Install both halves with one command"
-    body: "The npm package carries the extension build, so nothing is cloned and nothing is compiled. It installs the extension, starts the local daemon and prints a pairing code."
+    body: "The npm package carries the extension build, so nothing is cloned and nothing is compiled. It installs the extension, starts the daemon and prints a pairing code."
   - title: "Load the extension"
     body: "Open chrome://extensions, turn on Developer mode, press Load unpacked and choose the folder the command printed."
   - title: "Paste the pairing code"
     body: "The code is single use and lives for ten minutes. Paste it into the popup and press Connect."
   - title: "Optional: hand the same browser to an MCP client"
-    body: "The side panel already works. If you also live in a terminal, one more command gives your client the same tab and its 49 page tools."
+    body: "The side panel already works. If you also live in a terminal, one more command gives your client the same tab."
 ---
 {% import "partials/macros.njk" as m with context %}
 
@@ -33,13 +33,13 @@ howToSteps:
 
 {% call m.section("prerequisites") %}
   {{ m.kicker("Before you start", "lime") }}
-  {{ m.heading("Three things, and you probably have all of them") }}
+  {{ m.heading("What you need, and you probably have it") }}
 
   <div class="mt-10 grid gap-4 lg:grid-cols-3" data-reveal data-stagger>
     {%- for req in [
-      { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc via Manifest V3. Firefox is not supported yet: release Firefox refuses unsigned extensions.", accent: "brand" },
-      { name: "Node.js 20 or newer", body: "That is the whole toolchain. npx fetches the package, which already carries the built extension, so there is nothing to compile.", accent: "lime" },
-      { name: "One agent CLI", body: "claude, codex or agy on your PATH: the one you already signed in to. There is no API key to paste anywhere.", accent: "amber" }
+      { name: "A Chromium browser", body: "Chrome, Edge, Brave or Arc, via Manifest V3. Firefox is not supported yet: it refuses unsigned extensions.", accent: "brand" },
+      { name: "Node.js 20 or newer", body: "The whole toolchain. npx fetches the package, which already carries the built extension, so there is nothing to compile.", accent: "lime" },
+      { name: "One agent CLI", body: "claude, codex or agy on your PATH: the one you already signed in to. No API key to paste anywhere.", accent: "amber" }
     ] %}
     {%- set a = m.ACCENT[req.accent] %}
     <article class="card spotlight px-6 py-6">
@@ -76,15 +76,15 @@ howToSteps:
 {% call m.section("verify") %}
   {{ m.kicker("Check it landed", "lime") }}
   {{ m.heading("Ask your agent what it can see") }}
-  {{ m.lede("If the daemon is up and the browser is paired, this comes back with the active tab's title and URL rather than an error.") }}
+  {{ m.lede("If the daemon is up and the browser is paired, this comes back with the active tab, not an error.") }}
 
   <div class="mt-8 max-w-lg">{{ m.command("browsentic status") }}</div>
 
   <div class="mt-10 grid gap-4 md:grid-cols-3" data-reveal data-stagger>
     {%- for row in [
       { code: "EXTENSION_OFFLINE", body: "The daemon is running but no browser is paired. Redeem a pairing code in the popup." },
-      { code: "AGENT_MISSING", body: "The chosen CLI is not on the daemon's PATH. Set agents.<name>.bin to an absolute path." },
-      { code: "TAB_UNREACHABLE", body: "The content script has not been injected into that tab yet. Reload the page." }
+      { code: "AGENT_MISSING", body: "The CLI is not on the daemon's PATH. Set agents.<name>.bin to an absolute path." },
+      { code: "TAB_UNREACHABLE", body: "The content script is not in that tab yet. Reload the page." }
     ] %}
     <article class="card spotlight px-5 py-5">
       <code class="font-mono text-[0.78rem] text-ember">{{ row.code }}</code>
@@ -100,7 +100,7 @@ howToSteps:
 {% endcall %}
 
 {{ m.nextUp([
-  { href: "/docs/guide/pair/", title: "Pairing, in detail", body: "The single-use code, the session key, and how to revoke either." },
+  { href: "/docs/guide/pair/", title: "Pairing, in detail", body: "The single-use code, the session key, and how to revoke it." },
   { href: "/docs/guide/first-run/", title: "Your first instruction", body: "A tour of the side panel and what to try first." },
   { href: "/mcp-server/", title: "Add it to your MCP client", body: "Claude Code, Cursor, Zed, Codex or Claude Desktop." }
 ]) }}
