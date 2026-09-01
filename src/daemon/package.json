@@ -1,6 +1,6 @@
 {
   "name": "browsentic",
-  "version": "0.4.9",
+  "version": "0.4.10",
   "description": "Hand your real, logged-in browser to the AI agent you already run. Installs the browser extension, runs the local daemon, and speaks MCP.",
   "type": "module",
   "license": "MIT",
