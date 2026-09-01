@@ -33,6 +33,7 @@ ${link('Security', u('/security/'), 'the security model, and where it stops shor
 ${link('Install', u('/install/'), 'one command, then load the extension and pair')}
 ${link('MCP server', u('/mcp-server/'), 'optional: driving the same logged-in browser from an external MCP client')}
 ${link('FAQ', u('/faq/'), 'the questions people ask first')}
+${link('Privacy', u('/privacy/'), 'what the product collects (nothing) and what this website does')}
 
 ## Docs
 

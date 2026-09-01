@@ -867,6 +867,93 @@ export const FAQ = [
   },
 ]
 
+/**
+ * /privacy/. Every claim here is checkable against the source: the product has no
+ * server to send anything to, and the only third party on the site is the analytics
+ * tag in base.njk. If that tag changes, this file changes with it.
+ */
+export const PRIVACY = {
+  updated: 'September 2026',
+  lede: 'The extension sends us nothing, because there is no server to send it to. This website uses analytics. Both, in full, below.',
+  summary: [
+    {
+      title: 'The extension sends us nothing',
+      body: 'There is no Browsentic server to send it to. No account, no telemetry, no crash reports. What the extension and the daemon write stays under your home directory.',
+      accent: 'brand',
+    },
+    {
+      title: 'This website uses Google Analytics',
+      body: 'Pageviews, referrers and rough country, so we know which pages are worth writing. It sets cookies. Block it and the site works exactly the same.',
+      accent: 'amber',
+    },
+    {
+      title: 'Nothing to sign up for',
+      body: 'No accounts, no forms, no newsletter, no comments. There is nothing here for you to hand over, and nothing for us to sell.',
+      accent: 'lime',
+    },
+  ],
+
+  site: {
+    lede: 'browsentic.com is static pages on a CDN. Two parties see anything at all, and one of them is the host.',
+    rows: [
+      {
+        what: 'Request logs',
+        who: 'Vercel, the host',
+        body: 'IP address, user agent, URL and timestamp, in ordinary web server logs. Needed to serve the page and to absorb abuse.',
+      },
+      {
+        what: 'Analytics',
+        who: 'Google Analytics 4',
+        body: 'Pages viewed, referrer, rough country from your IP, device and browser. It sets _ga cookies that last two years.',
+      },
+      {
+        what: 'Fonts, scripts, images',
+        who: 'Nobody else',
+        body: 'All served from this domain. No Google Fonts, no CDN embeds, no trackers beyond the one named above.',
+      },
+    ],
+  },
+
+  product: {
+    lede: 'The extension and the daemon run on your machine and answer to nothing on the network except your own browser and your own agent.',
+    stays: [
+      ['~/.browsentic', 'Pairing keys, session keys, config and logs.'],
+      ['~/browsentic', 'Skills, site maps, recordings, screenshots and files you attached.'],
+      ['The extension', 'Conversations, tab sessions and approvals, in browser storage.'],
+    ],
+    leavesTitle: 'What does leave your machine, and where it goes',
+    leaves: [
+      {
+        title: 'Your agent CLI talks to its own vendor',
+        body: 'Browsentic spawns Claude Code, Codex or Antigravity as you. Whatever the agent reads from a page travels to that vendor as part of the conversation, under their privacy policy rather than ours.',
+      },
+      {
+        title: 'Dictation goes to Google to be transcribed',
+        body: 'Speech uses Chrome’s own Web Speech API, which streams the audio to Google and hands back text. No model is bundled and nothing is downloaded.',
+      },
+      {
+        title: 'The sites it works see your real browser',
+        body: 'It drives the tab in front of you, with your cookies and your session, so those sites see ordinary traffic from you. That is the whole point of it.',
+      },
+    ],
+  },
+
+  choices: [
+    {
+      title: 'Block the analytics',
+      body: 'Any content blocker, or Google’s own opt-out add-on, stops it dead. Nothing on this site depends on it.',
+    },
+    {
+      title: 'Ask what we hold',
+      body: 'Almost nothing, and none of it names you. If you are in the EU or UK and want access, correction or erasure, open an issue and we will deal with it.',
+    },
+    {
+      title: 'Read the code instead',
+      body: 'The extension and the daemon are MIT licensed and source available. Every claim on this page is checkable against them.',
+    },
+  ],
+}
+
 export const NAV_LINKS = [
   { href: '#how', label: 'Architecture' },
   { href: '#highlights', label: 'What it does' },

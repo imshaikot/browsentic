@@ -70,6 +70,7 @@ export default {
         { href: `${REPO}/releases`, label: 'Releases', external: true },
         { href: `${REPO}/issues`, label: 'Issues', external: true },
         { href: '/security/', label: 'Security model' },
+        { href: '/privacy/', label: 'Privacy' },
         { href: '/llms.txt', label: 'llms.txt' },
       ],
     },
