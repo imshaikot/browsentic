@@ -110,11 +110,17 @@ export const CONDITIONS = {
   injectsCode: (request) => request.action === INJECT_ACTION,
 
   /**
-   * The one place a caller is named in a condition rather than left to `unattended`.
+   * The two places a caller is named in a condition rather than left to `unattended`.
    * A toolkit is approved by a person reading it in the side panel, for the conversation
    * they were having; an MCP client was never in that room, and the switch the user
    * turned off is not one it can see.
+   *
+   * Both halves have to say so themselves. `unattended` only answers a `confirm`, so a
+   * rule that merely confirms is one config line away from being waived, and writing new
+   * code is the more powerful half of the pair, not the lesser one.
    */
+  injectsCodeOutsideThePanel: (request) => request.action === INJECT_ACTION && request.caller === 'external',
+
   runsCodeOutsideThePanel: (request) => request.action === RUN_CODE_ACTION && request.caller === 'external',
 
   /**
@@ -227,13 +233,24 @@ export const DEFAULT_RULES: readonly Rule[] = [
     // its work: the panel puts the source behind a Review button, because "allow this
     // action?" is not a question anyone can answer about code they have not read. It
     // confirms rather than denies because a reviewed function is how twenty repetitions
-    // stop being twenty round trips — and `unattended: deny` keeps an external MCP
-    // client, which has nobody to show the code to, from installing any at all.
+    // stop being twenty round trips.
     id: 'code-injection',
     when: 'injectsCode',
     effect: 'confirm',
     title: 'Runs code it wrote in the page',
     reason: 'That installs JavaScript the agent wrote into the page, with your logged-in session.',
+  },
+  {
+    // `code-injection` confirms, and a confirm is what `unattended: allow` waives, so on
+    // its own it left installation one config line away from an MCP client. Denying is
+    // not a duplicate of that rule: it is the half that cannot be configured off, which
+    // is what the equivalent rule below has always been for calls.
+    id: 'external-code-injection',
+    when: 'injectsCodeOutsideThePanel',
+    effect: 'deny',
+    title: 'Installs code from outside the panel',
+    reason:
+      'Installing page code needs a person to read it first, and an MCP client has nobody to show it to. Ask from the Browsentic side panel instead.',
   },
   {
     id: 'external-code-execution',

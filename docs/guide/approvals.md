@@ -53,6 +53,7 @@ depend on declaration order.
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
 | `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
 | `code-injection` | `page_injectCode` — installing JavaScript the agent wrote into the page | confirm |
+| `external-code-injection` | `page_injectCode` called by an MCP client rather than the side panel | **deny** |
 | `external-code-execution` | `page_runCode` called by an MCP client rather than the side panel | **deny** |
 | `secret-in-url` | A saved secret placed in a navigation URL | **deny** |
 | `secret-release` | A saved secret about to be typed into the page | confirm |
@@ -123,6 +124,11 @@ someone allowlists the browsentic tools to stop being asked.
 ```
 
 waives them instead, going back to "the client's permissions are the only gate".
+
+It does not waive a `deny`. That is why the two live-tool rules deny rather than confirm: a
+client allowlisting the Browsentic tools is exactly the setup where `unattended: allow` gets
+turned on, and writing code into your logged-in page is not something a client's own prompt is
+in any position to judge.
 
 ---
 

@@ -162,11 +162,19 @@ check('external never returns confirm', external('page.attachFile', { fileId: 'f
 check('external download denied by default', external('page.captureDownload', { url: 'https://example.com/f.csv' }).effect, 'deny');
 // Nobody to show the code to, so nobody can approve it — and a toolkit a person approved
 // in the panel is not thereby available to an MCP client.
-check('external code injection denied by default', external('page.injectCode', { purpose: 'p', code: 'x' }).effect, 'deny');
+check('external code injection denied outright', external('page.injectCode', { purpose: 'p', code: 'x' }).effect, 'deny');
+check('the injection refusal names its rule', external('page.injectCode', { purpose: 'p', code: 'x' }).matched.map((r) => r.id), ['external-code-injection']);
 check('external code execution denied outright', external('page.runCode', { function: 'x' }).effect, 'deny');
 check('the refusal names its rule', external('page.runCode', { function: 'x' }).matched.map((r) => r.id), ['external-code-execution']);
 check('unattended=allow does not open it', external('page.runCode', { function: 'x' }, policyFrom({ unattended: 'allow' })).effect, 'deny');
-check('the panel is unaffected by that rule', agent('page.runCode', { function: 'x' }).matched.map((r) => r.id), []);
+// The gap this pair closes: `code-injection` only confirms, and `unattended: allow` waives
+// a confirm, so installing was reachable from an MCP client with one line of config. The
+// `call` argument on page.injectCode then runs a function without passing this way again,
+// which made an allowed install an execution too.
+check('unattended=allow does not open injection either', external('page.injectCode', { purpose: 'p', code: 'x' }, policyFrom({ unattended: 'allow' })).effect, 'deny');
+check('nor does it open an install that calls straight through', external('page.injectCode', { purpose: 'p', code: 'x', call: { function: 'x', args: [] } }, policyFrom({ unattended: 'allow' })).effect, 'deny');
+check('the panel is unaffected by those rules', agent('page.runCode', { function: 'x' }).matched.map((r) => r.id), []);
+check('the panel still only confirms an install', agent('page.injectCode', { purpose: 'p', code: 'x' }).matched.map((r) => r.id), ['code-injection']);
 
 // ── guardrails: policy overrides ─────────────────────────────────────────────────
 const strict = policyFrom({ rules: { 'raw-html-read': 'deny', 'off-scope-navigation': 'deny' } });
