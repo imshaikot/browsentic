@@ -213,7 +213,7 @@ export const MCP_POINTS = [
 ]
 
 export const STATS = [
-  { value: 47, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
+  { value: 49, suffix: '', label: 'browser capabilities', note: 'sense, act, navigate, wait' },
   { value: 3, suffix: '', label: 'tabs worked at once', note: 'independent sessions, up to eight' },
   { value: 0, suffix: '', label: 'API keys to configure', note: 'it runs on the login you already own' },
   { value: 1, suffix: '', label: 'command to install', note: 'npx browsentic setup, MIT licensed' },
@@ -261,6 +261,14 @@ export const TOOL_GROUPS = [
       'page_applyTheme',
       'page_highlightElement',
     ],
+  },
+  {
+    id: 'script',
+    label: 'Script',
+    accent: 'magenta',
+    blurb:
+      'Writes its own tool when the fixed set is the wrong shape. A job that repeats twenty times with only the input changing, or something no tool covers (seeking a video, reading a canvas, driving an editor’s own API), becomes a small script the agent drafts for that page. You read the source in the side panel and approve it before a line of it runs, and every later call reuses what you approved without asking again. Off until you turn the Live tool switch on, bound to the tab and site you approved it for, and never available to an MCP client.',
+    tools: ['page_injectCode', 'page_runCode'],
   },
   {
     id: 'move',
@@ -613,6 +621,13 @@ export const HIGHLIGHTS = [
     link: { href: '/capabilities/', label: 'What it can read' },
   },
   {
+    id: 'live',
+    title: 'When a job repeats twenty times, it writes a tool',
+    body: 'Twenty tags to create, every row to archive, a video to seek, a canvas to read. Flip the Live tool switch and the agent drafts a small script for that page, you read the code in the panel and approve it, then it runs as many times as the job needs. Off until you turn it on, and nothing runs unread.',
+    accent: 'magenta',
+    link: { href: '/capabilities/', label: 'Live tools' },
+  },
+  {
     id: 'skills',
     title: 'Teach it your own moves',
     body: 'Write a skill in plain markdown and drop it in, or let a mapped site or a recording become one. Skills route by trigger words, and nothing arms itself until you have read it.',
@@ -633,6 +648,10 @@ export const SECURITY = [
   {
     title: 'Consequential actions ask first',
     body: 'Approval prompts appear in the side panel with the action named. Form submission is gated by default, because it is the one effect that reaches someone other than you. Cancelling a run stops it mid-flight.',
+  },
+  {
+    title: 'Agent-written code is read before it runs',
+    body: 'The Live tool switch starts off, and with it off the agent is not even told the tools exist. Turned on, any script it writes arrives as an approval prompt with a Review button that shows you the full source first. What you approve is that code, on that tab and that site, so later calls can only reuse what you already read. There is no "always allow" for it, and an MCP client can neither install a script nor call one you approved.',
   },
   {
     title: 'Recordings capture what you do, not what you type',
@@ -827,6 +846,10 @@ export const FAQ = [
   {
     q: 'What can I actually automate with it?',
     a: 'Ordinary browsing work on sites you are already signed in to: negotiating a renewal in a support chat that already holds your ticket history, answering a job application from a resume you attached, taking a cancellation as far as the step that cannot be undone, watching a slow release and saying when it lands, redoing Friday’s expense report from a recording, or pulling one summary out of five dashboards. Anything that commits something, or sends it to someone other than you, pauses and names itself before it happens.',
+  },
+  {
+    q: 'Can it write its own script for a page?',
+    a: 'Yes, once you let it. The composer has a Live tool switch that starts off, and while it is off the agent cannot reach the tools and is not told they exist. Turn it on and, for a job that repeats many times with only the input changing or for something no built-in tool covers, the agent drafts a small toolkit of JavaScript functions for that page. It arrives as an approval prompt with a Review button that shows the full source, and nothing runs until you allow it. One approval then covers every later call into that toolkit, which is what turns twenty repetitions into twenty cheap calls, and it is bound to the tab and site you approved it for. A different script asks again, there is no "always allow" for it, and an MCP client can neither install one nor call one you approved from the panel.',
   },
   {
     q: 'Which browsers work?',

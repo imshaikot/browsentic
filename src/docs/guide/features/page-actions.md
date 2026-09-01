@@ -3,8 +3,8 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "Page actions"
 seoTitle: "Page actions — Browsentic features"
-description: "The 47 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what…"
-deck: "The 47 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what is worth asking for."
+description: "The 49 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what…"
+deck: "The 49 things Browsentic can do to a page. You never have to name these — you say what you want and the agent picks — but knowing what exists tells you what is worth asking for."
 docsPath: "guide/features/page-actions.md"
 section: "guide/features"
 sectionLabel: "Features"
@@ -71,6 +71,32 @@ by **visible text** survives redesigns that break CSS paths.
 Tab tools are the only ones that change *which* tab everything else acts on, and they are scoped to
 the current window. `closeTab` refuses deliberately in four cases: the only tab in a window, a
 pinned tab, a browser page, and a tab being [recorded](/docs/guide/features/recordings/).
+
+## Repeating a job, and doing what no tool covers
+
+Two tools exist for the cases the fixed toolset handles badly. When the same sequence is about to
+run twenty times with only the input changing — creating twenty tags, archiving every row — twenty
+rounds of wait, find, click and verify is slow and fragile. And some things no tool covers at all:
+seeking a video to a timestamp, reading pixels off a canvas, driving an editor's own API.
+
+**Both are off unless you switch them on.** The composer has a **Live tool** switch — the `</>` button
+beside the message box — and it starts off. With it off the agent cannot reach these tools at all,
+is not told they exist, and gets `LIVE_TOOLS_OFF` if it tries; nothing but your own click turns it
+on. With it on, the agent decides whether the job actually warrants a script.
+
+`page_injectCode` then asks to install a small toolkit of JavaScript functions in the page. **You
+review the source and approve it** — the prompt in the side panel has a **Review** button that opens
+the full code before you decide. `page_runCode` calls one of those functions with fresh arguments,
+as often as the job needs, without asking again.
+
+What you approve is that code, on that tab, on that site. Later calls can only reach the functions
+you read; only their arguments change. There is no "always on this site" for an injection, because
+that would authorise code you never saw. Navigate to another site and the toolkit stops working
+rather than following you.
+
+The agent is told to reach for this only when a task repeats three or more times or when nothing
+else can do the job — a one-off click is cheaper as a click. See [Approvals](/docs/guide/approvals/) and
+[reference/tools.md](/docs/reference/tools/#scripting).
 
 ## Everything else
 

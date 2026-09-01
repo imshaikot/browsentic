@@ -34,6 +34,7 @@ The surface, at a glance:
 | [Status](#status) | `browsentic_status` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
+| [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
 | [Diagnostics](#diagnostics) | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` |
@@ -466,6 +467,87 @@ the user what was found.
 | `target` | [target](#element-targets) | required | Element to highlight |
 | `durationMs` | integer | `2000` | How long the highlight stays visible |
 | `label` | string | — | Small caption rendered above the highlight |
+
+---
+
+## Scripting
+
+Two tools for the jobs the fixed toolset is the wrong shape for: a sequence about to be repeated
+many times with different inputs, and a capability no tool covers. `page_injectCode` installs a
+small toolkit of functions after **you** approve the source; `page_runCode` calls one of them, as
+often as the job needs, without asking again.
+
+**Both require the composer's "Live tool" switch, which starts off.** A side-panel run whose message
+was sent with it off gets `LIVE_TOOLS_OFF` from either tool, and the guidance telling the agent how
+to use them is not even loaded. Only the person at the panel can turn it on.
+
+**Both are side-panel only.** An [MCP client](/docs/guide/mcp-clients/) cannot install code — it has
+nobody to show it to — and cannot call a toolkit the panel installed either: the approval belonged
+to the conversation whose user read the source, and a client that was not in that room does not
+inherit it.
+
+The approval is the whole security boundary, so it is worth knowing exactly what it covers. The
+prompt in the side panel carries a **Review** button that opens the full source before you decide.
+What you approve is that code, on that tab, on that site — `page_runCode` can only ever call back
+into it, and only its arguments change. There is deliberately no "always on this site" for an
+injection: it would authorise later code you never read. A different script asks again.
+
+Installing goes through Chrome's debugger, so the browser shows its "Browsentic is debugging this
+browser" bar for the moment it takes, it fails on a tab with DevTools open, and it is unavailable on
+Firefox. The calls afterwards use an ordinary event bridge and show nothing.
+
+### page_injectCode
+
+Install a toolkit of JavaScript functions into the page, to be called later with `page_runCode`.
+Gated by the [`code-injection`](/docs/guide/approvals/) rule, which is why an external MCP client —
+having nobody to show the code to — cannot install any.
+
+The code runs once in the page's **main world**, so it sees the page's own DOM, globals and
+same-origin `fetch`, and nothing of the extension. It is handed a `tools` object and assigns each
+entry point onto it:
+
+```js
+tools.addTag = async (name) => {
+  document.querySelector('#new-tag').value = name;
+  document.querySelector('#new-tag').dispatchEvent(new Event('input', { bubbles: true }));
+  document.querySelector('form.tag-form button[type=submit]').click();
+  await new Promise((done) => setTimeout(done, 400));
+  return [...document.querySelectorAll('.tag-row .name')].some((el) => el.textContent === name);
+};
+```
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `purpose` | string | required | One sentence, shown to you on the approval prompt, saying what the toolkit does |
+| `code` | string | required | The source, assigning each function onto `tools`. Max 32 KB |
+| `call` | object | — | `{ function, args }` to run immediately after installing, saving a round trip |
+
+Returns `toolkitId`, the `origin` it was approved for, and `functions` — the names it defined.
+
+Values that vary per call belong in `page_runCode`'s arguments, not baked into the source: the code
+is what was approved, so changing it means approving again. Secrets never belong in it either —
+this is the field the approval prompt displays, and it is shown in full.
+
+### page_runCode
+
+Call one function from the installed toolkit. Not gated for the side panel — the approval already
+covered the code — and denied outright for an MCP client by
+[`external-code-execution`](/docs/guide/approvals/).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `function` | string | required | Name of a function the toolkit defined |
+| `args` | array | `[]` | Arguments, in order. JSON values only |
+| `timeoutMs` | integer | `10000` | How long the call may run before it is abandoned |
+
+Returns `{ function, returned }`, where `returned` is the function's JSON value.
+
+A page reload wipes the toolkit out of the page but not the record of what you approved, so the next
+call silently re-installs the same source and proceeds. Four refusals are worth reading rather than
+retrying: `TOOLKIT_MISSING` (nothing installed here — inject first), `TOOLKIT_SCOPE` (the tab has
+moved to a different site than the code was approved on), `UNKNOWN_FUNCTION` (the error lists what
+the toolkit does define), and `CODE_ERROR` (the function threw; the page's own message comes back
+with it).
 
 ---
 

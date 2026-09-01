@@ -3,7 +3,7 @@ layout: layouts/doc.njk
 pageKey: docs
 title: "The action registry"
 seoTitle: "The action registry — Browsentic internals"
-description: "One definition, compiled into two bundles. There are 45 page capabilities. They are defined once, in src/lib/actions/registry.ts, and that array is compiled…"
+description: "One definition, compiled into two bundles. There are 49 page capabilities. They are defined once, in src/lib/actions/registry.ts, and that array is compiled…"
 deck: "One definition, compiled into two bundles."
 docsPath: "internals/registry.md"
 section: "internals"
@@ -20,7 +20,7 @@ sourceUrl: "https://github.com/imshaikot/browsentic/blob/main/docs/internals/reg
 
 ## One array, two consumers
 
-There are **45 page capabilities**. They are defined once, in
+There are **49 page capabilities**. They are defined once, in
 [`src/lib/actions/registry.ts`](https://github.com/imshaikot/browsentic/blob/main/src/lib/actions/registry.ts), and that array is compiled into **both**
 the extension and the daemon.
 

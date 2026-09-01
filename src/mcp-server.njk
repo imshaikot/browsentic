@@ -90,7 +90,13 @@ keywords:
   </div>
 {% endcall %}
 
-{% call m.section("resources", "bg-ground-2/30") %}
+{% call m.section("panel-only", "bg-ground-2/30") %}
+  {{ m.kicker("One difference", "magenta") }}
+  {{ m.heading("Two tools stay in the side panel") }}
+  {{ m.lede("An MCP client gets 47 of the 49 page tools. The two left out are the live scripting pair, which lets the agent write a small script for a page: installing one needs a person reading the source in the side panel and approving it, and a toolkit approved there does not carry over to a client that was not in that conversation. Everything else is identical, because both surfaces are generated from the same registry.") }}
+{% endcall %}
+
+{% call m.section("resources") %}
   {{ m.kicker("Resources", "amber") }}
   {{ m.heading("Page context without spending a tool call") }}
 
