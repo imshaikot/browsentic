@@ -98,6 +98,27 @@ The agent is told to reach for this only when a task repeats three or more times
 else can do the job — a one-off click is cheaper as a click. See [Approvals](/docs/guide/approvals/) and
 [reference/tools.md](/docs/reference/tools/#scripting).
 
+### Keeping one
+
+A second after a toolkit installs, the panel asks whether to keep it as a tool of your own. Say yes
+and it gets a name after the place it belongs — `youtube.com:watch:darken-page-except-video-player` —
+and from then on it runs by typing `/` on that site and picking it. No agent, no round trip, and no
+second approval: you already read the code, which is what saving means.
+
+Only a zero-argument function can be kept, because `/` passes nothing. A toolkit whose entry point
+takes arguments stays a one-off, which is the honest answer for something that needs input each time.
+
+Scope is the host plus the first path segment. A tool made on a `/watch` page is offered on every
+`/watch` page and nowhere else on the host, and never on another host.
+
+The two halves are stored apart. The JavaScript lives in the extension's own storage and goes
+nowhere else; the daemon gets a markdown note that the tool exists and what it does, so the agent
+can point you at it instead of writing the same thing again. Nothing about a saved tool is a page
+action, so no MCP client can call one.
+
+Type `/remove-tools` for the list, with a cross beside each. Removing one deletes the code from the
+browser and the note from the daemon together.
+
 ## Everything else
 
 | Group | Tools | See |
