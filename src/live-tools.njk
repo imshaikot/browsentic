@@ -1,0 +1,133 @@
+---
+layout: layouts/page.njk
+pageKey: live-tools
+title: "Create your own agent tool for any website"
+seoTitle: "Live tools: create your own agent tool | Browsentic"
+description: "Ask for what no built-in tool does, read the code the agent writes, and keep it. It becomes a tool of your own that runs by name on the site you made it on."
+keywords:
+  - create your own AI tool
+  - custom browser automation tool
+  - AI writes browser script
+  - userscript alternative
+  - custom agent tool
+  - browser tool for one site
+  - AI generated page script
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.LIVE_TOOLS.kicker, copy.LIVE_TOOLS.title, copy.LIVE_TOOLS.lede, "magenta") %}
+<div class="mt-9 flex flex-wrap gap-3">
+  {{ m.button("/install/", "Install the extension") }}
+  {{ m.button("/capabilities/", "Every built-in tool", "ghost") }}
+</div>
+{% endcall %}
+
+<!-- Four beats: ask, read, keep, run -->
+{% call m.section("how") %}
+  {{ m.kicker("How one gets made", "magenta") }}
+  {{ m.heading("Four steps, and you only do two of them") }}
+
+  <ol class="mt-12 grid gap-4 lg:grid-cols-4" data-reveal data-stagger>
+    {%- for step in copy.LIVE_TOOLS.steps %}
+    <li class="card spotlight relative px-5 py-6">
+      {%- if not loop.last %}
+      <span class="rail pointer-events-none absolute left-full top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 lg:block" style="--rail-delay: {{ loop.index0 * 0.7 }}s" aria-hidden="true"></span>
+      {%- endif %}
+      <span class="font-mono text-[0.7rem] text-ink-faint" data-pop>{{ step.n }}</span>
+      <h2 class="mt-2.5 font-display text-[1.12rem] font-semibold text-ink">{{ step.title }}</h2>
+      <p class="mt-3 text-[0.88rem] leading-relaxed text-ink-faint">{{ step.body }}</p>
+    </li>
+    {%- endfor %}
+  </ol>
+{% endcall %}
+
+<!-- The name -->
+{% call m.section("name", "bg-ground-2/30") %}
+  {{ m.kicker("The name", "brand") }}
+  {{ m.heading("A tool is named after where it belongs") }}
+  {{ m.lede(copy.LIVE_TOOLS.anatomy.lede) }}
+
+  <div class="card mt-10 overflow-hidden" data-reveal>
+    <div class="table-scroll px-5 py-5">
+      <p class="whitespace-nowrap font-mono text-[0.95rem]">
+        <span class="text-ink-faint">/</span>{%- for part in copy.LIVE_TOOLS.anatomy.name -%}
+        {%- if not loop.first %}<span class="text-ink-faint">:</span>{% endif -%}
+        <span class="{{ ['text-brand', 'text-amber', 'text-magenta'][loop.index0] }}">{{ part }}</span>
+        {%- endfor %}
+      </p>
+    </div>
+    <div class="grid gap-px border-t border-line bg-line sm:grid-cols-3">
+      {%- for part in copy.LIVE_TOOLS.anatomy.parts %}
+      <div class="bg-surface px-5 py-5">
+        <p class="font-display text-[0.95rem] font-medium {{ ['text-brand', 'text-amber', 'text-magenta'][loop.index0] }}">{{ part[0] }}</p>
+        <p class="mt-2 text-[0.86rem] leading-relaxed text-ink-faint">{{ part[1] }}</p>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+{% endcall %}
+
+<!-- Scope -->
+{% call m.section("scope") %}
+  {{ m.kicker(copy.LIVE_TOOLS.scope.kicker, "lime") }}
+  {{ m.heading(copy.LIVE_TOOLS.scope.title) }}
+  {{ m.lede(copy.LIVE_TOOLS.scope.lede) }}
+
+  <ul class="mt-10 max-w-2xl divide-y divide-line border-y border-line" data-reveal>
+    {%- for row in copy.LIVE_TOOLS.scope.rows %}
+    <li class="flex items-center justify-between gap-4 py-3">
+      <code class="min-w-0 truncate font-mono text-[0.84rem] text-ink-dim">{{ row[0] }}</code>
+      {%- if row[1] %}
+      <span class="shrink-0 rounded-full bg-lime/10 px-2.5 py-0.5 font-mono text-[0.68rem] text-lime">offered</span>
+      {%- else %}
+      <span class="shrink-0 rounded-full bg-surface px-2.5 py-0.5 font-mono text-[0.68rem] text-ink-faint">not here</span>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+{% endcall %}
+
+<!-- Examples -->
+{% call m.section("examples", "bg-ground-2/30") %}
+  {{ m.kicker(copy.LIVE_TOOLS.examples.kicker, "amber") }}
+  {{ m.heading(copy.LIVE_TOOLS.examples.title) }}
+  {{ m.lede(copy.LIVE_TOOLS.examples.lede) }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    {%- for item in copy.LIVE_TOOLS.examples.items %}
+    {%- set a = m.ACCENT[item.accent] %}
+    <article class="card spotlight px-6 py-6">
+      <div class="flex items-center gap-2.5">
+        <span class="size-2 shrink-0 rounded-full {{ a.dot }}"></span>
+        <code class="min-w-0 truncate font-mono text-[0.82rem] {{ a.text }}">{{ item.name }}</code>
+      </div>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ item.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+<!-- Trust -->
+{% call m.section("trust") %}
+  {{ m.kicker(copy.LIVE_TOOLS.trust.kicker, "ember") }}
+  {{ m.heading(copy.LIVE_TOOLS.trust.title) }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    {%- for item in copy.LIVE_TOOLS.trust.items %}
+    <article class="card spotlight px-6 py-6">
+      <h3 class="font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ item.title }}</h3>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ item.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/security/", "The whole security model", "ghost") }}</div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/skills/", title: "Teach it a whole job", body: "Recordings and site maps: the other two ways it learns your work." },
+  { href: "/capabilities/", title: "What it already does", body: "Every built-in tool, before you go writing one of your own." },
+  { href: "/security/", title: "Why this is safe to allow", body: "The switch, the review, and what a saved tool can never reach." }
+]) }}
+
+{{ m.cta(copy) }}

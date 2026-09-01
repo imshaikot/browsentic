@@ -624,10 +624,10 @@ export const HIGHLIGHTS = [
   },
   {
     id: 'live',
-    title: 'When a job repeats twenty times, it writes a tool',
-    body: 'Every row to archive, a canvas to read. Flip the Live tool switch and the agent drafts a small script for that page, which you read and approve before it runs.',
+    title: 'Create your own agent tool',
+    body: 'Ask for what no built-in tool does. Read the code the agent writes, keep it, and it runs by name on that site from then on.',
     accent: 'magenta',
-    link: { href: '/capabilities/', label: 'Live tools' },
+    link: { href: '/live-tools/', label: 'Make your own tool' },
   },
   {
     id: 'skills',
@@ -866,6 +866,97 @@ export const FAQ = [
     a: 'One module in src/lib/actions/page/ and one line in the registry, which publishes it as an MCP tool at the same time. Four conventions are load-bearing: touch document and window only inside execute(), keep underscores out of action names, describe() every input field, and validate with ActionError inside execute().',
   },
 ]
+
+/**
+ * /live-tools/. The one capability the user builds rather than receives, so the page is
+ * shaped as a story with four beats rather than a feature grid: ask, read, keep, run.
+ */
+export const LIVE_TOOLS = {
+  kicker: 'Live tools',
+  title: ['Create your own agent tool,', 'for the site you made it on'],
+  lede: 'Ask for something the built-in tools cannot do. Read the code the agent writes, keep it, and it becomes a tool of your own that runs by name.',
+
+  steps: [
+    {
+      n: '01',
+      title: 'Ask for the thing no tool does',
+      body: 'Flip the Live tool switch and say what you want. Seek a video, read a canvas, archive every row.',
+    },
+    {
+      n: '02',
+      title: 'Read what it wrote',
+      body: 'The code arrives in the panel in full, never truncated. You approve the source, not a summary of it.',
+    },
+    {
+      n: '03',
+      title: 'Keep it',
+      body: 'A second after it works, the panel asks whether to keep it. Name it, or take the name it suggests.',
+    },
+    {
+      n: '04',
+      title: 'Run it by name',
+      body: 'Type a slash on that site and it is there. No agent, no waiting, no asking you again.',
+    },
+  ],
+
+  anatomy: {
+    lede: 'So you find it by remembering the site, not the tool. Three parts, and only the last one is yours to choose.',
+    name: ['youtube.com', 'watch', 'darken-page-except-video-player'],
+    parts: [
+      ['The site', 'Where it was made, and the only place it runs.'],
+      ['The kind of page', 'The first part of the path. Every watch page, not one video.'],
+      ['What you called it', 'Yours to name. This is the part you type.'],
+    ],
+  },
+
+  scope: {
+    kicker: 'Scope',
+    title: 'It offers itself where it belongs, and nowhere else',
+    lede: 'A tool made on a watch page knows it is for watch pages. It does not follow you around the site, and it never leaves the host.',
+    rows: [
+      ['youtube.com/watch?v=anything', true],
+      ['youtube.com/watch/live', true],
+      ['youtube.com/results', false],
+      ['youtube.com', false],
+      ['music.youtube.com/watch', false],
+    ],
+  },
+
+  examples: {
+    kicker: 'In practice',
+    title: 'The small things a site should have done itself',
+    lede: 'Every one of these is a few lines the agent writes once, on a page you use often.',
+    items: [
+      { name: 'darken-page-except-video-player', body: 'The dark mode the site never shipped, on the one page you watch.', accent: 'magenta' },
+      { name: 'collapse-bot-comments', body: 'Fold every automated comment on a pull request so the human ones are left.', accent: 'brand' },
+      { name: 'archive-newsletters', body: 'Clear the promotions out of an inbox in one press instead of forty.', accent: 'lime' },
+      { name: 'copy-table-as-csv', body: 'Take the table a dashboard will not export and put it on the clipboard.', accent: 'amber' },
+    ],
+  },
+
+  trust: {
+    kicker: 'What stays yours',
+    title: 'Your tool, in your browser, and nowhere else',
+    items: [
+      {
+        title: 'The code never leaves the browser',
+        body: 'It is kept by the extension. The daemon is told a tool exists and what it does, never how it works.',
+      },
+      {
+        title: 'Nothing runs unread',
+        body: 'You saw the source before it ran the first time. Keeping it is what makes later runs free of asking.',
+      },
+      {
+        title: 'No client can reach it',
+        body: 'It is not a page tool, so nothing an MCP client can call touches it. The side panel is the only way in.',
+      },
+      {
+        title: 'Gone when you say so',
+        body: 'Type slash remove-tools for the list, and a cross beside each. Removing one deletes the code with it.',
+      },
+    ],
+  },
+}
 
 export const NAV_LINKS = [
   { href: '#how', label: 'Architecture' },

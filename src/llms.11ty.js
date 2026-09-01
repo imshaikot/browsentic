@@ -28,6 +28,7 @@ ${link('How it works', u('/how-it-works/'), 'the four hops, and why a Manifest V
 ${link('Capabilities', u('/capabilities/'), 'every page tool, grouped, plus the read-only resources')}
 ${link('Agent orchestration', u('/orchestration/'), 'several tabs, several agents, one browser, all at once')}
 ${link('Automations', u('/automations/'), 'the jobs people hand over, and where each one stops for you')}
+${link('Live tools', u('/live-tools/'), 'the agent writes a tool for a site, you approve it, and keep it')}
 ${link('Skills', u('/skills/'), 'automatic site maps, record and replay, local intent routing')}
 ${link('Security', u('/security/'), 'the security model, and where it stops short')}
 ${link('Install', u('/install/'), 'one command, then load the extension and pair')}

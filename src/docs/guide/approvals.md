@@ -65,6 +65,7 @@ depend on declaration order.
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
 | `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
 | `code-injection` | `page_injectCode` — installing JavaScript the agent wrote into the page | confirm |
+| `external-code-injection` | `page_injectCode` called by an MCP client rather than the side panel | **deny** |
 | `external-code-execution` | `page_runCode` called by an MCP client rather than the side panel | **deny** |
 | `secret-in-url` | A saved secret placed in a navigation URL | **deny** |
 | `secret-release` | A saved secret about to be typed into the page | confirm |
@@ -135,6 +136,23 @@ someone allowlists the browsentic tools to stop being asked.
 ```
 
 waives them instead, going back to "the client's permissions are the only gate".
+
+### Tools the user kept
+
+A toolkit the user saved from the keep prompt runs from `/` with no approval at all. That is the
+whole point of saving one: the code was read and approved when it was kept, so asking again would
+be asking about something already answered. What holds it in place is not a prompt but the record
+itself, which pins the origin and the path segment it was approved on and re-checks both before it
+installs anything.
+
+The daemon is not in that loop. The code lives in extension storage, the run goes from the side
+panel straight to the tab, and the daemon holds only a markdown note that the tool exists. There
+is no action for it, so no MCP client can reach it, with or without `unattended`.
+
+It does not waive a `deny`. That is why the two live-tool rules deny rather than confirm: a
+client allowlisting the Browsentic tools is exactly the setup where `unattended: allow` gets
+turned on, and writing code into your logged-in page is not something a client's own prompt is
+in any position to judge.
 
 ---
 
