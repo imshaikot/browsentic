@@ -30,13 +30,16 @@ const gitTry = (...args) => {
 /**
  * `prepare` writes the notes into the annotated tag object, so a tag cut that way already
  * carries the text that should ship, hand-edits included. Only an annotated tag has its own
- * message: on a lightweight one `%(contents)` returns the commit's message, which would
- * publish a commit body as release notes.
+ * message: on a lightweight one the format would return the commit's message, which would
+ * publish a commit body as release notes. A signed tag's payload ends with the signature
+ * block, and git (through 2.50 at least) only splits PGP ones out of `contents:body` —
+ * v0.4.11 published its SSH signature as the last lines of the notes — so strip it here.
  */
+const TRAILING_SIGNATURE = /-----BEGIN (PGP|SSH) SIGNATURE-----[\s\S]*?-----END \1 SIGNATURE-----\s*$/;
+
 function annotatedBody(tag) {
   if (gitTry('cat-file', '-t', tag) !== 'tag') return null;
-  const contents = gitTry('tag', '-l', '--format=%(contents)', tag);
-  const body = contents.startsWith(tag) ? contents.slice(tag.length) : contents;
+  const body = gitTry('tag', '-l', '--format=%(contents:body)', tag).replace(TRAILING_SIGNATURE, '');
   return body.trim() || null;
 }
 
