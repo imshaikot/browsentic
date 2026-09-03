@@ -24,6 +24,7 @@ The surface, at a glance:
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
+| [Site tools (WebMCP)](#site-tools-webmcp) | `page_listSiteTools`, `page_callSiteTool` |
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
 | [Theming](#theming) | `page_readTheme`, `page_auditContrast`, `page_applyTheme` |
 | [Diagnostics](#diagnostics) | `page_startDiagnostics`, `page_readConsole`, `page_readNetwork`, `page_stopDiagnostics` |
@@ -537,6 +538,48 @@ retrying: `TOOLKIT_MISSING` (nothing installed here — inject first), `TOOLKIT_
 moved to a different site than the code was approved on), `UNKNOWN_FUNCTION` (the error lists what
 the toolkit does define), and `CODE_ERROR` (the function threw; the page's own message comes back
 with it).
+
+---
+
+## Site tools (WebMCP)
+
+Some sites now publish their own tools for agents through
+[WebMCP](https://github.com/webmachinelearning/webmcp) — `document.modelContext`, shipping natively
+in Chrome and polyfilled elsewhere. A registered site tool is the site saying "call this instead of
+clicking": one structured call with a schema, handled by the site's own code, replacing a whole
+click-and-fill sequence that selectors could miss. These two tools are how Browsentic finds and
+calls them; `page_getPageInfo` already carries a `siteTools` list whenever a page registers any, so
+a run learns a site is agent-ready without asking.
+
+Both read the page's main world through Chrome's scripting API — no debugger bar, no approval to
+install anything, and they work whether the site's implementation is the browser's own or a library.
+
+### page_listSiteTools
+
+List the tools the current site registers: `name`, `description`, `inputSchema` and any
+`annotations`, plus `api` — which of `document.modelContext` or the older `navigator.modelContext`
+the page exposes. No parameters.
+
+Fails with `NO_SITE_TOOLS` on the many sites that register none, which is the signal to work with
+the ordinary page tools instead.
+
+### page_callSiteTool
+
+Call one registered tool by name. Gated by the [`site-tool-call`](../guide/approvals.md) rule the
+same way a form submit is: the site decides what the call does, and that can include acting on the
+signed-in account.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `tool` | string | required | Name exactly as `page_listSiteTools` reported it |
+| `args` | object | `{}` | Arguments matching the tool's input schema. JSON values only |
+| `timeoutMs` | integer | `15000` | How long the tool may run before the call is abandoned |
+
+Returns `{ tool, returned }`, where `returned` is whatever the site's tool produced, as JSON.
+
+Three refusals are worth reading rather than retrying: `NO_SITE_TOOLS` (the site registers nothing —
+use the ordinary tools), `SITE_TOOL_NOT_FOUND` (the error lists what the site does register), and
+`SITE_TOOL_FAILED` (the site's own error message comes back with it).
 
 ---
 

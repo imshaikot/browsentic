@@ -5,6 +5,7 @@ import { applyTheme } from './page/apply-theme';
 import { attachFile } from './page/attach-file';
 import { auditContrast } from './page/audit-contrast';
 import { awaitMonitor } from './page/await-monitor';
+import { callSiteTool } from './page/call-site-tool';
 import { captureDownload } from './page/capture-download';
 import { clickElement } from './page/click-element';
 import { closeTab } from './page/close-tab';
@@ -22,6 +23,7 @@ import { injectCode } from './page/inject-code';
 import { listDownloads } from './page/list-downloads';
 import { listFiles } from './page/list-files';
 import { listRecordings } from './page/list-recordings';
+import { listSiteTools } from './page/list-site-tools';
 import { monitorStatus } from './page/monitor-status';
 import { navigate } from './page/navigate';
 import { openTab } from './page/open-tab';
@@ -74,6 +76,8 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       waitForElement,
       injectCode,
       runCode,
+      listSiteTools,
+      callSiteTool,
       findProgress,
       findSearch,
       readTheme,

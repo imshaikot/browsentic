@@ -15,6 +15,8 @@ Each entry also carries its `role`, its `state` and the `region` it lives in. Ch
 
 `page_getPageInfo { maxPerKind: 30 }` is the useful default. Drop to `maxPerKind: 1` when you only need the layout diagram and the URL.
 
+When the snapshot carries a `siteTools` list, this site registers its own tools for agents through WebMCP — a structured alternative to its UI, offered by the site itself. Call `page_listSiteTools` for their schemas and prefer `page_callSiteTool` over a click-and-fill sequence wherever a listed tool covers the step: the site's own code handles the call, so there is no selector to break and no intermediate state to wait through. A call is gated like a form submit, because the site decides what it does. No `siteTools` in the snapshot means the site registers none, which is the common case — work with the ordinary tools and do not go looking.
+
 ## 2. Target by what the user can see
 
 ```

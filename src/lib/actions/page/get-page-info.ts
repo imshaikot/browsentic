@@ -43,7 +43,7 @@ const LANDMARK_ROLES = new Set([
 export const getPageInfo = defineAction({
   name: 'page.getPageInfo',
   description:
-    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in.',
+    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step.',
   input: z.object({
     maxPerKind: z
       .number()

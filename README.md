@@ -14,7 +14,7 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
 
 - **Your Real Browser, Not a Headless One**: Drives the tab in front of you, in your own profile, with your own logins and sessions
 - **Bring Your Own Agent**: Runs on the agent CLI you already pay for and are already signed in to — switch between Claude Code, Codex and Antigravity with one click, and pick the model each one runs
-- **49 Page Capabilities**: Reading, clicking, typing, dragging, on-site search, form submission, navigation, screenshots, file upload and download, captchas, theming and accessibility, console and network diagnostics, background progress monitoring, scheduled and repeating jobs, and pointing at an element
+- **51 Page Capabilities**: Reading, clicking, typing, dragging, on-site search, form submission, navigation, screenshots, file upload and download, captchas, theming and accessibility, console and network diagnostics, background progress monitoring, scheduled and repeating jobs, pointing at an element, and calling the tools a WebMCP site registers for agents
 - **Live Tools, Off By Default**: For work that repeats twenty times or needs something no tool covers, flip the **Live tool** switch and the agent may write a small script for the page — you read the code in the panel and approve it before a line of it runs
 - **Keep What It Wrote**: A script that worked can be kept as a tool of your own, named after the site it belongs to (`youtube.com:watch:darken-page-except-video-player`) and run later by typing `/`. The code stays in the browser; no MCP client can reach it
 - **Voice, Text, or Demonstration**: Dictate in the side panel, type anywhere, or record yourself doing a job once and later say "do it like last time"
@@ -67,7 +67,7 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 - 📚 [Documentation](docs/)
 - 🚀 [Install and Pair](docs/guide/install.md)
 - ✨ [Features](docs/guide/features/)
-- 🧰 [All 49 Page Tools](docs/reference/tools.md)
+- 🧰 [All 51 Page Tools](docs/reference/tools.md)
 - 🔌 [Use It From Claude Code, Cursor or Zed](docs/guide/mcp-clients.md)
 - 🛡️ [Approvals and Guardrails](docs/guide/approvals.md)
 - 🏗️ [Architecture](docs/internals/)

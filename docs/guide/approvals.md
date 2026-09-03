@@ -48,6 +48,7 @@ depend on declaration order.
 | `off-scope-navigation` | Navigating off the sites this run is about | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
+| `site-tool-call` | `page_callSiteTool` — running a tool the site registered through WebMCP | confirm |
 | `file-upload` | `page_attachFile` — putting one of your files into a page | confirm |
 | `file-download` | `page_captureDownload` — letting a page write a file to your disk | confirm |
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |

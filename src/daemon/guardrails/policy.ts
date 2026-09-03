@@ -36,6 +36,7 @@ export const CAPTCHA_ACTION = 'page.solveCaptcha';
 export const NETWORK_ACTION = 'page.readNetwork';
 export const INJECT_ACTION = 'page.injectCode';
 export const RUN_CODE_ACTION = 'page.runCode';
+export const SITE_TOOL_ACTION = 'page.callSiteTool';
 
 /** One definition, shared with the settings screen that renders it. */
 export type Effect = RuleEffect;
@@ -102,6 +103,9 @@ export const CONDITIONS = {
 
   /** Acting on another site's human-verification control. */
   answersCaptcha: (request) => request.action === CAPTCHA_ACTION,
+
+  /** Running a tool the site registered through WebMCP — the site decides what it does. */
+  callsSiteTool: (request) => request.action === SITE_TOOL_ACTION,
 
   /**
    * Installing agent-written JavaScript into the page. The code is the whole of what is
@@ -210,6 +214,13 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Submits a form',
     reason: 'Submitting a form is a consequential action.',
+  },
+  {
+    id: 'site-tool-call',
+    when: 'callsSiteTool',
+    effect: 'confirm',
+    title: 'Calls a tool the site provides',
+    reason: 'A WebMCP site tool runs the site’s own code and can act on the user’s account in one call.',
   },
   {
     id: 'file-upload',
