@@ -1,0 +1,107 @@
+---
+layout: layouts/page.njk
+pageKey: webmcp
+title: "Use the tools a website registers for AI agents"
+seoTitle: "WebMCP client: call a site's own agent tools | Browsentic"
+description: "Sites are starting to publish WebMCP tools for agents. Browsentic detects them, hands your agent the schemas, and calls them through the site's own code."
+keywords:
+  - WebMCP
+  - WebMCP client
+  - WebMCP browser extension
+  - document.modelContext
+  - navigator.modelContext
+  - agent-ready website
+  - call WebMCP tools
+  - WebMCP Chrome
+---
+{% import "partials/macros.njk" as m with context %}
+
+{% call m.pageHero(copy.WEBMCP.kicker, copy.WEBMCP.title, copy.WEBMCP.lede, "brand") %}
+<div class="mt-9 flex flex-wrap gap-3">
+  {{ m.button("/install/", "Install the extension") }}
+  {{ m.button("/capabilities/", "Every built-in tool", "ghost") }}
+</div>
+{% endcall %}
+
+<!-- What the standard is -->
+{% call m.section("standard") %}
+  {{ m.kicker(copy.WEBMCP.standard.kicker, "brand") }}
+  {{ m.heading(copy.WEBMCP.standard.title) }}
+  {{ m.lede(copy.WEBMCP.standard.lede) }}
+
+  <div class="mt-12 grid gap-4 md:grid-cols-3" data-reveal data-stagger>
+    {%- for item in copy.WEBMCP.standard.items %}
+    {%- set a = m.ACCENT[item.accent] %}
+    <article class="card spotlight px-6 py-6">
+      <span class="size-2 block rounded-full {{ a.dot }}"></span>
+      <h2 class="mt-4 font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ item.title }}</h2>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ item.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+{% endcall %}
+
+<!-- The four beats: notice, read, call, ask -->
+{% call m.section("flow", "bg-ground-2/30") %}
+  {{ m.kicker(copy.WEBMCP.flow.kicker, "ember") }}
+  {{ m.heading(copy.WEBMCP.flow.title) }}
+
+  <ol class="mt-12 grid gap-4 lg:grid-cols-4" data-reveal data-stagger>
+    {%- for step in copy.WEBMCP.flow.steps %}
+    <li class="card spotlight relative px-5 py-6">
+      {%- if not loop.last %}
+      <span class="rail pointer-events-none absolute left-full top-1/2 z-10 hidden h-4 w-4 -translate-y-1/2 lg:block" style="--rail-delay: {{ loop.index0 * 0.7 }}s" aria-hidden="true"></span>
+      {%- endif %}
+      <span class="font-mono text-[0.7rem] text-ink-faint" data-pop>{{ step.n }}</span>
+      <h2 class="mt-2.5 font-display text-[1.12rem] font-semibold text-ink">{{ step.title }}</h2>
+      <p class="mt-3 text-[0.88rem] leading-relaxed text-ink-faint">{{ step.body }}</p>
+    </li>
+    {%- endfor %}
+  </ol>
+{% endcall %}
+
+<!-- Coverage -->
+{% call m.section("coverage") %}
+  {{ m.kicker(copy.WEBMCP.coverage.kicker, "lime") }}
+  {{ m.heading(copy.WEBMCP.coverage.title) }}
+  {{ m.lede(copy.WEBMCP.coverage.lede) }}
+
+  <ul class="mt-10 max-w-2xl divide-y divide-line border-y border-line" data-reveal>
+    {%- for row in copy.WEBMCP.coverage.rows %}
+    <li class="flex items-center justify-between gap-4 py-3">
+      <code class="min-w-0 truncate font-mono text-[0.84rem] text-ink-dim">{{ row[0] }}</code>
+      {%- if row[1] %}
+      <span class="shrink-0 rounded-full bg-lime/10 px-2.5 py-0.5 font-mono text-[0.68rem] text-lime">answers</span>
+      {%- else %}
+      <span class="shrink-0 rounded-full bg-surface px-2.5 py-0.5 font-mono text-[0.68rem] text-ink-faint">ordinary tools</span>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  <p class="mt-6 max-w-2xl text-[0.9rem] leading-relaxed text-ink-faint" data-reveal>{{ copy.WEBMCP.coverage.note }}</p>
+{% endcall %}
+
+<!-- Trust -->
+{% call m.section("trust", "bg-ground-2/30") %}
+  {{ m.kicker(copy.WEBMCP.trust.kicker, "ember") }}
+  {{ m.heading(copy.WEBMCP.trust.title) }}
+
+  <div class="mt-10 grid gap-4 md:grid-cols-2" data-reveal data-stagger>
+    {%- for item in copy.WEBMCP.trust.items %}
+    <article class="card spotlight px-6 py-6">
+      <h3 class="font-display text-[1.02rem] font-semibold leading-snug text-ink">{{ item.title }}</h3>
+      <p class="mt-3 text-[0.9rem] leading-relaxed text-ink-faint">{{ item.body }}</p>
+    </article>
+    {%- endfor %}
+  </div>
+
+  <div class="mt-8">{{ m.button("/security/", "The whole security model", "ghost") }}</div>
+{% endcall %}
+
+{{ m.nextUp([
+  { href: "/capabilities/", title: "Every built-in tool", body: "The capabilities that carry the job on the sites that register nothing." },
+  { href: "/mcp-server/", title: "Drive it from a terminal", body: "The same browser answers Claude Code, Codex, Cursor or Zed over MCP." },
+  { href: "/security/", title: "Why calls are gated", body: "The approval rules, the unattended switch, and what an external client can never reach." }
+]) }}
+
+{{ m.cta(copy) }}

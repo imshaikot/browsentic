@@ -40,6 +40,7 @@ export default {
         { href: '/orchestration/', label: 'Agent orchestration' },
         { href: '/automations/', label: 'Automations' },
         { href: '/live-tools/', label: 'Live tools' },
+        { href: '/webmcp/', label: 'WebMCP' },
         { href: '/skills/', label: 'Skills and recordings' },
         { href: '/vs-claude-in-chrome/', label: 'vs Claude in Chrome' },
       ],

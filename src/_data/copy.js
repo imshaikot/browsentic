@@ -2,7 +2,7 @@
 // and docs/. Templates hold no copy of their own.
 
 export const REPO = 'https://github.com/imshaikot/browsentic'
-export const VERSION = 'v0.4.11'
+export const VERSION = 'v0.4.12'
 
 export const SEO = {
   title: 'Browsentic: AI browser automation in your own browser',
@@ -33,6 +33,8 @@ export const SEO = {
     'site mapping',
     'Claude Code browser automation',
     'MCP server',
+    'WebMCP',
+    'WebMCP client',
   ],
 }
 
@@ -273,6 +275,14 @@ export const TOOL_GROUPS = [
     blurb:
       'Writes its own tool when the fixed set is the wrong shape. A job that repeats twenty times becomes a small script drafted for that page, which you read and approve before a line of it runs. Off until you turn it on, and never available to an MCP client.',
     tools: ['page_injectCode', 'page_runCode'],
+  },
+  {
+    id: 'site-tools',
+    label: 'Site tools',
+    accent: 'brand',
+    blurb:
+      'Takes a site up on its own offer. Where a page registers WebMCP tools for agents, the snapshot says so, and one schema-checked call into the site’s own code replaces a click sequence a redesign could break.',
+    tools: ['page_listSiteTools', 'page_callSiteTool'],
   },
   {
     id: 'move',
@@ -854,6 +864,10 @@ export const FAQ = [
     a: 'Yes, once you let it. The Live tool switch starts off, and while it is off the agent is not told the tools exist. Turn it on and it drafts a small toolkit of JavaScript for that page, shown to you in full before a line of it runs. One approval covers every later call into it, bound to the tab and site you approved. An MCP client can neither install one nor call one.',
   },
   {
+    q: 'Does it work with WebMCP sites?',
+    a: 'Yes. When a site registers tools for agents through WebMCP (document.modelContext), the page snapshot says so, page_listSiteTools returns their schemas, and page_callSiteTool runs one through the site’s own code. Calls are gated like form submits, because the site decides what a tool does. Sites without WebMCP work exactly as before.',
+  },
+  {
     q: 'Which browsers work?',
     a: 'Chrome, or another Chromium browser such as Edge, Brave or Arc, via Manifest V3. Firefox is not there yet: it refuses unsigned extensions, and the signed build is not ready. You also need Node.js 20 or newer and one agent CLI on your PATH: claude, codex or agy.',
   },
@@ -953,6 +967,103 @@ export const LIVE_TOOLS = {
       {
         title: 'Gone when you say so',
         body: 'Type slash remove-tools for the list, and a cross beside each. Removing one deletes the code with it.',
+      },
+    ],
+  },
+}
+
+/**
+ * /webmcp/. The standard is early and mostly unconsumed, so the page sells the
+ * position honestly: sites are starting to publish tools for agents, and this
+ * browser is already the client that notices and calls them.
+ */
+export const WEBMCP = {
+  kicker: 'WebMCP',
+  title: ['When a site offers its own tools,', 'your agent takes them'],
+  lede: 'WebMCP lets a website register tools for agents: add to cart, search flights, file a ticket. Browsentic notices them, hands your agent the schemas, and calls them through the site’s own code.',
+
+  standard: {
+    kicker: 'The standard',
+    title: 'A site’s API for agents, served on the page itself',
+    lede: 'WebMCP is a W3C proposal shipping natively in Chrome: a page registers tools on document.modelContext, each with a name, a description, an input schema and a handler the site wrote.',
+    items: [
+      {
+        title: 'The site declares what it can do',
+        body: 'Instead of an agent guessing at buttons, the site names its own verbs: what each tool does, what it takes, what it returns.',
+        accent: 'brand',
+      },
+      {
+        title: 'The site’s code does the work',
+        body: 'A registered handler runs the same logic the UI runs, so a call cannot miss a selector or catch the page mid-render.',
+        accent: 'ember',
+      },
+      {
+        title: 'One call, not a click sequence',
+        body: 'Add to cart becomes one schema-checked call rather than find, scroll, click, wait, verify. Fewer steps, fewer ways to be wrong.',
+        accent: 'lime',
+      },
+    ],
+  },
+
+  flow: {
+    kicker: 'How Browsentic uses it',
+    title: 'Noticed on arrival, called on approval',
+    steps: [
+      {
+        n: '01',
+        title: 'The snapshot says so',
+        body: 'The page snapshot carries a siteTools list whenever a page registers any. The agent learns a site is agent-ready without being told.',
+      },
+      {
+        n: '02',
+        title: 'The schemas come over',
+        body: 'page_listSiteTools returns every tool the site registered: name, description and input schema, ready to call.',
+      },
+      {
+        n: '03',
+        title: 'The site takes the call',
+        body: 'page_callSiteTool runs one by name, through the site’s own handler, and returns whatever it produced.',
+      },
+      {
+        n: '04',
+        title: 'You are asked first',
+        body: 'A site tool call is gated like a form submit: the site decides what it does, so it pauses in the panel and names itself.',
+      },
+    ],
+  },
+
+  coverage: {
+    kicker: 'Coverage',
+    title: 'Native, aliased or polyfilled, it all answers',
+    lede: 'The reader goes to the page’s main world, so it finds whichever implementation a site actually has.',
+    rows: [
+      ['document.modelContext, native in Chrome', true],
+      ['navigator.modelContext, the older alias', true],
+      ['Library and polyfill implementations', true],
+      ['Sites that register nothing', false],
+    ],
+    note: 'The last row is most of the web today, and nothing changes there: the ordinary page tools carry the job, and the agent is told not to go looking.',
+  },
+
+  trust: {
+    kicker: 'Kept honest',
+    title: 'A new door, watched like the old ones',
+    items: [
+      {
+        title: 'Calls are gated like submits',
+        body: 'The site-tool-call rule pauses every call in the side panel first. The site decides what a tool does, which is exactly why you are asked.',
+      },
+      {
+        title: 'Listing is read-only',
+        body: 'Discovering tools and reading schemas changes nothing on the page, so autonomous site maps record which pages are agent-ready without acting on them.',
+      },
+      {
+        title: 'No install, no debugger, no flags',
+        body: 'Reading a page’s registered tools uses the extension’s ordinary scripting permission. Nothing is injected for you to approve, and no debugger bar appears.',
+      },
+      {
+        title: 'Headless callers stay held',
+        body: 'An MCP client has nobody to answer a prompt, so its calls resolve by the unattended policy, which ships as deny until you say otherwise.',
       },
     ],
   },
