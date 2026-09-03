@@ -2,6 +2,12 @@
 
 # Browsentic – Agentic Browsing in the Browser You Already Use
 
+[![npm version](https://img.shields.io/npm/v/browsentic)](https://www.npmjs.com/package/browsentic)
+[![npm downloads](https://img.shields.io/npm/dm/browsentic)](https://www.npmjs.com/package/browsentic)
+[![CI](https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/ci.yml?branch=main&label=CI)](https://github.com/imshaikot/browsentic/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/browsentic)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/browsentic)](LICENSE)
+
 Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension plus a small local daemon: say what you want and it drives the page, ask a question and it reads the page and answers. It runs on [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) — whichever you already have logged in — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
 
 ## Key Capabilities
