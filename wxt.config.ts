@@ -20,10 +20,17 @@ export default defineConfig({
   vite: () => ({
     plugins: [tailwindcss()],
   }),
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Browsentic',
     description: 'Reimagine browsing as agentic — driven by the AI agent you already run, in your own logged-in browser.',
-    permissions: ['storage', 'unlimitedStorage', 'activeTab', 'sidePanel', 'contextMenus', 'alarms', 'scripting', 'notifications', 'debugger', 'downloads'],
+    permissions: [
+      'storage', 'unlimitedStorage', 'activeTab', 'sidePanel', 'contextMenus', 'alarms', 'scripting',
+      'notifications', 'debugger', 'downloads',
+      // Chrome grants the microphone at install time or not at all: a permission bubble has nowhere to
+      // anchor in a popup or a side panel, so getUserMedia there is refused without ever asking. Firefox
+      // has no such permission and prompts from the sidebar on its own.
+      ...(browser === 'firefox' ? [] : ['audioCapture']),
+    ],
     host_permissions: ['<all_urls>'],
-  },
+  }),
 });
