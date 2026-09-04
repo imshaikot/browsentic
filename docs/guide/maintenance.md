@@ -50,19 +50,47 @@ the fresh build.
 
 ## Uninstalling
 
+Four steps, and the order matters. Only the second one depends on how you installed.
+
+**1. Unpair the browsers and stop the daemon.**
+
 ```sh
 browsentic revoke      # unpair every browser
 browsentic stop        # stop the daemon
-yarn daemon:unlink        # remove browsentic from PATH
+```
+
+`revoke` asks the running daemon to drop its session keys, so it has to come before `stop` rather
+than after. If you installed through `npx` and never installed the command permanently, these are
+`npx browsentic revoke` and `npx browsentic stop`.
+
+**2. Remove the command**, if you have one on your PATH. This is the step that differs:
+
+| How you installed | What to remove |
+| --- | --- |
+| `npx browsentic setup` | Nothing. `npx` runs the package from its own cache and never puts anything on your PATH. |
+| `npm i -g browsentic` | `npm rm -g browsentic` |
+| From a clone | `yarn daemon:unlink`, which removes the global link `yarn daemon:link` created |
+
+**3. Remove the extension** at `chrome://extensions`.
+
+Do this *before* the next step. The folder Chrome loaded is `~/browsentic/extension/chrome-mv3`,
+which step 4 deletes — remove the directory first and the browser is left holding a broken card.
+Removing the extension also clears recordings and stored files, which live in extension storage
+rather than on disk.
+
+**4. Delete the two directories.**
+
+```sh
 rm -rf ~/.browsentic ~/browsentic
 ```
 
-Then remove the extension at `chrome://extensions`. That also clears recordings and stored files,
-which live in extension storage rather than on disk.
+`~/.browsentic` holds pairing keys, config, approvals and logs; `~/browsentic` holds the extension
+you just removed, plus skills, screenshots and captured downloads. If you set `BROWSENTIC_HOME`,
+the first one is wherever you pointed it.
 
-What those two directories held is listed in [internals/state.md](../internals/state.md) — worth a
-look before deleting, since `~/browsentic/skills/` contains any site maps you generated and any
-notes you wrote by hand.
+What those directories held is listed in [internals/state.md](../internals/state.md) — worth a look
+before deleting, since `~/browsentic/skills/` contains any site maps you generated and any notes you
+wrote by hand, and nothing else has a copy of them.
 
 ---
 
