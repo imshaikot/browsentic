@@ -22,12 +22,13 @@ export function asTheme(value: unknown): ThemeId {
   return THEMES.some((theme) => theme.id === value) ? (value as ThemeId) : DEFAULT_THEME;
 }
 
-/* index.html paints an inline ground so the frame before the stylesheet is not
-   white; an inline colour outranks every rule, so hand it back to the sheet. */
 export async function readTheme(): Promise<ThemeId> {
   return asTheme((await browser.storage.local.get(THEME_KEY))[THEME_KEY]);
 }
 
+/* Clearing the inline colour hands the ground back to the stylesheet: index.html
+   paints one so the frame before the sheet lands is not white, and an inline
+   colour outranks every rule that would later repaint it. */
 export function applyTheme(theme: ThemeId) {
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.backgroundColor = '';

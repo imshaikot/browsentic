@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* Every theme but Daylight is a dark one, so `dark:` asks that rather than
+   tracking a class — a new dark theme needs no edit here. */
+@custom-variant dark (&:not([data-theme='daylight'] *));
 
 /*
  * Browsentic — the landing page’s palette, at panel scale.
