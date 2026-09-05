@@ -41,9 +41,10 @@ The condition vocabulary is closed on purpose: a rule cannot express anything th
 | --- | --- | --- | --- |
 | `reserved-action` | `reservedAction` | **deny** | The action starts with `browsentic.` |
 | `non-http-navigation` | `nonHttpNavigation` | **deny** | `javascript:`, `data:`, `file:` and friends dressed up as a navigation |
+| `unreadable-navigation` | `unreadableNavigation` | **deny** | The URL resolves to no destination, with or without a page to resolve against |
 | `raw-html-read` | `readsRawHtml` | **deny** | `page.extractText` with `format: 'html'` |
 | `network-body-read` | `readsResponseBodies` | **deny** | `page.readNetwork` with `includeBodies: true` |
-| `off-scope-navigation` | `navigatesOffScope` | confirm | The target host is not in the run's scope |
+| `off-scope-navigation` | `navigatesOffScope` | confirm | The target host is not in the run's scope, whether the caller named it absolutely or with a `//host` reference |
 | `url-payload` | `carriesUrlPayload` | confirm | Query string + fragment exceed `urlPayloadBytes` (512) |
 | `form-submission` | `submitsForm` | confirm | Anything that commits a form, however spelled |
 | `file-upload` | `uploadsFile` | confirm | `page.attachFile` |

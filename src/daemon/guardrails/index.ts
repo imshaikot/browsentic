@@ -17,8 +17,8 @@
  * for the spawn — so every caller is covered.
  */
 
-export { ANYWHERE, hostAllowed, normalizeHost, scopeFor, targetUrl, targetsAnotherTab, urlPayloadBytes } from './scope';
-export type { Scope, ScopeSeed } from './scope';
+export { ANYWHERE, hostAllowed, hostBearingUrl, normalizeHost, scopeFor, targetUrl, targetsAnotherTab, urlPayloadBytes } from './scope';
+export type { NavigationTarget, Scope, ScopeSeed } from './scope';
 
 export {
   CONDITIONS,

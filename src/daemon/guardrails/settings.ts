@@ -24,10 +24,11 @@ import { DEFAULT_RULES, policyFrom, type GuardrailConfig } from './policy';
 
 /**
  * Not preferences. Allowing `javascript:` navigation, letting a page call an internal
- * verb, or letting a released credential travel in a query string have no use worth a
- * switch someone can hit by accident. Hand-editing config.json still works.
+ * verb, waving through a URL that resolves to no destination, or letting a released
+ * credential travel in a query string have no use worth a switch someone can hit by
+ * accident. Hand-editing config.json still works.
  */
-const LOCKED = new Set(['reserved-action', 'non-http-navigation', 'secret-in-url']);
+const LOCKED = new Set(['reserved-action', 'non-http-navigation', 'unreadable-navigation', 'secret-in-url']);
 
 const RULE_IDS = new Set(DEFAULT_RULES.map((rule) => rule.id));
 
