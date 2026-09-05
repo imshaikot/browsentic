@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Lock, RefreshCw, ShieldCheck } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
+import { ThemePicker } from '@/extension/components/theme-picker';
 import { Switch } from '@/extension/components/ui/switch';
 import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { useTheme } from '@/lib/bridge/use-theme';
 import {
   EFFECT_LABEL,
   FENCE_SETTING,
@@ -19,6 +21,17 @@ import { cn } from '@/lib/utils';
 const EFFECTS: RuleEffect[] = ['allow', 'confirm', 'deny'];
 
 export function SettingsPanel() {
+  const [theme, setTheme] = useTheme();
+
+  return (
+    <div className="space-y-6 px-3 pb-6">
+      <ThemePicker theme={theme} onSelect={setTheme} />
+      <Guardrails />
+    </div>
+  );
+}
+
+function Guardrails() {
   const daemon = useDaemonState();
   const connected = daemon?.connected ?? false;
   const [settings, setSettings] = useState<GuardrailSettings | null>(null);
@@ -54,7 +67,7 @@ export function SettingsPanel() {
   }
 
   return (
-    <div className="space-y-5 px-3 pb-6">
+    <div className="space-y-5">
       <header className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Guardrails</h2>
@@ -262,5 +275,5 @@ function Segmented<T extends string | boolean>({
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-4 py-8 text-center text-[11px] leading-relaxed text-ink-faint">{children}</p>;
+  return <p className="px-1 py-6 text-center text-[11px] leading-relaxed text-ink-faint">{children}</p>;
 }

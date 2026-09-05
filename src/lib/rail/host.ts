@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import {
   RAIL_CHANNEL,
-  RAIL_PALETTE,
+  RAIL_PALETTES,
   RAIL_TABS,
   RAIL_TONES,
   isRailCommand,
@@ -116,6 +116,8 @@ function escape(text: string): string {
 
 function styles(view: RailView): string {
   const edge = view.side === 'left' ? 'left: 12px' : 'right: 12px';
+  const palette = RAIL_PALETTES[view.theme];
+  const tone = RAIL_TONES[view.theme][view.tone];
   return `
     :host { all: initial; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -131,12 +133,12 @@ function styles(view: RailView): string {
       gap: 4px;
       width: 44px;
       padding: 6px 0;
-      border: 1px solid ${RAIL_PALETTE.line};
+      border: 1px solid ${palette.line};
       border-radius: 16px;
-      background: ${RAIL_PALETTE.ground2};
+      background: ${palette.ground2};
       box-shadow: 0 10px 34px -12px rgb(0 0 0 / 70%), 0 0 0 1px rgb(0 0 0 / 25%);
       font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-      ${view.running > 0 ? `outline: 1px solid color-mix(in oklch, ${RAIL_PALETTE.brand} 45%, transparent); outline-offset: -1px;` : ''}
+      ${view.running > 0 ? `outline: 1px solid color-mix(in oklch, ${palette.brand} 45%, transparent); outline-offset: -1px;` : ''}
     }
     .tab {
       position: relative;
@@ -148,12 +150,12 @@ function styles(view: RailView): string {
       border: 0;
       border-radius: 11px;
       background: transparent;
-      color: ${RAIL_PALETTE.inkFaint};
+      color: ${palette.inkFaint};
       cursor: pointer;
       transition: background-color 150ms, color 150ms;
     }
-    .tab:hover { background: ${RAIL_PALETTE.surface}; color: ${RAIL_PALETTE.ink}; }
-    .tab.active { background: color-mix(in oklch, ${RAIL_PALETTE.brand} 14%, transparent); color: ${RAIL_PALETTE.brand}; }
+    .tab:hover { background: ${palette.surface}; color: ${palette.ink}; }
+    .tab.active { background: color-mix(in oklch, ${palette.brand} 14%, transparent); color: ${palette.brand}; }
     .tab svg { width: 17px; height: 17px; display: block; }
     .mark {
       position: absolute;
@@ -162,20 +164,20 @@ function styles(view: RailView): string {
       width: 6px;
       height: 6px;
       border-radius: 999px;
-      background: ${RAIL_PALETTE.inkFaint};
+      background: ${palette.inkFaint};
     }
     .mark.busy {
-      background: ${RAIL_PALETTE.brand};
-      box-shadow: 0 0 8px 1px color-mix(in oklch, ${RAIL_PALETTE.brand} 75%, transparent);
+      background: ${palette.brand};
+      box-shadow: 0 0 8px 1px color-mix(in oklch, ${palette.brand} 75%, transparent);
       animation: browsentic-rail-pulse 1.4s ease-in-out infinite;
     }
-    .sep { width: 20px; height: 1px; background: ${RAIL_PALETTE.line}; margin: 3px 0; }
+    .sep { width: 20px; height: 1px; background: ${palette.line}; margin: 3px 0; }
     .runs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: center; width: 32px; }
     .runs i {
       width: 4px;
       height: 4px;
       border-radius: 999px;
-      background: ${RAIL_PALETTE.brand};
+      background: ${palette.brand};
       animation: browsentic-rail-think 1.2s ease-in-out infinite;
     }
     .runs i:nth-child(2) { animation-delay: 0.16s; }
@@ -184,7 +186,7 @@ function styles(view: RailView): string {
       width: 100%;
       text-align: center;
       font: 600 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
-      color: ${RAIL_PALETTE.brand};
+      color: ${palette.brand};
       font-variant-numeric: tabular-nums;
     }
     .status {
@@ -192,8 +194,8 @@ function styles(view: RailView): string {
       height: 7px;
       margin: 2px 0 1px;
       border-radius: 999px;
-      background: ${RAIL_TONES[view.tone]};
-      box-shadow: 0 0 8px 1px color-mix(in oklch, ${RAIL_TONES[view.tone]} 70%, transparent);
+      background: ${tone};
+      box-shadow: 0 0 8px 1px color-mix(in oklch, ${tone} 70%, transparent);
     }
     @keyframes browsentic-rail-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
     @keyframes browsentic-rail-think {

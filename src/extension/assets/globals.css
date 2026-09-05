@@ -5,12 +5,21 @@
 
 /*
  * Browsentic — the landing page’s palette, at panel scale.
- * Warm near-black ground, cyan brand, ember counter-accent, one committed
- * dark look. Semantic tokens feed the shadcn primitives; the named colours
- * below are the same ramp the website ships.
+ * A theme is one block of raw tokens: four grounds, three inks, two lines, six
+ * named colours, and the four dials (wash, grain, neon, glow) the utilities read.
+ * Nothing below this section names a colour, so a theme is that block and no more.
+ * The semantic tokens the shadcn primitives read are mapped once, afterwards,
+ * from whichever block won. The attribute is scoped rather than global — put it
+ * on a swatch and that subtree previews the theme, which is how the picker
+ * draws itself, and index.html carries Ember so the first paint has a palette.
  */
 :root {
   --radius: 0.75rem;
+}
+
+/* Warm near-black under a cyan brand — the look Browsentic ships. */
+[data-theme='ember'] {
+  color-scheme: dark;
 
   --ground: oklch(0.152 0.016 52);
   --ground-2: oklch(0.183 0.018 50);
@@ -30,7 +39,107 @@
   --magenta: oklch(0.7 0.21 335);
   --lime: oklch(0.84 0.18 150);
   --amber: oklch(0.84 0.15 85);
+  --danger: oklch(0.645 0.205 25);
 
+  --wash: oklch(0.98 0.01 60);
+  --grain: 0.03;
+  --neon: 55%;
+  --glow: 72%;
+}
+
+/* Cool blue-black under a violet brand. */
+[data-theme='midnight'] {
+  color-scheme: dark;
+
+  --ground: oklch(0.158 0.024 264);
+  --ground-2: oklch(0.192 0.028 264);
+  --surface: oklch(0.228 0.032 264);
+  --surface-2: oklch(0.272 0.036 264);
+
+  --ink: oklch(0.958 0.012 268);
+  --ink-dim: oklch(0.742 0.022 266);
+  --ink-faint: oklch(0.585 0.026 265);
+
+  --line: oklch(0.97 0.02 268 / 11%);
+  --line-strong: oklch(0.97 0.02 268 / 19%);
+
+  --brand: oklch(0.79 0.15 288);
+  --brand-deep: oklch(0.6 0.16 288);
+  --ember: oklch(0.75 0.16 22);
+  --magenta: oklch(0.72 0.2 330);
+  --lime: oklch(0.85 0.17 165);
+  --amber: oklch(0.86 0.14 82);
+  --danger: oklch(0.66 0.21 20);
+
+  --wash: oklch(0.97 0.02 268);
+  --grain: 0.03;
+  --neon: 55%;
+  --glow: 72%;
+}
+
+/* A green CRT: the grain and the glow both run hotter here on purpose. */
+[data-theme='phosphor'] {
+  color-scheme: dark;
+
+  --ground: oklch(0.142 0.022 152);
+  --ground-2: oklch(0.176 0.026 152);
+  --surface: oklch(0.208 0.03 150);
+  --surface-2: oklch(0.25 0.034 150);
+
+  --ink: oklch(0.945 0.06 150);
+  --ink-dim: oklch(0.755 0.075 150);
+  --ink-faint: oklch(0.6 0.062 150);
+
+  --line: oklch(0.9 0.12 150 / 14%);
+  --line-strong: oklch(0.9 0.12 150 / 24%);
+
+  --brand: oklch(0.86 0.2 152);
+  --brand-deep: oklch(0.66 0.17 152);
+  --ember: oklch(0.79 0.16 48);
+  --magenta: oklch(0.74 0.2 338);
+  --lime: oklch(0.9 0.2 122);
+  --amber: oklch(0.87 0.16 92);
+  --danger: oklch(0.66 0.2 28);
+
+  --wash: oklch(0.92 0.1 150);
+  --grain: 0.045;
+  --neon: 68%;
+  --glow: 85%;
+}
+
+/* Ink on paper. The inks and the named colours darken to carry on a light
+   ground, the wash inverts so a card still reads as raised, and the grain
+   and the neon halo — both of which only work on black — go to nothing. */
+[data-theme='daylight'] {
+  color-scheme: light;
+
+  --ground: oklch(0.988 0.004 88);
+  --ground-2: oklch(0.968 0.006 84);
+  --surface: oklch(0.945 0.008 80);
+  --surface-2: oklch(0.9 0.011 78);
+
+  --ink: oklch(0.265 0.018 58);
+  --ink-dim: oklch(0.455 0.02 56);
+  --ink-faint: oklch(0.556 0.02 55);
+
+  --line: oklch(0.3 0.02 58 / 13%);
+  --line-strong: oklch(0.3 0.02 58 / 24%);
+
+  --brand: oklch(0.514 0.12 214);
+  --brand-deep: oklch(0.42 0.11 218);
+  --ember: oklch(0.552 0.17 40);
+  --magenta: oklch(0.53 0.2 335);
+  --lime: oklch(0.52 0.14 148);
+  --amber: oklch(0.562 0.13 68);
+  --danger: oklch(0.54 0.2 26);
+
+  --wash: oklch(0.32 0.02 58);
+  --grain: 0;
+  --neon: 0%;
+  --glow: 26%;
+}
+
+:root {
   --background: var(--ground);
   --foreground: var(--ink);
   --card: var(--ground-2);
@@ -45,7 +154,7 @@
   --muted-foreground: var(--ink-dim);
   --accent: var(--surface-2);
   --accent-foreground: var(--ink);
-  --destructive: oklch(0.645 0.205 25);
+  --destructive: var(--danger);
   --border: var(--line);
   --input: var(--line-strong);
   --ring: var(--brand);
@@ -111,6 +220,10 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    background-color: var(--background);
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
@@ -131,7 +244,7 @@
     inset: 0;
     z-index: 100;
     pointer-events: none;
-    opacity: 0.03;
+    opacity: var(--grain);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
@@ -160,43 +273,51 @@
 @utility panel-card {
   background: linear-gradient(
     180deg,
-    oklch(0.98 0.01 60 / 4.5%),
-    oklch(0.98 0.01 60 / 1.5%)
+    color-mix(in oklch, var(--wash) 4.5%, transparent),
+    color-mix(in oklch, var(--wash) 1.5%, transparent)
   );
   border: 1px solid var(--line);
 }
 
 /* Neon halo around text, taken from the element’s current color. */
 @utility neon-text {
-  text-shadow: 0 0 12px color-mix(in oklch, currentColor 55%, transparent);
+  text-shadow: 0 0 12px color-mix(in oklch, currentColor var(--neon), transparent);
 }
 
 /* Glow for small indicators (status dots); color follows text color. */
 @utility glow-dot {
-  box-shadow: 0 0 8px 1px color-mix(in oklch, currentColor 75%, transparent);
+  box-shadow: 0 0 8px 1px color-mix(in oklch, currentColor var(--glow), transparent);
 }
 
 @utility glow-brand {
-  box-shadow: 0 6px 26px -10px color-mix(in oklch, var(--brand) 70%, transparent);
+  box-shadow: 0 6px 26px -10px color-mix(in oklch, var(--brand) var(--glow), transparent);
 }
 @utility glow-destructive {
   box-shadow:
-    0 6px 26px -10px color-mix(in oklch, var(--destructive) 70%, transparent);
+    0 6px 26px -10px color-mix(in oklch, var(--destructive) var(--glow), transparent);
 }
 
 /* Backdrops for empty states and headers. */
 @utility dot-grid {
   background-image: radial-gradient(
     circle at 1px 1px,
-    oklch(0.98 0.01 60 / 9%) 1px,
+    color-mix(in oklch, var(--wash) 9%, transparent) 1px,
     transparent 0
   );
   background-size: 22px 22px;
 }
 @utility line-grid {
   background-image:
-    linear-gradient(to right, oklch(0.98 0.01 60 / 5%) 1px, transparent 1px),
-    linear-gradient(to bottom, oklch(0.98 0.01 60 / 5%) 1px, transparent 1px);
+    linear-gradient(
+        to right,
+        color-mix(in oklch, var(--wash) 5%, transparent) 1px,
+        transparent 1px
+      ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--wash) 5%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 48px 48px;
 }
 
@@ -309,7 +430,7 @@
     vertical-align: -0.12em;
     border-radius: 1px;
     background: var(--brand);
-    box-shadow: 0 0 10px color-mix(in oklch, var(--brand) 70%, transparent);
+    box-shadow: 0 0 10px color-mix(in oklch, var(--brand) var(--glow), transparent);
     animation: browsentic-caret 1.05s steps(1, end) infinite;
   }
 

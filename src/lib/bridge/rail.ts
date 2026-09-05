@@ -9,6 +9,7 @@ import { listRecordings } from './recording-store';
 import { listSessions } from './session-store';
 import { listSkillMeta } from './skill-store';
 import { PANEL_COLLAPSED_KEY, PANEL_TAB_KEY, readPanelCollapsed, readPanelTab } from './panel-view';
+import { THEME_KEY, readTheme } from './theme';
 import { openSidePanel } from './side-panel';
 import { readTabSessions } from './tab-sessions';
 import type { DaemonState } from './socket';
@@ -82,7 +83,7 @@ function post(tabId: number | undefined, discarded: boolean | undefined, command
 }
 
 async function describeRail(): Promise<RailView> {
-  const [daemon, sessions, skills, recordings, tabSessions, tab, side] = await Promise.all([
+  const [daemon, sessions, skills, recordings, tabSessions, tab, side, theme] = await Promise.all([
     readDaemon(),
     listSessions(),
     listSkillMeta(),
@@ -90,6 +91,7 @@ async function describeRail(): Promise<RailView> {
     readTabSessions(),
     readPanelTab(),
     readSide(),
+    readTheme(),
   ]);
 
   const live = Object.values(tabSessions).filter((session) => session.runId).length;
@@ -97,6 +99,7 @@ async function describeRail(): Promise<RailView> {
 
   return {
     tab,
+    theme,
     side,
     running: live,
     tone: status.tone,
@@ -155,7 +158,7 @@ export function serveRail(): void {
     if (changed.status === 'complete') void paintTab(tabId);
   });
   browser.storage.local.onChanged.addListener((changes) => {
-    if (PANEL_COLLAPSED_KEY in changes || PANEL_TAB_KEY in changes) void syncRail();
+    if (PANEL_COLLAPSED_KEY in changes || PANEL_TAB_KEY in changes || THEME_KEY in changes) void syncRail();
   });
   browser.storage.session.onChanged.addListener((changes) => {
     if (DAEMON_KEY in changes) void syncRail();

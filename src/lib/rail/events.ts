@@ -1,11 +1,24 @@
+import type { ThemeId } from '@/lib/bridge/theme';
+
 export const RAIL_CHANNEL = 'browsentic/rail';
 
 export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings' | 'settings';
 
 export type RailTone = 'off' | 'pending' | 'live' | 'busy' | 'listening' | 'warn';
 
+export type RailPaletteKey =
+  | 'ground'
+  | 'ground2'
+  | 'surface'
+  | 'ink'
+  | 'inkDim'
+  | 'inkFaint'
+  | 'line'
+  | 'brand';
+
 export interface RailView {
   tab: PanelTab;
+  theme: ThemeId;
   side: 'left' | 'right';
   running: number;
   tone: RailTone;
@@ -83,23 +96,82 @@ export const RAIL_TABS: { id: PanelTab; label: string; paths: string[] }[] = [
   },
 ];
 
-/** The panel's tokens, spelled out — a content script has no stylesheet to read them from. */
-export const RAIL_PALETTE = {
-  ground: 'oklch(0.152 0.016 52)',
-  ground2: 'oklch(0.183 0.018 50)',
-  surface: 'oklch(0.213 0.019 48)',
-  ink: 'oklch(0.958 0.012 70)',
-  inkDim: 'oklch(0.735 0.018 60)',
-  inkFaint: 'oklch(0.575 0.02 55)',
-  line: 'oklch(0.98 0.01 60 / 12%)',
-  brand: 'oklch(0.83 0.13 195)',
-} as const;
+/** The panel's tokens, spelled out — a content script has no stylesheet to read them
+ *  from. One entry per block in globals.css; a new theme there needs one here. */
+export const RAIL_PALETTES: Record<ThemeId, Record<RailPaletteKey, string>> = {
+  ember: {
+    ground: 'oklch(0.152 0.016 52)',
+    ground2: 'oklch(0.183 0.018 50)',
+    surface: 'oklch(0.213 0.019 48)',
+    ink: 'oklch(0.958 0.012 70)',
+    inkDim: 'oklch(0.735 0.018 60)',
+    inkFaint: 'oklch(0.575 0.02 55)',
+    line: 'color-mix(in oklch, oklch(0.98 0.01 60) 12%, transparent)',
+    brand: 'oklch(0.83 0.13 195)',
+  },
+  midnight: {
+    ground: 'oklch(0.158 0.024 264)',
+    ground2: 'oklch(0.192 0.028 264)',
+    surface: 'oklch(0.228 0.032 264)',
+    ink: 'oklch(0.958 0.012 268)',
+    inkDim: 'oklch(0.742 0.022 266)',
+    inkFaint: 'oklch(0.585 0.026 265)',
+    line: 'color-mix(in oklch, oklch(0.97 0.02 268) 12%, transparent)',
+    brand: 'oklch(0.79 0.15 288)',
+  },
+  phosphor: {
+    ground: 'oklch(0.142 0.022 152)',
+    ground2: 'oklch(0.176 0.026 152)',
+    surface: 'oklch(0.208 0.03 150)',
+    ink: 'oklch(0.945 0.06 150)',
+    inkDim: 'oklch(0.755 0.075 150)',
+    inkFaint: 'oklch(0.6 0.062 150)',
+    line: 'color-mix(in oklch, oklch(0.92 0.1 150) 12%, transparent)',
+    brand: 'oklch(0.86 0.2 152)',
+  },
+  daylight: {
+    ground: 'oklch(0.988 0.004 88)',
+    ground2: 'oklch(0.968 0.006 84)',
+    surface: 'oklch(0.945 0.008 80)',
+    ink: 'oklch(0.265 0.018 58)',
+    inkDim: 'oklch(0.455 0.02 56)',
+    inkFaint: 'oklch(0.556 0.02 55)',
+    line: 'color-mix(in oklch, oklch(0.32 0.02 58) 12%, transparent)',
+    brand: 'oklch(0.514 0.12 214)',
+  },
+};
 
-export const RAIL_TONES: Record<RailTone, string> = {
-  off: 'oklch(0.575 0.02 55 / 50%)',
-  pending: 'oklch(0.84 0.15 85)',
-  live: 'oklch(0.84 0.18 150)',
-  busy: 'oklch(0.83 0.13 195)',
-  listening: 'oklch(0.7 0.21 335)',
-  warn: 'oklch(0.735 0.168 42)',
+export const RAIL_TONES: Record<ThemeId, Record<RailTone, string>> = {
+  ember: {
+    off: 'color-mix(in oklch, oklch(0.575 0.02 55) 50%, transparent)',
+    pending: 'oklch(0.84 0.15 85)',
+    live: 'oklch(0.84 0.18 150)',
+    busy: 'oklch(0.83 0.13 195)',
+    listening: 'oklch(0.7 0.21 335)',
+    warn: 'oklch(0.735 0.168 42)',
+  },
+  midnight: {
+    off: 'color-mix(in oklch, oklch(0.585 0.026 265) 50%, transparent)',
+    pending: 'oklch(0.86 0.14 82)',
+    live: 'oklch(0.85 0.17 165)',
+    busy: 'oklch(0.79 0.15 288)',
+    listening: 'oklch(0.72 0.2 330)',
+    warn: 'oklch(0.75 0.16 22)',
+  },
+  phosphor: {
+    off: 'color-mix(in oklch, oklch(0.6 0.062 150) 50%, transparent)',
+    pending: 'oklch(0.87 0.16 92)',
+    live: 'oklch(0.9 0.2 122)',
+    busy: 'oklch(0.86 0.2 152)',
+    listening: 'oklch(0.74 0.2 338)',
+    warn: 'oklch(0.79 0.16 48)',
+  },
+  daylight: {
+    off: 'color-mix(in oklch, oklch(0.556 0.02 55) 50%, transparent)',
+    pending: 'oklch(0.562 0.13 68)',
+    live: 'oklch(0.52 0.14 148)',
+    busy: 'oklch(0.514 0.12 214)',
+    listening: 'oklch(0.53 0.2 335)',
+    warn: 'oklch(0.552 0.17 40)',
+  },
 };

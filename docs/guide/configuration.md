@@ -109,6 +109,17 @@ ceiling is clamped; a value that is not a number ≥ 1 falls back to the default
 
 ---
 
+## Appearance
+
+The panel's theme is not in this file. It is a row of tiles in the side panel's **Settings** tab —
+**Ember** (warm near-black, cyan), **Midnight** (cool blue-black, violet), **Phosphor** (a green
+CRT) and **Daylight** (ink on paper) — and one click repaints the panel and the popup together.
+Each tile is drawn in the theme it offers, so the preview is the thing itself.
+
+The choice is stored in the browser, never sent to the daemon, and needs nothing paired to work.
+
+---
+
 ## Things that are not configurable
 
 Compiled-in ceilings, listed here so you do not go looking for a key that does not exist:

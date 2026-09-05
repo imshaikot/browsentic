@@ -52,10 +52,34 @@ learned, which is what keeps the strip from flapping between two fits at one pan
 practice five labels want ~485 px and one wants ~225 px, so a side panel at its usual size lands on
 the middle fit.
 
-**Settings** is the only tab whose state lives on the daemon rather than in extension storage. It
-reads and writes `~/.browsentic/config.json` through two bridge ops, `guardrails` and
-`setGuardrail`, which forward to the socket frames of the same name. The extension holds no copy:
-every write returns the daemon's fresh view, which is what the panel then renders.
+**Settings** is two halves with nothing in common. **Guardrails** is the only panel state that
+lives on the daemon rather than in extension storage: it reads and writes `~/.browsentic/config.json`
+through two bridge ops, `guardrails` and `setGuardrail`, which forward to the socket frames of the
+same name. The extension holds no copy — every write returns the daemon's fresh view, which is what
+the panel then renders, and the whole half is empty until the daemon is up. **Appearance** never
+leaves the browser, which is why it sits above and renders whether or not anything is paired.
+
+### Themes
+
+A theme is one block of raw tokens in `globals.css` — grounds, inks, lines, the six named colours,
+and four dials (`--wash`, `--grain`, `--neon`, `--glow`) that the utilities read instead of naming a
+colour themselves. `daylight` sets `--grain` and `--neon` to nothing because film grain and a neon
+halo are effects that only exist on black. The semantic tokens the shadcn primitives read are mapped
+once, afterwards, from whichever block won, so a theme is that block and no more.
+
+The blocks hang off `[data-theme]` rather than `:root`, and the attribute is **scoped rather than
+global**. Put it on a swatch and that subtree renders in the theme it advertises, which is how the
+picker draws four live previews with no second copy of the palette. Only raw tokens re-resolve that
+way (`bg-ground`, `bg-brand`); the semantic ones (`bg-background`, `border-border`) are computed at
+`:root` and inherit, so a scoped preview must not use them.
+
+`browser.storage.local` under `browsentic/theme` is the truth, read by `useTheme()`. It answers a
+tick after the page has already painted, though, which on a light theme is a dark flash every time
+the popup opens — so `mountTheme()` applies a `localStorage` mirror of the same id synchronously
+before React mounts, and lets storage correct it a moment later. `index.html` carries
+`data-theme="ember"` and an inline ground so the frame before the stylesheet is neither white nor
+unpainted; `applyTheme` clears that inline colour, since an inline colour outranks every rule and
+would otherwise pin `<html>` to a dark ground under a light theme.
 
 ## Minimizing: the rail lives in the page
 
@@ -67,13 +91,24 @@ can size.
 
 | | |
 | --- | --- |
-| `src/lib/rail/events.ts` | The channel, the `RailView` the background computes, the tab list with its Lucide paths copied out, and the palette spelled in `oklch` |
+| `src/lib/rail/events.ts` | The channel, the `RailView` the background computes, the tab list with its Lucide paths copied out, and one palette per theme spelled in `oklch` |
 | `src/lib/rail/host.ts` | `exposeRail()` in the content script — builds the rail in a **closed** shadow root on `documentElement` |
 | `src/lib/bridge/rail.ts` | `serveRail()` and `syncRail()` in the background — what to paint, and when |
 | `src/lib/bridge/panel-view.ts` | `browsentic/panelCollapsed` and `browsentic/panelTab`, read by `use-panel-view.ts` in the panel |
 
 The content script carries no React and no icon package, which is why the paths and colours are
 copied rather than imported — `src/extension/components/` would drag the whole panel bundle onto every page.
+
+**Which is also why the rail is the one place a theme is spelled twice.** It has no stylesheet to
+read `globals.css` from, so `RAIL_PALETTES` and `RAIL_TONES` carry an entry per `[data-theme]`
+block, `RailView` carries the id, and `describeRail()` reads `browsentic/theme` alongside everything
+else — the same `storage.local.onChanged` listener that repaints the rail on a tab change repaints
+it on a theme change.
+
+Both records are `Record<ThemeId, …>`, so a new id that forgets them fails `yarn compile` rather
+than stranding an ember rail on every page. The two halves it cannot check are the `[data-theme]`
+block itself and the entry in `THEMES` — a theme missing either is a theme the picker offers and
+the stylesheet ignores, or the reverse.
 
 **A closed shadow root on `documentElement` is load-bearing.** It keeps the rail out of
 `body.innerText` (so `extractText` never returns it), out of the page's `querySelectorAll`, and out
