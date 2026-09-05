@@ -9,6 +9,7 @@ import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { Wordmark } from '@/extension/components/brand';
 import { Composer, type AttachedSkill } from '@/extension/components/composer';
 import { ConnectionSheet } from '@/extension/components/connection-sheet';
+import { DropMask } from '@/extension/components/drop-mask';
 import { Greeting } from '@/extension/components/greeting';
 import { MonitorBar } from '@/extension/components/monitor-bar';
 import { PanelNav, type PanelTab } from '@/extension/components/panel-nav';
@@ -30,6 +31,7 @@ import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recordin
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
 import { usePanelCollapsed, usePanelTab } from '@/lib/bridge/use-panel-view';
 import { useRun } from '@/lib/bridge/use-run';
@@ -66,6 +68,14 @@ export default function App() {
   const [pinned, setPinned] = useState(true);
 
   const connected = daemon?.connected ?? false;
+
+  const dragging = useFileDrop({
+    active: connected,
+    onDrop: (dropped) => {
+      open('chat');
+      void attachFiles(dropped);
+    },
+  });
 
   const voice = useVoiceComposer({
     active: voiceEnabled && connected && !run.running,
@@ -169,12 +179,22 @@ export default function App() {
     voice.setInput(`${voice.input ? `${voice.input}\n\n` : ''}[Page: ${doc.title} — ${doc.url}${snippet}]\n`);
   }
 
-  async function attachFile(file: File) {
-    if (file.size > MAX_FILE_BYTES) {
-      setAttachError(`“${file.name}” is larger than ${MAX_FILE_BYTES / 1024 / 1024} MB.`);
-      return;
+  async function attachFiles(incoming: File[]) {
+    const tooBig = incoming.filter((file) => file.size > MAX_FILE_BYTES);
+    const limit = `${MAX_FILE_BYTES / 1024 / 1024} MB`;
+    setAttachError(
+      tooBig.length === 0
+        ? null
+        : tooBig.length === 1
+          ? `“${tooBig[0].name}” is larger than ${limit}.`
+          : `${tooBig.length} of those files are larger than ${limit}.`,
+    );
+    for (const file of incoming) {
+      if (file.size <= MAX_FILE_BYTES) await storeFile(file);
     }
-    setAttachError(null);
+  }
+
+  async function storeFile(file: File) {
     const id = crypto.randomUUID();
     const content = await readAsBase64(file);
     await putFile(
@@ -209,7 +229,7 @@ export default function App() {
   const counts = { history: sessions.length, skills: skills.length, recordings: recordings.length };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="relative flex h-screen flex-col">
       <header className="flex shrink-0 items-center gap-2 px-3 py-2.5">
         <Wordmark className="flex-1" />
         <StatusPill
@@ -375,11 +395,13 @@ export default function App() {
             onPick={() => void pointAtElement()}
             onClearFocus={() => setFocus(null)}
             onAttachPage={() => void attachPageContext()}
-            onAttachFile={(file) => void attachFile(file)}
+            onAttachFile={(file) => void attachFiles([file])}
             onRemoveFile={(id) => void removeFile(id)}
           />
         </footer>
       )}
+
+      {dragging && <DropMask connected={connected} maxBytes={MAX_FILE_BYTES} />}
     </div>
   );
 }

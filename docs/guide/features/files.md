@@ -6,8 +6,9 @@ Getting a file into a page, and getting one back out.
 
 ## Files you hand it
 
-Attach a file in the side panel. Browsentic reads it **once, at attach time**, and keeps notes about
-what it is.
+Attach a file in the side panel — press **Attach a file** on the composer, or **drop one anywhere on
+the panel**, which takes several at once. Browsentic reads each **once, at attach time**, and keeps
+notes about what it is. Anything over 10 MB is refused.
 
 From then on the agent sees those notes — never your filesystem — plus two tools:
 
