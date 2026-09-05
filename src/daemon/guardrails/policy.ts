@@ -26,7 +26,7 @@
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { handlesIn, sealedHandles } from '@/lib/secrets';
 import type { RuleEffect } from '@/lib/settings/guardrails';
-import { hostAllowed, targetUrl, targetsAnotherTab, urlPayloadBytes, type Scope } from './scope';
+import { hostAllowed, hostBearingUrl, targetUrl, targetsAnotherTab, urlPayloadBytes, type Scope } from './scope';
 
 export const SUBMIT_ACTION = 'page.submitForm';
 export const UPLOAD_ACTION = 'page.attachFile';
@@ -68,25 +68,38 @@ export const CONDITIONS = {
 
   /** javascript:, data:, file: and friends dressed up as a navigation. */
   nonHttpNavigation: (request) => {
-    const url = targetUrl(request.action, request.input);
+    const url = hostBearingUrl(request.action, request.input);
     return !!url && url.protocol !== 'http:' && url.protocol !== 'https:';
   },
 
+  /**
+   * A navigation URL nothing resolves to a destination. Every other url condition asks a
+   * question about a host, and a string no parser settles has no host to ask it of — so
+   * they all fall silent together, on the input that deserves it least. This is the one
+   * condition that fires on not knowing. It costs nothing the caller wanted: the
+   * extension refuses such a URL a moment later anyway. The daemon parses in Node and the
+   * browser that acts parses in Chrome, and agreeing to differ there is how the last hole
+   * opened.
+   */
+  unreadableNavigation: (request) => targetUrl(request.action, request.input)?.kind === 'opaque',
+
   /** Leaving the hosts the run was scoped to — the exfiltration path that matters most. */
   navigatesOffScope: (request) => {
-    const url = targetUrl(request.action, request.input);
+    const url = hostBearingUrl(request.action, request.input);
     return !!url && !hostAllowed(url.hostname, request.scope.hosts);
   },
 
   /**
-   * A navigation whose query string or fragment is large enough to be a payload. Downloads
-   * are exempt: a signed file url is mostly query string by design, and gating those would
-   * mean a prompt on every export.
+   * A navigation whose query string or fragment is large enough to be a payload. The one
+   * url condition with no host in it, and deliberately: bytes leaving the browser are
+   * bytes leaving the browser, and `/collect?d=…` carries the same ones as the absolute
+   * spelling of it. Downloads are exempt — a signed file url is mostly query string by
+   * design, and gating those would mean a prompt on every export.
    */
   carriesUrlPayload: (request, policy) => {
     if (request.action === DOWNLOAD_ACTION) return false;
-    const url = targetUrl(request.action, request.input);
-    return !!url && urlPayloadBytes(url) > policy.urlPayloadBytes;
+    const target = targetUrl(request.action, request.input);
+    return !!target?.url && urlPayloadBytes(target.url) > policy.urlPayloadBytes;
   },
 
   /** Anything that commits a form, however it is spelled. */
@@ -141,7 +154,8 @@ export const CONDITIONS = {
   /**
    * A sealed secret in a URL is a credential on its way out of the browser. Read from
    * the raw argument, not the parsed URL: parsing percent-encodes the handle's brackets
-   * and the placeholder stops looking like one.
+   * and the placeholder stops looking like one. Any navigation counts, whatever shape its
+   * URL is in — that a credential is in a URL at all settles this before its host does.
    */
   carriesSecretInUrl: (request) => {
     if (!targetUrl(request.action, request.input)) return false;
@@ -193,6 +207,18 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'deny',
     title: 'Non-http navigation',
     reason: 'Only http(s) URLs can be opened.',
+  },
+  {
+    // A URL is a destination or it is nothing, and this is the rule that makes that true.
+    // `//evil.com/x` used to arrive here as a null every url condition skipped, while the
+    // page it was typed on resolved it and left the site. Classifying fixed that spelling;
+    // refusing what still will not classify is what stops the next one, without anybody
+    // having to think of it first.
+    id: 'unreadable-navigation',
+    when: 'unreadableNavigation',
+    effect: 'deny',
+    title: 'URL with no readable destination',
+    reason: 'That URL does not resolve to a destination Browsentic can check. Pass an absolute https:// URL.',
   },
   {
     id: 'off-scope-navigation',

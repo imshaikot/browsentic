@@ -91,7 +91,8 @@ const SUBMITS = [
 for (const [action, input, want] of SUBMITS) check(`submitsForm(${action})`, guardrails.submitsForm(action, input), want);
 
 // ── guardrails: scope ────────────────────────────────────────────────────────────
-const { ANYWHERE, decide, fence, hostAllowed, policyFrom, scopeFor, shouldFence, urlPayloadBytes } = guardrails;
+const { ANYWHERE, decide, fence, hostAllowed, hostBearingUrl, policyFrom, scopeFor, shouldFence, targetUrl, urlPayloadBytes } =
+  guardrails;
 
 const HOSTS = [
   ['example.com', ['example.com'], true],
@@ -117,6 +118,40 @@ check('pinTab on pins the tab', scopeFor({ url: 'https://a.com/', tabId: 7, pinT
 
 check('url payload counts query and fragment', urlPayloadBytes(new URL('https://a.com/p?q=12345#ab')), 11);
 
+// Whether a url string brings its own host or borrows the page's. The probes are two
+// constants carrying the whole classification, so this table is what catches an edit that
+// makes them agree — `//one.probe.invalid/x` in particular, which proves that naming a
+// probe buys a reference nothing.
+const TARGET_KINDS = [
+  ['https://evil.com/x', 'absolute'],
+  ['javascript:alert(1)', 'absolute'],
+  ['https:evil.com/x', 'absolute'],
+  ['//evil.com/x', 'authority'],
+  ['\\\\evil.com/x', 'authority'],
+  ['/\\evil.com/x', 'authority'],
+  ['\t//evil.com/x', 'authority'],
+  ['/\t/evil.com', 'authority'],
+  ['//example.com@evil.com/', 'authority'],
+  ['//0x7f000001/x', 'authority'],
+  ['//one.probe.invalid/x', 'authority'],
+  ['/pricing', 'path'],
+  ['\\evil.com/x', 'path'],
+  ['#//evil.com', 'path'],
+  ['/%2f/evil.com/x', 'path'],
+  ['//', 'opaque'],
+  ['//evil.com%09/x', 'opaque'],
+];
+for (const [url, kind] of TARGET_KINDS) {
+  check(`targetUrl reads ${JSON.stringify(url)} as ${kind}`, targetUrl('page.navigate', { url }).kind, kind);
+}
+check('a non-navigation has no target', targetUrl('page.clickElement', { url: '//evil.com/x' }), null);
+check('nor does a history move', targetUrl('page.navigate', { action: 'back' }), null);
+check(
+  'only a host the caller supplied is judged',
+  [hostBearingUrl('page.navigate', { url: '//evil.com/x' }).hostname, hostBearingUrl('page.navigate', { url: '/pricing' })],
+  ['evil.com', null],
+);
+
 // ── guardrails: decisions ────────────────────────────────────────────────────────
 const scope = scopeFor({ url: 'https://example.com/', tabId: 3, pinTab: true });
 const agent = (action, input) => decide({ action, input, caller: 'agent', scope });
@@ -126,6 +161,38 @@ check('in-scope navigation allowed', agent('page.navigate', { url: 'https://app.
 check('off-scope navigation confirms', agent('page.navigate', { url: 'https://evil.com/x' }).effect, 'confirm');
 check('off-scope openTab confirms', agent('page.openTab', { url: 'https://evil.com/x' }).effect, 'confirm');
 check('relative navigation is not a host decision', agent('page.navigate', { url: '/pricing' }).effect, 'allow');
+
+// The extension does not open the URL; the page does, and it resolves what it was handed
+// against the URL it is already on. So a string the daemon cannot parse alone is not a
+// string that goes nowhere: on example.com, `//evil.com/x` is the page's own resolver
+// handing the run to evil.com, and every url condition used to read the null and stay
+// quiet. A path still names no host, because where the tab actually is is not something
+// scope knows.
+check('a protocol-relative navigation is a host decision', agent('page.navigate', { url: '//evil.com/x' }).matched.map((r) => r.id), ['off-scope-navigation']);
+check('and so is a backslashed one', agent('page.navigate', { url: '\\\\evil.com/x' }).matched.map((r) => r.id), ['off-scope-navigation']);
+check('and a half-backslashed one', agent('page.navigate', { url: '/\\evil.com/x' }).effect, 'confirm');
+check('and one hidden behind a control character', agent('page.navigate', { url: '\t//evil.com/x' }).effect, 'confirm');
+check('and one spliced with a tab mid-path', agent('page.navigate', { url: '/\t/evil.com' }).effect, 'confirm');
+check('userinfo does not decide the host', [agent('page.navigate', { url: '//evil.com@example.com/' }).effect, agent('page.navigate', { url: '//example.com@evil.com/' }).effect], ['allow', 'confirm']);
+check('a single backslash is still a path', agent('page.navigate', { url: '\\evil.com/x' }).effect, 'allow');
+check('the same reference in scope is not gated', agent('page.navigate', { url: '//app.example.com/x' }).effect, 'allow');
+check('naming the probe buys nothing', agent('page.navigate', { url: '//one.probe.invalid/x' }).effect, 'confirm');
+check('a relative openTab is judged the same way', agent('page.openTab', { url: '//evil.com/x' }).matched.map((r) => r.id), ['off-scope-navigation']);
+check('a relative download url too', agent('page.captureDownload', { url: '//evil.com/f.csv' }).matched.map((r) => r.id), ['off-scope-navigation', 'file-download']);
+check('and still when file-download is turned off', decide({ action: 'page.captureDownload', input: { url: '//evil.com/f.csv' }, caller: 'agent', scope }, policyFrom({ rules: { 'file-download': 'allow' } })).matched.map((r) => r.id), ['off-scope-navigation']);
+
+// A URL is a destination or it is nothing. What no parser settles is refused rather than
+// skipped, so the next spelling nobody thought of fails closed instead of silently.
+check('a url with no readable destination is denied', agent('page.navigate', { url: '//evil.com%09/x' }).matched.map((r) => r.id), ['unreadable-navigation']);
+check('and nothing else has an opinion about it', agent('page.navigate', { url: '//' }).matched.map((r) => r.id), ['unreadable-navigation']);
+
+// Bytes leaving the browser are counted whatever the URL's shape, because that rule is
+// about the payload and not about where it lands.
+check('a relative payload counts the same bytes', agent('page.navigate', { url: `/pricing?d=${'x'.repeat(600)}` }).matched.map((r) => r.id), ['url-payload']);
+check('a fragment counts too', agent('page.navigate', { url: `#d=${'x'.repeat(600)}` }).effect, 'confirm');
+check('a small relative query string is still fine', agent('page.navigate', { url: '/search?q=kettle' }).effect, 'allow');
+check('an unattended caller cannot smuggle one out', external('page.navigate', { url: `//evil.com/log?d=${'x'.repeat(600)}` }).effect, 'deny');
+check('which is what the absolute spelling already said', external('page.navigate', { url: `https://evil.com/log?d=${'x'.repeat(600)}` }).effect, 'deny');
 check('history navigation is not a host decision', agent('page.navigate', { action: 'back' }).effect, 'allow');
 check('javascript: navigation denied', agent('page.navigate', { url: 'javascript:alert(1)' }).effect, 'deny');
 check('reserved action denied', agent('browsentic.saveSiteMap', {}).effect, 'deny');
@@ -453,7 +520,7 @@ check('each row falls back to the shipped effect', untouched.rules.every((row, a
 check('rows carry the reason the agent is given', untouched.rules.every((row) => row.reason.length > 0), true);
 
 const LOCKED = untouched.rules.filter((r) => r.locked).map((r) => r.id);
-check('the structural rules are locked', LOCKED, ['reserved-action', 'non-http-navigation', 'secret-in-url']);
+check('the structural rules are locked', LOCKED, ['reserved-action', 'non-http-navigation', 'unreadable-navigation', 'secret-in-url']);
 check('every locked rule denies', untouched.rules.filter((r) => r.locked).every((r) => r.fallback === 'deny'), true);
 for (const id of LOCKED) check(`the panel cannot write ${id}`, settingWritable(id, 'allow'), false);
 check('an unlocked rule is writable', settingWritable('form-submission', 'allow'), true);
@@ -611,6 +678,8 @@ check('a secret from another site says so', agent('page.fillInput', { value: off
 check('a secret from the run’s own site does not', agent('page.fillInput', { value: `⟦password:1@example.com#${TAG}⟧` }).matched.map((r) => r.id).includes('secret-off-scope'), false);
 check('a secret in a url is denied outright', agent('page.navigate', { url: `https://example.com/?p=${real}` }).effect, 'deny');
 check('even on the run’s own site', agent('page.navigate', { url: `https://example.com/?p=${real}` }).matched.map((r) => r.id), ['secret-in-url']);
+check('however the url is spelled', [agent('page.navigate', { url: `//evil.com/?p=${real}` }).effect, agent('page.navigate', { url: `/x?p=${real}` }).effect], ['deny', 'deny']);
+check('and it is secret-in-url that says so', agent('page.navigate', { url: `/x?p=${real}` }).matched.map((r) => r.id), ['secret-in-url']);
 check('an unattended caller cannot release at all', external('page.fillInput', withSecret).effect, 'deny');
 check('an ordinary fill is untouched', agent('page.fillInput', { value: 'kettles' }).effect, 'allow');
 // The panel renders a fillInput value as [redacted], but a handle is public by

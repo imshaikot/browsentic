@@ -43,9 +43,10 @@ depend on declaration order.
 | --- | --- | --- |
 | `reserved-action` | An internal `browsentic.*` verb is called from outside | **deny** |
 | `non-http-navigation` | A `javascript:`, `data:` or `file:` URL dressed up as a navigation | **deny** |
+| `unreadable-navigation` | A URL that resolves to no destination Browsentic can check | **deny** |
 | `raw-html-read` | `page_extractText` with `format: "html"` | **deny** |
 | `network-body-read` | `page_readNetwork` with `includeBodies: true` | **deny** |
-| `off-scope-navigation` | Navigating off the sites this run is about | confirm |
+| `off-scope-navigation` | Navigating off the sites this run is about, however the URL is spelled | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
 | `site-tool-call` | `page_callSiteTool` — running a tool the site registered through WebMCP | confirm |
@@ -185,7 +186,7 @@ shipped default still reaches you.
 
 A run takes its policy when it starts. A change applies to the next run, not one already going.
 
-Three rows are shown but **locked**: `reserved-action`, `non-http-navigation` and `secret-in-url`.
+Four rows are shown but **locked**: `reserved-action`, `non-http-navigation`, `unreadable-navigation` and `secret-in-url`.
 Allowing a `javascript:` URL, letting a page call an internal verb, or letting a credential travel
 in a query string are not preferences, and none of them has a use worth a switch you can hit by
 accident. Hand-editing config.json still works if you genuinely mean it.
