@@ -5,7 +5,8 @@ browsentic <command>
 ```
 
 With no command it prints usage. Most commands start the daemon if one is not already running;
-`status`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals` and `downloads` do not.
+`status`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals`, `downloads` and `uninstall` do
+not — an uninstall that started a daemon would be absurd.
 
 ---
 
@@ -14,7 +15,8 @@ With no command it prints usage. Most commands start the daemon if one is not al
 | Command | Does |
 | --- | --- |
 | `browsentic setup` | Install the extension, start the daemon, print a pairing code |
-| `browsentic update` | Refresh the installed extension in place and restart the daemon |
+| `browsentic update` | Pull the newest build: the command itself first, then the extension, then restart the daemon |
+| `browsentic uninstall` | Stop the daemon and remove everything Browsentic wrote |
 
 `setup` writes the extension to `~/browsentic/extension/chrome-mv3` and leaves you two steps: load
 that folder at `chrome://extensions` with Developer mode on, and paste the code into the popup.
@@ -29,9 +31,30 @@ origin, so a versioned path would unpair the browser on every update.
 | `--no-pair` | Install and start the daemon, mint no code |
 | `--force` | Rewrite every file even when the installed build already matches |
 | `--browser <name>` | `chrome` only for now. See [install](../guide/install.md) for the Firefox situation |
-| `--json` | Machine-readable result |
+| `--no-self-update` | Install what this copy carries, without asking the registry whether a newer one exists |
+| `--json` | Machine-readable result. Progress goes to stderr, so stdout stays parseable |
 
-See [guide/install.md](../guide/install.md).
+`setup` and `update` both replace the command itself when the registry has something newer, because
+the extension ships *inside* the package — a stale CLI installs a stale extension and says
+"already current". Under `npx` that lasts as long as the cache does, which is what made `update`
+look like it did nothing. A pinned `npx browsentic@<version>` is never upgraded past, and a source
+checkout is told rather than touched.
+
+### Uninstall
+
+| Flag | Does |
+| --- | --- |
+| `--dry-run` | Print the plan and stop |
+| `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal |
+| `--keep-skills` | Leave `skills/` behind — site maps and hand-written notes have no other copy |
+
+It removes the daemon (found by probing 8765–8767, so an orphan whose lockfile was deleted is still
+caught), `~/.browsentic`, `~/browsentic`, and every `~/.npm/_npx/*` directory holding a copy of the
+package. It names, but will not touch, the extension card at `chrome://extensions`, the command
+itself, your MCP client's entry, and any directory you moved with `screenshotDir`, `downloadDir` or
+`skillsDir`.
+
+See [guide/install.md](../guide/install.md) and [guide/maintenance.md](../guide/maintenance.md).
 
 ## Pairing
 
@@ -84,7 +107,7 @@ configurations written against the older name keep working.
 
 | Command | Does |
 | --- | --- |
-| `browsentic stop` | Stop the background daemon |
+| `browsentic stop` | Stop the background daemon, whichever of 8765–8767 is answering |
 | `browsentic restart` | Stop the daemon and bring up a fresh one |
 | `browsentic --version` / `-v` | Print the version |
 | `browsentic help` / `--help` / `-h` | Usage |

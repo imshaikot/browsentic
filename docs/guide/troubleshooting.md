@@ -28,6 +28,8 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | "Load unpacked" cannot see `~/browsentic` | A Flatpak or Snap browser, sandboxed away from your home directory. Snap Chromium is the Ubuntu default | Grant it: `flatpak override --user --filesystem=~/browsentic com.google.Chrome`. Or install somewhere the sandbox can read: `browsentic setup --dir ~/snap/chromium/common/browsentic-extension` |
 | The folder picker does not show `~/browsentic` | It is there; some pickers open elsewhere by default | macOS: press ⇧⌘G and paste the path. Linux: Ctrl+L |
 | Updated with `npx`, but the browser still runs the old build | Chrome never auto-reloads an unpacked extension | `browsentic status` names both versions. Press ↻ on the Browsentic card |
+| `browsentic update` says "already current" forever, and reinstalling still lands on an old build | npm's `npx` cache serves the version it first resolved and never asks the registry again | `browsentic update` now replaces the cached command before installing. To clear it by hand, delete every `~/.npm/_npx/*` directory containing `node_modules/browsentic` |
+| Deleted `~/.browsentic`, but a daemon is still holding port 8765 | The lockfile went with it; the process did not notice | `browsentic stop` probes the ports rather than the lockfile, so it finds that one. `browsentic uninstall` does it as part of the sweep |
 
 ## MCP clients
 

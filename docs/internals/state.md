@@ -29,6 +29,14 @@ Nothing lives in the repository.
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
+## The one that is not yours
+
+`~/.npm/_npx/<hash>/` is npm's, not Browsentic's, but a machine set up with `npx browsentic setup`
+keeps the whole package there — CLI and extension payload both — and npm reuses it without ever
+re-checking the registry. It therefore behaves like state: it decides which version you run, it
+survives deleting both directories above, and it is why a reinstall could land on a months-old
+build. `browsentic update` replaces it; `browsentic uninstall` deletes it.
+
 ## The three exceptions
 
 **Held secrets** never reach disk at all. A credential the sanitizer seals out of a page is kept in

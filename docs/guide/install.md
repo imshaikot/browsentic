@@ -56,12 +56,22 @@ npm i -g browsentic
 ### Updating
 
 ```sh
-npx browsentic@latest update
+npx browsentic update
 ```
 
-That refreshes the installed extension in place and restarts the daemon. The install path never
-changes, so your browser stays paired. Press ↻ on the Browsentic card at `chrome://extensions` to
-pick up the new build. See [Maintenance](maintenance.md).
+That replaces the command itself if the registry has something newer, refreshes the installed
+extension in place, and restarts the daemon. The install path never changes, so your browser stays
+paired. Press ↻ on the Browsentic card at `chrome://extensions` to pick up the new build.
+
+### Uninstalling
+
+```sh
+npx browsentic uninstall
+```
+
+One command for the daemon, both directories and the `npx` cache. It prints the plan and asks first.
+Remove the card at `chrome://extensions` yourself, ideally before running it. See
+[Maintenance](maintenance.md).
 
 ### Firefox
 

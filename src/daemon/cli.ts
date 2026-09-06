@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
 import { AGENTS, AGENT_KINDS, isAgentKind } from '@/lib/agents/catalog';
@@ -10,19 +11,23 @@ import { forgetGrants, listGrants } from './agent/approvals';
 import { clearDownloads, downloadDir, storedDownloads } from './downloads';
 import { readAgentConfig, rememberExtensionDir } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
-import { ensureDaemon, probeExisting } from './ensure-daemon';
+import { ensureDaemon, probeExisting, runningDaemons, stopDaemons } from './ensure-daemon';
 import { install, InstallError, readStamp } from './install';
-import { clearLockfile, isRunning, logPath, readLockfile } from './lockfile';
+import { logPath, readLockfile } from './lockfile';
 import { log } from './log';
+import { installKind } from './npx';
 import { extensionDir } from './paths';
 import { RemoteBridge } from './remote-bridge';
+import { upgradeCli } from './self-update';
 import { createMcpServer } from './server';
+import { planUninstall, purgeNpxCache, removeAll } from './uninstall';
 import pkg from './package.json';
 
 const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent you already run
 
   browsentic setup            install the extension, start the daemon, print a pairing code
-  browsentic update           refresh the installed extension and restart the daemon
+  browsentic update           pull the newest build — the command itself, then the extension
+  browsentic uninstall        stop the daemon and remove everything Browsentic wrote
   browsentic pair             issue a one-time code to type into the extension
   browsentic status           daemon, extension and agent state
   browsentic sessions         list paired browsers
@@ -74,6 +79,9 @@ switch (command) {
   case 'update':
     await setup(['--no-pair', '--restart', ...process.argv.slice(3)]);
     break;
+  case 'uninstall':
+    await uninstall(process.argv.slice(3));
+    break;
   case 'pair':
     await pair();
     break;
@@ -93,7 +101,7 @@ switch (command) {
     await showStatus();
     break;
   case 'stop':
-    stop();
+    await stop();
     break;
   case 'restart':
     await restart();
@@ -221,28 +229,23 @@ async function showStatus(): Promise<void> {
   if (!status.pairedBrowsers) console.log('\nRun "browsentic setup" to install the extension, or "browsentic pair" if it is already loaded.');
 }
 
-function stop(): void {
-  const lock = readLockfile();
-  if (!lock) return console.log('No daemon lockfile; nothing to stop.');
-  try {
-    process.kill(lock.pid, 'SIGTERM');
-    console.log(`Stopped daemon (pid ${lock.pid}).`);
-  } catch {
-    console.log(`Daemon (pid ${lock.pid}) was not running; clearing the lockfile.`);
-    clearLockfile();
+// Stops what is *answering*, not what the lockfile claims. A daemon outlives a deleted
+// ~/.browsentic and goes on holding its port, and that orphan is the one people hit.
+async function stop(): Promise<void> {
+  const { stopped, stubborn } = await stopDaemons();
+  for (const daemon of stopped) console.log(`Stopped daemon (pid ${daemon.pid}) on 127.0.0.1:${daemon.port}.`);
+  for (const daemon of stubborn) {
+    console.error(`Daemon (pid ${daemon.pid}) on 127.0.0.1:${daemon.port} would not exit — kill it by hand.`);
   }
+  if (!stopped.length && !stubborn.length) console.log('No daemon is answering; nothing to stop.');
+  if (stubborn.length) process.exitCode = 1;
 }
 
 async function restart(): Promise<void> {
-  const lock = readLockfile();
-  stop();
-  const deadline = Date.now() + 5_000;
-  while (lock && isRunning(lock.pid)) {
-    if (Date.now() > deadline) {
-      console.error(`Daemon (pid ${lock.pid}) is still exiting — try again in a moment.`);
-      process.exit(1);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  const { stubborn } = await stopDaemons();
+  if (stubborn.length) {
+    console.error(`Daemon (pid ${stubborn[0].pid}) is still exiting — try again in a moment.`);
+    process.exit(1);
   }
   const fresh = await ensureDaemon();
   console.log(`Daemon running on 127.0.0.1:${fresh.port} (pid ${fresh.pid}, v${fresh.daemonVersion}).`);
@@ -293,6 +296,14 @@ async function setup(argv: string[]): Promise<void> {
     return at === -1 ? undefined : argv[at + 1];
   };
 
+  // A stale command installs a stale extension, silently, and under npx it will keep doing so
+  // for as long as the cache lives — which is what makes `update` look like it does nothing.
+  // Replace the command first and let the fresh one do the install.
+  if (!flag('no-self-update')) {
+    const code = await upgradeCli(pkg.version, process.argv.slice(2));
+    if (code !== null) process.exit(code);
+  }
+
   const browser = valueOf('browser') ?? 'chrome';
   if (browser === 'firefox') {
     console.log(`
@@ -339,15 +350,14 @@ async function setup(argv: string[]): Promise<void> {
   if (flag('restart')) await restart();
   const lock = await ensureDaemon();
 
-  let code: string | undefined;
-  let alreadyPaired = false;
-  if (!flag('no-pair')) {
-    const bridge = await RemoteBridge.connect(lock.port, lock.token);
-    const sessions = await bridge.sessions();
-    alreadyPaired = sessions.some((session) => session.origin.startsWith('chrome-extension://'));
-    if (!alreadyPaired) code = (await bridge.pair()).code;
-    await bridge.close();
-  }
+  // --no-pair means mint no code, not learn nothing: `update` still has to know whether this
+  // browser is paired, because that decides whether what is left to do is "load unpacked" or
+  // the one step an update actually needs, which is pressing ↻.
+  const bridge = await RemoteBridge.connect(lock.port, lock.token);
+  const sessions = await bridge.sessions();
+  const alreadyPaired = sessions.some((session) => session.origin.startsWith('chrome-extension://'));
+  const code = alreadyPaired || flag('no-pair') ? undefined : (await bridge.pair()).code;
+  await bridge.close();
 
   if (json) {
     console.log(
@@ -383,8 +393,109 @@ async function setup(argv: string[]): Promise<void> {
     console.log(`  2. Open the Browsentic popup and paste this code:\n`);
     console.log(`         ${groupCode(code)}\n`);
     console.log(`     Single use, expires in 10 minutes. Need another? "browsentic pair"\n`);
+  } else {
+    console.log(`  2. Run "browsentic pair" and paste the code into the Browsentic popup.\n`);
   }
   console.log(`  Then open the side panel and say what you want.\n`);
+}
+
+/**
+ * Remove Browsentic in one command.
+ *
+ * The manual procedure this replaces could not reach two of these: an npx cache, which is
+ * invisible and goes on serving the version it first resolved, and a daemon whose lockfile was
+ * deleted before it was stopped, which keeps its port for as long as the machine is up. Between
+ * them they made a reinstall land on the old build, which looked like the installer was broken.
+ */
+async function uninstall(argv: string[]): Promise<void> {
+  const flag = (name: string) => argv.includes(`--${name}`);
+  const plan = planUninstall({ keepSkills: flag('keep-skills') });
+  const daemons = await runningDaemons();
+  const kind = installKind();
+
+  console.log(`\n  Browsentic ${pkg.version} — uninstall\n`);
+  if (!daemons.length && !plan.removals.length && !plan.npx.length) {
+    console.log('  Nothing to remove; this machine is already clean.\n');
+    return;
+  }
+
+  console.log('  This removes:\n');
+  for (const daemon of daemons) console.log(`    daemon      127.0.0.1:${daemon.port}, pid ${daemon.pid}`);
+  for (const removal of plan.removals) {
+    console.log(`    ${removal.label.padEnd(11)} ${removal.path}`);
+    console.log(`                ${removal.holds}${removal.keep ? ' — keeping skills/' : ''}`);
+  }
+  for (const entry of plan.npx) {
+    const running = entry.running ? ', the copy running right now' : '';
+    console.log(`    npx cache   ${entry.dir}`);
+    console.log(`                browsentic ${entry.version ?? 'unknown'}${running}`);
+  }
+
+  if (plan.elsewhere.length) {
+    console.log('\n  Left alone — configuration put these outside the two roots:\n');
+    for (const dir of plan.elsewhere) console.log(`    ${dir.label.padEnd(11)} ${dir.path}  (${dir.holds})`);
+  }
+
+  console.log('\n  You will have to remove these yourself:\n');
+  console.log('    the Browsentic card at chrome://extensions. Do that first — remove the');
+  console.log('    directory while the card is loaded and the browser is left holding a');
+  console.log('    broken one. It is also what clears recordings and held secrets, which');
+  console.log('    live in extension storage rather than on disk.');
+  if (kind === 'global') console.log('\n    the command itself:  npm rm -g browsentic');
+  if (kind === 'repo') console.log('\n    the global link:     yarn daemon:unlink');
+  console.log('\n    the entry in your MCP client, e.g.  claude mcp remove browsentic');
+
+  if (flag('dry-run')) {
+    console.log('\n  --dry-run: nothing was removed.\n');
+    return;
+  }
+
+  if (!flag('yes') && !argv.includes('-y')) {
+    if (!process.stdin.isTTY) {
+      console.error('\n  Nothing was removed — this is not a terminal, so there is nobody to ask.');
+      console.error('  Re-run it with --yes.\n');
+      process.exit(1);
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await rl.question('\n  Remove all of it? [y/N] ');
+    rl.close();
+    if (!/^y(es)?$/i.test(answer.trim())) return console.log('\n  Nothing was removed.\n');
+  }
+
+  console.log();
+
+  // Ask the daemon to drop its session keys before killing it, so a browser still holding the
+  // socket is told it is unpaired instead of discovering it. Never spawn one to do this.
+  const lock = await probeExisting();
+  if (lock) {
+    try {
+      const bridge = await RemoteBridge.connect(lock.port, lock.token);
+      const revoked = await bridge.revoke();
+      await bridge.close();
+      if (revoked) console.log(`  ✓ Unpaired   ${revoked} browser${revoked === 1 ? '' : 's'}`);
+    } catch {
+      console.log('  · Unpair     skipped, the daemon did not answer');
+    }
+  }
+
+  const { stopped, stubborn } = await stopDaemons();
+  if (stopped.length) console.log(`  ✓ Daemon     stopped (pid ${stopped.map((daemon) => daemon.pid).join(', ')})`);
+  for (const daemon of stubborn) console.log(`  ✗ Daemon     pid ${daemon.pid} would not exit — kill it by hand`);
+
+  for (const outcome of removeAll(plan.removals)) {
+    if (!outcome.removed) console.log(`  ✗ ${outcome.removal.path} — ${outcome.error}`);
+    else if (outcome.kept.length) console.log(`  ✓ Emptied    ${outcome.removal.path} — kept ${outcome.kept.join(', ')}/`);
+    else console.log(`  ✓ Removed    ${outcome.removal.path}`);
+  }
+
+  // Last, because it deletes the directory this process is running out of.
+  for (const purge of purgeNpxCache(plan.npx)) {
+    if (purge.removed) console.log(`  ✓ Cleared    ${purge.entry.dir}`);
+    else console.log(`  ✗ ${purge.entry.dir} — ${purge.error}`);
+  }
+
+  console.log('\n  Done. Remove the card at chrome://extensions if you have not.\n');
+  if (stubborn.length) process.exitCode = 1;
 }
 
 async function showSessions(): Promise<void> {

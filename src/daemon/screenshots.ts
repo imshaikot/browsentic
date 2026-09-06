@@ -7,7 +7,7 @@ import { uploadedSkillsDir } from './agent/skills';
 
 export function saveScreenshot(dataUrl: string, opts: { filename?: string; dir?: string } = {}): string {
   const { mime, bytes } = parseDataUrl(dataUrl);
-  const dir = opts.dir ? containedSkillDir(opts.dir) : resolveDir();
+  const dir = opts.dir ? containedSkillDir(opts.dir) : screenshotDir();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
 
   const ext = extensionFor(mime);
@@ -27,7 +27,7 @@ function containedSkillDir(dir: string): string {
   return target;
 }
 
-function resolveDir(): string {
+export function screenshotDir(): string {
   const configured = readAgentConfig().screenshotDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
   return join(homedir(), 'browsentic', 'screenshot');

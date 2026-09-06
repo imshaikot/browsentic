@@ -5,20 +5,35 @@
 ## Updating
 
 ```sh
+browsentic update
+```
+
+That refreshes two things, in order: **the command itself**, then the extension it carries.
+
+The first half matters more than it sounds. `npx browsentic setup` does not put anything on your
+`PATH` — it runs the package out of npm's own throwaway cache, and npm names that directory after
+the spec it was asked for, records the version it resolved *the first time*, and reuses it forever
+without asking the registry again. So a machine set up with `npx` keeps running whatever version it
+first saw, and since the extension ships inside the package, `update` had nothing newer to install
+and reported "already current" every time. It now checks the registry, replaces the stale cache, and
+re-runs itself under the new version.
+
+`--no-self-update` skips the check, and a pinned `npx browsentic@<version>` is never upgraded past —
+a pin is a decision, not a stale cache.
+
+From a clone, `update` says so and leaves the checkout alone:
+
+```sh
 git pull
 yarn setup
 ```
 
-Then reload the extension at `chrome://extensions` (↻ on the Browsentic card) and restart the
-daemon:
+Either way the last step is yours: **nothing reloads itself.** Chrome does not auto-reload an
+unpacked extension, so press ↻ on the Browsentic card at `chrome://extensions`. `browsentic update`
+has already replaced the daemon; from a clone, `browsentic restart` is that half, because a running
+daemon keeps the old build in memory until it is swapped out.
 
-```sh
-browsentic restart
-```
-
-Both steps are needed, for the same reason in two places: **nothing reloads itself.** Chrome does
-not auto-reload an unpacked extension, and a running daemon keeps the old build in memory until it
-is replaced.
+`browsentic status` names both versions when they disagree, and says which one to reload.
 
 **Rebuild both halves together.** If only one side is rebuilt, `browsentic status` reports
 `manifest: DRIFTED`. The daemon then falls back to the tools the browser actually has and tells
@@ -50,43 +65,51 @@ the fresh build.
 
 ## Uninstalling
 
-Four steps, and the order matters. Only the second one depends on how you installed.
-
-**1. Unpair the browsers and stop the daemon.**
-
 ```sh
-browsentic revoke      # unpair every browser
-browsentic stop        # stop the daemon
+browsentic uninstall
 ```
 
-`revoke` asks the running daemon to drop its session keys, so it has to come before `stop` rather
-than after. If you installed through `npx` and never installed the command permanently, these are
-`npx browsentic revoke` and `npx browsentic stop`.
+It prints exactly what it is about to remove and asks before removing any of it:
 
-**2. Remove the command**, if you have one on your PATH. This is the step that differs:
-
-| How you installed | What to remove |
+| | |
 | --- | --- |
-| `npx browsentic setup` | Nothing. `npx` runs the package from its own cache and never puts anything on your PATH. |
-| `npm i -g browsentic` | `npm rm -g browsentic` |
-| From a clone | `yarn daemon:unlink`, which removes the global link `yarn daemon:link` created |
+| daemon | Whatever is *answering* on 8765–8767, not what the lockfile claims. Sessions are revoked through it first, so a connected browser is told it is unpaired rather than left to discover it |
+| state | `~/.browsentic` — pairing keys, config, approvals, logs |
+| files | `~/browsentic` — the unpacked extension, skills, site maps, screenshots, captured downloads |
+| npx cache | Every `~/.npm/_npx/*` directory holding a copy of the package |
 
-**3. Remove the extension** at `chrome://extensions`.
+| Flag | Does |
+| --- | --- |
+| `--dry-run` | Print the plan and stop |
+| `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal, since there is nobody to ask |
+| `--keep-skills` | Leave `skills/` behind. Nothing else has a copy of your site maps |
 
-Do this *before* the next step. The folder Chrome loaded is `~/browsentic/extension/chrome-mv3`,
-which step 4 deletes — remove the directory first and the browser is left holding a broken card.
-Removing the extension also clears recordings and stored files, which live in extension storage
-rather than on disk.
+**Remove the card at `chrome://extensions` first.** That is the one step no command can do for you,
+and doing it afterwards leaves the browser holding a folder that is no longer there. It is also what
+clears recordings and held secrets, which live in extension storage rather than on disk.
 
-**4. Delete the two directories.**
+Two things it names but will not touch: the command itself (`npm rm -g browsentic`, or
+`yarn daemon:unlink` from a clone) and the entry in your MCP client
+(`claude mcp remove browsentic`). It also names, without deleting, any directory you pointed
+somewhere else with `screenshotDir`, `downloadDir` or `skillsDir` — you put those there.
 
-```sh
-rm -rf ~/.browsentic ~/browsentic
-```
+### Why the manual procedure was not enough
 
-`~/.browsentic` holds pairing keys, config, approvals and logs; `~/browsentic` holds the extension
-you just removed, plus skills, screenshots and captured downloads. If you set `BROWSENTIC_HOME`,
-the first one is wherever you pointed it.
+It could not reach two of these, and both fail quietly:
+
+**The npx cache.** Deleting `~/.browsentic` and `~/browsentic` leaves it untouched, so the reinstall
+afterwards runs the same cached CLI and lays down the same old extension. It looks like the installer
+is broken.
+
+**An orphaned daemon.** `rm -rf ~/.browsentic` takes the lockfile with it, and the running daemon
+never notices — it holds its port for as long as the machine is up, and nothing that reads
+`~/.browsentic` can see it any more. `browsentic stop` now probes the ports instead of trusting the
+lockfile, so it finds that one too.
+
+If you would rather do it by hand, the order is: `browsentic revoke`, `browsentic stop`, remove the
+card at `chrome://extensions`, `rm -rf ~/.browsentic ~/browsentic`, then delete every
+`~/.npm/_npx/*` directory containing `node_modules/browsentic`. `revoke` needs the daemon, so it
+comes before `stop`; the cache is the step people miss.
 
 What those directories held is listed in [internals/state.md](../internals/state.md) — worth a look
 before deleting, since `~/browsentic/skills/` contains any site maps you generated and any notes you

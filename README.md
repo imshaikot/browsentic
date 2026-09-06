@@ -41,7 +41,7 @@ Then open the side panel and say what you want.
 
 You also need one agent CLI on your `PATH` and logged in — `claude`, `codex` or `agy`. Full prerequisites in the [install guide](docs/guide/install.md), which also covers [building from source](docs/guide/install.md#from-source).
 
-Later, `npx browsentic@latest update` refreshes the extension in place. The install path never changes, so your browser stays paired.
+Later, `npx browsentic update` refreshes the command and the extension in place. The install path never changes, so your browser stays paired. `npx browsentic uninstall` removes the lot.
 
 ## How It Works
 
