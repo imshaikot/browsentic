@@ -27,6 +27,7 @@ import {
   type MonitorUntil,
 } from '@/lib/monitor/events';
 import { hostOf, originOf } from '@/lib/recordings/events';
+import { showToast } from '@/lib/bridge/toast';
 
 const MONITORS_KEY = 'browsentic/monitors';
 const DONE_KEY = 'browsentic/monitorsDone';
@@ -287,7 +288,7 @@ export async function finishMonitor(
   }
   for (const settle of waiters.get(monitorId) ?? []) settle(state);
   waiters.delete(monitorId);
-  if (phase !== 'stopped') await notify(state);
+  if (phase !== 'stopped') await announce(state);
   fanOut(state);
   return state;
 }
@@ -495,16 +496,27 @@ function pathOf(url: string): string {
   }
 }
 
-async function notify(state: MonitorState): Promise<void> {
-  const name = state.label ?? state.host;
-  const copy: Partial<Record<MonitorPhase, { title: string; message: string }>> = {
-    done: { title: `Done: ${name}`, message: `Finished after ${clock(state.elapsedMs)}.` },
-    timeout: { title: `Still going: ${name}`, message: `Watched for ${clock(state.elapsedMs)} without completing.` },
-    'tab-closed': { title: 'Monitor ended — tab closed', message: `${name} was closed before finishing.` },
-    'tab-navigated': { title: 'Monitor ended — tab moved on', message: state.message ?? `The tab left ${state.host}.` },
-  };
-  const content = copy[state.phase];
+/**
+ * A card drawn onto the page the user is on, which is the only surface they are certainly
+ * looking at. The OS notification stays as the fallback for when no page will take one —
+ * every tab is a chrome:// page, or the window has nothing open.
+ */
+async function announce(state: MonitorState): Promise<void> {
+  const content = copyFor(state);
   if (!content) return;
+
+  const shown = await showToast(
+    {
+      toastId: state.monitorId,
+      tone: state.phase === 'done' ? 'live' : 'warn',
+      title: content.title,
+      body: content.message,
+      tabId: state.phase === 'tab-closed' ? undefined : state.tabId,
+    },
+    state.tabId,
+  );
+  if (shown) return;
+
   await browser.notifications
     ?.create(`${NOTIFICATION_PREFIX}${state.monitorId}`, {
       type: 'basic',
@@ -513,6 +525,17 @@ async function notify(state: MonitorState): Promise<void> {
       message: content.message,
     })
     .catch(() => undefined);
+}
+
+function copyFor(state: MonitorState): { title: string; message: string } | undefined {
+  const name = state.label ?? state.host;
+  const copy: Partial<Record<MonitorPhase, { title: string; message: string }>> = {
+    done: { title: `Done: ${name}`, message: `Finished after ${clock(state.elapsedMs)}.` },
+    timeout: { title: `Still going: ${name}`, message: `Watched for ${clock(state.elapsedMs)} without completing.` },
+    'tab-closed': { title: 'Monitor ended — tab closed', message: `${name} was closed before finishing.` },
+    'tab-navigated': { title: 'Monitor ended — tab moved on', message: state.message ?? `The tab left ${state.host}.` },
+  };
+  return copy[state.phase];
 }
 
 function largestIcon(): string {

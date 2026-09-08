@@ -3,6 +3,7 @@ import { exposeIndicator } from '@/lib/indicator/host';
 import { exposeMonitor } from '@/lib/monitor/watch';
 import { exposeRail } from '@/lib/rail/host';
 import { exposeRecorder } from '@/lib/recordings/host';
+import { exposeToast } from '@/lib/toast/host';
 
 export default defineContentScript({
   matches: ['*://*/*'],
@@ -15,5 +16,6 @@ export default defineContentScript({
     exposeMonitor();
     exposeIndicator();
     exposeRail();
+    exposeToast();
   },
 });

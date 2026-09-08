@@ -14,6 +14,7 @@ import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/rec
 import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
 import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { serveTimers } from '@/lib/bridge/timer';
+import { serveToast } from '@/lib/bridge/toast';
 import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
@@ -208,6 +209,7 @@ export default defineBackground(() => {
   serveRunPorts();
   serveTabSessions();
   serveRail();
+  serveToast();
   void syncRail();
 
   onWelcome(() => {
