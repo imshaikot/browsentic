@@ -130,6 +130,14 @@ The result also carries `downloadId`, and `page_attachFile { downloadId, target 
 
 Expect a confirm prompt — writing a file to someone's disk is gated the same way uploading one is. Four refusals are final and none of them is worth routing around: an executable (`DOWNLOAD_REFUSED`), anything over 100 MB (`DOWNLOAD_TOO_LARGE`), a file from a host this run was not about (`DOWNLOAD_OFF_SCOPE`), and a click that downloaded nothing (`NO_DOWNLOAD_STARTED` — it probably opened a page instead, so check where the tab landed). Say what happened and stop.
 
-## 11. Multi-step tasks
+## 11. Frames — when the thing is inside an iframe
+
+`page_getPageInfo` sees one document at a time. Visible iframes come back under `frames` with a selector, and nothing inside them is in the snapshot: a form, a button or a piece of text that is plainly on screen but missing from the inventory is usually inside one.
+
+`page_switchFrame { frame: { selector } }` steps into it. From then on every tool acts inside that frame as if it were the page — snapshot, click, fill, wait, `page_listSiteTools`, `page_callSiteTool`, `page_injectCode` and `page_runCode` — and each snapshot carries a `frame` block naming where you are. Call it again from inside to go deeper. `page_switchFrame {}` returns to the top document and `{ to: "parent" }` steps out one level; any navigation puts you back at the top on its own. `page_screenshot` and `page_navigate` always work on the whole tab, wherever you are.
+
+`FRAME_UNREACHABLE` means the frame cannot run scripts, most often a sandbox without `allow-scripts`. Do not retry it: a screenshot still shows what is there, and `page_trustedClick` with a `point` still reaches it.
+
+## 12. Multi-step tasks
 
 Do the whole task, not the first step of it. If the user says "search for X and open the first result", that is a fill, a submit, a wait, a snapshot, and a click — finish all of it, then report once at the end. Stop early only when you are blocked on something the user must decide.

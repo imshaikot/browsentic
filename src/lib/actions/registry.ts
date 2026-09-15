@@ -47,6 +47,7 @@ import { stopDiagnostics } from './page/stop-diagnostics';
 import { stopMonitor } from './page/stop-monitor';
 import { stopTimer } from './page/stop-timer';
 import { submitForm } from './page/submit-form';
+import { switchFrame } from './page/switch-frame';
 import { switchTab } from './page/switch-tab';
 import { timerStatus } from './page/timer-status';
 import { trustedClick } from './page/trusted-click';
@@ -99,6 +100,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       navigate,
       openTab,
       switchTab,
+      switchFrame,
       closeTab,
       screenshot,
       listFiles,

@@ -17,7 +17,8 @@ import { runCode } from '@/lib/actions/page/run-code';
 import { installerSource, TOOLKIT_MISSING, type ToolkitEntry } from '@/lib/actions/page/toolkit';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { scopeOf, slugFromPurpose } from '@/lib/skills/saved-tool';
-import { send, withDebugger, type DebuggerSession } from './cdp';
+import { send, withDebugger } from './cdp';
+import { mainWorldOf, type FrameContext } from './frame-context';
 import { getSavedTool, scopeMatches } from './saved-tools';
 
 const TOOLKITS_KEY = 'browsentic/codeToolkits';
@@ -26,6 +27,9 @@ const FIREFOX_HINT =
   'Installing page code needs Chrome’s debugger, which Firefox does not expose — use the ordinary page tools instead.';
 
 const MAX_ERROR_LENGTH = 600;
+
+const FRAME_CONTEXT_HINT =
+  'Chrome’s debugger found no script context for the frame in focus — call page.switchFrame with no arguments and inject from the top document, or enter the frame again once it has loaded.';
 
 interface StoredToolkit {
   id: string;
@@ -243,7 +247,9 @@ export async function runToolkit(tabId: number, url: string | undefined, input: 
 
 function evaluateInstaller(tabId: number, toolkit: StoredToolkit): Promise<ActionResult> {
   return withDebugger(tabId, FIREFOX_HINT, async (session) => {
-    const reply = await evaluate(session, installerSource(toolkit.id, toolkit.code));
+    const context = await mainWorldOf(session);
+    if (!context) return failure('FRAME_UNREACHABLE', FRAME_CONTEXT_HINT);
+    const reply = await evaluate(context, installerSource(toolkit.id, toolkit.code));
     const thrown = reply.exceptionDetails;
     if (thrown) {
       return failure('CODE_ERROR', `The code failed while installing: ${describeThrow(thrown)}`);
@@ -256,11 +262,12 @@ function evaluateInstaller(tabId: number, toolkit: StoredToolkit): Promise<Actio
   });
 }
 
-function evaluate(session: DebuggerSession, expression: string): Promise<EvaluateReply> {
+function evaluate({ session, contextId }: FrameContext, expression: string): Promise<EvaluateReply> {
   return send<EvaluateReply>(session, 'Runtime.evaluate', {
     expression,
     returnByValue: true,
     awaitPromise: true,
+    ...(contextId == null ? {} : { contextId }),
   });
 }
 

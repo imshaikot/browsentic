@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
-import { invokeInTab } from '@/lib/actions/client';
+import { invokeInFrame } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { TOP_FRAME } from './frame-focus';
 import { publishScreenshot } from './screenshot-preview';
 
 interface CapturePlan {
@@ -26,7 +27,7 @@ export async function screenshotTab(
   input?: unknown,
   runId?: string,
 ): Promise<ActionResult> {
-  const planned = await invokeInTab(tab.id, 'page.screenshot', input);
+  const planned = await invokeInFrame(tab.id, TOP_FRAME, 'page.screenshot', input);
   if (!planned.ok) return planned;
   const plan = planned.data as CapturePlan;
 
@@ -38,7 +39,7 @@ export async function screenshotTab(
     if (error instanceof ActionError) return failure(error.code, error.message);
     return failure('CAPTURE_FAILED', error instanceof Error ? error.message : String(error));
   } finally {
-    void invokeInTab(tab.id, 'page.scrollTo', {
+    void invokeInFrame(tab.id, TOP_FRAME, 'page.scrollTo', {
       position: { x: plan.scroll.x, y: plan.scroll.y },
       behavior: 'instant',
     });
@@ -88,7 +89,7 @@ async function capture(tab: { id: number; windowId?: number }, plan: CapturePlan
 
   for (const y of ys) {
     for (const x of xs) {
-      const scrolled = await invokeInTab(tab.id, 'page.scrollTo', {
+      const scrolled = await invokeInFrame(tab.id, TOP_FRAME, 'page.scrollTo', {
         position: { x, y },
         behavior: 'instant',
       });

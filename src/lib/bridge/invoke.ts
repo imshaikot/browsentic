@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { z } from 'zod';
-import { invokeInTab } from '@/lib/actions/client';
+import { invokeInFrame, invokeInTab } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { attachFile } from '@/lib/actions/page/attach-file';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
@@ -31,6 +31,7 @@ import { startTimer } from '@/lib/actions/page/start-timer';
 import { stopDiagnostics } from '@/lib/actions/page/stop-diagnostics';
 import { stopMonitor } from '@/lib/actions/page/stop-monitor';
 import { stopTimer } from '@/lib/actions/page/stop-timer';
+import { switchFrame } from '@/lib/actions/page/switch-frame';
 import { switchTab } from '@/lib/actions/page/switch-tab';
 import { timerStatus } from '@/lib/actions/page/timer-status';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
@@ -41,6 +42,8 @@ import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { installToolkit, runToolkit } from '@/lib/bridge/code-toolkit';
 import { callSiteToolInTab, listSiteToolsInTab, pageInfoWithSiteTools } from '@/lib/bridge/site-tools';
 import { captureFromPage } from '@/lib/bridge/downloads';
+import { focusedUrl, forgetFrameFocus, TOP_FRAME } from '@/lib/bridge/frame-focus';
+import { switchFrameInTab } from '@/lib/bridge/frames';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import {
   readConsoleFor,
@@ -83,7 +86,8 @@ export async function invokeForHarness(
 async function targetOrigin(tabId?: number, runId?: string): Promise<string | undefined> {
   const owner = runId ? await sessionForRun(runId) : null;
   const tab = await resolveTab(tabId, owner);
-  return tab?.url ? hostOf(tab.url) : undefined;
+  const url = tab?.id != null ? await focusedUrl(tab.id, tab.url) : tab?.url;
+  return url ? hostOf(url) : undefined;
 }
 
 function hostOf(url: string): string | undefined {
@@ -130,16 +134,17 @@ async function dispatch(
   if (action === navigate.name) return navigateTab(tab.id, input);
   if (action === searchSite.name) return searchTab(tab.id, input);
   if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);
+  if (action === switchFrame.name) return switchFrameInTab(tab.id, tab.url, input);
   if (action === closeTab.name) return closeOpenTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === screenshot.name) return screenshotTab({ id: tab.id, windowId: tab.windowId }, input, runId);
   if (action === pickElement.name) return pickInTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   if (action === captureDownload.name) return captureFromPage(tab.id, input);
-  if (action === injectCode.name) return installToolkit(tab.id, tab.url, input);
-  if (action === runCode.name) return runToolkit(tab.id, tab.url, input);
-  if (action === getPageInfo.name) return pageInfoWithSiteTools(tab.id, input);
-  if (action === listSiteTools.name) return listSiteToolsInTab(tab.id, tab.url);
-  if (action === callSiteTool.name) return callSiteToolInTab(tab.id, tab.url, input);
+  if (action === injectCode.name) return installToolkit(tab.id, await focusedUrl(tab.id, tab.url), input);
+  if (action === runCode.name) return runToolkit(tab.id, await focusedUrl(tab.id, tab.url), input);
+  if (action === getPageInfo.name) return pageInfoWithSiteTools(tab.id, tab.url, input);
+  if (action === listSiteTools.name) return listSiteToolsInTab(tab.id, await focusedUrl(tab.id, tab.url));
+  if (action === callSiteTool.name) return callSiteToolInTab(tab.id, await focusedUrl(tab.id, tab.url), input);
   if (action === trustedClick.name) return trustedClickInTab(tab.id, input);
   if (action === dragElement.name && isTrustedDrag(input)) return dragInTab(tab.id, input);
   if (action === findCaptcha.name) return findCaptchaInTab(tab.id);
@@ -358,7 +363,8 @@ async function attachStoredFile(tabId: number, input: unknown): Promise<ActionRe
 const NO_CONTENT_SCRIPT = 'Receiving end does not exist';
 
 async function navigateTab(tabId: number, input: unknown): Promise<ActionResult> {
-  const inPage = await invokeInTab(tabId, navigate.name, input);
+  await forgetFrameFocus(tabId);
+  const inPage = await invokeInFrame(tabId, TOP_FRAME, navigate.name, input);
   if (inPage.ok) {
     return success({ ...(inPage.data as object), loaded: await watchForLoad(tabId).settled });
   }

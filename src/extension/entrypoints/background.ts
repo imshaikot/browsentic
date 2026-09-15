@@ -5,6 +5,7 @@ import { invokeForHarness } from '@/lib/bridge/invoke';
 import { serveDebuggerEvents } from '@/lib/bridge/cdp';
 import { serveCodeToolkits } from '@/lib/bridge/code-toolkit';
 import { serveDiagnostics } from '@/lib/bridge/diagnostics';
+import { serveFrameFocus } from '@/lib/bridge/frame-focus';
 import { analyzeStoredFile } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
@@ -202,6 +203,7 @@ export default defineBackground(() => {
   });
 
   serveDiagnostics();
+  serveFrameFocus();
   serveCodeToolkits();
   serveRecorder();
   serveMonitor();

@@ -31,6 +31,7 @@ const READ_ONLY_ACTIONS = new Set([
   'page.findSearch',
   'page.findCaptcha',
   'page.listSiteTools',
+  'page.switchFrame',
   'page.monitorStatus',
   'page.timerStatus',
   'page.readTheme',

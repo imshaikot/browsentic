@@ -2,8 +2,9 @@ import { invokeInTab } from '@/lib/actions/client';
 import { dragElement } from '@/lib/actions/page/drag-element';
 import { APPROACH_STEPS, pathBetween, type Point } from '@/lib/actions/page/pointer';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
-import { success, type ActionResult } from '@/lib/actions/protocol';
+import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { send, settle, withDebugger, type DebuggerSession } from './cdp';
+import { FRAME_GONE_HINT, frameOffset } from './frame-focus';
 
 const MODIFIER_BIT: Record<string, number> = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 const BUTTON_BIT: Record<string, number> = { left: 1, right: 2, middle: 4 };
@@ -40,7 +41,10 @@ export function trustedClickInTab(tabId: number, input: unknown): Promise<Action
   return withDebugger(tabId, FIREFOX_HINT, async (session) => {
     const planned = await invokeInTab(tabId, trustedClick.name, input);
     if (!planned.ok) return planned;
-    await dispatchClick(session, planned.data as ClickPlan);
+    const offset = await frameOffset(tabId);
+    if (!offset) return failure('TAB_UNREACHABLE', `The click could not be placed — ${FRAME_GONE_HINT}`);
+    const plan = planned.data as ClickPlan;
+    await dispatchClick(session, { ...plan, point: shifted(plan.point, offset), from: shifted(plan.from, offset) });
     return success({ ...(planned.data as object), trusted: true });
   });
 }
@@ -49,10 +53,20 @@ export function dragInTab(tabId: number, input: unknown): Promise<ActionResult> 
   return withDebugger(tabId, FIREFOX_DRAG_HINT, async (session) => {
     const planned = await invokeInTab(tabId, dragElement.name, input);
     if (!planned.ok) return planned;
-    await dispatchDrag(session, planned.data as DragPlan);
+    const offset = await frameOffset(tabId);
+    if (!offset) return failure('TAB_UNREACHABLE', `The drag could not be placed — ${FRAME_GONE_HINT}`);
+    const plan = planned.data as DragPlan;
+    await dispatchDrag(session, {
+      ...plan,
+      approach: shifted(plan.approach, offset),
+      grip: shifted(plan.grip, offset),
+      drop: shifted(plan.drop, offset),
+    });
     return success({ ...(planned.data as object), trusted: true });
   });
 }
+
+const shifted = (at: Point, by: Point): Point => ({ x: at.x + by.x, y: at.y + by.y });
 
 export async function dispatchClick(session: DebuggerSession, plan: ClickPlan): Promise<void> {
   const { point, from, button, clickCount, modifiers, moveSteps, hoverMs, holdMs } = plan;

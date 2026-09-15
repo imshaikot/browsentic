@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { defineAction } from '../core';
 import { accessibleText, cssPath, describeElement, documentBounds, isExposed } from './dom';
+import { isFrameElement, sandboxOf } from './switch-frame';
 
 interface Tally {
   links: number;
@@ -43,7 +44,7 @@ const LANDMARK_ROLES = new Set([
 export const getPageInfo = defineAction({
   name: 'page.getPageInfo',
   description:
-    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step.',
+    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step. Visible iframes come back under "frames"; nothing inside one is in this snapshot until page.switchFrame enters it, and "frame" then says which one is in focus.',
   input: z.object({
     maxPerKind: z
       .number()
@@ -82,9 +83,28 @@ export const getPageInfo = defineAction({
           text: accessibleText(heading).slice(0, 120),
         })),
       interactive: inventory(found, owners, maxPerKind),
+      frames: embeddedFrames(),
     };
   },
 });
+
+const MAX_FRAMES = 20;
+
+function embeddedFrames() {
+  const frames = [...document.querySelectorAll('iframe,frame')]
+    .filter(isFrameElement)
+    .filter(isExposed)
+    .slice(0, MAX_FRAMES)
+    .map((frame) => ({
+      selector: cssPath(frame),
+      src: frame.src || undefined,
+      name: frame.name || undefined,
+      title: frame.title || undefined,
+      sandbox: sandboxOf(frame),
+      bounds: documentBounds(frame),
+    }));
+  return frames.length ? frames : undefined;
+}
 
 function regionRole(el: HTMLElement): string | undefined {
   const explicit = el.getAttribute('role');

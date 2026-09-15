@@ -15,6 +15,8 @@ import { callSiteTool } from '@/lib/actions/page/call-site-tool';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { originOf } from './code-toolkit';
+import { focusedFrame, framePath } from './frame-focus';
+import { focusOf } from './frames';
 
 const TIMEOUT_MARKER = '⟪browsentic:site-tool-timeout⟫';
 
@@ -141,7 +143,7 @@ async function callRegisteredTool(
 async function inMainWorld<T>(tabId: number, func: (...args: never[]) => Promise<T>, args: unknown[]): Promise<T | null> {
   try {
     const results = await browser.scripting.executeScript({
-      target: { tabId },
+      target: { tabId, frameIds: [await focusedFrame(tabId)] },
       world: 'MAIN',
       func: func as () => Promise<T>,
       args: args as [],
@@ -158,10 +160,18 @@ export async function probeSiteTools(tabId: number) {
   return { api: read.api, count: read.tools.length, tools: read.tools };
 }
 
-export async function pageInfoWithSiteTools(tabId: number, input: unknown): Promise<ActionResult> {
-  const [info, siteTools] = await Promise.all([invokeInTab(tabId, getPageInfo.name, input), probeSiteTools(tabId)]);
-  if (!info.ok || !siteTools) return info;
-  return success({ ...(info.data as object), siteTools });
+export async function pageInfoWithSiteTools(tabId: number, topUrl: string | undefined, input: unknown): Promise<ActionResult> {
+  const [info, siteTools, path] = await Promise.all([
+    invokeInTab(tabId, getPageInfo.name, input),
+    probeSiteTools(tabId),
+    framePath(tabId),
+  ]);
+  if (!info.ok) return info;
+  return success({
+    ...(info.data as object),
+    ...(siteTools ? { siteTools } : {}),
+    ...(path.length ? focusOf(path, topUrl) : {}),
+  });
 }
 
 export async function listSiteToolsInTab(tabId: number, url: string | undefined): Promise<ActionResult> {

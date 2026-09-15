@@ -1,4 +1,5 @@
 import { exposeActions } from '@/lib/actions/host';
+import { exposeFrameProbe } from '@/lib/frames/host';
 import { exposeIndicator } from '@/lib/indicator/host';
 import { exposeMonitor } from '@/lib/monitor/watch';
 import { exposeRail } from '@/lib/rail/host';
@@ -12,6 +13,8 @@ export default defineContentScript({
     if (world.__browsenticActions) return;
     world.__browsenticActions = true;
     exposeActions();
+    exposeFrameProbe();
+    if (window !== window.top) return;
     exposeRecorder();
     exposeMonitor();
     exposeIndicator();

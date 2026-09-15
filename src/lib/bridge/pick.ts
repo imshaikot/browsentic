@@ -1,6 +1,7 @@
 import { invokeInTab } from '@/lib/actions/client';
 import { pickElement } from '@/lib/actions/page/pick-element';
 import { success, type ActionResult } from '@/lib/actions/protocol';
+import { describeFrame, focusedFrame, frameOffset, TOP_FRAME } from './frame-focus';
 import { blobToDataUrl, captureViewport } from './screenshot';
 
 export interface PickShot {
@@ -33,8 +34,20 @@ export async function pickInTab(
   if (!picked.ok) return picked;
 
   const { capture, ...data } = picked.data as { capture?: PickCapture } & Record<string, unknown>;
-  const shot = capture ? await shootRegion(tab.windowId, capture).catch(() => null) : null;
+  const placed = capture ? await inTabViewport(tab.id, capture) : null;
+  const shot = placed ? await shootRegion(tab.windowId, placed).catch(() => null) : null;
   return success(shot ? { ...data, shot } : data);
+}
+
+async function inTabViewport(tabId: number, capture: PickCapture): Promise<PickCapture | null> {
+  if ((await focusedFrame(tabId)) === TOP_FRAME) return capture;
+  const [offset, top] = await Promise.all([frameOffset(tabId), describeFrame(tabId, TOP_FRAME)]);
+  if (!offset || !top) return null;
+  return {
+    ...capture,
+    region: { ...capture.region, x: capture.region.x + offset.x, y: capture.region.y + offset.y },
+    viewport: top.viewport,
+  };
 }
 
 async function shootRegion(windowId: number | undefined, capture: PickCapture): Promise<PickShot | null> {
