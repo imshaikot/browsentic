@@ -1,6 +1,6 @@
 ![Browsentic: your browser's superpower, free and open source](docs/assets/social-card.png?v=0.4.11)
 
-# Browsentic – Agentic Browsing in the Browser You Already Use
+# Browsentic – a completely integrated agentic browser extension
 
 [![npm version](https://img.shields.io/npm/v/browsentic)](https://www.npmjs.com/package/browsentic)
 [![npm downloads](https://img.shields.io/npm/dm/browsentic)](https://www.npmjs.com/package/browsentic)
