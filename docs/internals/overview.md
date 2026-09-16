@@ -12,8 +12,8 @@ A Manifest V3 service worker cannot listen for connections. It can only dial out
 and revived at the browser's discretion. So the extension is a *client*, and something outside the
 browser has to be the meeting point.
 
-That something is the daemon. It owns exactly one live browser link and fans it out to however many
-MCP clients want a turn:
+That something is the daemon. It owns exactly one live browser link and fans it out to the side
+panel's agent and to however many external MCP clients want a turn:
 
 ```
 You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI

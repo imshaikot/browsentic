@@ -8,10 +8,11 @@
 [![node](https://img.shields.io/node/v/browsentic)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/browsentic)](LICENSE)
 
-Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension plus a small local daemon: say what you want and it drives the page, ask a question and it reads the page and answers. It runs on [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) — whichever you already have logged in — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
+Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) — whichever you already have logged in — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
 
 ## Key Capabilities
 
+- **A Side Panel, Not a Terminal**: Open it beside any tab, type or dictate, and watch every action land on a timeline with approvals where you are looking. The terminal is optional: the same daemon doubles as an MCP server for Claude Code, Cursor or Zed
 - **Your Real Browser, Not a Headless One**: Drives the tab in front of you, in your own profile, with your own logins and sessions
 - **Bring Your Own Agent**: Runs on the agent CLI you already pay for and are already signed in to — switch between Claude Code, Codex and Antigravity with one click, and pick the model each one runs
 - **52 Page Capabilities**: Reading, clicking, typing, dragging, on-site search, form submission, navigation, stepping into iframes, screenshots, file upload and download, captchas, theming and accessibility, console and network diagnostics, background progress monitoring, scheduled and repeating jobs, pointing at an element, and calling the tools a WebMCP site registers for agents
@@ -67,8 +68,8 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 - 📚 [Documentation](docs/)
 - 🚀 [Install and Pair](docs/guide/install.md)
 - ✨ [Features](docs/guide/features/)
-- 🧰 [All 51 Page Tools](docs/reference/tools.md)
-- 🔌 [Use It From Claude Code, Cursor or Zed](docs/guide/mcp-clients.md)
+- 🧰 [All 52 Page Tools](docs/reference/tools.md)
+- 🔌 [Optional: Drive It From Claude Code, Cursor or Zed Over MCP](docs/guide/mcp-clients.md)
 - 🛡️ [Approvals and Guardrails](docs/guide/approvals.md)
 - 🏗️ [Architecture](docs/internals/)
 - 🩺 [Troubleshooting](docs/guide/troubleshooting.md)

@@ -1,7 +1,9 @@
 # Browsentic documentation
 
-Browsentic hands your real, logged-in browser to the AI agent you already run — by voice, by
-typing, or by showing it once — and turns that into real actions on the tab in front of you.
+Browsentic is a browser extension with an AI side panel. It hands your real, logged-in browser to
+the AI agent you already run — by voice, by typing, or by showing it once — and turns that into real
+actions on the tab in front of you. The daemon behind it also answers MCP clients, so a terminal can
+drive the same browser, but nothing about the panel requires one.
 
 The docs are split by who is asking.
 
@@ -13,12 +15,12 @@ Start here if you want to run Browsentic on your own machine.
 
 | | |
 | --- | --- |
-| [Install](guide/install.md) | Prerequisites, clone, build, load the extension |
-| [Pair](guide/pair.md) | Put the CLI on your `PATH` and connect your browser |
+| [Install](guide/install.md) | One command, then load the extension |
+| [Pair](guide/pair.md) | Connect your browser with a single-use code |
 | [First run](guide/first-run.md) | A tour of the side panel and your first instruction |
 | [Features](guide/features/) | One page per capability — what it does and when to reach for it |
 | [Choosing an agent](guide/agents.md) | Claude Code, Codex or Antigravity |
-| [MCP clients](guide/mcp-clients.md) | Drive the same browser from Claude Code, Cursor, Zed, Gemini CLI |
+| [MCP clients](guide/mcp-clients.md) | Optional: drive the same browser from Claude Code, Cursor, Zed or Gemini CLI |
 | [Configuration](guide/configuration.md) | Every key in `~/.browsentic/config.json` |
 | [Approvals](guide/approvals.md) | What asks before it acts, and how to change that |
 | [Limits](guide/limits.md) | Where Browsentic does not fit — read before you rely on it |
@@ -50,7 +52,7 @@ How the pieces actually work, for contributors and for anyone integrating.
 
 | | |
 | --- | --- |
-| [Tools](reference/tools.md) | All 45 MCP tools with their parameters, plus the resources |
+| [Tools](reference/tools.md) | All 52 page tools with their parameters, plus the resources |
 | [CLI](reference/cli.md) | Every `browsentic` command |
 | [Errors](reference/errors.md) | Every error code, what caused it, what to do |
 

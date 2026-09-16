@@ -1,8 +1,8 @@
 # Driving Browsentic from an MCP client
 
-Pairing connects your *browser* to the daemon. Registering an MCP client lets **that client** drive
-the same browser — Claude Code, Codex, Cursor, Zed, Gemini CLI, Claude Desktop, anything that
-speaks MCP.
+**Optional.** The side panel is the product and needs none of this. But pairing connects your
+*browser* to the daemon, and registering an MCP client lets **that client** drive the same browser
+too — Claude Code, Codex, Cursor, Zed, Gemini CLI, Claude Desktop, anything that speaks MCP.
 
 This direction is fully agent-agnostic. Nothing here depends on which CLI you picked in
 [Choosing an agent](agents.md).
@@ -45,7 +45,7 @@ Tools missing from a session you registered mid-flight is the single most common
 
 ## What the client gets
 
-- **49 page tools** — every one listed with its parameters in [reference/tools.md](../reference/tools.md)
+- **All 52 page tools** — every one listed with its parameters in [reference/tools.md](../reference/tools.md)
 - **`browsentic_status`** — whether the extension is connected, its version, the active tab, any
   running monitors, and a `hint` naming the fix when something is wrong. Call it first when a page
   tool fails.

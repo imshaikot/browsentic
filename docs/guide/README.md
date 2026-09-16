@@ -7,8 +7,8 @@ Everything you need to run Browsentic on your own machine and your own browser.
 Three short steps, about five minutes in total. There is no account, no API key and no cloud
 service.
 
-1. **[Install](install.md)** — clone, build, load the extension
-2. **[Pair](pair.md)** — put `browsentic` on your `PATH` and connect your browser to it
+1. **[Install](install.md)** — one command, then load the extension
+2. **[Pair](pair.md)** — connect your browser with a single-use code
 3. **[First run](first-run.md)** — a tour of the side panel, and your first instruction
 
 ## Using it
@@ -34,7 +34,7 @@ service.
 | | |
 | --- | --- |
 | [Choosing an agent](agents.md) | Claude Code, Codex or Antigravity — switching, and what each needs |
-| [MCP clients](mcp-clients.md) | Registering Browsentic with Claude Code, Cursor, Zed, Codex, Gemini CLI |
+| [MCP clients](mcp-clients.md) | Optional: registering Browsentic with Claude Code, Cursor, Zed, Codex or Gemini CLI |
 | [Configuration](configuration.md) | Every key in `~/.browsentic/config.json` |
 | [Approvals](approvals.md) | The gate — what asks first, and how to tune it |
 

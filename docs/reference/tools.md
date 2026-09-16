@@ -1,7 +1,8 @@
-# MCP tools and actions
+# Page tools
 
-Every tool Browsentic publishes to an MCP client, the action behind each one, the read-only
-resources, and the reserved actions that never become tools.
+Every tool the agent can call, the action behind each one, the read-only resources, and the
+reserved actions that never become tools. The side panel's agent and any MCP client receive the
+same list, published from the same registry.
 
 The page tools are generated from the shared action registry
 ([src/lib/actions/registry.ts](../../src/lib/actions/registry.ts)) — one module per action under

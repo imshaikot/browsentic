@@ -4,8 +4,9 @@ How an instruction becomes a click, end to end.
 
 ![The ten chapters as one request's path through all four processes](../assets/internals-map.png)
 
-Browsentic is four processes cooperating over loopback: a browser extension, a local daemon, one
-stdio MCP server per client, and — when the side panel is driving — a headless agent CLI.
+Browsentic is four processes cooperating over loopback: the browser extension with its side panel,
+a local daemon, the headless agent CLI the daemon spawns for a side-panel run, and — on the optional
+terminal path — one stdio MCP server per external client.
 
 Read in order, these pages follow a request through all of them:
 

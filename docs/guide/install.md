@@ -1,7 +1,7 @@
 # Install
 
-Browsentic is two halves: a browser extension and a local daemon. One command installs both. Then
-[pair them](pair.md).
+Browsentic is two halves: a browser extension with a side panel, and the local daemon it talks to.
+One command installs both. Then [pair them](pair.md) and open the panel.
 
 There is no account, no API key and no cloud service. Browsentic drives your real browser using the
 AI agent you already run locally.
@@ -18,9 +18,10 @@ AI agent you already run locally.
 
 Two things worth knowing before you start:
 
-- **An agent CLI is only needed for the side panel.** It is what the daemon spawns to reason about
-  an instruction. If you only ever drive the browser from an MCP client, the daemon spawns nothing
-  and no agent CLI is required. See [Choosing an agent](agents.md).
+- **The side panel runs on the agent CLI.** It is what the daemon spawns to reason about an
+  instruction, so it is the one thing to have ready before your first run. See
+  [Choosing an agent](agents.md). The only setup that needs no CLI is driving the browser solely
+  from an [MCP client](mcp-clients.md), which is optional and spawns nothing.
 - **Only one of the three is needed.** Browsentic checks all three and tells you in the popup which
   are installed. Switching is a click.
 

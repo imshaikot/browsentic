@@ -97,5 +97,5 @@ connection supersedes the old one.
 
 **[First run →](first-run.md)** — open the side panel and give it something to do.
 
-Driving the browser from Claude Code, Cursor or another MCP client instead? That is a separate
-registration step: [MCP clients](mcp-clients.md).
+Want to also drive the browser from Claude Code, Cursor or another MCP client? That is optional,
+and a separate registration step: [MCP clients](mcp-clients.md).

@@ -1,7 +1,7 @@
 {
   "name": "browsentic",
   "version": "0.5.0",
-  "description": "Hand your real, logged-in browser to the AI agent you already run. Installs the browser extension, runs the local daemon, and speaks MCP.",
+  "description": "A browser extension with an AI side panel that hands your real, logged-in browser to the AI agent you already run. Installs the extension, runs the local daemon, and optionally speaks MCP.",
   "type": "module",
   "license": "MIT",
   "packageManager": "yarn@4.17.1",
@@ -13,8 +13,12 @@
   },
   "bugs": "https://github.com/imshaikot/browsentic/issues",
   "keywords": [
-    "browser-automation",
+    "browser-extension",
     "chrome-extension",
+    "ai-browser-extension",
+    "side-panel",
+    "browser-agent",
+    "browser-automation",
     "ai-agent",
     "agentic-browsing",
     "mcp",

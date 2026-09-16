@@ -1,6 +1,6 @@
 # Page actions
 
-The 49 things Browsentic can do to a page. You never have to name these — you say what you want and
+The 52 things Browsentic can do to a page. You never have to name these — you say what you want and
 the agent picks — but knowing what exists tells you what is worth asking for.
 
 Exact parameters for every one: [reference/tools.md](../../reference/tools.md).
