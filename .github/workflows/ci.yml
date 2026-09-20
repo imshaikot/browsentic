@@ -45,3 +45,14 @@ jobs:
         run: |
           node "$YARN" build
           node "$YARN" daemon:build
+
+  mac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build and test the macOS app
+        working-directory: src/mac
+        run: |
+          swift build
+          swift test

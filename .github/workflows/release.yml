@@ -220,3 +220,40 @@ jobs:
           fi
           npm publish
           echo "published: https://www.npmjs.com/package/browsentic/v/$VERSION" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------
+  # The macOS app, attached to the release the job above created. A separate job because it
+  # needs a Mac, and after it rather than before because it is the one artifact that can be
+  # rebuilt and re-uploaded by hand: a failure here leaves a release without a DMG, never a
+  # DMG without a release. Signed ad hoc and not notarized — docs/guide/mac-app.md says so.
+  # ---------------------------------------------------------------------------------------
+  mac:
+    needs: release
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build the extension and the daemon the app carries
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          node "$yarn_bin" install --immutable
+          node "$yarn_bin" --cwd src/daemon install --immutable
+          node "$yarn_bin" build
+          node "$yarn_bin" daemon:build
+
+      - name: Build Browsentic.app and the disk image
+        run: |
+          src/mac/Scripts/build-app.sh
+          src/mac/Scripts/make-dmg.sh
+          test -s "dist/mac/Browsentic-${GITHUB_REF_NAME#v}.dmg"
+
+      - name: Attach the disk image to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "dist/mac/Browsentic-${GITHUB_REF_NAME#v}.dmg" --clobber
