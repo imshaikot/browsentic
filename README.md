@@ -10,6 +10,18 @@
 
 Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) — whichever you already have logged in — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
 
+## Quick Start
+
+**macOS** — download the DMG from the [latest release](https://github.com/imshaikot/browsentic/releases/latest), drag [Browsentic.app](docs/guide/mac-app.md) to Applications and open it. It installs everything, Node included, and runs it from a window.
+
+**Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
+
+```sh
+npx browsentic setup
+```
+
+Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. You also need one agent CLI logged in — `claude`, `codex` or `agy`. Details, updating and building from source are in the [install guide](docs/guide/install.md).
+
 ## Key Capabilities
 
 - **A Side Panel, Not a Terminal**: Open it beside any tab, type or dictate, and watch every action land on a timeline with approvals where you are looking. The terminal is optional: the same daemon doubles as an MCP server for Claude Code, Cursor or Zed
@@ -24,25 +36,6 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
 - **Instant Commands**: "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent round trip
 - **Guardrails, Not Vibes**: A declarative policy gates consequential actions, confines each run to the sites it is about, and marks every byte of page text as untrusted data — tunable per rule from a Settings tab, with nothing overridden until you say so
 - **Off By Default**: A fresh install contacts nothing until you redeem a one-time pairing code
-
-## Quick Start
-
-One command installs the extension, starts the local daemon and prints a pairing code (requires [Node.js](https://nodejs.org) 20 or newer):
-
-```sh
-npx browsentic setup
-```
-
-Two steps are left, and both happen inside the browser:
-
-1. **Load the extension** at `chrome://extensions` → **Developer mode** → **Load unpacked** → the folder it printed (`~/browsentic/extension/chrome-mv3`)
-2. **Paste the pairing code** into the Browsentic popup and press **Connect**
-
-Then open the side panel and say what you want.
-
-You also need one agent CLI on your `PATH` and logged in — `claude`, `codex` or `agy`. Full prerequisites in the [install guide](docs/guide/install.md), which also covers [building from source](docs/guide/install.md#from-source).
-
-Later, `npx browsentic update` refreshes the command and the extension in place. The install path never changes, so your browser stays paired. `npx browsentic uninstall` removes the lot.
 
 ## How It Works
 
@@ -76,21 +69,11 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 
 ## Privacy and Security
 
-- **Nothing Connects Until You Pair**: An unpaired extension never contacts the daemon
-- **Two Independent Gates**: The daemon classifies every peer by handshake `Origin` — which browsers set and pages cannot forge — then demands proof of a pairing code or an origin-bound session key. A web page can never reach the control path
-- **Both Ends Prove Themselves**: Neither secret crosses the wire; each side answers the other's nonce, so no local process can squat a port and pose as your daemon
-- **Consequential Actions Ask First**: Form submission, file upload, answering a captcha and leaving the run's sites all pause for an explicit Allow or Deny
-- **Agent Runs Are Contained**: The spawned CLI gets Browsentic's tools and nothing else — no shell, no filesystem, no other MCP servers, and a sealed environment stripped of your cloud keys and tokens
-- **Credentials Are Sealed, Not Read**: A deterministic sanitizer runs on both sides of the socket. Passwords, keys, tokens, cookies and card numbers found in a page are replaced by a placeholder before the agent ever sees them, and become plaintext again only in the field they are typed into
-- **Recordings Capture What You Do, Not What You Type**: Passwords, hidden fields, one-time codes and card numbers are never stored
-
-Two limits worth stating plainly: pairing controls **which browser**, not which local process, and an agent reading a hostile page is still susceptible to prompt injection. Both are covered in [Limits](docs/guide/limits.md).
-
-Browsentic is provided as is, without warranty — you are responsible for what you approve and where you point it. The plain-language version, and how to report a vulnerability privately, are in [SECURITY.md](SECURITY.md).
+Nothing connects until you pair, both ends prove themselves, consequential actions ask first, and credentials on a page are sealed before the agent sees them. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
 
 ## Contributing
 
-Found a bug 🐛 or have an idea for a capability ✨? Adding a page capability is one file plus one line in the registry, which publishes it as an MCP tool at the same time. Start at [CONTRIBUTING.md](CONTRIBUTING.md); the [internals guide](docs/internals/contributing.md) covers the setup, the checks, and the four conventions that are load-bearing at runtime.
+Bugs and ideas are welcome — start at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
