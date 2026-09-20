@@ -15,7 +15,7 @@ curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
 That downloads the latest release, checks the app’s signature is intact, copies `Browsentic.app` into
-Applications and opens it. It asks for no password. `BROWSENTIC_VERSION=0.6.0` pins a release, and
+Applications, clears the quarantine flag on that copy and opens it. It asks for no password. `BROWSENTIC_VERSION=0.6.0` pins a release, and
 `BROWSENTIC_NO_OPEN=1` installs without opening. [Read the script](https://browsentic.com/install.sh)
 first if you like — it is sixty lines.
 
@@ -32,8 +32,8 @@ Browsentic line and press **Open Anyway**, or run:
 xattr -dr com.apple.quarantine /Applications/Browsentic.app
 ```
 
-Right-click ▸ Open no longer gets past this on macOS 15 and newer. The one-line install never meets
-it, because `curl` does not quarantine what it downloads.
+Right-click ▸ Open no longer gets past this on macOS 15 and newer. The one-line install does that
+`xattr` step for you, after verifying the signature.
 
 ## The first screen: what your Mac already has
 

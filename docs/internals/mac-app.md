@@ -65,7 +65,9 @@ too. With none of them the build is ad hoc, which runs where it was built and is
 Gatekeeper anywhere it was downloaded to.
 
 That is why the install path people are pointed at is `curl -fsSL https://browsentic.com/install.sh | sh`:
-`curl` sets no quarantine flag, so Gatekeeper never assesses the app. The script lives on the
+it verifies the signature and then clears `com.apple.quarantine` on the copy it installed. Clearing it
+is not optional: `curl` sets no flag of its own, but a terminal that was itself downloaded passes its
+quarantine to everything its children write, and the app then arrives flagged anyway. The script lives on the
 `website` branch as `public/install.sh`, resolves the newest release from the `releases/latest`
 redirect, verifies the signature, and copies the app into Applications. It depends on the release
 asset being named `Browsentic-<version>.dmg`.
