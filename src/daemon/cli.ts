@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
-import { AGENTS, AGENT_KINDS, isAgentKind } from '@/lib/agents/catalog';
+import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind } from '@/lib/agents/catalog';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { basename, join } from 'node:path';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
 import { clearDownloads, downloadDir, storedDownloads } from './downloads';
-import { readAgentConfig, rememberExtensionDir } from './agent/config';
+import { readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting, runningDaemons, stopDaemons } from './ensure-daemon';
 import { install, InstallError, readStamp } from './install';
@@ -36,6 +36,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic agent            show which agent runs the side panel, and which are installed
   browsentic agent <name>     switch to claude, codex or antigravity
   browsentic agent fix <name> let Browsentic fix what that agent still needs
+  browsentic agent model <name> [model]   pin that agent's model, or omit it for the CLI's default
 
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
@@ -44,9 +45,12 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic downloads clear  delete all of them
   browsentic tools            print the bundled tool manifest (no browser needed)
   browsentic logs             print the daemon log
+  browsentic start            bring the background daemon up, if it is not already
   browsentic stop             stop the background daemon
   browsentic restart          stop the daemon and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
+
+  agent, skills, approvals and downloads take --json, which is what the macOS app reads.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -64,6 +68,8 @@ const invokedAs = basename(process.argv[1] ?? '').replace(/\.(?:js|cjs|mjs|exe|c
 const servesBare = invokedAs === 'browsentic-mcp' || !!process.env.BROWSENTIC_AGENT_RUN;
 
 const [command] = process.argv.slice(2);
+const wantsJson = process.argv.includes('--json');
+const positional = process.argv.slice(3).filter((arg) => !arg.startsWith('--'));
 
 switch (command) {
   case undefined:
@@ -92,13 +98,16 @@ switch (command) {
     await revoke(process.argv[3]);
     break;
   case 'agent':
-    await chooseAgent(process.argv[3], process.argv[4]);
+    await chooseAgent(positional[0], positional[1], positional[2]);
     break;
   case 'tools':
     printTools();
     break;
   case 'status':
     await showStatus();
+    break;
+  case 'start':
+    await start();
     break;
   case 'stop':
     await stop();
@@ -110,10 +119,10 @@ switch (command) {
     printSkills();
     break;
   case 'approvals':
-    manageApprovals(process.argv[3], process.argv[4]);
+    manageApprovals(positional[0], positional[1]);
     break;
   case 'downloads':
-    manageDownloads(process.argv[3]);
+    manageDownloads(positional[0]);
     break;
   case 'logs':
     showLogs();
@@ -164,6 +173,16 @@ function printTools(): void {
 
 function printSkills(): void {
   const skills = loadSkills();
+  if (wantsJson) {
+    const config = readAgentConfig();
+    const listed = skills.map(({ body: _body, ...skill }) => ({
+      ...skill,
+      path: skill.provenance === 'generated' ? join(uploadedSkillsDir(), skill.name) : undefined,
+    }));
+    const own = agentSkills(config).map(({ name, description }) => ({ name, description }));
+    console.log(JSON.stringify({ skills: listed, dirs: skillDirNames(), agent: config.agent, agentSkills: own }, null, 2));
+    return;
+  }
   if (!skills.length) {
     console.log(`No skills found. Looked in:\n  ${skillDirNames().join('\n  ')}`);
     return;
@@ -239,6 +258,11 @@ async function stop(): Promise<void> {
   }
   if (!stopped.length && !stubborn.length) console.log('No daemon is answering; nothing to stop.');
   if (stubborn.length) process.exitCode = 1;
+}
+
+async function start(): Promise<void> {
+  const lock = await ensureDaemon();
+  console.log(`Daemon running on 127.0.0.1:${lock.port} (pid ${lock.pid}, v${lock.daemonVersion}).`);
 }
 
 async function restart(): Promise<void> {
@@ -443,6 +467,7 @@ async function uninstall(argv: string[]): Promise<void> {
   console.log('    live in extension storage rather than on disk.');
   if (kind === 'global') console.log('\n    the command itself:  npm rm -g browsentic');
   if (kind === 'repo') console.log('\n    the global link:     yarn daemon:unlink');
+  if (kind === 'app') console.log('\n    the app itself:      drag Browsentic.app from Applications to the Trash');
   console.log('\n    the entry in your MCP client, e.g.  claude mcp remove browsentic');
 
   if (flag('dry-run')) {
@@ -511,7 +536,16 @@ async function showSessions(): Promise<void> {
   }
 }
 
-async function chooseAgent(first?: string, second?: string): Promise<void> {
+async function chooseAgent(first?: string, second?: string, third?: string): Promise<void> {
+  if (first === 'model') {
+    if (!isAgentKind(second)) {
+      console.error(`Name the agent whose model to set. Pick one of: ${AGENT_KINDS.join(', ')}`);
+      process.exit(1);
+    }
+    writeAgentModel(second, third ?? null);
+    first = second = undefined;
+  }
+
   // Renamed to "fix" because `browsentic setup` now means something else entirely. The old
   // spelling stays as an undocumented alias for one release.
   const grant = first === 'fix' || first === 'setup';
@@ -525,6 +559,11 @@ async function chooseAgent(first?: string, second?: string): Promise<void> {
   const bridge = await connect();
   const state = await bridge.agent(kind && (grant ? { grant: kind } : { set: kind }));
   await bridge.close();
+
+  if (wantsJson) {
+    console.log(JSON.stringify({ ...state, catalog: AGENT_LIST }, null, 2));
+    return;
+  }
 
   for (const runner of state.runners) {
     const agent = AGENTS[runner.kind];
@@ -566,6 +605,10 @@ function manageDownloads(sub?: string): void {
   }
 
   const downloads = storedDownloads();
+  if (wantsJson) {
+    console.log(JSON.stringify({ dir: downloadDir(), downloads }, null, 2));
+    return;
+  }
   if (!downloads.length) {
     console.log(`Nothing captured. Files land in ${downloadDir()} when an agent uses page.captureDownload.`);
     return;
@@ -594,6 +637,10 @@ function manageApprovals(sub?: string, host?: string): void {
   }
 
   const grants = listGrants();
+  if (wantsJson) {
+    console.log(JSON.stringify({ grants }, null, 2));
+    return;
+  }
   if (!grants.length) {
     console.log('No standing approvals. Every gated action still asks.');
     return;
