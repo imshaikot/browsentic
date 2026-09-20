@@ -12,7 +12,11 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
 
 ## Quick Start
 
-**macOS** — download the DMG from the [latest release](https://github.com/imshaikot/browsentic/releases/latest), drag [Browsentic.app](docs/guide/mac-app.md) to Applications and open it. It installs everything, Node included, and runs it from a window.
+**macOS** — one line installs [Browsentic.app](docs/guide/mac-app.md), and the app installs everything else, Node included, and runs it from a window:
+
+```sh
+curl -fsSL https://browsentic.com/install.sh | sh
+```
 
 **Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
 

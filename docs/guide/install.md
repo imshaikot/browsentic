@@ -29,8 +29,13 @@ Two things worth knowing before you start:
 
 ## Install
 
-On macOS there is an app that does all of this from a window, Node included:
-[Browsentic for macOS](mac-app.md). Everywhere else, and on a Mac if you prefer a terminal:
+On macOS there is an [app](mac-app.md) that does all of this from a window, Node included:
+
+```sh
+curl -fsSL https://browsentic.com/install.sh | sh
+```
+
+Everywhere else, and on a Mac if you would rather not have the app:
 
 ```sh
 npx browsentic setup

@@ -64,6 +64,12 @@ ARCHS=arm64 Scripts/build-app.sh     # quick local bundle; the default is a univ
 too. With none of them the build is ad hoc, which runs where it was built and is blocked by
 Gatekeeper anywhere it was downloaded to.
 
+That is why the install path people are pointed at is `curl -fsSL https://browsentic.com/install.sh | sh`:
+`curl` sets no quarantine flag, so Gatekeeper never assesses the app. The script lives on the
+`website` branch as `public/install.sh`, resolves the newest release from the `releases/latest`
+redirect, verifies the signature, and copies the app into Applications. It depends on the release
+asset being named `Browsentic-<version>.dmg`.
+
 CI builds and tests it on `macos-15`; the release workflow’s `mac` job attaches the DMG to the
 GitHub release after the npm publish. Colours in
 [Theme.swift](../../src/mac/Sources/Browsentic/Theme/Theme.swift) are Ember and Daylight from

@@ -7,6 +7,8 @@ struct SettingsView: View {
     @State private var confirmingUninstall = false
     @State private var keepSkills = true
 
+    private static let installLine = "curl -fsSL https://browsentic.com/install.sh | sh"
+
     private var mcpCommand: String { "claude mcp add browsentic -- \(Paths.mcpShim.path)" }
 
     var body: some View {
@@ -15,10 +17,9 @@ struct SettingsView: View {
                 Card {
                     HStack(spacing: 14) {
                         Image(systemName: "arrow.down.circle.fill").font(.system(size: 22)).foregroundStyle(Palette.brand)
-                        SectionTitle(title: "Browsentic \(latest) is out", subtitle: "You have \(model.appVersion). The new app replaces the command and the extension together.")
+                        SectionTitle(title: "Browsentic \(latest) is out", subtitle: "You have \(model.appVersion). Paste this into a terminal and it replaces the app, which then replaces the command and the extension: \(Self.installLine)")
                         Spacer()
-                        Button("Download") { NSWorkspace.shared.open(URL(string: "https://github.com/imshaikot/browsentic/releases/latest")!) }
-                            .buttonStyle(PrimaryButtonStyle())
+                        CopyButton(value: Self.installLine, label: "Copy the line")
                     }
                 }
             }

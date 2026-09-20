@@ -10,20 +10,30 @@ Requires macOS 14 or newer, on Apple silicon or Intel.
 
 ## Install
 
-1. Download `Browsentic-<version>.dmg` from the
-   [latest release](https://github.com/imshaikot/browsentic/releases/latest).
-2. Open it and drag **Browsentic** onto **Applications**.
-3. Open the app.
+```sh
+curl -fsSL https://browsentic.com/install.sh | sh
+```
 
-Until the release is notarized, macOS blocks the downloaded app with “Apple could not verify
-Browsentic is free of malware”. Press **Done**, then either open **System Settings → Privacy &
-Security**, scroll to the Browsentic line and press **Open Anyway**, or run:
+That downloads the latest release, checks the app’s signature is intact, copies `Browsentic.app` into
+Applications and opens it. It asks for no password. `BROWSENTIC_VERSION=0.6.0` pins a release, and
+`BROWSENTIC_NO_OPEN=1` installs without opening. [Read the script](https://browsentic.com/install.sh)
+first if you like — it is sixty lines.
+
+### From the disk image instead
+
+Download `Browsentic-<version>.dmg` from the
+[latest release](https://github.com/imshaikot/browsentic/releases/latest) and drag **Browsentic** onto
+**Applications**. The build is not notarized yet, and macOS quarantines anything a browser
+downloads, so the first open is blocked with “Apple could not verify Browsentic is free of
+malware”. Press **Done**, then either open **System Settings → Privacy & Security**, scroll to the
+Browsentic line and press **Open Anyway**, or run:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Browsentic.app
 ```
 
-Right-click ▸ Open no longer gets past this on macOS 15 and newer.
+Right-click ▸ Open no longer gets past this on macOS 15 and newer. The one-line install never meets
+it, because `curl` does not quarantine what it downloads.
 
 ## The first screen: what your Mac already has
 
@@ -78,8 +88,8 @@ not two that can drift apart.
 
 ## Updating
 
-Settings shows a banner when a newer release is out. Download the new DMG, replace the app, open
-it: the first screen notices the command and the extension are older than the ones it carries,
+Settings shows a banner when a newer release is out. Run the install line again — it replaces the
+app and opens it: the first screen notices the command and the extension are older than the ones it carries,
 and **Set up everything** replaces both and restarts the daemon. Then press ↻ on the Browsentic card
 at `chrome://extensions`, which is the one step no installer can do for you.
 
