@@ -17,6 +17,10 @@ dist/
 .output/
 *.tsbuildinfo
 
+# SwiftPM's build tree for the macOS app. The bundle and the DMG land in dist/mac/, which the
+# `dist/` rule above already covers.
+src/mac/.build/
+
 # WXT generated types + bundle stats
 .wxt/
 stats.html
