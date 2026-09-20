@@ -59,6 +59,11 @@ swift build && swift test            # swift-testing, no XCTest
 ARCHS=arm64 Scripts/build-app.sh     # quick local bundle; the default is a universal binary
 ```
 
+`build-app.sh` signs with the hardened runtime when `CODESIGN_IDENTITY` names a Developer ID, and
+`make-dmg.sh` notarizes and staples when `APPLE_ID`, `APPLE_TEAM_ID` and `APPLE_APP_PASSWORD` are set
+too. With none of them the build is ad hoc, which runs where it was built and is blocked by
+Gatekeeper anywhere it was downloaded to.
+
 CI builds and tests it on `macos-15`; the release workflow’s `mac` job attaches the DMG to the
 GitHub release after the npm publish. Colours in
 [Theme.swift](../../src/mac/Sources/Browsentic/Theme/Theme.swift) are Ember and Daylight from

@@ -61,8 +61,17 @@ cp -R "$EXTENSION" "$PAYLOAD/extension/chrome-mv3"
 cp "$DAEMON/package.json" "$DAEMON/LICENSE" "$PAYLOAD/"
 find "$PAYLOAD" -name .DS_Store -delete
 
-echo "▸ Signing (ad hoc)"
-codesign --force --deep --sign "${CODESIGN_IDENTITY:--}" --timestamp=none "$APP"
+# Notarization only accepts a Developer ID signature with the hardened runtime and a secure
+# timestamp. Under the hardened runtime, opening chrome://extensions over Apple Events needs the
+# entitlement. Without an identity the build is ad hoc, which Gatekeeper blocks on download.
+if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+  echo "▸ Signing as $CODESIGN_IDENTITY"
+  codesign --force --deep --options runtime --timestamp \
+    --entitlements "$MAC/Packaging/Browsentic.entitlements" --sign "$CODESIGN_IDENTITY" "$APP"
+else
+  echo "▸ Signing (ad hoc — Gatekeeper will block this build when it is downloaded)"
+  codesign --force --deep --sign - --timestamp=none "$APP"
+fi
 codesign --verify --verbose=2 "$APP"
 
 echo "✓ $APP"

@@ -15,8 +15,15 @@ Requires macOS 14 or newer, on Apple silicon or Intel.
 2. Open it and drag **Browsentic** onto **Applications**.
 3. Open the app.
 
-The build is signed ad hoc and is not notarized. If macOS refuses to open it, right-click the app
-and choose **Open** once, or run `xattr -dr com.apple.quarantine /Applications/Browsentic.app`.
+Until the release is notarized, macOS blocks the downloaded app with “Apple could not verify
+Browsentic is free of malware”. Press **Done**, then either open **System Settings → Privacy &
+Security**, scroll to the Browsentic line and press **Open Anyway**, or run:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Browsentic.app
+```
+
+Right-click ▸ Open no longer gets past this on macOS 15 and newer.
 
 ## The first screen: what your Mac already has
 

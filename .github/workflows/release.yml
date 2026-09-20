@@ -225,7 +225,12 @@ jobs:
   # The macOS app, attached to the release the job above created. A separate job because it
   # needs a Mac, and after it rather than before because it is the one artifact that can be
   # rebuilt and re-uploaded by hand: a failure here leaves a release without a DMG, never a
-  # DMG without a release. Signed ad hoc and not notarized — docs/guide/mac-app.md says so.
+  # DMG without a release.
+  #
+  # Notarized when five repository secrets exist, ad hoc when they do not: MACOS_CERT_P12 (a
+  # base64 "Developer ID Application" certificate with its key), MACOS_CERT_PASSWORD,
+  # APPLE_ID, APPLE_TEAM_ID and APPLE_APP_PASSWORD (an app-specific password). An ad hoc build
+  # is blocked by Gatekeeper on download; docs/guide/mac-app.md says how to get past that.
   # ---------------------------------------------------------------------------------------
   mac:
     needs: release
@@ -247,7 +252,34 @@ jobs:
           node "$yarn_bin" build
           node "$yarn_bin" daemon:build
 
+      - name: Import the Developer ID certificate, when there is one
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERT_P12" ]; then
+            echo "::warning::no MACOS_CERT_P12 secret, so this DMG is ad hoc and Gatekeeper will block it on download"
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(uuidgen)"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' | head -1)"
+          test -n "$identity" || { echo "::error::MACOS_CERT_P12 holds no Developer ID Application identity"; exit 1; }
+          echo "CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
       - name: Build Browsentic.app and the disk image
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           src/mac/Scripts/build-app.sh
           src/mac/Scripts/make-dmg.sh

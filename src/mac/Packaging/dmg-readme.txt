@@ -11,8 +11,9 @@ puts the browsentic command, the daemon and the browser extension where they bel
 The extension sits outside the dotfolder on purpose. Chrome's "Load unpacked" picker
 hides dotfolders, and a browser's pairing is tied to the extension's path.
 
-This build is signed ad hoc and is not notarized. If macOS refuses to open it,
-right-click the app and choose Open once, or run:
+If macOS says it "could not verify Browsentic is free of malware", this build was
+not notarized by Apple. Press Done, open System Settings > Privacy & Security,
+scroll down to the Browsentic line and press Open Anyway. Or run this once:
 
     xattr -dr com.apple.quarantine /Applications/Browsentic.app
 
