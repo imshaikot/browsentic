@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 /** The installed package, whatever tree it landed in. The bundle sits one level down, in dist/. */
 export const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-export type InstallKind = 'npx' | 'global' | 'repo';
+export type InstallKind = 'npx' | 'global' | 'repo' | 'app';
+
+/** Written beside the payload by Browsentic.app when it lays the CLI down in ~/.browsentic/cli. */
+export const APP_MARKER = '.browsentic-app.json';
 
 const inNpxCache = (path: string) => path.split(sep).includes('_npx');
 
@@ -16,6 +19,7 @@ const inNpxCache = (path: string) => path.split(sep).includes('_npx');
  */
 export function installKind(): InstallKind {
   if (inNpxCache(packageRoot)) return 'npx';
+  if (existsSync(join(packageRoot, APP_MARKER))) return 'app';
   // A build config the `files` allowlist never ships. Checking for the extension payload
   // instead would misread a checkout that still has src/daemon/extension/ staged from a
   // previous `npm pack`, which is the normal state of a maintainer's tree.

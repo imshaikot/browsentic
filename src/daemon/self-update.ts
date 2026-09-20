@@ -58,6 +58,12 @@ export async function upgradeCli(current: string, forward: string[]): Promise<nu
     return null;
   }
 
+  if (kind === 'app') {
+    console.error(`\n  ! browsentic ${latest} is published; this is ${current}, installed by Browsentic.app.`);
+    console.error(`    Update it from the app, which replaces the command and the extension together.\n`);
+    return null;
+  }
+
   console.error(`\n  ↻ Updating the command itself, ${current} → ${latest}\n`);
   const rerun = [...forward, '--no-self-update'];
 
