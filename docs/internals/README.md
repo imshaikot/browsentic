@@ -22,6 +22,7 @@ Read in order, these pages follow a request through all of them:
 | **8.** [Subsystems](subsystems.md) | Monitors, recordings, site maps, files, screenshots |
 | **9.** [State on disk](state.md) | Every file Browsentic writes, and why it is where it is |
 | **10.** [Contributing](contributing.md) | Build topology, the checks, and adding a capability |
+| **11.** [The macOS app](mac-app.md) | What is native, what stays in the daemon, and how the payload is laid down |
 
 Looking for an error code? [reference/errors.md](../reference/errors.md).
 

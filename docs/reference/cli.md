@@ -73,6 +73,7 @@ See [guide/pair.md](../guide/pair.md).
 | `browsentic agent` | Show which agent runs the side panel, and which are installed |
 | `browsentic agent <name>` | Switch to `claude`, `codex` or `antigravity` |
 | `browsentic agent fix <name>` | Let Browsentic fix what that agent still needs |
+| `browsentic agent model <name> [model]` | Pin that agent’s model in `config.json`; omit the model to go back to the CLI’s own default |
 
 `agent fix antigravity` appends exactly one entry, `mcp(browsentic/*)`, to `permissions.allow` in
 `~/.gemini/antigravity-cli/settings.json`. See [guide/agents.md](../guide/agents.md).
@@ -103,10 +104,14 @@ configurations written against the older name keep working.
 | `browsentic downloads clear` | Delete all of them |
 | `browsentic token` | The control token, for MCP clients. Not for the browser |
 
+`agent`, `skills`, `approvals` and `downloads` take `--json`. It is what the [macOS app](../guide/mac-app.md)
+reads, so the app and a terminal can never disagree about what is on disk.
+
 ## Lifecycle
 
 | Command | Does |
 | --- | --- |
+| `browsentic start` | Bring the background daemon up, if it is not already |
 | `browsentic stop` | Stop the background daemon, whichever of 8765–8767 is answering |
 | `browsentic restart` | Stop the daemon and bring up a fresh one |
 | `browsentic --version` / `-v` | Print the version |
@@ -129,6 +134,8 @@ Not the CLI, but frequently wanted alongside it:
 | `yarn daemon:restart` | Rebuild the daemon, then swap the running one for it |
 | `yarn daemon:manifest` | Build and print the tool manifest |
 | `yarn check` | Both type checks plus both fixture suites |
+| `yarn mac:app` | Build both halves, then `dist/mac/Browsentic.app` around them (macOS only) |
+| `yarn mac:dmg` | The same, wrapped in `dist/mac/Browsentic-<version>.dmg` |
 | `yarn check:intent "<utterance>"` | Explain how one instruction would be routed |
 
 Full list: [internals/contributing.md](../internals/contributing.md).

@@ -11,7 +11,10 @@ Nothing lives in the repository.
 ├── config.json                optional, hand-written
 ├── approvals.json 0600        "always on this site" grants, one action + host per entry
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
-└── skills/                    hand-written skill overrides
+├── skills/                    hand-written skill overrides
+├── cli/                       macOS app only: the command, the daemon, bundled skills, the extension payload
+├── bin/                       macOS app only: the `browsentic` and `browsentic-mcp` launchers
+└── runtime/node/              macOS app only, and only when the Mac had no Node 20+: a private copy from nodejs.org
 
 ~/browsentic/                  (paths configurable)
 ├── extension/chrome-mv3/      the unpacked extension `browsentic setup` installs
@@ -27,6 +30,7 @@ Nothing lives in the repository.
 | `auth.json` | Pairing | Session keys are per extension origin and survive restarts. Cleared by `browsentic revoke` |
 | `config.json` | You, and the agent picker | Re-read before every run — no restart needed. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
+| `cli/`, `bin/`, `runtime/` | [Browsentic.app](../guide/mac-app.md) | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
 ## The one that is not yours

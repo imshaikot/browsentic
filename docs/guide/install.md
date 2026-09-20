@@ -29,6 +29,9 @@ Two things worth knowing before you start:
 
 ## Install
 
+On macOS there is an app that does all of this from a window, Node included:
+[Browsentic for macOS](mac-app.md). Everywhere else, and on a Mac if you prefer a terminal:
+
 ```sh
 npx browsentic setup
 ```

@@ -7,7 +7,7 @@ Everything you need to run Browsentic on your own machine and your own browser.
 Three short steps, about five minutes in total. There is no account, no API key and no cloud
 service.
 
-1. **[Install](install.md)** — one command, then load the extension
+1. **[Install](install.md)** — one command, then load the extension. On a Mac, the [app](mac-app.md) does the same from a window
 2. **[Pair](pair.md)** — connect your browser with a single-use code
 3. **[First run](first-run.md)** — a tour of the side panel, and your first instruction
 
