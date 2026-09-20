@@ -91,6 +91,11 @@ function renderNotes(version, commits, prevTag) {
   lines.push(
     '### Install',
     '',
+    `**macOS** — download \`Browsentic-${version}.dmg\` below, drag the app to Applications and open it. It installs`,
+    'everything, Node included. The build is signed ad hoc, so right-click ▸ **Open** the first time.',
+    '',
+    '**Any platform**',
+    '',
     '```sh',
     `npx browsentic@${version} setup`,
     '```',
