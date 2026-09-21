@@ -77,7 +77,7 @@ describe('asking the daemon', () => {
   });
 
   test('its status, a pairing code, the paired browsers, its agent, and a revocation', async () => {
-    const status = { connected: true, daemonVersion: '0.6.2', protocolVersion: 9, port, manifestInSync: true, pairedBrowsers: 1, pairingPending: false };
+    const status = { connected: true, daemonVersion: '0.6.2', protocolVersion: 9, port, manifestInSync: true, connectedBrowsers: 1, pairedBrowsers: 1, pairingPending: false };
     const agentState = { active: 'claude' as const, runners: [] };
     answer = (request) => {
       const { id } = request;

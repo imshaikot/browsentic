@@ -20,14 +20,15 @@ tools return `TAB_UNREACHABLE` there. `page_navigate` still works and is the way
 Ordinary sites self-heal: a tab that loaded before the extension did gets a content script injected
 on first contact.
 
-## One browser link, one run at a time per tab
+## Several browsers, one run at a time per tab
 
-The daemon keeps a single live extension connection — a newer one supersedes the old. Several
-browsers can be *paired*, but only one is connected at a time.
+Several browsers can be paired and connected at once, each with its own side panel. A connection is
+superseded only by a newer one from the same browser profile. An MCP client outside the browser
+reaches one browser at a time — the one you were last in; see [pairing](pair.md).
 
 Within the side panel, one instruction runs at a time **per tab session**; a second in the same tab
-returns `RUN_IN_PROGRESS`. Eight tab sessions may be open, three may run at once (raise with
-`maxConcurrentRuns`, ceiling 8).
+returns `RUN_IN_PROGRESS`. Eight tab sessions may be open, three may run at once across every
+connected browser (raise with `maxConcurrentRuns`, ceiling 8).
 
 ## Pairing controls which browser, not which process
 

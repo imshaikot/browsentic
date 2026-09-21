@@ -42,14 +42,17 @@ private struct SessionRow: View {
         HStack(spacing: 12) {
             GlowDot(color: session.connected ? Palette.lime : Palette.inkFaint, pulsing: session.connected)
             VStack(alignment: .leading, spacing: 3) {
-                Text(session.extensionId).font(.code(12)).foregroundStyle(Palette.ink).textSelection(.enabled)
+                if let browser = session.browser {
+                    Text(browser).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.ink)
+                }
+                Text(session.extensionId).font(.code(12)).foregroundStyle(session.browser == nil ? Palette.ink : Palette.inkDim).textSelection(.enabled)
                 Text("Extension v\(session.extensionVersion) · paired \(Timestamp.ago(session.pairedAt)) · seen \(Timestamp.ago(session.lastSeenAt))")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Palette.inkDim)
             }
             Spacer()
             Pill(text: session.connected ? "Connected" : "Away", tint: session.connected ? Palette.lime : Palette.inkDim)
-            Button("Unpair") { Task { await model.revoke(session.origin) } }
+            Button("Unpair") { Task { await model.revoke(session) } }
                 .buttonStyle(QuietButtonStyle(tint: Palette.danger))
                 .disabled(model.busy.contains("revoke"))
         }

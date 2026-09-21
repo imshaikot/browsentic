@@ -109,7 +109,7 @@ clients get it too. It is not a proof against prompt injection — see [Limits](
 
 ## Several clients at once
 
-They share one daemon and one browser, so they interleave. Tool calls stay correctly correlated, but
+They share one daemon, and unless you have several browsers connected, one browser, so they interleave. Tool calls stay correctly correlated, but
 page state can shift under either of them. The side panel can be running at the same time.
 
 ---

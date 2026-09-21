@@ -7,7 +7,7 @@ Nothing lives in the repository.
 ```
 ~/.browsentic/                 (mode 0700, override with BROWSENTIC_HOME)
 ├── daemon.json    0600        lockfile: pid, port, control token, protocol + daemon version
-├── auth.json      0600        outstanding pairing code, session keys per origin
+├── auth.json      0600        outstanding pairing code, session keys per browser
 ├── config.json                optional, hand-written
 ├── approvals.json 0600        "always on this site" grants, one action + host per entry
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
@@ -27,7 +27,7 @@ Nothing lives in the repository.
 | File | Written by | Notes |
 | --- | --- | --- |
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
-| `auth.json` | Pairing | Session keys are per extension origin and survive restarts. Cleared by `browsentic revoke` |
+| `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
 | `config.json` | You, and the agent picker | Re-read before every run — no restart needed. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `cli/`, `bin/`, `runtime/` | [Browsentic.app](../guide/mac-app.md) | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |

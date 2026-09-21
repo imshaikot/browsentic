@@ -21,9 +21,9 @@ export const userDir = join(homedir(), 'browsentic');
  * Two properties of this path are load-bearing, and both are easy to break:
  *
  *  - **It never carries a version.** Chrome derives an unpacked extension's ID from the
- *    absolute path of its directory, and the daemon binds each session key to the resulting
- *    `chrome-extension://<id>` origin. A versioned path would hand out a new identity on
- *    every update and silently unpair the browser.
+ *    absolute path of its directory, and the browser keeps the extension's storage under that
+ *    ID — the install id and session key the daemon knows it by. A versioned path would hand
+ *    out a new identity on every update and silently unpair the browser.
  *  - **It does not live under stateDir.** stateDir moves with BROWSENTIC_HOME, which would
  *    make the extension ID hostage to an environment variable. It is also a dotfolder, and
  *    Chrome's "Load unpacked" dialog is the native folder picker, which hides those.

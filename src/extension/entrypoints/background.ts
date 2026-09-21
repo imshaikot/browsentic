@@ -28,6 +28,7 @@ import {
   pairDaemon,
   readAgentState,
   readGuardrails,
+  reportFocus,
   readSkillCatalog,
   setGuardrail,
   setUpAgent,
@@ -221,6 +222,11 @@ export default defineBackground(() => {
 
   void connectDaemon();
   browser.runtime.onStartup.addListener(() => void connectDaemon());
+
+  // With several browsers connected, a caller outside any of them reaches the one last in front.
+  browser.windows?.onFocusChanged.addListener((windowId) => {
+    if (windowId !== browser.windows.WINDOW_ID_NONE) reportFocus();
+  });
 
   browser.alarms.create(RECONNECT_ALARM, { periodInMinutes: 1 });
   browser.alarms.onAlarm.addListener((alarm) => {

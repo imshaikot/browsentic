@@ -7,6 +7,7 @@ import {
   EXTERNAL_RUN_ID,
   SOCKET_PROTOCOL_VERSION,
   failure,
+  isInstallId,
   parseFrame,
   success,
   type ActionResult,
@@ -32,6 +33,7 @@ import {
   type Transcript,
 } from '@/lib/actions/handshake';
 import {
+  claimSession,
   consumePairing,
   createPairing,
   createSession,
@@ -39,8 +41,10 @@ import {
   listSessions,
   pendingPairings,
   revokeSessions,
-  sessionFor,
-  touchSession,
+  sessionCandidates,
+  sessionId,
+  type Install,
+  type Session,
 } from './auth-store';
 import { AgentSession } from './agent/service';
 import { summarizeFile } from './agent/analyze';
@@ -75,9 +79,21 @@ type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgen
 type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
+const BINDING_IDLE_MS = 2 * 60 * 1000;
+const BROWSER_LABEL_MAX = 40;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const EXTENSION_ORIGIN = /^(chrome|moz|safari-web)-extension:\/\//;
 const LOOPBACK_HOST = /^(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?$/i;
+
+interface Binding {
+  id?: string;
+  usedAt: number;
+}
+
+function browserLabel(claimed: unknown): string | undefined {
+  if (typeof claimed !== 'string') return undefined;
+  return claimed.replace(/[^\x20-\x7E]/g, '').trim().slice(0, BROWSER_LABEL_MAX) || undefined;
+}
 
 export interface DaemonOptions {
   version: string;
@@ -139,9 +155,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const bundledHash = hashManifest(bundled);
 
   let tools = bundled;
-  let manifestInSync = true;
-  let link: ExtensionLink | null = null;
-  let agent: AgentSession | null = null;
+  const links = new Map<string, ExtensionLink>();
+  const agents = new Map<ExtensionLink, AgentSession>();
   const controls = new Set<WebSocket>();
   let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
@@ -163,7 +178,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     }
     if (req.url?.startsWith('/health')) {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, pid: process.pid, version, connected: !!link?.isOpen }));
+      res.end(JSON.stringify({ ok: true, pid: process.pid, version, connected: openLinks().length > 0 }));
       return;
     }
     res.writeHead(404).end();
@@ -243,6 +258,17 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       ws.close(1002, 'expected a nonce');
       return;
     }
+    if (!isInstallId(hello.installId)) {
+      log('extension hello carried no install id; closing');
+      ws.close(1002, 'expected an install id');
+      return;
+    }
+    const install: Install = {
+      installId: hello.installId,
+      origin: req.headers.origin!,
+      extensionVersion: hello.extensionVersion,
+      browser: browserLabel(hello.browser),
+    };
 
     const transcript: Transcript = {
       protocolVersion: SOCKET_PROTOCOL_VERSION,
@@ -260,7 +286,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       return;
     }
 
-    const origin = req.headers.origin!;
     let secret: string;
     let sealedSessionKey: string | undefined;
     if (hello.auth?.kind === 'pair') {
@@ -270,21 +295,28 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       }
       consumePairing(matched.code);
       secret = matched.secret;
-      const session = createSession(origin, hello.extensionVersion);
+      const session = createSession(install);
       sealedSessionKey = await sealSessionKey(secret, transcript, session.key);
-      log(`paired ${origin} (extension ${hello.extensionVersion})`);
+      log(`paired ${install.browser ?? install.origin} (extension ${hello.extensionVersion})`);
     } else if (hello.auth?.kind === 'session') {
-      const session = sessionFor(origin);
-      if (!session || !sameProof(proven.proof, await clientProof(session.key, transcript))) {
+      const session = await matchSession(proven.proof, transcript, install);
+      if (!session) {
         return reject('This browser is no longer paired. Run "browsentic-mcp pair" to pair again.', false);
       }
-      touchSession(origin);
+      claimSession(session.key, install);
       secret = session.key;
     } else {
       return reject('That hello named no credential to prove.', false);
     }
 
-    await settle(ws, hello, origin, transcript, secret, sealedSessionKey);
+    await settle(ws, hello, install, transcript, secret, sealedSessionKey);
+  }
+
+  async function matchSession(proof: unknown, transcript: Transcript, install: Install): Promise<Session | null> {
+    for (const session of sessionCandidates(install)) {
+      if (sameProof(proof, await clientProof(session.key, transcript))) return session;
+    }
+    return null;
   }
 
   async function matchPairing(
@@ -301,23 +333,22 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   async function settle(
     ws: WebSocket,
     hello: Extract<SocketFrame, { t: 'hello' }>,
-    origin: string,
+    install: Install,
     transcript: Transcript,
     secret: string,
     sealedSessionKey?: string,
   ): Promise<void> {
-    link?.close('superseded by a newer connection');
-    agent?.dispose();
-    manifestInSync = hello.manifestHash === bundledHash;
+    // Only the same browser profile is superseded: its worker restarted and the old socket lingers.
+    links.get(install.installId)?.close('superseded by a newer connection');
+    const manifestInSync = hello.manifestHash === bundledHash;
     const accepted = new ExtensionLink(
       ws,
-      { ...hello, origin },
+      { ...hello, ...install },
       (closing) => {
-        if (link !== closing) return;
-        link = null;
-        agent?.dispose();
-        agent = null;
-        log('extension disconnected');
+        agents.get(closing)?.dispose();
+        agents.delete(closing);
+        if (links.get(closing.id) === closing) links.delete(closing.id);
+        log(`${closing.label} disconnected`);
         scheduleIdleExit();
       },
       (request, source) => {
@@ -359,6 +390,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
             source.send({ t: 'agentInfo', id: request.id, result: state });
             // The catalog's agent-skill half belongs to the agent that just took over.
             if (request.t === 'setAgent') pushSkillCatalog(source);
+            if (request.t !== 'agentState') announceAgent(source);
           });
           return;
         }
@@ -370,15 +402,15 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         }
         if (request.t === 'saveSkill') {
           source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
-          return pushSkillCatalog(source);
+          return shareSkillCatalog();
         }
         if (request.t === 'deleteSkill') {
           source.send({ t: 'skillResult', id: request.id, result: deleteSkill(request.name) });
-          return pushSkillCatalog(source);
+          return shareSkillCatalog();
         }
         if (request.t === 'deleteSiteMap') {
           source.send({ t: 'skillResult', id: request.id, result: deleteSiteMap(request.name) });
-          return pushSkillCatalog(source);
+          return shareSkillCatalog();
         }
         if (request.t === 'activateSiteMap') {
           const result = commitStaging(request.stagingId, request.exactHost === true);
@@ -387,7 +419,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
             id: request.id,
             result: result.ok ? { ok: true, data: { name: result.data.name, path: result.data.path } } : result,
           });
-          return pushSkillCatalog(source);
+          return shareSkillCatalog();
         }
         if (request.t === 'discardSiteMap') {
           return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
@@ -395,15 +427,47 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         session(source).handle(request);
       },
     );
-    link = accepted;
-    log(`extension ${hello.extensionVersion} connected from ${origin} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
+    links.set(accepted.id, accepted);
+    log(`extension ${hello.extensionVersion} connected from ${accepted.label} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
     const welcome = { daemonVersion: version, manifestHash: bundledHash, manifestInSync, sealedSessionKey };
     accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
     scheduleIdleExit();
     void pushAgentState(accepted);
     pushSkillCatalog(accepted);
-    if (manifestInSync) restoreBundledManifest();
-    else await adoptExtensionManifest(accepted);
+    if (!manifestInSync) await adoptExtensionManifest(accepted);
+    else if (openLinks().every(inSync)) restoreBundledManifest();
+  }
+
+  function openLinks(): ExtensionLink[] {
+    return [...links.values()].filter((link) => link.isOpen);
+  }
+
+  function inSync(link: ExtensionLink): boolean {
+    return link.manifestHash === bundledHash;
+  }
+
+  /** The browser the user was last in, for a caller that has no run to say which one it means. */
+  function activeLink(): ExtensionLink | null {
+    return openLinks().reduce<ExtensionLink | null>(
+      (latest, link) => (latest && latest.lastActiveAt >= link.lastActiveAt ? latest : link),
+      null,
+    );
+  }
+
+  function resetConversations(): void {
+    for (const agent of agents.values()) agent.handle({ t: 'reset' });
+  }
+
+  function announceAgent(except?: ExtensionLink): void {
+    for (const link of openLinks()) {
+      if (link === except) continue;
+      void pushAgentState(link);
+      pushSkillCatalog(link);
+    }
+  }
+
+  function shareSkillCatalog(): void {
+    for (const link of openLinks()) pushSkillCatalog(link);
   }
 
   async function settleAgent(request: AgentFrame): Promise<ActionResult<AgentState>> {
@@ -413,7 +477,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (request.t === 'setAgent') {
       writeActiveAgent(request.agent);
       // The held conversation belongs to the agent that just left; the next turn starts fresh.
-      agent?.handle({ t: 'reset' });
+      resetConversations();
       log(`agent set to ${AGENTS[request.agent].label}`);
     }
     if (request.t === 'setAgentModel') {
@@ -468,11 +532,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function session(source: ExtensionLink): AgentSession {
-    return (agent ??= new AgentSession({
-      invoke,
+    const held = agents.get(source);
+    if (held) return held;
+    const created = new AgentSession({
+      invoke: (action, input, opts) => invokeOn(source, action, input, opts),
       emit: (id, event) => source.send({ t: 'run', id, event }),
       draft: (id, draft) => source.send({ t: 'siteMapDraft', id, draft }),
-    }));
+      running: () => [...agents.values()].reduce((total, agent) => total + agent.running, 0),
+    });
+    agents.set(source, created);
+    return created;
+  }
+
+  function sessionRunning(runId: string): AgentSession | undefined {
+    return [...agents.values()].find((agent) => agent.owns(runId));
   }
 
   async function adoptExtensionManifest(source: ExtensionLink): Promise<void> {
@@ -501,8 +574,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     broadcast({ event: 'manifest-changed' });
   }
 
+  /**
+   * A caller's tab ids only mean something in the browser that issued them, so a burst of calls
+   * stays with one browser. Once the caller goes quiet, its next call follows the user instead.
+   */
+  function routeFor(binding: Binding): ExtensionLink | null {
+    const held = binding.id ? links.get(binding.id) : undefined;
+    const target = held?.isOpen && Date.now() - binding.usedAt < BINDING_IDLE_MS ? held : activeLink();
+    binding.id = target?.id;
+    binding.usedAt = Date.now();
+    return target;
+  }
+
   function describeFor(runId?: string): Described {
-    const offer = runId ? agent?.offerFor(runId) : null;
+    const offer = runId ? sessionRunning(runId)?.offerFor(runId) : null;
     if (offer) return { tools: tools.filter(({ name }) => !offer.withheld.includes(name)), reserved: offer.reserved };
 
     const config = readAgentConfig();
@@ -517,6 +602,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
 
   function acceptControl(ws: WebSocket): void {
     const client = `c${++controlSeq}`;
+    const binding: Binding = { usedAt: 0 };
     controls.add(ws);
     scheduleIdleExit();
     ws.on('message', async (raw) => {
@@ -527,18 +613,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         return log('dropped unparseable control frame');
       }
       if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', ...describeFor(request.runId) });
-      if (request.op === 'status') return send(ws, { id: request.id, op: 'status', status: statusNow() });
+      if (request.op === 'status') {
+        return send(ws, { id: request.id, op: 'status', status: statusNow(routeFor(binding)) });
+      }
       if (request.op === 'invoke') {
         let result: ActionResult;
         if (request.runId) {
           result =
-            (await agent?.invokeForRun(request.runId, request.action, request.input)) ??
+            (await sessionRunning(request.runId)?.invokeForRun(request.runId, request.action, request.input)) ??
             failure('RUN_INACTIVE', 'This agent run is no longer active');
           if (!result.ok && result.error.code === 'RUN_INACTIVE') {
             log(`control ${client} invoked ${request.action} for inactive run ${request.runId}`);
           }
         } else {
-          result = await invokeExternal(request.action, request.input, client);
+          result = await invokeExternal(routeFor(binding), request.action, request.input, client);
         }
         return send(ws, { id: request.id, op: 'invoke', result });
       }
@@ -557,22 +645,19 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         }
         if (request.set) {
           writeActiveAgent(request.set);
-          agent?.handle({ t: 'reset' });
+          resetConversations();
           log(`control ${client} set the agent to ${AGENTS[request.set].label}`);
         }
         if (request.grant) await grantRunner(request.grant);
         const state = await agentState(readAgentConfig(), { refresh: !!changed });
-        if (changed && link?.isOpen) {
-          void pushAgentState(link);
-          pushSkillCatalog(link);
-        }
+        if (changed) announceAgent();
         return send(ws, { id: request.id, op: 'agent', state });
       }
       if (request.op === 'revoke') {
-        const target = request.origin;
-        const revoked = revokeSessions((session) => !target || session.origin === target);
-        if (revoked && link?.isOpen && (!target || link.origin === target)) {
-          link.close('pairing revoked');
+        const { session: id, origin } = request;
+        const revoked = revokeSessions((session) => (id ? sessionId(session) === id : !origin || session.origin === origin));
+        for (const link of openLinks()) {
+          if (id ? link.id === id : !origin || link.origin === origin) link.close('pairing revoked');
         }
         log(`revoked ${revoked} session(s)`);
         return send(ws, { id: request.id, op: 'revoke', revoked });
@@ -595,26 +680,29 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function sessionSummaries(): SessionSummary[] {
-    return listSessions().map(({ key: _key, ...session }) => ({
-      ...session,
-      connected: link?.isOpen === true && link.origin === session.origin,
-    }));
+    return listSessions().map(({ key: _key, installId: _installId, ...session }) => {
+      const id = sessionId({ installId: _installId, origin: session.origin });
+      return { id, ...session, connected: links.get(id)?.isOpen === true };
+    });
   }
 
-  function statusNow(): BridgeStatus {
+  function statusNow(target: ExtensionLink | null): BridgeStatus {
     return {
-      connected: !!link?.isOpen,
+      connected: !!target,
       daemonVersion: version,
       protocolVersion: SOCKET_PROTOCOL_VERSION,
       port,
-      manifestInSync,
-      extensionVersion: link?.extensionVersion,
+      manifestInSync: !target || inSync(target),
+      extensionVersion: target?.extensionVersion,
+      browser: target?.browser,
+      connectedBrowsers: openLinks().length,
       pairedBrowsers: listSessions().length,
       pairingPending: hasPendingPairing(),
     };
   }
 
-  async function invoke(
+  async function invokeOn(
+    link: ExtensionLink | null,
     action: string,
     input?: unknown,
     opts?: { saveTo?: { dir: string; filename: string }; tabId?: number; runId?: string; hosts?: readonly string[] },
@@ -635,8 +723,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     return persistDownload(action, persistScreenshot(action, input, result, opts?.saveTo), opts?.hosts);
   }
 
-  async function invokeExternal(action: string, input: unknown, client: string): Promise<ActionResult> {
-    const target = link;
+  async function invokeExternal(
+    target: ExtensionLink | null,
+    action: string,
+    input: unknown,
+    client: string,
+  ): Promise<ActionResult> {
     const toolId = randomUUID();
     const tell = (event: RunEvent) => {
       if (target?.isOpen) target.send({ t: 'run', id: EXTERNAL_RUN_ID, event });
@@ -659,7 +751,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       log(`external ${client} → ${action} waived: ${describeDecision(decision)}`);
     }
 
-    const result = await invoke(action, input);
+    const result = await invokeOn(target, action, input);
     log(`external ${client} → ${action} ${result.ok ? 'ok' : result.error.code}`);
     tell({
       kind: 'toolResult',
@@ -673,9 +765,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   function scheduleIdleExit(): void {
     if (idleTimer) clearTimeout(idleTimer);
     if (!idleExit) return;
-    if (link?.isOpen || controls.size > 0) return;
+    if (openLinks().length || controls.size > 0) return;
     idleTimer = setTimeout(() => {
-      if (link?.isOpen || controls.size > 0) return scheduleIdleExit();
+      if (openLinks().length || controls.size > 0) return scheduleIdleExit();
       log('idle with no clients; exiting');
       void stop().then(() => process.exit(0));
     }, IDLE_EXIT_MS);
@@ -684,8 +776,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
 
   async function stop(): Promise<void> {
     if (idleTimer) clearTimeout(idleTimer);
-    agent?.dispose();
-    link?.close('daemon shutting down');
+    for (const link of [...links.values()]) link.close('daemon shutting down');
     for (const ws of controls) ws.close(1001, 'daemon shutting down');
     wss.close();
     await new Promise<void>((resolve) => http.close(() => resolve()));
@@ -693,11 +784,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     log('daemon stopped');
   }
 
+  const local: Binding = { usedAt: 0 };
   return {
     port,
     describe: async () => describeFor(),
-    invoke,
-    status: async () => statusNow(),
+    invoke: (action, input) => invokeOn(routeFor(local), action, input),
+    status: async () => statusNow(routeFor(local)),
     onManifestChanged: (listener) => manifestListeners.add(listener),
     close: stop,
     stop,

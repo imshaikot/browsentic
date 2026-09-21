@@ -9,11 +9,16 @@ export interface BridgeStatus {
   port: number;
   manifestInSync: boolean;
   extensionVersion?: string;
+  /** The connected browser this caller's tools reach, when more than one could answer. */
+  browser?: string;
+  connectedBrowsers: number;
   pairedBrowsers: number;
   pairingPending: boolean;
 }
 
 export interface SessionSummary {
+  id: string;
+  browser?: string;
   origin: string;
   extensionVersion: string;
   pairedAt: string;
@@ -27,7 +32,7 @@ export type ControlRequest =
   | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string }
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
-  | { id: string; op: 'revoke'; origin?: string }
+  | { id: string; op: 'revoke'; session?: string; origin?: string }
   | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind };
 
 export type ControlMessage =

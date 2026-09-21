@@ -293,9 +293,9 @@ final class AppModel: ObservableObject {
         await perform("pair") { _, control in self.pairing = try await control.pair() }
     }
 
-    func revoke(_ origin: String?) async {
+    func revoke(_ session: BrowserSession?) async {
         await perform("revoke") { _, control in
-            let count = try await control.revoke(origin: origin)
+            let count = try await control.revoke(session)
             self.say(count == 0 ? "Nothing to unpair." : "Unpaired \(count) browser\(count == 1 ? "" : "s").")
         }
         await refresh()

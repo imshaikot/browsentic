@@ -29,19 +29,25 @@ export class ExtensionLink {
   readonly extensionVersion: string;
   readonly manifestHash: string;
   readonly origin: string;
+  readonly id: string;
+  readonly browser?: string;
+  /** Which connected browser the user was last in, so a caller that names none reaches that one. */
+  lastActiveAt = Date.now();
   private readonly pending = new Map<string, Pending>();
   private readonly ping: ReturnType<typeof setTimeout>;
   private closed = false;
 
   constructor(
     private readonly socket: WebSocket,
-    hello: { extensionVersion: string; manifestHash: string; origin: string },
+    hello: { extensionVersion: string; manifestHash: string; origin: string; installId: string; browser?: string },
     private readonly onClose: (link: ExtensionLink) => void,
     private readonly onRequest?: (request: ExtensionRequest, link: ExtensionLink) => void,
   ) {
     this.extensionVersion = hello.extensionVersion;
     this.manifestHash = hello.manifestHash;
     this.origin = hello.origin;
+    this.id = hello.installId;
+    this.browser = hello.browser;
     socket.on('message', (raw) => this.receive(String(raw)));
     socket.on('close', () => this.dispose('socket closed'));
     socket.on('error', (error) => {
@@ -49,6 +55,10 @@ export class ExtensionLink {
       this.dispose('socket error');
     });
     this.ping = setInterval(() => this.send({ t: 'ping', id: randomUUID() }), PING_INTERVAL_MS);
+  }
+
+  get label(): string {
+    return this.browser ?? this.origin;
   }
 
   get isOpen(): boolean {
@@ -100,7 +110,11 @@ export class ExtensionLink {
     if (!frame) return log('dropped unparseable frame from extension');
     if (frame.t === 'ping') return this.send({ t: 'pong', id: frame.id });
     if (frame.t === 'pong') return;
-    if (isExtensionRequest(frame)) return this.onRequest?.(frame, this);
+    if (frame.t === 'focus') return void (this.lastActiveAt = Date.now());
+    if (isExtensionRequest(frame)) {
+      this.lastActiveAt = Date.now();
+      return this.onRequest?.(frame, this);
+    }
 
     const id = 'id' in frame ? frame.id : undefined;
     const waiting = id ? this.pending.get(id) : undefined;

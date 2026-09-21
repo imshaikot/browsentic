@@ -85,11 +85,19 @@ for the mechanism, [internals/transport.md](../internals/transport.md).
 ```sh
 browsentic sessions          # which browsers are paired
 browsentic revoke            # unpair every browser
-browsentic revoke <origin>   # unpair one
+browsentic revoke <id>       # unpair one, by the id "sessions" prints
 ```
 
-Several browsers can be *paired*, but the daemon keeps **one live link** at a time — a newer
-connection supersedes the old one.
+Several browsers can be paired **and connected at once** — Chrome beside Brave, or two Chrome
+profiles. Each pairs with its own code and keeps its own key, and the side panel in each runs on its
+own. Every Chromium browser that loads the same folder presents the same extension origin, so a
+browser is known by an install id it mints on first run, never by its origin.
+
+A newer connection supersedes an older one only when both come from the same browser profile.
+
+An MCP client outside the browser reaches the browser you were last in. It stays with that browser
+through a burst of calls — tab ids only mean something in the browser that issued them — and follows
+you again once it has been quiet for two minutes. `browsentic_status` names the browser it reaches.
 
 ---
 

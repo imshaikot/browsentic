@@ -56,9 +56,12 @@ actor ControlClient {
         return try JSONDecoder().decode(PairingCode.self, from: data)
     }
 
-    func revoke(origin: String?) async throws -> Int {
+    func revoke(_ session: BrowserSession?) async throws -> Int {
         var frame: [String: Any] = ["op": "revoke"]
-        if let origin { frame["origin"] = origin }
+        if let session {
+            frame["origin"] = session.origin
+            if let id = session.sessionId { frame["session"] = id }
+        }
         return try await request(frame, as: Reply<Int>.self, key: "revoked")
     }
 

@@ -10,7 +10,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 16;
+export const SOCKET_PROTOCOL_VERSION = 17;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -169,6 +169,12 @@ export type SocketFrame =
       manifestHash: string;
       auth: SocketAuth;
       nonce: string;
+      /**
+       * Which browser profile this is. The extension origin cannot say: every Chromium browser
+       * loading the same unpacked folder presents the same one.
+       */
+      installId: string;
+      browser?: string;
     }
   | { t: 'challenge'; nonce: string }
   | { t: 'prove'; proof: string }
@@ -188,6 +194,7 @@ export type SocketFrame =
   | { t: 'result'; id: string; result: ActionResult }
   | { t: 'ping'; id: string }
   | { t: 'pong'; id: string }
+  | { t: 'focus' }
   | { t: 'instruct'; id: string; text: string; context?: RunContext }
   | { t: 'cancel'; id: string }
   | { t: 'decision'; id: string; toolId: string; allow: boolean; remember?: boolean }
@@ -254,6 +261,12 @@ export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUE
 
 export function isExtensionRequest(frame: SocketFrame): frame is ExtensionRequest {
   return (EXTENSION_REQUEST_FRAMES as readonly string[]).includes(frame.t);
+}
+
+const INSTALL_ID = /^[A-Za-z0-9_-]{16,64}$/;
+
+export function isInstallId(value: unknown): value is string {
+  return typeof value === 'string' && INSTALL_ID.test(value);
 }
 
 export function parseFrame(raw: string): SocketFrame | null {

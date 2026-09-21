@@ -12,6 +12,9 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 export interface Session {
   key: string;
   origin: string;
+  /** Absent on a session paired before the extension sent one; the first reconnect claims it. */
+  installId?: string;
+  browser?: string;
   extensionVersion: string;
   pairedAt: string;
   lastSeenAt: string;
@@ -68,30 +71,49 @@ export function hasPendingPairing(): boolean {
   return read().pairings.some((pairing) => pairing.expiresAt > Date.now());
 }
 
-export function createSession(origin: string, extensionVersion: string): Session {
+export interface Install {
+  installId: string;
+  origin: string;
+  extensionVersion: string;
+  browser?: string;
+}
+
+export const sessionId = (session: Pick<Session, 'installId' | 'origin'>): string =>
+  session.installId ?? session.origin;
+
+export function createSession({ installId, origin, extensionVersion, browser }: Install): Session {
   const auth = read();
   const now = new Date().toISOString();
   const session: Session = {
     key: randomBytes(32).toString('base64url'),
     origin,
+    installId,
+    browser,
     extensionVersion,
     pairedAt: now,
     lastSeenAt: now,
   };
-  const sessions = auth.sessions.filter((existing) => existing.origin !== origin);
+  const sessions = auth.sessions.filter((existing) => existing.installId !== installId);
   write({ ...auth, sessions: [...sessions, session] });
   return session;
 }
 
-export function sessionFor(origin: string): Session | null {
-  return read().sessions.find((candidate) => candidate.origin === origin) ?? null;
+/**
+ * The sessions this install may hold the key to. An origin names a browser only until a second
+ * Chromium browser loads the same folder, so it is consulted just for sessions that predate the
+ * install id, and which of those is this browser's is settled by the proof.
+ */
+export function sessionCandidates({ installId, origin }: Pick<Install, 'installId' | 'origin'>): Session[] {
+  const sessions = read().sessions;
+  const own = sessions.filter((candidate) => candidate.installId === installId);
+  return own.length ? own : sessions.filter((candidate) => !candidate.installId && candidate.origin === origin);
 }
 
-export function touchSession(origin: string): void {
+export function claimSession(key: string, { installId, extensionVersion, browser }: Install): void {
   const auth = read();
-  const session = auth.sessions.find((candidate) => candidate.origin === origin);
+  const session = auth.sessions.find((candidate) => candidate.key === key);
   if (!session) return;
-  session.lastSeenAt = new Date().toISOString();
+  Object.assign(session, { installId, extensionVersion, browser, lastSeenAt: new Date().toISOString() });
   write(auth);
 }
 
