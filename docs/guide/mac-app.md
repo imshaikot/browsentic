@@ -15,7 +15,7 @@ curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
 That downloads the latest release, checks the app’s signature is intact, copies `Browsentic.app` into
-Applications, clears the quarantine flag on that copy and opens it. It asks for no password. `BROWSENTIC_VERSION=0.6.0` pins a release, and
+Applications, clears the quarantine flag on that copy and opens it. It asks for no password. `BROWSENTIC_VERSION=0.6.2` pins a release, and
 `BROWSENTIC_NO_OPEN=1` installs without opening. [Read the script](https://browsentic.com/install.sh)
 first if you like — it is sixty lines.
 
