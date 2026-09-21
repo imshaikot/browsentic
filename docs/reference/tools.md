@@ -74,8 +74,8 @@ a page tool fails. No parameters.
 
 ### page_getPageInfo
 
-Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree
-with a text diagram, the heading outline, and an inventory of interactive elements — each with a
+Snapshot the current page: document metadata, viewport and scroll state, a text diagram of the
+landmark regions with a selector for each, the heading outline, and an inventory of interactive elements — each with a
 stable selector already computed. The workhorse; start here.
 
 Every element in the inventory carries three things beyond its selector, so you can decide what to
@@ -83,18 +83,20 @@ touch without a second call:
 
 | Field | What it tells you |
 | --- | --- |
-| `role` | The computed ARIA role — `link`, `button`, `textbox`, `combobox`, `checkbox`, `tab`, whatever the page declares. The same vocabulary the `role` field of a [target](#element-targets) accepts. |
+| `role` | The computed ARIA role — `link`, `button`, `textbox`, `combobox`, `checkbox`, `tab`, whatever the page declares. The same vocabulary the `role` field of a [target](#element-targets) accepts. Left out, along with `tag`, where the list already says it: an `<a>` under `links` is a link, a `<button>` under `buttons` is a button. |
 | `state` | Only the keys that apply: `disabled`, `checked`, `expanded`, `selected`, `required`, `invalid`, `current` (from `aria-current`, which marks the page you are on), `filled` for text inputs, and `value` for the selected option of a `<select>`. Field contents are never reported — `filled` says whether something is typed, not what. |
 | `region` | The landmark it lives in, e.g. `navigation “Primary”` or `form “Checkout”`. Use it to tell the main content's “Delete” from the sidebar's. |
 
 Elements hidden from assistive technology — anything inside `aria-hidden="true"` or `inert` — are
-left out of the tree, the outline and the inventory. Each region in the diagram is annotated with
-how many links, buttons and fields its subtree holds, and `interactive.counts` reports the true
+left out of the diagram, the outline and the inventory. Each region in the diagram is annotated with
+how many links, buttons and fields its subtree holds and ends with its selector, which scopes a
+`page_extractText` to that region, and `interactive.counts` reports the true
 totals before `maxPerKind` truncates the lists.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `maxPerKind` | integer | `30` | Cap on links, buttons, fields, and forms listed per kind |
+| `geometry` | boolean | `false` | Add each element's `bounds` in document pixels. Ask only when you need coordinates, such as a `point` for `page_trustedClick` |
 
 ### page_extractText
 
@@ -1006,7 +1008,7 @@ tab at the moment it is fetched.
 | Resource | Type | What it returns |
 | --- | --- | --- |
 | `browsentic://page/diagram` | `text/plain` | Text diagram of the page's landmark regions — the cheapest useful view of a page |
-| `browsentic://page/current` | `application/json` | The full `page_getPageInfo` snapshot: metadata, layout tree, headings, interactive inventory |
+| `browsentic://page/current` | `application/json` | The full `page_getPageInfo` snapshot: metadata, layout diagram, headings, interactive inventory |
 | `browsentic://page/text` | `text/plain` | The rendered text of the page — the first `page_extractText` group, with no way to page past it |
 
 ---

@@ -29,7 +29,7 @@ const RESOURCES = [
   {
     uri: 'browsentic://page/current',
     name: 'Active page snapshot',
-    description: 'Full page.getPageInfo snapshot of the active tab: metadata, layout tree, headings, interactive inventory.',
+    description: 'Full page.getPageInfo snapshot of the active tab: metadata, layout diagram, headings, interactive inventory.',
     mimeType: 'application/json',
   },
   {
