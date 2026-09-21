@@ -27,7 +27,7 @@ Every upgrade is classified by the handshake `Origin` header before anything els
 
 | `Origin` | Role | Requirement |
 | --- | --- | --- |
-| `chrome-extension://…`, `moz-extension://…`, `safari-web-extension://…` | `extension` | Proof of a pairing code, or of a session key bound to that same origin |
+| `chrome-extension://…`, `moz-extension://…`, `safari-web-extension://…` | `extension` | Proof of a pairing code, or of the session key minted for that browser's install id |
 | Any other value | — | **Refused.** This is what keeps web pages out |
 | Absent | `control` | `Authorization: Bearer <token>` matching the lockfile, compared with `timingSafeEqual` |
 
@@ -75,8 +75,11 @@ The extension connects to nothing until you pair it.
 5. The daemon verifies, then proves *itself*: `welcome` carries
    `HMAC(secret, "browsentic/server" ‖ transcript ‖ the rest of the welcome)`. The two labels are
    distinct, so an impostor cannot reflect the extension's own proof back at it.
-6. On pairing, the daemon mints a **session key** (32 random bytes) bound to that extension origin
-   and returns it XORed with a keystream derived from the same secret, so the long-lived credential
+6. On pairing, the daemon mints a **session key** (32 random bytes) bound to the **install id**
+   the `hello` carried — a UUID the extension mints once per browser profile. The origin cannot
+   name a browser: every Chromium browser loading the same unpacked folder presents the same one.
+   A session paired before install ids existed is found by its origin and claimed by whichever
+   browser proves its key. The daemon returns the key XORed with a keystream derived from the same secret, so the long-lived credential
    never crosses the wire in the clear. It survives browser and daemon restarts and dies only when
    you `browsentic revoke`.
 

@@ -22,8 +22,9 @@ not — an uninstall that started a daemon would be absurd.
 that folder at `chrome://extensions` with Developer mode on, and paste the code into the popup.
 
 The install path never carries a version, deliberately. Chrome derives an unpacked extension's ID
-from the absolute path of its directory, and the daemon binds each session key to the resulting
-origin, so a versioned path would unpair the browser on every update.
+from the absolute path of its directory, and the browser keeps the extension's storage — the
+install id and the session key with it — under that ID, so a versioned path would unpair the browser
+on every update.
 
 | Flag | Does |
 | --- | --- |
@@ -62,7 +63,7 @@ See [guide/install.md](../guide/install.md) and [guide/maintenance.md](../guide/
 | --- | --- |
 | `browsentic pair` | Issue a one-time code to type into the extension popup. 8 characters, valid 10 minutes, single use |
 | `browsentic sessions` | List paired browsers |
-| `browsentic revoke [origin]` | Unpair one browser, or all of them |
+| `browsentic revoke [id]` | Unpair one browser by the id `sessions` prints, or all of them. An origin still works, and unpairs every browser presenting it |
 
 See [guide/pair.md](../guide/pair.md).
 
