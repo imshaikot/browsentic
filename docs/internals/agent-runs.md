@@ -88,7 +88,7 @@ Every runner is given the same four things, by whichever mechanism its CLI suppo
 | | Claude Code | Codex | Antigravity |
 | --- | --- | --- | --- |
 | Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` |
-| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*` | `.agents/mcp_config.json` in its cwd |
+| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd |
 | System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd |
 | Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` |
 | Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"` | its own permission rules |

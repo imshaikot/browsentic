@@ -83,6 +83,9 @@ export const codexRunner: Runner = {
         `${server}.env=${tomlTable(mcp.env)}`,
         '-c',
         `${server}.required=true`,
+        // Headless Codex refuses an MCP call it would have asked about; the daemon gates these tools itself.
+        '-c',
+        `${server}.default_tools_approval_mode="approve"`,
         '-c',
         `developer_instructions=${tomlString(context.systemPrompt)}`,
         '-c',
