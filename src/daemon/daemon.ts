@@ -56,10 +56,12 @@ import { agentState, grantRunner } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
-import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
+import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
 import {
   ANYWHERE,
+  INJECT_ACTION,
+  RUN_CODE_ACTION,
   blocked,
   decide,
   describe as describeDecision,
@@ -584,6 +586,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     return target;
   }
 
+  function describeFor(runId?: string): Described {
+    const offer = runId ? sessionRunning(runId)?.offerFor(runId) : null;
+    if (offer) return { tools: tools.filter(({ name }) => !offer.withheld.includes(name)), reserved: offer.reserved };
+
+    const config = readAgentConfig();
+    const policy = policyFrom(config.guardrails, config.requireApproval);
+    const denied = (action: string) =>
+      decide({ action, input: {}, caller: 'external', scope: ANYWHERE }, policy).effect === 'deny';
+    return {
+      tools: tools.filter(({ name }) => !((name === INJECT_ACTION || name === RUN_CODE_ACTION) && denied(name))),
+      reserved: [],
+    };
+  }
+
   function acceptControl(ws: WebSocket): void {
     const client = `c${++controlSeq}`;
     const binding: Binding = { usedAt: 0 };
@@ -596,7 +612,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       } catch {
         return log('dropped unparseable control frame');
       }
-      if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', tools });
+      if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', ...describeFor(request.runId) });
       if (request.op === 'status') {
         return send(ws, { id: request.id, op: 'status', status: statusNow(routeFor(binding)) });
       }
@@ -771,7 +787,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const local: Binding = { usedAt: 0 };
   return {
     port,
-    describe: async () => tools,
+    describe: async () => describeFor(),
     invoke: (action, input) => invokeOn(routeFor(local), action, input),
     status: async () => statusNow(routeFor(local)),
     onManifestChanged: (listener) => manifestListeners.add(listener),

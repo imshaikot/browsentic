@@ -18,6 +18,17 @@ Not every capability can run in the page. The background service worker splits t
 | `openTab`, `switchTab`, `closeTab`, `screenshot`, `navigate` | Need the `tabs`/`scripting` APIs |
 | Everything else | Forwarded to the content script |
 
+## The microphone is granted from a tab
+
+Chromium anchors a permission prompt to a tab. A side panel and a popup have none, so
+`getUserMedia` there is refused without ever asking, and no manifest permission grants the
+microphone to an extension. `use-speech.ts` therefore reads `navigator.permissions` first: on
+`prompt` it never calls `getUserMedia` — repeated silent refusals would earn the origin a temporary
+block — and offers **Allow microphone** instead. That opens the unlisted `mic-permission.html`
+entrypoint in a tab, where the prompt can appear. The grant belongs to the extension's origin, so the
+panel and the popup both see the `PermissionStatus` change and start listening without a reload.
+Firefox prompts from its sidebar on its own and skips the check.
+
 ## Self-healing injection
 
 The forwarding call is `invokeInTab()`. A tab that loaded *before* the extension did has no content

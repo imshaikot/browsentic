@@ -21,7 +21,7 @@ by **visible text** survives redesigns that break CSS paths.
 
 | | |
 | --- | --- |
-| `page_getPageInfo` | The workhorse. Document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of every interactive element — each with its selector, its ARIA role, its live state (disabled, checked, expanded, filled, `aria-current`) and the landmark region it sits in |
+| `page_getPageInfo` | The workhorse. Document metadata, viewport and scroll state, a text diagram of the landmark regions with a selector for each, the heading outline, and an inventory of every interactive element — each with its selector, its ARIA role, its live state (disabled, checked, expanded, filled, `aria-current`) and the landmark region it sits in |
 | `page_extractText` | Rendered text of an element or the whole page, a sentence-aligned group at a time — long pages come back through a cursor rather than truncated. Raw HTML is [denied by default](../approvals.md) |
 | `page_waitForElement` | Wait until an element is attached, visible, hidden or detached |
 | `page_findProgress` | Scan for progress signals worth [monitoring](monitoring.md) |

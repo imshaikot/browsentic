@@ -45,9 +45,12 @@ Change where with `screenshotDir` in [config](../configuration.md).
 
 ## Format and size
 
-Defaults are JPEG at quality 80, downscaled so the longest side is at most 1600 px — far smaller
-and quicker than PNG, which matters because these go to a model. PNG is available when you need
-lossless or transparency.
+Defaults are JPEG at quality 80 — far smaller and quicker than PNG, which matters because these go
+to a model. A viewport capture the agent takes to look at the page comes back at the page's own
+CSS-pixel size, which on a high-density display is half the pixels and well under half the cost,
+and makes a position in the picture a usable click point. Full-page, element and saved captures
+are downscaled so the longest side is at most 1600 px. `maxLongSide` overrides either. PNG is
+available when you need lossless or transparency.
 
 ---
 

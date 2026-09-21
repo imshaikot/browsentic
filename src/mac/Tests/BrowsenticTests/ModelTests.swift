@@ -57,3 +57,46 @@ import Testing
         #expect(Timestamp.ago("not a date") == "not a date")
     }
 }
+
+@Suite struct UpdateTests {
+    @Test func takesTheNewerOfGitHubAndNpm() {
+        #expect(UpdateFeed.newest(of: ["0.6.3", "0.7.0"], after: "0.6.2") == "0.7.0")
+        #expect(UpdateFeed.newest(of: ["0.7.0", "0.6.3"], after: "0.6.2") == "0.7.0")
+        #expect(UpdateFeed.newest(of: [nil, "0.6.3"], after: "0.6.2") == "0.6.3")
+    }
+
+    @Test func offersNothingWhenCurrentOrAhead() {
+        #expect(UpdateFeed.newest(of: ["0.6.2", "0.6.2"], after: "0.6.2") == nil)
+        #expect(UpdateFeed.newest(of: ["0.6.1", nil], after: "0.6.2") == nil)
+        #expect(UpdateFeed.newest(of: [nil, nil], after: "0.6.2") == nil)
+    }
+
+    @Test func releaseLinksFollowTheAssetNameTheInstallerUses() {
+        let release = AppRelease(version: "0.7.0", hasMacBuild: true)
+        #expect(release.dmg.absoluteString == "https://github.com/imshaikot/browsentic/releases/download/v0.7.0/Browsentic-0.7.0.dmg")
+        #expect(release.notes.absoluteString == "https://github.com/imshaikot/browsentic/releases/tag/v0.7.0")
+    }
+
+    @Test func replacesTheRunningBundleOnlyWhereItCanBeReplaced() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("browsentic-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let writable = folder.appendingPathComponent("Browsentic.app", isDirectory: true)
+        #expect(try AppUpdater.destination(running: writable) == writable)
+
+        let translocated = URL(fileURLWithPath: "/private/var/folders/xx/T/AppTranslocation/1234/d/Browsentic.app", isDirectory: true)
+        #expect(try AppUpdater.destination(running: translocated).lastPathComponent == "Browsentic.app")
+        #expect(try AppUpdater.destination(running: translocated) != translocated)
+
+        #expect(throws: UpdateError.self) { try AppUpdater.destination(running: folder.appendingPathComponent("debug/Browsentic")) }
+    }
+
+    @Test func onlyTheInstallingPhasesBlockASecondPress() {
+        #expect(UpdatePhase.downloading(0.4).isInstalling)
+        #expect(UpdatePhase.verifying.isInstalling)
+        #expect(UpdatePhase.relaunching.isInstalling)
+        #expect(!UpdatePhase.failed("offline").isInstalling)
+        #expect(!UpdatePhase.checking.isInstalling)
+    }
+}

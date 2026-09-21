@@ -117,6 +117,24 @@ export function describeActions(): ToolDescriptor[] {
   return [...actions.values()].map(({ name, description, input }) => ({
     name,
     description,
-    inputSchema: z.toJSONSchema(input, { io: 'input' }),
+    inputSchema: tidy(z.toJSONSchema(input, { io: 'input' })),
   }));
 }
+
+const UNBOUNDED = new Set([Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER]);
+
+/**
+ * Every tool's schema is re-sent to the model on every turn, so what zod emits for its
+ * own sake — the dialect URL, and the safe-integer bounds `.int()` implies — is cut.
+ */
+function tidy(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(tidy);
+  if (!schema || typeof schema !== 'object') return schema;
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([key, value]) => key !== '$schema' && !(isBound(key) && UNBOUNDED.has(value as number)))
+      .map(([key, value]) => [key, tidy(value)]),
+  );
+}
+
+const isBound = (key: string) => key === 'minimum' || key === 'maximum';

@@ -53,6 +53,10 @@ export default function App() {
 
   function toggleMic() {
     if (!voice.supported) return;
+    if (micOn && voice.needsGrant) {
+      voice.grant();
+      return;
+    }
     if (micOn && voice.error) {
       voice.retry();
       return;
@@ -62,7 +66,9 @@ export default function App() {
 
   const hint = status.blocker
     ? BLOCKED[status.blocker]
-    : voice.error
+    : voice.needsGrant
+      ? `${voice.error} Tap to allow it.`
+      : voice.error
         ? voice.error
         : micOn && voice.listening
           ? voice.interim || 'Listening… speak, then pause'

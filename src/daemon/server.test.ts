@@ -19,12 +19,12 @@ const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 type Answer = (action: string, input: unknown) => ActionResult;
 
 /** A bridge that answers each action from a table, and remembers what it was asked. */
-function fakeBridge(answers: Record<string, ActionResult> | Answer = {}, status: Partial<BridgeStatus> = {}, tools: ToolDescriptor[] = describeActions()) {
+function fakeBridge(answers: Record<string, ActionResult> | Answer = {}, status: Partial<BridgeStatus> = {}, tools: ToolDescriptor[] = describeActions(), reserved?: string[]) {
   const asked: [string, unknown][] = [];
   const listeners: (() => void)[] = [];
   const answer: Answer = typeof answers === 'function' ? answers : (action) => answers[action] ?? failure('UNKNOWN_ACTION', action);
   const bridge: Bridge = {
-    describe: async () => tools,
+    describe: async () => ({ tools, reserved }),
     invoke: async (action, input) => {
       asked.push([action, input]);
       return answer(action, input);
@@ -72,7 +72,16 @@ describe('the tool list', () => {
     ]);
   });
 
-  test("an agent run is also offered the site-map report and the picked element's screenshot", async () => {
+  test('a reserved tool is listed only when the daemon offers it to this caller', async () => {
+    const offered = (reserved: string[]) => fakeBridge({}, {}, describeActions(), reserved).bridge;
+    const names = async (bridge: Bridge) => (await (await connect(bridge, { agentRun: true })).listTools()).tools.slice(-2).map((tool) => tool.name);
+    expect([await names(offered([FOCUS_SHOT_ACTION])), await names(offered([]))]).toEqual([
+      ['browsentic_status', toolNameFor(FOCUS_SHOT_ACTION)],
+      [toolNameFor(describeActions().at(-1)!.name), 'browsentic_status'],
+    ]);
+  });
+
+  test('a daemon too old to say what it offers leaves an agent run with both reserved tools', async () => {
     const { tools } = await (await connect(fakeBridge().bridge, { agentRun: true })).listTools();
     expect(tools.slice(-3).map((tool) => tool.name)).toEqual(['browsentic_status', toolNameFor(SAVE_SITE_MAP_ACTION), toolNameFor(FOCUS_SHOT_ACTION)]);
   });
@@ -119,7 +128,7 @@ describe('a tool call', () => {
   test('fencing can be turned off in config', async () => {
     writeFileSync(configPath, JSON.stringify({ guardrails: { fence: false } }));
     const client = await connect(fakeBridge({ 'page.extractText': success({ content: 'Pricing' }) }).bridge);
-    expect(texts(await call(client, 'page_extractText'))).toEqual([JSON.stringify({ content: 'Pricing' }, null, 2)]);
+    expect(texts(await call(client, 'page_extractText'))).toEqual([JSON.stringify({ content: 'Pricing' })]);
   });
 
   test('a failure comes back as an error that reads CODE: message, unfenced', async () => {
@@ -154,7 +163,7 @@ describe('a screenshot', () => {
 
   test('a result with no image in it is shown as it is', async () => {
     const client = await connect(fakeBridge({ 'page.screenshot': success({ skipped: true }) }).bridge);
-    expect(texts(await call(client, 'page_screenshot'))).toEqual([JSON.stringify({ skipped: true }, null, 2)]);
+    expect(texts(await call(client, 'page_screenshot'))).toEqual([JSON.stringify({ skipped: true })]);
   });
 });
 

@@ -363,9 +363,18 @@ function FocusChip({
 function VoiceStatus({ voice, voiceEnabled }: { voice: Voice; voiceEnabled: boolean }) {
   if (voiceEnabled && voice.error) {
     return (
-      <p className="mb-2 rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-1.5 text-[11px] text-amber">
-        {voice.error}
-      </p>
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber/40 bg-amber/10 px-2.5 py-1.5 text-[11px] text-amber">
+        <span className="flex-1">{voice.error}</span>
+        {voice.needsGrant && (
+          <button
+            type="button"
+            onClick={voice.grant}
+            className="shrink-0 rounded-full border border-amber/50 px-2 py-0.5 transition-colors hover:bg-amber/15"
+          >
+            Allow microphone
+          </button>
+        )}
+      </div>
     );
   }
 
