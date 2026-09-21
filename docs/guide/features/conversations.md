@@ -18,6 +18,10 @@ Speech uses the browser's built-in recognition. Nothing is bundled or downloaded
 means audio is streamed to Google for transcription. Type instead if that matters to you; see
 [Limits](../limits.md#speech-goes-to-google).
 
+The first time you turn the mic on, the panel shows **Allow microphone**. It opens a Browsentic tab
+where the browser can ask — a side panel and a popup have nowhere to show that prompt. Choose
+**Allow** once; the tab closes itself and dictation starts.
+
 Replies stream back token by token. Follow-ups continue the same conversation, so **"now click the
 second one"** works.
 

@@ -24,6 +24,9 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | "That pairing code is wrong or expired" | Codes are single-use and last 10 minutes | `browsentic pair` for a fresh one. A failed attempt does not burn the outstanding code |
 | "No Browsentic daemon is running" | Nothing on 8765–8767 | `browsentic status`; check `browsentic logs` |
 | `browsentic: command not found` | The global npm prefix is not on `PATH` | `npm prefix -g`, then add its `bin` directory |
+| "Browsentic has not been given the microphone yet" | A browser cannot show its microphone prompt inside a side panel or a popup, so a fresh install has never been asked | Press **Allow microphone** and choose **Allow** in the tab that opens |
+| "Microphone access is blocked" | The microphone was refused for the extension | Press **Allow microphone**, then click the icon at the left of that tab's address bar and set **Microphone** to **Allow** |
+| "This browser has no speech service" | Brave and some Chromium builds ship speech recognition without a transcription service behind it | Type instead, or use Chrome or Edge for dictation |
 | `EXTENSION_OFFLINE` | Browser closed, or not paired | Open the browser; `browsentic sessions` to check pairing |
 | "Load unpacked" cannot see `~/browsentic` | A Flatpak or Snap browser, sandboxed away from your home directory. Snap Chromium is the Ubuntu default | Grant it: `flatpak override --user --filesystem=~/browsentic com.google.Chrome`. Or install somewhere the sandbox can read: `browsentic setup --dir ~/snap/chromium/common/browsentic-extension` |
 | The folder picker does not show `~/browsentic` | It is there; some pickers open elsewhere by default | macOS: press ⇧⌘G and paste the path. Linux: Ctrl+L |
