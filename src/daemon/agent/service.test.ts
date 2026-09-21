@@ -21,6 +21,7 @@ beforeEach(() => {
     invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
     emit: (runId: string, event: RunEvent) => void (event.kind === 'error' && ended.push(runId)),
     draft: () => {},
+    actionNames: () => [],
   });
 });
 

@@ -50,6 +50,7 @@ export const streamContext = (settings: AgentSettings, overrides: Partial<Stream
   sessionId: null,
   workspace: stateDir,
   mcp,
+  mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
   ...overrides,
 });
 

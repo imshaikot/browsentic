@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -42,6 +42,15 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     install: 'https://antigravity.google/docs/cli/install',
     docs: 'https://antigravity.google/docs/cli',
     models: ['gemini-3-pro', 'gemini-3-flash'],
+  },
+  vibe: {
+    kind: 'vibe',
+    label: 'Mistral Vibe',
+    vendor: 'Mistral AI',
+    bin: 'vibe',
+    install: 'uv tool install mistral-vibe',
+    docs: 'https://github.com/mistralai/mistral-vibe',
+    models: ['mistral-medium-3.5'],
   },
 };
 

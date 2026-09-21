@@ -6,14 +6,13 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ActionResult } from '@/lib/actions/protocol';
-import { FOCUS_SHOT_ACTION, RESERVED_ACTIONS, RESERVED_PREFIX, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
-import { actionNameFor, assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
+import { FOCUS_SHOT_ACTION, RESERVED_ACTIONS, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
+import { actionNameFor, assertToolNamesRoundTrip, STATUS_TOOL, toolNameFor } from '@/lib/actions/tool-names';
 import { readAgentConfig } from './agent/config';
 import type { Bridge } from './control';
 import { IMAGE_NOTE, fence, fenceTag, policyFrom, sealSecrets, shouldFence } from './guardrails';
 import { log } from './log';
 
-const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
 const SCREENSHOT_TOOL = 'page_screenshot';
 const PICK_TOOL = 'page_pickElement';
 

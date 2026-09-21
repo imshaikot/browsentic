@@ -19,15 +19,16 @@ const stub = (name: string, { prints = `${name} 1.0.0`, exit = 0 } = {}) => {
   return path;
 };
 
-/** The stubs probed so far, a round at a time. The three agents are probed at once, so each round is sorted. */
+/** The stubs probed so far, a round at a time. Every agent is probed at once, so each round is sorted. */
 const rounds = () => {
   const lines = readFileSync(probes, 'utf8').split('\n').filter(Boolean);
-  return [lines.slice(0, 3).sort(), lines.slice(3, 6).sort()].filter((round) => round.length);
+  const size = AGENT_KINDS.length;
+  return [lines.slice(0, size).sort(), lines.slice(size, size * 2).sort()].filter((round) => round.length);
 };
 
 const configWith = (agents: Partial<Record<AgentKind, AgentSettings>>, agent: AgentKind = 'claude'): AgentConfig => ({
   agent,
-  agents: { claude: { bin: join(bin, 'claude') }, codex: { bin: join(bin, 'codex') }, antigravity: { bin: join(bin, 'agy') }, ...agents },
+  agents: { claude: { bin: join(bin, 'claude') }, codex: { bin: join(bin, 'codex') }, antigravity: { bin: join(bin, 'agy') }, vibe: { bin: join(bin, 'vibe') }, ...agents },
   requireApproval: [],
 });
 
@@ -58,7 +59,7 @@ describe('the registry', () => {
 describe('readiness probes', () => {
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
-    for (const name of ['claude', 'claude-next', 'codex', 'agy']) stub(name);
+    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe']) stub(name);
     stub('codex-expired', { prints: 'licence expired', exit: 3 });
   });
 
@@ -98,7 +99,7 @@ describe('readiness probes', () => {
   test('probes are reused for half a minute, even when only the active agent changed', async () => {
     await agentState(configWith({}), { refresh: true });
     const again = await agentState(configWith({}, 'antigravity'));
-    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex']], 'antigravity']);
+    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'vibe']], 'antigravity']);
   });
 
   test('asking for a refresh probes again', async () => {
@@ -111,8 +112,8 @@ describe('readiness probes', () => {
     await agentState(configWith({}), { refresh: true });
     await agentState(configWith({ claude: { bin: join(bin, 'claude-next') } }));
     expect(rounds()).toEqual([
-      ['agy', 'claude', 'codex'],
-      ['agy', 'claude-next', 'codex'],
+      ['agy', 'claude', 'codex', 'vibe'],
+      ['agy', 'claude-next', 'codex', 'vibe'],
     ]);
   });
 
