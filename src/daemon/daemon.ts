@@ -87,7 +87,7 @@ export interface Daemon extends Bridge {
   stop(): Promise<void>;
 }
 
-function persistScreenshot(
+export function persistScreenshot(
   action: string,
   input: unknown,
   result: ActionResult,
