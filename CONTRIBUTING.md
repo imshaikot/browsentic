@@ -61,7 +61,8 @@ Where a test lives decides what it runs in:
 | --- | --- |
 | `src/lib/**` | Node, with WXT's fake `browser` |
 | `src/lib/actions/page/**` | happy-dom |
-| `src/daemon/**` | Node, with `HOME` and the daemon's state in a throwaway directory |
+| `src/daemon/**` | Node, with `HOME` and the daemon's state in a throwaway directory and ports the OS picks |
+| `src/daemon/test/**` | The same sandbox, for tests that start a real daemon |
 
 Never put a test under `src/extension/entrypoints/`, because WXT builds every file there as an
 entrypoint. The floors in [vitest.coverage.ts](vitest.coverage.ts) only ever go up: raise one when

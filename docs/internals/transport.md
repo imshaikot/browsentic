@@ -14,6 +14,11 @@ The daemon runs one HTTP server that answers `GET /health` and upgrades everythi
 WebSocket. It binds the first free port of **8765, 8766, 8767**. If all three are taken it will not
 start.
 
+`BROWSENTIC_PORTS` replaces that list for the daemon and the CLI: comma-separated, with `0` for
+whatever port the OS hands out. The test suite sets it so a test daemon never takes a port from the
+one you are running. The extension cannot read it and still walks the three, so a daemon moved off
+them is one no browser will find.
+
 ---
 
 ## The origin gate

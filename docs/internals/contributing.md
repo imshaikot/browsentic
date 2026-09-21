@@ -39,6 +39,7 @@ yarn daemon:dev          # rebuild the daemon on change
 yarn daemon:restart      # rebuild, then swap the running daemon for the fresh build
 yarn daemon:manifest     # print the tool manifest, no browser needed
 yarn test             # every test; pass a path to run fewer
+yarn test:integration # only the tests that start a real daemon
 yarn coverage         # the tests, then coverage by area against its floors
 yarn check:intent "<utterance>"   # how the local grammar routes one instruction
 yarn check            # both type checks, then the tests and their coverage floors

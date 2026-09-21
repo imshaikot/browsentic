@@ -19,6 +19,7 @@
     "check": "yarn compile && yarn daemon:compile && yarn coverage",
     "check:intent": "node scripts/explain-intent.ts",
     "test": "vitest run",
+    "test:integration": "vitest run --project integration",
     "coverage": "vitest run --coverage",
     "daemon:compile": "yarn --cwd src/daemon compile",
     "daemon:build": "yarn --cwd src/daemon build",

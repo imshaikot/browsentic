@@ -9,10 +9,10 @@ import type { Reporter, Vitest } from 'vitest/node';
  */
 export const COVERAGE_AREAS = [
   { name: 'Guardrails, secrets, intent', glob: 'src/{daemon/guardrails,lib/secrets,lib/intent}/**', lines: 93 },
-  { name: 'Daemon', glob: 'src/daemon/{*.ts,!(guardrails)/**/*.ts}', lines: 11 },
-  { name: 'Shared lib', glob: 'src/lib/{*.ts,actions/*.ts,!(actions|bridge|intent|secrets)/**/*.ts}', lines: 13 },
+  { name: 'Daemon', glob: 'src/daemon/{*.ts,!(guardrails)/**/*.ts}', lines: 16 },
+  { name: 'Shared lib', glob: 'src/lib/{*.ts,actions/*.ts,!(actions|bridge|intent|secrets)/**/*.ts}', lines: 22 },
   { name: 'Extension background', glob: 'src/lib/bridge/!(use-*).ts', lines: 1 },
-  { name: 'Page actions', glob: 'src/lib/actions/page/**', lines: 3 },
+  { name: 'Page actions', glob: 'src/lib/actions/page/**', lines: 11 },
 ];
 
 interface CoverageMap {

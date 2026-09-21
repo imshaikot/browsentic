@@ -43,6 +43,15 @@ export default defineConfig({
           setupFiles: ['src/daemon/test/sandbox.ts'],
         },
       },
+      {
+        resolve: daemonResolve,
+        test: {
+          name: 'integration',
+          include: ['src/daemon/test/**/*.test.ts'],
+          setupFiles: ['src/daemon/test/sandbox.ts'],
+          testTimeout: 20_000,
+        },
+      },
     ],
     coverage: {
       provider: 'v8',
