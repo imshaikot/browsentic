@@ -222,6 +222,10 @@ to scroll the page in viewport-sized steps and wait out the browser's two-captur
 between each, so it costs roughly a second per screenful; ask for it when you need what is below
 the fold rather than by default.
 
+The capture is of the tab the call resolves to, whether or not it is the one in front. A tab that
+is behind another is rendered through Chrome's debugger (`tabs.captureTab` on Firefox), so it can
+fail with `DEBUGGER_UNAVAILABLE` while DevTools is open on it.
+
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `target` | [target](#element-targets) | — | Capture only this element's box. When set, `fullPage` is ignored |

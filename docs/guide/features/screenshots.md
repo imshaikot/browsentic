@@ -20,6 +20,17 @@ by default.
 
 ---
 
+## A capture follows the tab, not your eyes
+
+An agent working in one tab keeps photographing that tab after you move to another. While the tab
+is in front it is captured the ordinary way; once it is behind, Chrome renders it through its
+debugger instead, so the “started debugging this browser” bar appears for the moment the capture
+takes. Firefox captures a background tab directly and shows nothing. If DevTools is open on that
+tab the debugger cannot attach, and the capture fails with `DEBUGGER_UNAVAILABLE` until you close
+it.
+
+---
+
 ## Captures do not touch your disk unless you ask
 
 This is the part worth knowing. The image is handed straight back to whoever called for it, so

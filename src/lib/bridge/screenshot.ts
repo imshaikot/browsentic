@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import { invokeInFrame } from '@/lib/actions/client';
 import { ActionError } from '@/lib/actions/core';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { send, withDebugger, type DebuggerSession } from './cdp';
 import { TOP_FRAME } from './frame-focus';
 import { publishScreenshot } from './screenshot-preview';
 
@@ -22,24 +23,104 @@ const MAX_TILES = 48;
 const MAX_CANVAS_SIDE = 16384;
 const MAX_CANVAS_AREA = MAX_CANVAS_SIDE * MAX_CANVAS_SIDE;
 
+interface Frame {
+  dataUrl: string;
+  bitmap: ImageBitmap;
+}
+
+type Snap = (format: 'png' | 'jpeg', quality: number | undefined) => Promise<Frame>;
+
+type TabCapture = { captureTab: (tabId: number, options: { format: string; quality?: number }) => Promise<string> };
+
+const LEFT_THE_FRONT = 'TAB_LEFT_THE_FRONT';
+const DEBUGGER_CAPTURE_TIMEOUT_MS = 10_000;
+
+const FIREFOX_HINT = 'Capturing a background tab through the debugger is Chrome-only — Firefox captures it directly.';
+
 export async function screenshotTab(
   tab: { id: number; windowId?: number },
   input?: unknown,
   runId?: string,
 ): Promise<ActionResult> {
-  const planned = await invokeInFrame(tab.id, TOP_FRAME, 'page.screenshot', input);
+  if (import.meta.env.FIREFOX) return shoot(tab.id, input, runId, snapFirefoxTab(tab.id));
+
+  if (await inFront(tab.id)) {
+    const shot = await shoot(tab.id, input, runId, snapWhileInFront(tab));
+    if (shot.ok || shot.error.code !== LEFT_THE_FRONT) return shot;
+  }
+  return withDebugger(tab.id, FIREFOX_HINT, (session) => shoot(tab.id, input, runId, snapThroughDebugger(session)));
+}
+
+async function inFront(tabId: number): Promise<boolean> {
+  const tab = await browser.tabs.get(tabId).catch(() => null);
+  return tab?.active === true;
+}
+
+function snapWhileInFront(tab: { id: number; windowId?: number }): Snap {
+  return async (format, quality) => {
+    const frame = await captureViewport(tab.windowId, format, quality);
+    if (await inFront(tab.id)) return frame;
+    frame.bitmap.close();
+    throw new ActionError('The tab went behind another one mid-capture', LEFT_THE_FRONT);
+  };
+}
+
+function snapThroughDebugger(session: DebuggerSession): Snap {
+  return async (format, quality) => {
+    const captured = send<{ data: string }>(session, 'Page.captureScreenshot', {
+      format,
+      ...(format === 'jpeg' ? { quality: quality ?? DEFAULT_JPEG_QUALITY } : {}),
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new ActionError(
+              'Chrome did not render the background tab in time — bring the tab to the front and retry',
+              'CAPTURE_FAILED',
+            ),
+          ),
+        DEBUGGER_CAPTURE_TIMEOUT_MS,
+      );
+    });
+    const { data } = await Promise.race([captured, stalled]).finally(() => clearTimeout(timer));
+    return framed(`data:image/${format};base64,${data}`);
+  };
+}
+
+function snapFirefoxTab(tabId: number): Snap {
+  return async (format, quality) => {
+    const grade = format === 'jpeg' ? (quality ?? DEFAULT_JPEG_QUALITY) : undefined;
+    try {
+      return await framed(await (browser.tabs as unknown as TabCapture).captureTab(tabId, { format, quality: grade }));
+    } catch (error) {
+      throw new ActionError(cannotCapture(error), 'CAPTURE_UNSUPPORTED');
+    }
+  };
+}
+
+async function framed(dataUrl: string): Promise<Frame> {
+  return { dataUrl, bitmap: await createImageBitmap(await (await fetch(dataUrl)).blob()) };
+}
+
+const cannotCapture = (error: unknown) =>
+  `Cannot capture this tab (${error instanceof Error ? error.message : String(error)}) — it may be a chrome:// page, the Web Store, or a PDF, which browsers refuse to screenshot`;
+
+async function shoot(tabId: number, input: unknown, runId: string | undefined, snap: Snap): Promise<ActionResult> {
+  const planned = await invokeInFrame(tabId, TOP_FRAME, 'page.screenshot', input);
   if (!planned.ok) return planned;
   const plan = planned.data as CapturePlan;
 
   try {
-    const shot = await capture(tab, plan);
+    const shot = await capture(tabId, plan, snap);
     void publishCapture(shot, runId);
     return success(shot);
   } catch (error) {
     if (error instanceof ActionError) return failure(error.code, error.message);
     return failure('CAPTURE_FAILED', error instanceof Error ? error.message : String(error));
   } finally {
-    void invokeInFrame(tab.id, TOP_FRAME, 'page.scrollTo', {
+    void invokeInFrame(tabId, TOP_FRAME, 'page.scrollTo', {
       position: { x: plan.scroll.x, y: plan.scroll.y },
       behavior: 'instant',
     });
@@ -60,7 +141,7 @@ async function publishCapture(shot: Shot, runId?: string): Promise<void> {
   } catch {}
 }
 
-async function capture(tab: { id: number; windowId?: number }, plan: CapturePlan): Promise<Shot> {
+async function capture(tabId: number, plan: CapturePlan, snap: Snap): Promise<Shot> {
   const { viewport, format, quality, maxLongSide } = plan;
   const region = { ...plan.region };
 
@@ -89,7 +170,7 @@ async function capture(tab: { id: number; windowId?: number }, plan: CapturePlan
 
   for (const y of ys) {
     for (const x of xs) {
-      const scrolled = await invokeInFrame(tab.id, TOP_FRAME, 'page.scrollTo', {
+      const scrolled = await invokeInFrame(tabId, TOP_FRAME, 'page.scrollTo', {
         position: { x, y },
         behavior: 'instant',
       });
@@ -99,7 +180,7 @@ async function capture(tab: { id: number; windowId?: number }, plan: CapturePlan
       const sinceLast = Date.now() - lastCaptureAt;
       if (lastCaptureAt && sinceLast < CAPTURE_INTERVAL_MS) await delay(CAPTURE_INTERVAL_MS - sinceLast);
 
-      const shot = await captureViewport(tab.windowId, format, quality);
+      const shot = await snap(format, quality);
       lastCaptureAt = Date.now();
       const bitmap = shot.bitmap;
 
@@ -187,7 +268,7 @@ export async function captureViewport(
   windowId: number | undefined,
   format: 'png' | 'jpeg',
   quality: number | undefined,
-): Promise<{ dataUrl: string; bitmap: ImageBitmap }> {
+): Promise<Frame> {
   const grade = format === 'jpeg' ? (quality ?? DEFAULT_JPEG_QUALITY) : undefined;
   for (let attempt = 0; ; attempt++) {
     try {
@@ -195,17 +276,14 @@ export async function captureViewport(
         windowId == null
           ? await browser.tabs.captureVisibleTab({ format, quality: grade })
           : await browser.tabs.captureVisibleTab(windowId, { format, quality: grade });
-      return { dataUrl, bitmap: await createImageBitmap(await (await fetch(dataUrl)).blob()) };
+      return await framed(dataUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (attempt < 2 && /MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/i.test(message)) {
         await delay(CAPTURE_INTERVAL_MS);
         continue;
       }
-      throw new ActionError(
-        `Cannot capture this tab (${message}) — it may be a chrome:// page, the Web Store, or a PDF, which browsers refuse to screenshot`,
-        'CAPTURE_UNSUPPORTED',
-      );
+      throw new ActionError(cannotCapture(error), 'CAPTURE_UNSUPPORTED');
     }
   }
 }
