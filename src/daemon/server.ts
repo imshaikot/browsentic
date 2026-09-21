@@ -342,7 +342,7 @@ function splitDataUrl(dataUrl: string): [mimeType: string, base64: string] {
  */
 function render(result: ActionResult, fenceWith?: string) {
   if (result.ok) {
-    const body = sealSecrets(JSON.stringify(result.data, null, 2));
+    const body = sealSecrets(JSON.stringify(result.data));
     return { content: [{ type: 'text' as const, text: fenceWith ? fence(body, fenceWith) : body }] };
   }
   return {

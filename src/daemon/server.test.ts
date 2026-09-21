@@ -118,7 +118,7 @@ describe('a tool call', () => {
   test('fencing can be turned off in config', async () => {
     writeFileSync(configPath, JSON.stringify({ guardrails: { fence: false } }));
     const client = await connect(fakeBridge({ 'page.extractText': success({ content: 'Pricing' }) }).bridge);
-    expect(texts(await call(client, 'page_extractText'))).toEqual([JSON.stringify({ content: 'Pricing' }, null, 2)]);
+    expect(texts(await call(client, 'page_extractText'))).toEqual([JSON.stringify({ content: 'Pricing' })]);
   });
 
   test('a failure comes back as an error that reads CODE: message, unfenced', async () => {
@@ -153,7 +153,7 @@ describe('a screenshot', () => {
 
   test('a result with no image in it is shown as it is', async () => {
     const client = await connect(fakeBridge({ 'page.screenshot': success({ skipped: true }) }).bridge);
-    expect(texts(await call(client, 'page_screenshot'))).toEqual([JSON.stringify({ skipped: true }, null, 2)]);
+    expect(texts(await call(client, 'page_screenshot'))).toEqual([JSON.stringify({ skipped: true })]);
   });
 });
 
