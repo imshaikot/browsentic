@@ -28,19 +28,24 @@ BUILD_NUMBER="${BUILD_NUMBER:-$(git -C "$REPO" rev-list --count HEAD 2>/dev/null
 
 cd "$MAC"
 echo "▸ Building Browsentic $VERSION ($BUILD_NUMBER) for: $ARCHS"
+# Where a slice lands depends on the toolchain, and the newer build system writes every
+# architecture to the same place, so each one is asked for and set aside before the next is built.
+mkdir -p "$DIST"
 slices=()
 for arch in $ARCHS; do
-  swift build -c release --triple "${arch}-apple-macosx14.0" --product Browsentic
-  slices+=(".build/${arch}-apple-macosx/release/Browsentic")
+  triple="${arch}-apple-macosx14.0"
+  swift build -c release --triple "$triple" --product Browsentic
+  cp "$(swift build -c release --triple "$triple" --show-bin-path)/Browsentic" "$DIST/Browsentic.$arch"
+  slices+=("$DIST/Browsentic.$arch")
 done
 
-mkdir -p "$DIST"
 BIN="$DIST/Browsentic.bin"
 if [ ${#slices[@]} -gt 1 ]; then
   lipo -create "${slices[@]}" -output "$BIN"
 else
   cp "${slices[0]}" "$BIN"
 fi
+rm -f "${slices[@]}"
 
 echo "▸ Assembling $APP"
 rm -rf "$APP"
