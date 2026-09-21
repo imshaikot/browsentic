@@ -1,0 +1,4 @@
+# Hand-written from antigravity.ts's reader, not recorded: agy is not installed where this was written. A run the CLI ends with an error after it has started talking.
+{"event":"init","conversation_id":"5e6f7a8b-9c0d-41e2-83f4-a5b6c7d8e9f0"}
+{"event":"step_update","step_update":{"step_index":0,"step_type":"response","text_delta":"Opening the page"}}
+{"event":"result","result":{"conversation_id":"5e6f7a8b-9c0d-41e2-83f4-a5b6c7d8e9f0","status":"error","error":"quota exceeded for this model"}}

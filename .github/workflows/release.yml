@@ -87,8 +87,8 @@ jobs:
           node "$yarn_bin" --cwd src/daemon install --immutable
 
       - name: Check
-        # The same gate the README asks for before a pull request: both type checks, the intent
-        # fixtures and the security fixtures.
+        # The same gate CONTRIBUTING.md asks for before a pull request: both type checks, then the
+        # tests and their coverage floors.
         run: node "$YARN" check
 
       - name: Build the store archives and the daemon

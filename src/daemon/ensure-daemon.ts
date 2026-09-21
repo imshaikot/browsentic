@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { DAEMON_PORTS } from '@/lib/actions/protocol';
 import { clearLockfile, isRunning, readLockfile, type Lockfile } from './lockfile';
 import { log } from './log';
+import { daemonPorts } from './ports';
 
 const SPAWN_TIMEOUT_MS = 8_000;
 const POLL_INTERVAL_MS = 150;
@@ -41,7 +41,7 @@ export async function probeExisting(): Promise<Lockfile | null> {
 
   // The control token is minted per daemon, so a daemon found on another port is only reachable
   // through the lockfile it wrote itself — which its pid identifies.
-  for (const port of DAEMON_PORTS) {
+  for (const port of daemonPorts) {
     if (port === lock?.port) continue;
     const pid = await healthyPid(port);
     if (pid === null) continue;
@@ -67,7 +67,7 @@ export interface RunningDaemon {
  */
 export async function runningDaemons(): Promise<RunningDaemon[]> {
   const found = new Map<number, number>();
-  for (const port of DAEMON_PORTS) {
+  for (const port of daemonPorts) {
     const pid = await healthyPid(port);
     if (pid !== null && !found.has(pid)) found.set(pid, port);
   }

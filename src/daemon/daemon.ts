@@ -1,9 +1,9 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
-  DAEMON_PORTS,
   EXTERNAL_RUN_ID,
   SOCKET_PROTOCOL_VERSION,
   failure,
@@ -67,6 +67,7 @@ import {
 } from './guardrails';
 import { log } from './log';
 import { readLockfile, writeLockfile, clearLockfile, type Lockfile } from './lockfile';
+import { daemonPorts } from './ports';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
 type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
@@ -86,7 +87,7 @@ export interface Daemon extends Bridge {
   stop(): Promise<void>;
 }
 
-function persistScreenshot(
+export function persistScreenshot(
   action: string,
   input: unknown,
   result: ActionResult,
@@ -689,16 +690,16 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
 
 function listen(http: Server): Promise<number> {
   return new Promise((resolve, reject) => {
-    const remaining = [...DAEMON_PORTS];
+    const remaining = [...daemonPorts];
     const attempt = () => {
       const port = remaining.shift();
       if (port === undefined) {
-        reject(new Error(`No free port in ${DAEMON_PORTS.join(', ')} — another process is using them all`));
+        reject(new Error(`No free port in ${daemonPorts.join(', ')} — another process is using them all`));
         return;
       }
       const onListening = () => {
         http.removeListener('error', onError);
-        resolve(port);
+        resolve((http.address() as AddressInfo).port);
       };
       const onError = (error: NodeJS.ErrnoException) => {
         http.removeListener('listening', onListening);

@@ -1,0 +1,14 @@
+# Hand-written from claude.ts's reader, not recorded. A research run: Claude's own WebSearch and WebFetch are tools the daemon cannot see, so the reader announces them.
+{"type":"system","subtype":"init","session_id":"7d3f1c20-8b4a-4e59-a6d2-0c9e1f3b5a77","tools":["WebSearch","WebFetch","mcp__browsentic__page_getPageInfo"],"model":"claude-sonnet-5"}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":400,"cache_read_input_tokens":6000,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_ws","name":"WebSearch"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_wf","name":"WebFetch"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_stop","index":1}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_mcp","name":"mcp__browsentic__page_getPageInfo"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_stop","index":2}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":90}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":3000,"cache_read_input_tokens":6400,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Their docs list three plans."}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}}
+{"type":"result","subtype":"success","is_error":false,"stop_reason":"end_turn","result":"Their docs list three plans.","session_id":"7d3f1c20-8b4a-4e59-a6d2-0c9e1f3b5a77"}

@@ -38,9 +38,11 @@ yarn daemon:compile      # type check the daemon
 yarn daemon:dev          # rebuild the daemon on change
 yarn daemon:restart      # rebuild, then swap the running daemon for the fresh build
 yarn daemon:manifest     # print the tool manifest, no browser needed
-yarn check:intent     # route a fixture table of utterances through the local grammar
-yarn check:security
-yarn check            # both type checks plus both fixture suites
+yarn test             # every test; pass a path to run fewer
+yarn test:integration # only the tests that start a real daemon
+yarn coverage         # the tests, then coverage by area against its floors
+yarn check:intent "<utterance>"   # how the local grammar routes one instruction
+yarn check            # both type checks, then the tests and their coverage floors
 ```
 
 **Run `yarn check` before opening a pull request.** If you touched the action registry, also run
@@ -83,8 +85,8 @@ a new predicate, add it to `CONDITIONS`; the vocabulary is closed on purpose.
 
 ### If it should be reachable from the side panel without an agent
 
-Add a rule to [`src/lib/intent/grammar.ts`](../../src/lib/intent/grammar.ts) and a fixture to the
-`yarn check:intent` table. Bias toward escalating — see
+Add a rule to [`src/lib/intent/grammar.ts`](../../src/lib/intent/grammar.ts) and a case to the table in
+[`route.test.ts`](../../src/lib/intent/route.test.ts). Bias toward escalating — see
 [the intent funnel](agent-runs.md#the-intent-funnel).
 
 ---
@@ -98,7 +100,9 @@ decides what to say and how to read the answer back.
 You must also add a `CONTAINMENT` entry in
 [`src/daemon/guardrails/spawn.ts`](../../src/daemon/guardrails/spawn.ts) declaring which containment mode
 that CLI supports and what its plan must carry. `vetPlan()` refuses to spawn a runner whose plan does
-not match — that is the point, and it is asserted in tests without spawning anything.
+not match — that is the point, and [`spawn.test.ts`](../../src/daemon/guardrails/spawn.test.ts) asserts it
+without spawning anything. Those tests walk every agent in the catalog, so a new runner is covered the
+moment it exists; add tampering cases for the flags its containment depends on.
 
 ---
 

@@ -227,7 +227,7 @@ Three passes, in `src/lib/secrets/`:
 
 The label vocabulary is written once, as word parts, and both readers are generated from it — the
 inline regex joins the parts with an optional separator, the key matcher joins them bare. They
-cannot drift, and `yarn check:security` asserts every word is readable both ways.
+cannot drift, and [`secrets.test.ts`](../../src/lib/secrets/secrets.test.ts) asserts every word is readable both ways.
 
 The entropy gate carries two signals because one is not enough. `ContinueReadingTheFullArticleHere`
 reaches 3.96 bits per character; a random 32-character token reaches 4.5–5.0, and flips case about

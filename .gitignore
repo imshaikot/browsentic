@@ -17,6 +17,9 @@ dist/
 .output/
 *.tsbuildinfo
 
+# `yarn coverage` writes its report here.
+coverage/
+
 # SwiftPM's build tree for the macOS app. The bundle and the DMG land in dist/mac/, which the
 # `dist/` rule above already covers.
 src/mac/.build/

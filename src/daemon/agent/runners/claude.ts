@@ -59,9 +59,10 @@ type StreamLine =
         type?: string;
         delta?: { type?: string; text?: string };
         content_block?: { type?: string; id?: string; name?: string };
+        message?: { usage?: UsageLine };
+        usage?: UsageLine;
       };
     }
-  | { type: 'assistant'; parent_tool_use_id?: string | null; message?: { usage?: UsageLine } }
   | {
       type: 'result';
       is_error?: boolean;
@@ -114,19 +115,19 @@ export const claudeRunner: Runner = {
   },
 
   reader(): StreamReader {
+    // A message's usage is only final in its message_delta. The assistant lines repeat the
+    // opening snapshot once per content block, so counting those under-reports and double-counts.
+    let prompt = 0;
     let generated = 0;
+    let counted = false;
 
-    const report = (usage: UsageLine | undefined, sink: StreamSink) => {
-      if (!usage) return;
+    const promptOf = (usage: UsageLine) =>
+      (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
+
+    const report = (usage: UsageLine, sink: StreamSink) => {
+      counted = true;
       generated += usage.output_tokens ?? 0;
-      sink.usage({
-        contextTokens:
-          (usage.input_tokens ?? 0) +
-          (usage.cache_read_input_tokens ?? 0) +
-          (usage.cache_creation_input_tokens ?? 0) +
-          (usage.output_tokens ?? 0),
-        outputTokens: generated,
-      });
+      sink.usage({ contextTokens: prompt + (usage.output_tokens ?? 0), outputTokens: generated });
     };
 
     return (line, sink) => {
@@ -152,18 +153,19 @@ export const claudeRunner: Runner = {
             const name = event.content_block.name ?? 'tool';
             if (WEB_TOOLS.includes(name)) sink.tool(event.content_block.id ?? randomUUID(), name);
           }
+          if (event?.type === 'message_start') prompt = promptOf(event.message?.usage ?? {});
+          if (event?.type === 'message_delta' && event.usage) report(event.usage, sink);
           return;
         }
-
-        case 'assistant':
-          if (!message.parent_tool_use_id) report(message.message?.usage, sink);
-          return;
 
         case 'result':
           if (message.is_error) {
             return sink.fail('AGENT_FAILED', message.result || message.subtype || 'Claude Code reported an error');
           }
-          if (!generated) report(message.usage, sink);
+          if (!counted && message.usage) {
+            prompt = promptOf(message.usage);
+            report(message.usage, sink);
+          }
           return sink.done(message.stop_reason || 'end_turn');
       }
     };

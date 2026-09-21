@@ -1,0 +1,11 @@
+# Hand-written from codex.ts's reader, not recorded. One turn in which Codex reports a message as growing snapshots, searches the web, then finishes a second message it only sends whole.
+{"type":"thread.started","thread_id":"01a0c580-1d2e-7f30-8a41-5b6c7d8e9f00"}
+{"type":"turn.started"}
+{"type":"item.updated","item":{"id":"item_0","type":"agent_message","text":"Looking"}}
+{"type":"item.updated","item":{"id":"item_0","type":"agent_message","text":"Looking it up"}}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Looking it up."}}
+{"type":"item.started","item":{"id":"item_1","type":"web_search","query":"acme pricing"}}
+{"type":"item.completed","item":{"id":"item_1","type":"web_search","query":"acme pricing"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"ls"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"It costs $12 a month."}}
+{"type":"turn.completed","usage":{"input_tokens":20000,"cached_input_tokens":18000,"output_tokens":45}}

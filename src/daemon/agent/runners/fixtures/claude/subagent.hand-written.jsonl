@@ -1,0 +1,14 @@
+# Hand-written from claude.ts's reader, not recorded. Everything a subagent says arrives tagged with the parent_tool_use_id that spawned it, and none of it is the run's own answer.
+{"type":"system","subtype":"init","session_id":"c41a9e07-2f65-4b18-93d0-6e7a2b1c8f45","tools":["Agent"],"model":"claude-sonnet-5"}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":500,"cache_read_input_tokens":5000,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_task","name":"Agent"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":40}}}
+{"type":"stream_event","parent_tool_use_id":"toolu_task","event":{"type":"message_start","message":{"usage":{"input_tokens":9000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":"toolu_task","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_sub_ws","name":"WebSearch"}}}
+{"type":"stream_event","parent_tool_use_id":"toolu_task","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Subagent notes nobody asked to see."}}}
+{"type":"stream_event","parent_tool_use_id":"toolu_task","event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":700}}}
+{"type":"assistant","parent_tool_use_id":"toolu_task","message":{"content":[{"type":"text","text":"Subagent notes nobody asked to see."}],"usage":{"input_tokens":9000,"output_tokens":700}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":800,"cache_read_input_tokens":5500,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Done."}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":3}}}
+{"type":"result","subtype":"success","is_error":false,"stop_reason":"end_turn","result":"Done.","session_id":"c41a9e07-2f65-4b18-93d0-6e7a2b1c8f45"}
