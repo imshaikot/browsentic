@@ -1,0 +1,19 @@
+# Hand-written from claude.ts's reader, not recorded. A run that calls one browsentic tool and then answers: two API messages, each closing with its own message_delta usage.
+{"type":"system","subtype":"init","session_id":"5b0e8a52-3c71-4d7e-9f10-2a6c4b8d9e01","tools":["mcp__browsentic__page_getPageInfo"],"model":"claude-sonnet-5"}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":1200,"cache_read_input_tokens":7000,"cache_creation_input_tokens":0,"output_tokens":2}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_01","name":"mcp__browsentic__page_getPageInfo"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{}"}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":1200,"cache_read_input_tokens":7000,"cache_creation_input_tokens":0,"output_tokens":60}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_stop"}}
+{"type":"assistant","parent_tool_use_id":null,"message":{"content":[{"type":"tool_use","id":"toolu_01","name":"mcp__browsentic__page_getPageInfo","input":{}}],"usage":{"input_tokens":1200,"cache_read_input_tokens":7000,"cache_creation_input_tokens":0,"output_tokens":2}}}
+{"type":"user","parent_tool_use_id":null,"message":{"content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"{\"document\":{\"title\":\"Pricing\"}}"}]}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_start","message":{"usage":{"input_tokens":900,"cache_read_input_tokens":8200,"cache_creation_input_tokens":0,"output_tokens":1}}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"It costs "}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"$12 a month."}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":900,"cache_read_input_tokens":8200,"cache_creation_input_tokens":0,"output_tokens":12}}}
+{"type":"stream_event","parent_tool_use_id":null,"event":{"type":"message_stop"}}
+{"type":"assistant","parent_tool_use_id":null,"message":{"content":[{"type":"text","text":"It costs $12 a month."}],"usage":{"input_tokens":900,"cache_read_input_tokens":8200,"cache_creation_input_tokens":0,"output_tokens":1}}}
+{"type":"result","subtype":"success","is_error":false,"stop_reason":"end_turn","result":"It costs $12 a month.","session_id":"5b0e8a52-3c71-4d7e-9f10-2a6c4b8d9e01","usage":{"input_tokens":2100,"cache_read_input_tokens":15200,"cache_creation_input_tokens":0,"output_tokens":72}}
