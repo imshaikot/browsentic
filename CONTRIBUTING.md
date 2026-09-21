@@ -37,12 +37,35 @@ the daemon's lifecycle, and every command live in the
 yarn check
 ```
 
-That is both type checks plus the intent and security fixture suites — the same command CI runs
+That is both type checks plus the test suite and its coverage floors — the same command CI runs
 on your pull request. Green locally means green in CI.
 
 If you touched the action registry, also run `yarn daemon:manifest` and keep
 [docs/reference/tools.md](docs/reference/tools.md) in step with what it prints. The manifest is
 generated from the registry, so the docs are the only place drift can hide.
+
+## Tests
+
+A test sits next to the module it tests, as `<module>.test.ts`, and runs with
+[Vitest](https://vitest.dev):
+
+```sh
+yarn test                          # everything
+yarn test src/daemon/guardrails    # one directory or file
+yarn coverage                      # everything, then coverage by area against its floors
+```
+
+Where a test lives decides what it runs in:
+
+| Where | Runs in |
+| --- | --- |
+| `src/lib/**` | Node, with WXT's fake `browser` |
+| `src/lib/actions/page/**` | happy-dom |
+| `src/daemon/**` | Node, with `HOME` and the daemon's state in a throwaway directory |
+
+Never put a test under `src/extension/entrypoints/`, because WXT builds every file there as an
+entrypoint. The floors in [vitest.coverage.ts](vitest.coverage.ts) only ever go up: raise one when
+your tests lift an area, and never lower one to get a build through.
 
 ## Adding a capability
 
@@ -64,7 +87,7 @@ somewhere, or acts on another site's security control should carry a rule in the
   `docs: …`. Look at `git log --oneline` and match it.
 - **Docs travel with the change.** A new capability without its `docs/` page is half a PR.
 - CI runs `yarn check` and both builds on every PR. A red check is yours to fix, but ask if
-  the failure makes no sense — the fixtures have opinions.
+  the failure makes no sense — the tests have opinions.
 
 ## Conduct
 

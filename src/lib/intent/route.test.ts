@@ -1,12 +1,9 @@
-#!/usr/bin/env node
-import { build } from 'esbuild';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { describe, expect, test } from 'vitest';
+import { routeIntent, type Routing } from './route';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
+type Case = [say: string, expected: string, input?: unknown];
 
-const CASES = [
+const CASES: Case[] = [
   ['back', 'act:history.back', { action: 'back' }],
   ['go back', 'act:history.back'],
   ['Hey Browsentic, could you go back please?', 'act:history.back'],
@@ -119,59 +116,15 @@ const CASES = [
   ['@shopping go to amazon.com', 'escalate:skill-prefix'],
 ];
 
-const outfile = join(root, 'node_modules/.cache/browsentic/intent-check.mjs');
-await mkdir(dirname(outfile), { recursive: true });
-await build({
-  entryPoints: [join(root, 'src/lib/intent/index.ts')],
-  outfile,
-  bundle: true,
-  format: 'esm',
-  platform: 'node',
-  logLevel: 'warning',
-  alias: { '@': join(root, 'src') },
-});
+const outcome = (routing: Routing) =>
+  routing.decision === 'act' ? `act:${routing.intent.ruleId}` : `escalate:${routing.reason}`;
 
-const { routeIntent, ACT_THRESHOLD } = await import(pathToFileURL(outfile).href);
-await rm(dirname(outfile), { recursive: true, force: true });
-
-const ask = process.argv.slice(2).join(' ').trim();
-if (ask) {
-  console.log(`${ask}\n${JSON.stringify(routeIntent(ask), null, 2)}`);
-  process.exit(0);
-}
-
-let failed = 0;
-let lowestAct = Infinity;
-let highestEscalate = 0;
-
-for (const [say, expected, expectedInput] of CASES) {
-  const routing = routeIntent(say);
-  const got =
-    routing.decision === 'act' ? `act:${routing.intent.ruleId}` : `escalate:${routing.reason}`;
-  const inputMismatch =
-    expectedInput && JSON.stringify(routing.intent?.input) !== JSON.stringify(expectedInput);
-
-  if (routing.decision === 'act') lowestAct = Math.min(lowestAct, routing.intent.score);
-  else if (routing.reason === 'below-threshold') highestEscalate = Math.max(highestEscalate, routing.score);
-
-  if (got !== expected || inputMismatch) {
-    failed++;
-    console.log(`✗ ${JSON.stringify(say)}\n    expected ${expected}, got ${got}`);
-    if (inputMismatch) {
-      console.log(`    input    ${JSON.stringify(routing.intent?.input)}`);
-      console.log(`    wanted   ${JSON.stringify(expectedInput)}`);
-    }
+describe('routeIntent', () => {
+  for (const [say, expected, input] of CASES) {
+    test(`${JSON.stringify(say)} → ${expected}`, () => {
+      const routing = routeIntent(say);
+      expect(outcome(routing)).toBe(expected);
+      if (input !== undefined) expect(routing.decision === 'act' ? routing.intent.input : undefined).toEqual(input);
+    });
   }
-}
-
-const acting = CASES.filter(([, e]) => e.startsWith('act:')).length;
-console.log(
-  `\n${CASES.length - failed}/${CASES.length} routed as expected` +
-    ` (${acting} handled locally, ${CASES.length - acting} escalated)`,
-);
-console.log(
-  `threshold ${ACT_THRESHOLD} sits in (${highestEscalate.toFixed(3)}, ${lowestAct.toFixed(3)}] — ` +
-    'the band between the best case it rejects and the worst it accepts',
-);
-if (failed) console.log(`\n${failed} case(s) failed`);
-process.exit(failed ? 1 : 0);
+});
