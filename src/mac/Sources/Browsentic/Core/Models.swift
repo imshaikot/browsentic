@@ -19,14 +19,22 @@ struct BridgeStatus: Decodable, Equatable {
 }
 
 struct BrowserSession: Decodable, Identifiable, Equatable {
+    /// Absent from a daemon that still knows a browser by its origin alone.
+    let sessionId: String?
+    let browser: String?
     let origin: String
     let extensionVersion: String
     let pairedAt: String
     let lastSeenAt: String
     let connected: Bool
 
-    var id: String { origin }
-    var extensionId: String { origin.replacingOccurrences(of: "chrome-extension://", with: "") }
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "id"
+        case browser, origin, extensionVersion, pairedAt, lastSeenAt, connected
+    }
+
+    var id: String { sessionId ?? origin }
+    var extensionId: String { origin.replacingOccurrences(of: #"^[a-z-]+-extension://"#, with: "", options: .regularExpression) }
 }
 
 struct PairingCode: Decodable, Equatable {
