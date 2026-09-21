@@ -116,6 +116,19 @@ export class AgentSession {
     }
   }
 
+  /**
+   * What a run's tool list should hold. A tool the run would only be refused is left
+   * out: its schema is re-sent on every turn, and listing it invites the call.
+   */
+  offerFor(runId: string): { withheld: string[]; reserved: string[] } | null {
+    const run = this.runs.get(runId);
+    if (!run) return null;
+    return {
+      withheld: run.liveTools ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
+      reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), ...(run.focusShot ? [FOCUS_SHOT_ACTION] : [])],
+    };
+  }
+
   async invokeForRun(runId: string, action: string, input?: unknown): Promise<ActionResult> {
     const run = this.runs.get(runId);
     if (!run) {

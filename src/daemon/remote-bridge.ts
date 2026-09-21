@@ -4,10 +4,9 @@ import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { PICK_DEFAULT_TIMEOUT_MS, pickElement } from '@/lib/actions/page/pick-element';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { failure, type ActionResult } from '@/lib/actions/protocol';
-import type { ToolDescriptor } from '@/lib/actions/manifest';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
-import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, SessionSummary } from './control';
+import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 
 const REQUEST_TIMEOUT_MS = 60_000;
 
@@ -32,9 +31,9 @@ export class RemoteBridge implements Bridge {
     });
   }
 
-  async describe(): Promise<ToolDescriptor[]> {
-    const reply = await this.request({ id: randomUUID(), op: 'describe' });
-    return reply && 'tools' in reply ? reply.tools : [];
+  async describe(): Promise<Described> {
+    const reply = await this.request({ id: randomUUID(), op: 'describe', runId: this.runId });
+    return reply && 'tools' in reply ? { tools: reply.tools, reserved: reply.reserved } : { tools: [] };
   }
 
   async invoke(action: string, input?: unknown): Promise<ActionResult> {

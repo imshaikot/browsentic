@@ -62,8 +62,9 @@ describe('connecting to the daemon', () => {
 
 describe('asking the daemon', () => {
   test('the tools it describes', async () => {
-    answer = ({ id }) => ({ id, op: 'describe', tools: [{ name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} }] });
-    expect(await bridge.describe()).toEqual([{ name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} }]);
+    const tools = [{ name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} }];
+    answer = ({ id }) => ({ id, op: 'describe', tools, reserved: ['browsentic.focusShot'] });
+    expect(await bridge.describe()).toEqual({ tools, reserved: ['browsentic.focusShot'] });
   });
 
   test('an action, stamped with the run it belongs to', async () => {
@@ -163,7 +164,7 @@ describe('when the daemon does not answer', () => {
 
   test('lists come back empty and counts as zero', async () => {
     expect([await giveUp(() => bridge.describe()), await giveUp(() => bridge.sessions()), await giveUp(() => bridge.revoke())]).toEqual([
-      [60_000, []],
+      [60_000, { tools: [] }],
       [60_000, []],
       [60_000, 0],
     ]);
@@ -174,7 +175,7 @@ describe('when the daemon does not answer', () => {
     await vi.waitFor(() => expect(daemonSide.readyState).toBe(daemonSide.CLOSED));
     expect([await bridge.invoke('page.getPageInfo'), await bridge.describe(), received]).toEqual([
       { ok: false, error: { code: 'DAEMON_UNREACHABLE', message: 'The Browsentic daemon did not respond' } },
-      [],
+      { tools: [] },
       [],
     ]);
   });

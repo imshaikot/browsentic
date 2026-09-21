@@ -22,7 +22,7 @@ export interface SessionSummary {
 }
 
 export type ControlRequest =
-  | { id: string; op: 'describe' }
+  | { id: string; op: 'describe'; runId?: string }
   | { id: string; op: 'status' }
   | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string }
   | { id: string; op: 'pair' }
@@ -31,7 +31,7 @@ export type ControlRequest =
   | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind };
 
 export type ControlMessage =
-  | { id: string; op: 'describe'; tools: ToolDescriptor[] }
+  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[] }
   | { id: string; op: 'status'; status: BridgeStatus }
   | { id: string; op: 'invoke'; result: ActionResult }
   | { id: string; op: 'pair'; code: string; expiresAt: number }
@@ -40,8 +40,14 @@ export type ControlMessage =
   | { id: string; op: 'agent'; state: AgentState }
   | { event: 'manifest-changed' };
 
+export interface Described {
+  tools: ToolDescriptor[];
+  /** Reserved actions this caller may be offered. Absent when the daemon predates the field. */
+  reserved?: string[];
+}
+
 export interface Bridge {
-  describe(): Promise<ToolDescriptor[]>;
+  describe(): Promise<Described>;
   invoke(action: string, input?: unknown): Promise<ActionResult>;
   status(): Promise<BridgeStatus>;
   onManifestChanged(listener: () => void): void;
