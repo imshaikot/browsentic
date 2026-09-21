@@ -10,6 +10,8 @@ export interface VoiceComposer {
   listening: boolean;
   supported: boolean;
   error: string | null;
+  needsGrant: boolean;
+  grant: () => void;
   pendingSend: boolean;
   autoSendMs: number;
   cancelPending: () => void;
@@ -99,6 +101,8 @@ export function useVoiceComposer(opts: {
     listening: speech.listening,
     supported: speech.supported,
     error: speech.error,
+    needsGrant: speech.needsGrant,
+    grant: speech.grant,
     pendingSend,
     autoSendMs,
     cancelPending,

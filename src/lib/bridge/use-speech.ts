@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
+import { micPermission, openMicPermissionPage, watchMicPermission } from './mic-permission';
 
 interface SpeechAlternativeLike {
   readonly transcript: string;
@@ -48,6 +49,8 @@ function recognitionCtor(): SpeechRecognitionConstructor | null {
 const RESTART_DELAY_MS = 400;
 
 const MIC_BLOCKED = 'Microphone access is blocked. Allow it for this extension, or type instead.';
+const NO_SPEECH_SERVICE = 'This browser has no speech service to transcribe with. Type instead.';
+const MIC_NOT_GRANTED = 'Browsentic has not been given the microphone yet.';
 
 export const VOICE_PREF_KEY = 'browsentic:voiceEnabled';
 
@@ -88,6 +91,8 @@ export interface Speech {
   supported: boolean;
   listening: boolean;
   error: string | null;
+  needsGrant: boolean;
+  grant: () => void;
   start: () => void;
   stop: () => void;
 }
@@ -95,6 +100,7 @@ export interface Speech {
 export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsGrant, setNeedsGrant] = useState(false);
   const supported = useMemo(() => recognitionCtor() !== null, []);
 
   const handlers = useRef({ onFinal, onInterim });
@@ -102,6 +108,7 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
 
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const wanted = useRef(false);
+  const blocked = useRef(false);
   const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micGrant = useRef<Promise<void> | null>(null);
   const beginRef = useRef<() => void>(() => {});
@@ -127,11 +134,20 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
   const begin = useCallback(async () => {
     const Ctor = recognitionCtor();
     if (!Ctor || recognition.current) return;
+    if ((await micPermission()) === 'prompt') {
+      setListening(false);
+      setNeedsGrant(true);
+      setError(MIC_NOT_GRANTED);
+      return;
+    }
+    setNeedsGrant(false);
     try {
       await ensureMic();
     } catch {
       wanted.current = false;
+      blocked.current = true;
       setListening(false);
+      setNeedsGrant(true);
       setError(MIC_BLOCKED);
       return;
     }
@@ -163,13 +179,20 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
       if (event.error === 'aborted' || event.error === 'no-speech') return;
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         wanted.current = false;
+        blocked.current = true;
         micGrant.current = null;
+        setNeedsGrant(true);
         setError(MIC_BLOCKED);
         return;
       }
       if (event.error === 'audio-capture') {
         wanted.current = false;
         setError('No microphone was found.');
+        return;
+      }
+      if (event.error === 'network') {
+        wanted.current = false;
+        setError(NO_SPEECH_SERVICE);
         return;
       }
       setError(event.error);
@@ -201,6 +224,7 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
 
   const stop = useCallback(() => {
     wanted.current = false;
+    blocked.current = false;
     if (restartTimer.current) clearTimeout(restartTimer.current);
     const speech = recognition.current;
     recognition.current = null;
@@ -215,5 +239,26 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
 
   useEffect(() => () => stop(), [stop]);
 
-  return { supported, listening, error, start, stop };
+  useEffect(
+    () =>
+      watchMicPermission((state) => {
+        if (state === 'prompt') return;
+        micGrant.current = null;
+        if (state === 'denied') {
+          setNeedsGrant(true);
+          setError(MIC_BLOCKED);
+          return;
+        }
+        setNeedsGrant(false);
+        setError(null);
+        if (blocked.current) wanted.current = true;
+        blocked.current = false;
+        if (wanted.current) beginRef.current();
+      }),
+    [],
+  );
+
+  const grant = useCallback(() => void openMicPermissionPage(), []);
+
+  return { supported, listening, error, needsGrant, grant, start, stop };
 }
