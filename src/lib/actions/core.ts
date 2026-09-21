@@ -5,6 +5,8 @@ export interface Action<Input extends z.ZodType = z.ZodType, Output = unknown> {
   readonly description: string;
   readonly input: Input;
   readonly execute: (input: z.output<Input>) => Output | Promise<Output>;
+  /** Needs Chrome's debugger, which Firefox has no counterpart for, so a Firefox build leaves it off the list it offers. */
+  readonly chromiumOnly?: true;
 }
 
 export type AnyAction = Action<any, any>;

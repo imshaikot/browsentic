@@ -46,7 +46,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `DIAGNOSTICS_IN_PROGRESS` | Extension | That tab is already being recorded. Read it, or stop it first |
 | `DIAGNOSTICS_LIMIT` | Extension | Two tabs are already being recorded — stop one |
 | `DEBUGGER_UNAVAILABLE` | Extension | Chrome refused the attach, usually because DevTools is open on that tab. Close it and retry |
-| `UNSUPPORTED` | Extension | Firefox exposes no CDP, so the diagnostics tools do not exist there — and there is no fallback |
+| `UNSUPPORTED` | Extension | A debugger-only tool was called on Firefox. A Firefox build leaves those nine off its list, so only a stale skill or recording reaches this — and there is no fallback |
 | `BLOCKED` | Policy | `includeBodies: true` without the `network-body-read` rule allowed. Metadata and headers are still available |
 
 ## Runs and sessions

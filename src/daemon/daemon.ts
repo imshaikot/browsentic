@@ -16,7 +16,7 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
-import { hashManifest } from '@/lib/actions/manifest';
+import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
@@ -151,10 +151,16 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const swept = sweepDownloads();
   if (swept) log(`swept ${swept} expired download${swept === 1 ? '' : 's'}`);
 
-  const bundled = describeActions();
+  const bundled = describeActions('chromium');
   const bundledHash = hashManifest(bundled);
+  const bundledByHash = new Map(
+    (['chromium', 'firefox'] as const).map((target) => {
+      const list = describeActions(target);
+      return [hashManifest(list), list] as const;
+    }),
+  );
 
-  let tools = bundled;
+  let offered = bundled;
   const links = new Map<string, ExtensionLink>();
   const agents = new Map<ExtensionLink, AgentSession>();
   const controls = new Set<WebSocket>();
@@ -340,7 +346,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   ): Promise<void> {
     // Only the same browser profile is superseded: its worker restarted and the old socket lingers.
     links.get(install.installId)?.close('superseded by a newer connection');
-    const manifestInSync = hello.manifestHash === bundledHash;
+    const known = bundledByHash.get(hello.manifestHash);
+    const manifestInSync = known !== undefined;
     const accepted = new ExtensionLink(
       ws,
       { ...hello, ...install },
@@ -350,6 +357,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
         scheduleIdleExit();
+        settleOffer();
       },
       (request, source) => {
         if (request.t === 'analyzeFile') {
@@ -428,14 +436,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       },
     );
     links.set(accepted.id, accepted);
+    accepted.tools = known ?? bundled;
+    settleOffer();
     log(`extension ${hello.extensionVersion} connected from ${accepted.label} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
-    const welcome = { daemonVersion: version, manifestHash: bundledHash, manifestInSync, sealedSessionKey };
+    const welcome = {
+      daemonVersion: version,
+      manifestHash: known ? hello.manifestHash : bundledHash,
+      manifestInSync,
+      sealedSessionKey,
+    };
     accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
     scheduleIdleExit();
     void pushAgentState(accepted);
     pushSkillCatalog(accepted);
-    if (!manifestInSync) await adoptExtensionManifest(accepted);
-    else if (openLinks().every(inSync)) restoreBundledManifest();
+    if (!known) await adoptExtensionManifest(accepted);
   }
 
   function openLinks(): ExtensionLink[] {
@@ -443,7 +457,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   }
 
   function inSync(link: ExtensionLink): boolean {
-    return link.manifestHash === bundledHash;
+    return bundledByHash.has(link.manifestHash);
   }
 
   /** The browser the user was last in, for a caller that has no run to say which one it means. */
@@ -548,30 +562,35 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     return [...agents.values()].find((agent) => agent.owns(runId));
   }
 
+  // A drifted build is served its own list, and only its own: the adopted list lives on the
+  // link and leaves with it, so a browser that agrees with us again is back on a bundled list
+  // the moment it reconnects — the recovery direction of "the newer side wins".
   async function adoptExtensionManifest(source: ExtensionLink): Promise<void> {
     const reported = await source.describe();
     if (!reported?.length) {
-      log('extension manifest drifted but could not be fetched; keeping the bundled tool list');
+      log(`${source.label} drifted but its manifest could not be fetched; serving it the bundled tool list`);
       return;
     }
-    tools = reported;
-    log(`adopted ${reported.length} tools from the extension (bundled list was ${bundled.length})`);
-    announceManifest();
+    source.tools = reported;
+    log(`adopted ${reported.length} tools from ${source.label} (bundled list was ${bundled.length})`);
+    settleOffer();
   }
 
-  // An adopted list outlives the connection that justified it, so a reloaded extension that
-  // agrees with us again would otherwise keep being served the drifted list until the daemon
-  // restarts — the recovery direction of "the newer side wins".
-  function restoreBundledManifest(): void {
-    if (tools === bundled) return;
-    tools = bundled;
-    log(`extension back in sync; serving the bundled ${bundled.length} tools again`);
-    announceManifest();
+  /** What a caller with no run of its own is offered: the list of the browser the user was last in. */
+  function offeredTools(): ToolDescriptor[] {
+    return activeLink()?.tools ?? bundled;
   }
 
-  function announceManifest(): void {
-    for (const listener of manifestListeners) listener();
-    broadcast({ event: 'manifest-changed' });
+  // A browser's worker restarting closes one link and opens another in the same tick, so the
+  // comparison waits for the tick to end rather than announcing a change that has already undone itself.
+  function settleOffer(): void {
+    setImmediate(() => {
+      const now = offeredTools();
+      if (now === offered) return;
+      offered = now;
+      for (const listener of manifestListeners) listener();
+      broadcast({ event: 'manifest-changed' });
+    });
   }
 
   /**
@@ -586,10 +605,16 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     return target;
   }
 
-  function describeFor(runId?: string): Described {
-    const offer = runId ? sessionRunning(runId)?.offerFor(runId) : null;
-    if (offer) return { tools: tools.filter(({ name }) => !offer.withheld.includes(name)), reserved: offer.reserved };
+  // A tool list belongs to a browser. A run is offered the list of the browser it runs in; a
+  // caller with no run is offered the browser its next call would reach, so list and calls agree.
+  function describeFor(runId: string | undefined, binding: Binding): Described {
+    const running = runId ? [...agents].find(([, agent]) => agent.owns(runId)) : undefined;
+    const offer = running && runId ? running[1].offerFor(runId) : null;
+    if (offer && running) {
+      return { tools: running[0].tools.filter(({ name }) => !offer.withheld.includes(name)), reserved: offer.reserved };
+    }
 
+    const tools = routeFor(binding)?.tools ?? bundled;
     const config = readAgentConfig();
     const policy = policyFrom(config.guardrails, config.requireApproval);
     const denied = (action: string) =>
@@ -612,7 +637,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       } catch {
         return log('dropped unparseable control frame');
       }
-      if (request.op === 'describe') return send(ws, { id: request.id, op: 'describe', ...describeFor(request.runId) });
+      if (request.op === 'describe') {
+        return send(ws, { id: request.id, op: 'describe', ...describeFor(request.runId, binding) });
+      }
       if (request.op === 'status') {
         return send(ws, { id: request.id, op: 'status', status: statusNow(routeFor(binding)) });
       }
@@ -787,7 +814,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const local: Binding = { usedAt: 0 };
   return {
     port,
-    describe: async () => describeFor(),
+    describe: async () => describeFor(undefined, local),
     invoke: (action, input) => invokeOn(routeFor(local), action, input),
     status: async () => statusNow(routeFor(local)),
     onManifestChanged: (listener) => manifestListeners.add(listener),

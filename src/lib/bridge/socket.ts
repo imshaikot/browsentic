@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { hashManifest } from '@/lib/actions/manifest';
+import { describeOwnActions } from '@/lib/bridge/own-actions';
 import {
   clientProof,
   isNonce,
@@ -24,7 +25,6 @@ import {
   type SkillCatalog,
   type SocketFrame,
 } from '@/lib/actions/protocol';
-import { describeActions } from '@/lib/actions/registry';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillDraft } from '@/lib/skills/format';
@@ -401,7 +401,7 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
     port,
     hello: {
       extensionVersion: browser.runtime.getManifest().version,
-      manifestHash: hashManifest(describeActions()),
+      manifestHash: hashManifest(describeOwnActions()),
       nonce: newNonce(),
     },
     done() {
@@ -547,7 +547,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
     }
 
     case 'describe':
-      return send(ws, { t: 'manifest', id: frame.id, tools: describeActions() });
+      return send(ws, { t: 'manifest', id: frame.id, tools: describeOwnActions() });
 
     case 'invoke':
       return send(ws, {

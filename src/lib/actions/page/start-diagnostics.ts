@@ -4,6 +4,7 @@ import { ActionError, defineAction } from '../core';
 
 export const startDiagnostics = defineAction({
   name: 'page.startDiagnostics',
+  chromiumOnly: true,
   description:
     'Start recording what a page reports rather than what it shows — console messages, uncaught exceptions and every request the tab makes. ' +
     'Console and network events only exist while Chrome’s debugger is attached, so this has to be running before the thing you are diagnosing happens: start it, then reload or click, then read. ' +

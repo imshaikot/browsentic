@@ -18,6 +18,15 @@ Not every capability can run in the page. The background service worker splits t
 | `openTab`, `switchTab`, `closeTab`, `screenshot`, `navigate` | Need the `tabs`/`scripting` APIs |
 | Everything else | Forwarded to the content script |
 
+Nine of those need Chrome's `debugger` API, which Firefox has no counterpart for: `trustedClick`,
+the two captcha tools, the four diagnostics tools, `injectCode` and `runCode`. Each is marked
+`chromiumOnly` in its module, and `describeActions('firefox')` leaves them out, so a Firefox build
+never lists them — the agent there is offered a shorter list, and the daemon knows that list by its
+hash and reports it as in sync. The actions themselves stay registered on both builds: a stale
+skill that names one is answered with `UNSUPPORTED` and a hint, not `UNKNOWN_ACTION`. The
+build-time branch lives in one place, `describeOwnActions()` in `src/lib/bridge/own-actions.ts`;
+the registry itself never reads `import.meta.env`, because the daemon bundles it under Node.
+
 ## The microphone is granted from a tab
 
 Chromium anchors a permission prompt to a tab. A side panel and a popup have none, so

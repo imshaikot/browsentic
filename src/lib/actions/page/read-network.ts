@@ -4,6 +4,7 @@ import { ActionError, defineAction } from '../core';
 
 export const readNetwork = defineAction({
   name: 'page.readNetwork',
+  chromiumOnly: true,
   description:
     'Read the requests a page has made since page.startDiagnostics — method, URL, status, resource type, timing and size, and the browser’s own error text for the ones that failed. ' +
     'Newest last. This is how a button that “did nothing” turns into a 500 or a CORS refusal. Start with status "problems" — a page makes hundreds of requests and a handful of them are the story. ' +

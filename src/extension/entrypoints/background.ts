@@ -1,6 +1,6 @@
 import { failure, isBridgeRequest, success } from '@/lib/actions/protocol';
-import { describeActions } from '@/lib/actions/registry';
 import { injectContentScript } from '@/lib/actions/client';
+import { describeOwnActions } from '@/lib/bridge/own-actions';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { serveDebuggerEvents } from '@/lib/bridge/cdp';
 import { serveCodeToolkits } from '@/lib/bridge/code-toolkit';
@@ -42,7 +42,7 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isBridgeRequest(message)) return;
     if (message.op === 'describe') {
-      sendResponse(success(describeActions()));
+      sendResponse(success(describeOwnActions()));
       return;
     }
     if (message.op === 'invoke' && typeof message.action === 'string') {

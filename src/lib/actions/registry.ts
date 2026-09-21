@@ -113,12 +113,21 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
   ).map((action) => [action.name, action]),
 );
 
-export function describeActions(): ToolDescriptor[] {
-  return [...actions.values()].map(({ name, description, input }) => ({
-    name,
-    description,
-    inputSchema: tidy(z.toJSONSchema(input, { io: 'input' })),
-  }));
+export type BrowserTarget = 'chromium' | 'firefox';
+
+/**
+ * The tools a build of the extension offers. Every action stays invocable on either browser —
+ * a stale skill that names a hidden one gets its UNSUPPORTED hint, not UNKNOWN_ACTION — but a
+ * Firefox build does not list what it can never run.
+ */
+export function describeActions(target: BrowserTarget = 'chromium'): ToolDescriptor[] {
+  return [...actions.values()]
+    .filter((action) => target === 'chromium' || !action.chromiumOnly)
+    .map(({ name, description, input }) => ({
+      name,
+      description,
+      inputSchema: tidy(z.toJSONSchema(input, { io: 'input' })),
+    }));
 }
 
 const UNBOUNDED = new Set([Number.MAX_SAFE_INTEGER, Number.MIN_SAFE_INTEGER]);

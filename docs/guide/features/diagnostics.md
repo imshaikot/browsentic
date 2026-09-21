@@ -125,8 +125,9 @@ means no bodies regardless of policy.
 with `DEBUGGER_UNAVAILABLE` and a hint saying so — which is annoying precisely because it is the moment
 a developer is most likely to ask. Close DevTools and retry.
 
-**Firefox has none of this.** There is no CDP, so all four tools return `UNSUPPORTED`. The same is true
-of `page_trustedClick` and the captcha tools.
+**Firefox has none of this.** There is no CDP, so a Firefox build leaves all four tools off the list it
+offers, along with `page_trustedClick`, the captcha tools and the page-code tools. An older
+instruction that still names one gets `UNSUPPORTED`.
 
 **Top-level frame only.** What a cross-origin iframe logs to its own console is not collected.
 
