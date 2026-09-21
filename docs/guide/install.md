@@ -70,7 +70,8 @@ npx browsentic update
 
 That replaces the command itself if the registry has something newer, refreshes the installed
 extension in place, and restarts the daemon. The install path never changes, so your browser stays
-paired. Press ↻ on the Browsentic card at `chrome://extensions` to pick up the new build.
+paired. Press ↻ on the Browsentic card at `chrome://extensions` to pick up the new build. Firefox
+takes its add-on from the release page instead and updates it on its own — see [Firefox](#firefox).
 
 ### Uninstalling
 
@@ -84,12 +85,28 @@ Remove the card at `chrome://extensions` yourself, ideally before running it. Se
 
 ### Firefox
 
-Not yet. Release Firefox refuses unsigned extensions, and an add-on loaded through
-`about:debugging` is discarded when the browser restarts, so there is nothing durable to install. A
-signed build distributed through addons.mozilla.org is the fix and it is not ready.
+Release Firefox installs only add-ons that addons.mozilla.org has signed, so the Firefox build is
+not loaded from a folder — it is a signed `.xpi` on every
+[GitHub release](https://github.com/imshaikot/browsentic/releases/latest). The daemon half is the
+same as above: run `npx browsentic setup` (or the Mac app) and keep the pairing code it prints.
 
-Developer Edition and Nightly can load `dist/firefox-mv2` from a source checkout with
-`xpinstall.signatures.required` set to `false`.
+**1. Install the add-on.** Download `browsentic-<version>-firefox.xpi` from the latest release, then
+open `about:addons`, press the gear, choose **Install Add-on From File…** and pick it. Dragging the
+file onto a Firefox window does the same. Firefox shows what the add-on asks for and installs it for
+good — it survives restarts, unlike anything loaded through `about:debugging`.
+
+**2. Paste the pairing code** into the popup and press Connect.
+
+Firefox checks the release page for a newer signed build about once a day and updates itself;
+**Check for Updates** under the same gear does it now. There is no `↻` step and nothing to reload.
+
+Nine tools that need Chrome's debugger — the trusted click, the captcha, diagnostics and page-code
+tools — do not exist on Firefox, and the agent there is not offered them. [Limits](limits.md) has
+the list.
+
+Developer Edition and Nightly can still load `dist/firefox-mv2` from a source checkout with
+`xpinstall.signatures.required` set to `false`; that is the loop for working on the Firefox build,
+not for using it.
 
 ---
 

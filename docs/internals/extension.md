@@ -29,6 +29,27 @@ entrypoint in a tab, where the prompt can appear. The grant belongs to the exten
 panel and the popup both see the `PermissionStatus` change and start listening without a reload.
 Firefox prompts from its sidebar on its own and skips the check.
 
+## The Firefox build is signed, and says who it is
+
+`yarn build:firefox` produces a Manifest V2 extension from the same source, and its manifest carries
+a `browser_specific_settings.gecko` block the Chrome build has no use for:
+
+- **`id: browsentic@browsentic.com`** — addons.mozilla.org signs nothing without a permanent id,
+  and the first signing bound this one to the project's AMO account for good. Changing it would make
+  every installed copy a different add-on.
+- **`update_url`** — the `updates.json` under the latest GitHub release. Every signed build carries
+  this URL, so moving it means every older install stops updating; the release job publishes the
+  file next to each signed `.xpi`.
+- **`data_collection_permissions: websiteContent`** — Firefox shows this at install. It is the honest
+  declaration: what the agent reads on a page leaves the browser for the daemon and reaches the model
+  behind whichever agent CLI the user runs.
+- **`strict_min_version: 140.0`** — the first Firefox that understands the data-collection key.
+
+Two permissions are filtered out of that build, `sidePanel` and `debugger`: Firefox has neither, and
+AMO's validator flags each name it does not know. The Firefox sidebar is `sidebar_action`, which WXT
+derives from the same entrypoint, and the nine tools that need the debugger are left off the list a
+Firefox build offers (see [Background vs content script](#background-vs-content-script)).
+
 ## Self-healing injection
 
 The forwarding call is `invokeInTab()`. A tab that loaded *before* the extension did has no content

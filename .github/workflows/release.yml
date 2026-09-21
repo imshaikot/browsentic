@@ -2,8 +2,9 @@
 #
 # The tag is both the trigger and the source of truth. CI bumps nothing and tags nothing:
 # it rebuilds the tagged commit from scratch, checks the build agrees with the tag, and
-# publishes the three store archives under a release of that name. So the whole local half
-# of a release is "bump both package.json files, commit, tag vX.Y.Z, push the tag".
+# publishes the three store archives under a release of that name, then the Mac app and the
+# signed Firefox add-on in their own jobs. So the whole local half of a release is "bump
+# both package.json files, commit, tag vX.Y.Z, push the tag".
 #
 # Two properties this leans on:
 #   - Both package.json files must already say X.Y.Z at the tagged commit. A mismatch fails
@@ -289,3 +290,76 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "dist/mac/Browsentic-${GITHUB_REF_NAME#v}.dmg" --clobber
+
+  # ---------------------------------------------------------------------------------------
+  # The Firefox add-on release Firefox will actually install: the firefox zip, signed by
+  # addons.mozilla.org on the unlisted channel, plus the updates.json that installed copies
+  # poll. Its own job for the same reason as the Mac app — a failure here leaves a release
+  # without an .xpi, never an .xpi without a release — and because Mozilla's queue can take
+  # an hour that npm and the DMG should not wait on.
+  #
+  # Needs two repository secrets from addons.mozilla.org → Developer Hub → Manage API Keys:
+  # AMO_JWT_ISSUER (`user:…:…`) and AMO_JWT_SECRET. Without them the job warns and ends,
+  # and the unsigned zip stays the only Firefox asset.
+  #
+  # AMO signs each version once per add-on id, ever. A re-run of a tag that already signed
+  # therefore fails the sign step; the recovery is by hand and the step summary says how.
+  # ---------------------------------------------------------------------------------------
+  firefox:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Build the Firefox add-on and its sources
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          node "$yarn_bin" install --immutable
+          node "$yarn_bin" zip -b firefox
+          test -s "dist/browsentic-${GITHUB_REF_NAME#v}-sources.zip"
+
+      - name: Have addons.mozilla.org sign it
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -z "$WEB_EXT_API_KEY" ]; then
+            echo "::warning::no AMO_JWT_ISSUER secret, so this release carries only the unsigned Firefox zip"
+            exit 0
+          fi
+          versions="https://addons.mozilla.org/developers/addon/browsentic/versions"
+          if node "$YARN" sign:firefox \
+               --approval-timeout 3600000 \
+               --upload-source-code "dist/browsentic-$VERSION-sources.zip" 2>&1 | tee sign.log; then
+            xpi=$(ls dist/*.xpi | head -1)
+            test -s "$xpi" || { echo "::error::web-ext reported success but wrote no .xpi"; exit 1; }
+            mv "$xpi" "dist/browsentic-$VERSION-firefox.xpi"
+            echo "SIGNED=dist/browsentic-$VERSION-firefox.xpi" >> "$GITHUB_ENV"
+          elif grep -qi 'version already exists\|Version .* already exists' sign.log; then
+            echo "::warning::$VERSION was already signed on AMO; download it from $versions, then run scripts/firefox-updates.ts and gh release upload by hand"
+            echo "firefox: $VERSION already signed — attach it by hand from $versions" >> "$GITHUB_STEP_SUMMARY"
+          elif grep -qi 'timed out\|timeout' sign.log; then
+            echo "::warning::AMO has not approved $VERSION within an hour; it will appear at $versions, then run scripts/firefox-updates.ts and gh release upload by hand"
+            echo "firefox: still in Mozilla's queue — attach it by hand from $versions" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::signing failed; see sign.log above"
+            exit 1
+          fi
+
+      - name: Attach the signed add-on, then the update manifest that points at it
+        # The .xpi goes up first: an updates.json that names a file not yet uploaded would
+        # send every installed Firefox after a 404 until the next poll.
+        if: env.SIGNED != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/firefox-updates.ts "$SIGNED" dist/updates.json
+          gh release upload "$GITHUB_REF_NAME" "$SIGNED" --clobber
+          gh release upload "$GITHUB_REF_NAME" dist/updates.json --clobber
+          echo "firefox: signed .xpi and updates.json attached" >> "$GITHUB_STEP_SUMMARY"
