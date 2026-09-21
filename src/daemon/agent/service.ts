@@ -91,6 +91,12 @@ export class AgentSession {
   /** Per session, the conversation its agent is holding open. Switching agents drops them all. */
   private held = new Map<string, { agent: AgentKind; sessionId: string }>();
   private runs = new Map<string, ActiveRun>();
+  /**
+   * Conversations that have been shown the page-code tools. The tool list leads the
+   * prefix an agent caches, so it may grow once within a conversation and never shrink:
+   * a follow-up lands while the cache is warm, and a changed list re-bills its history.
+   */
+  private codeListed = new Set<string>();
 
   constructor(private readonly deps: AgentSessionDeps) {}
 
@@ -109,8 +115,13 @@ export class AgentSession {
         });
         return;
       case 'reset':
-        if (request.sessionId) this.held.delete(request.sessionId);
-        else this.held.clear();
+        if (request.sessionId) {
+          this.held.delete(request.sessionId);
+          this.codeListed.delete(request.sessionId);
+        } else {
+          this.held.clear();
+          this.codeListed.clear();
+        }
         log(request.sessionId ? `agent conversation reset for session ${request.sessionId}` : 'agent conversations reset');
         return;
     }
@@ -123,9 +134,12 @@ export class AgentSession {
   offerFor(runId: string): { withheld: string[]; reserved: string[] } | null {
     const run = this.runs.get(runId);
     if (!run) return null;
+    const codeListed = run.liveTools || (run.sessionId !== undefined && this.codeListed.has(run.sessionId));
     return {
-      withheld: run.liveTools ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
-      reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), ...(run.focusShot ? [FOCUS_SHOT_ACTION] : [])],
+      withheld: codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
+      // A mapping run never resumes a conversation, so its tool can come and go. A pick
+      // comes and goes between the messages of one, so the tool that shows it stays.
+      reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), FOCUS_SHOT_ACTION],
     };
   }
 
@@ -214,6 +228,7 @@ export class AgentSession {
   dispose(): void {
     for (const runId of [...this.runs.keys()]) this.cancel(runId);
     this.held.clear();
+    this.codeListed.clear();
   }
 
   private async start(runId: string, instruction: string, context?: RunContext): Promise<void> {
@@ -296,6 +311,7 @@ export class AgentSession {
       liveTools: context?.liveTools === true,
     };
     this.runs.set(runId, run);
+    if (run.liveTools && sessionId) this.codeListed.add(sessionId);
 
     // Claim the slot before probing, so a second instruction still meets RUN_IN_PROGRESS.
     const runner = activeRunner(await agentState(config));
