@@ -157,6 +157,10 @@ enum Timestamp {
 
     static func ago(_ text: String, now: Date = Date()) -> String {
         guard let date = date(text) else { return text }
+        return ago(date, now: now)
+    }
+
+    static func ago(_ date: Date, now: Date = Date()) -> String {
         if now.timeIntervalSince(date) < 5 { return "just now" }
         return relative.localizedString(for: date, relativeTo: now)
     }

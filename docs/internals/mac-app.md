@@ -72,6 +72,17 @@ quarantine to everything its children write, and the app then arrives flagged an
 redirect, verifies the signature, and copies the app into Applications. It depends on the release
 asset being named `Browsentic-<version>.dmg`.
 
+The app updates itself along the same path (`Core/Updater.swift`). `UpdateFeed` takes the newer of
+GitHub's `releases/latest` tag and npm's `latest` version, then asks with a `HEAD` whether that
+release's DMG exists yet, because the `mac` job attaches it after the npm publish. `AppUpdater`
+downloads the image, mounts it, verifies the signature, refuses a bundle whose identifier or version
+is not the one offered, and copies it beside the running bundle as `.Browsentic-<version>.app`. A
+running app cannot replace itself, so a detached `sh` waits for the process to exit, renames the old
+bundle aside, renames the new one in, puts the old one back if that fails, and reopens it. A
+translocated copy is not replaced where it runs; the new app goes to Applications instead. The
+`finishUpdateOnLaunch` default tells the next launch to replace the command and the extension
+without waiting for **Set up everything**. It too depends on the asset name.
+
 CI builds and tests it on `macos-15`; the release workflow’s `mac` job attaches the DMG to the
 GitHub release after the npm publish. Colours in
 [Theme.swift](../../src/mac/Sources/Browsentic/Theme/Theme.swift) are Ember and Daylight from

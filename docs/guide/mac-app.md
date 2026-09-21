@@ -88,10 +88,16 @@ not two that can drift apart.
 
 ## Updating
 
-Settings shows a banner when a newer release is out. Run the install line again — it replaces the
-app and opens it: the first screen notices the command and the extension are older than the ones it carries,
-and **Set up everything** replaces both and restarts the daemon. Then press ↻ on the Browsentic card
-at `chrome://extensions`, which is the one step no installer can do for you.
+The app asks GitHub and npm for a newer release when it opens and every few hours after. When one
+is out, a card appears at the top of **Overview** (and in Settings) with **Update now**: it downloads
+the release, checks its signature and that it is the version it claims to be, replaces the app and
+reopens it, and the new app replaces the command and the extension and restarts the daemon. Then
+press ↻ on the Browsentic card at `chrome://extensions`, which is the one step no installer can do
+for you. **Check for updates** on the same card asks again on the spot.
+
+A release reaches npm a few minutes before its Mac build is attached; until then the card says so
+and offers **Check again** instead. If an update fails nothing is changed, and the card hands you
+the install line, which installs the same release from a terminal.
 
 `browsentic update` does not replace an install the app made; it says so and points back here.
 
