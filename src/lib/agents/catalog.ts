@@ -32,7 +32,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     bin: 'codex',
     install: 'npm i -g @openai/codex',
     docs: 'https://developers.openai.com/codex/cli',
-    models: ['gpt-5.6-terra', 'gpt-5.1-codex-max', 'gpt-5.1-codex', 'gpt-5.1-codex-mini'],
+    models: ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
   },
   antigravity: {
     kind: 'antigravity',

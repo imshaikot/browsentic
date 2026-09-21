@@ -57,7 +57,7 @@ interface LegacyEvent {
 export const codexRunner: Runner = {
   kind: 'codex',
   versionArgs: ['--version'],
-  efforts: ['minimal', 'low', 'medium', 'high'],
+  efforts: ['low', 'medium', 'high', 'xhigh'],
 
   workspace: () => stateDir,
 
@@ -142,7 +142,7 @@ export const codexRunner: Runner = {
           case 'task_complete':
             return sink.done('end_turn');
           case 'error':
-            return sink.fail('AGENT_FAILED', msg.error || msg.message || 'Codex reported an error');
+            return sink.fail('AGENT_FAILED', explain(msg.error || msg.message) || 'Codex reported an error');
           default:
             return;
         }
@@ -178,10 +178,10 @@ export const codexRunner: Runner = {
         }
 
         case 'turn.failed':
-          return sink.fail('AGENT_FAILED', frame.error?.message || 'Codex could not finish the turn');
+          return sink.fail('AGENT_FAILED', explain(frame.error?.message) || 'Codex could not finish the turn');
 
         case 'error':
-          return sink.fail('AGENT_FAILED', frame.message || frame.error?.message || 'Codex reported an error');
+          return sink.fail('AGENT_FAILED', explain(frame.message || frame.error?.message) || 'Codex reported an error');
 
         default:
           return;
@@ -241,6 +241,15 @@ export const codexRunner: Runner = {
     return null;
   },
 };
+
+/** The API's error arrives as a JSON document inside the message; say the sentence, and what to do about a refused model. */
+function explain(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  const message = parseJsonLine<{ error?: { message?: string } }>(raw)?.error?.message ?? raw;
+  return /model .*(not supported|does not exist|not found)/i.test(message)
+    ? `${message} Pick another model for Codex in the Browsentic popup, then try again.`
+    : message;
+}
 
 function kindOf(item: Item | undefined): string | undefined {
   return item?.type ?? item?.item_type;
