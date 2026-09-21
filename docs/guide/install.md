@@ -87,13 +87,21 @@ Remove the card at `chrome://extensions` yourself, ideally before running it. Se
 
 Release Firefox installs only add-ons that addons.mozilla.org has signed, so the Firefox build is
 not loaded from a folder — it is a signed `.xpi` on every
-[GitHub release](https://github.com/imshaikot/browsentic/releases/latest). The daemon half is the
-same as above: run `npx browsentic setup` (or the Mac app) and keep the pairing code it prints.
+[GitHub release](https://github.com/imshaikot/browsentic/releases/latest).
 
-**1. Install the add-on.** Download `browsentic-<version>-firefox.xpi` from the latest release, then
-open `about:addons`, press the gear, choose **Install Add-on From File…** and pick it. Dragging the
-file onto a Firefox window does the same. Firefox shows what the add-on asks for and installs it for
-good — it survives restarts, unlike anything loaded through `about:debugging`.
+```sh
+npx browsentic setup --browser firefox
+```
+
+That starts the daemon and prints two things: the link to the signed add-on for that same version,
+and a pairing code. (The Mac app starts the same daemon; take the add-on from the release page.)
+
+**1. Install the add-on.** Open the link in Firefox and accept both prompts — one to let github.com
+install software, one to add Browsentic. Or download `browsentic-<version>-firefox.xpi`, open
+`about:addons`, press the gear, choose **Install Add-on From File…** and pick it. Either way
+Firefox shows what the add-on asks for and installs it for good — it survives restarts, unlike
+anything loaded through `about:debugging`. If the command says the file is not attached yet,
+Mozilla is still signing that version; it appears within minutes, occasionally longer.
 
 **2. Paste the pairing code** into the popup and press Connect.
 

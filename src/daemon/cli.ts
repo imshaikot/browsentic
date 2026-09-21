@@ -17,6 +17,7 @@ import { logPath, readLockfile } from './lockfile';
 import { log } from './log';
 import { installKind } from './npx';
 import { extensionDir } from './paths';
+import { RELEASES_PAGE, signedAddonAttached, signedAddonUrl } from './firefox-addon';
 import { RemoteBridge } from './remote-bridge';
 import { upgradeCli } from './self-update';
 import { createMcpServer } from './server';
@@ -26,6 +27,7 @@ import pkg from './package.json';
 const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent you already run
 
   browsentic setup            install the extension, start the daemon, print a pairing code
+                              --browser firefox: link the signed add-on instead of installing a folder
   browsentic update           pull the newest build — the command itself, then the extension
   browsentic uninstall        stop the daemon and remove everything Browsentic wrote
   browsentic pair             issue a one-time code to type into the extension
@@ -329,31 +331,18 @@ async function setup(argv: string[]): Promise<void> {
   }
 
   const browser = valueOf('browser') ?? 'chrome';
-  if (browser === 'firefox') {
-    console.log(`
-  Firefox is not supported by this command yet.
-
-  Release Firefox refuses unsigned extensions, and an add-on loaded through
-  about:debugging is discarded when the browser restarts, so there is nothing
-  useful to install. A signed build distributed through addons.mozilla.org is
-  the fix, and it is not ready.
-
-  Developer Edition and Nightly can load dist/firefox-mv2 from the source
-  repository with xpinstall.signatures.required set to false.
-`);
+  if (browser !== 'chrome' && browser !== 'firefox') {
+    console.error(`Unknown browser "${browser}". Supported: chrome, firefox`);
     process.exit(1);
   }
-  if (browser !== 'chrome') {
-    console.error(`Unknown browser "${browser}". Supported: chrome`);
-    process.exit(1);
-  }
+  const json = flag('json');
+  if (browser === 'firefox') return setupFirefox({ json, restart: flag('restart'), pair: !flag('no-pair') });
 
   // An explicit --dir is remembered, so `update` lands in the same place rather than laying
   // down a second copy at the default path and leaving the browser pointed at the first.
   const chosen = valueOf('dir');
   const dir = extensionDir(chosen ?? readAgentConfig().extensionDir);
   if (chosen) rememberExtensionDir(chosen);
-  const json = flag('json');
 
   let result;
   try {
@@ -422,6 +411,67 @@ async function setup(argv: string[]): Promise<void> {
     console.log(`  2. Run "browsentic pair" and paste the code into the Browsentic popup.\n`);
   }
   console.log(`  Then open the side panel and say what you want.\n`);
+}
+
+/**
+ * Firefox installs only what addons.mozilla.org has signed, so there is no folder to write.
+ * The signed add-on hangs under the GitHub release of this same version, and once installed
+ * Firefox keeps it current on its own — which is why `update` lands here with nothing to
+ * refresh but the daemon. What is left is the daemon and the pairing.
+ */
+async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; restart: boolean; pair: boolean }): Promise<void> {
+  if (fresh) await restart();
+  const lock = await ensureDaemon();
+  const bridge = await RemoteBridge.connect(lock.port, lock.token);
+  const sessions = await bridge.sessions();
+  const alreadyPaired = sessions.some((session) => session.origin.startsWith('moz-extension://'));
+  const code = alreadyPaired || !pair ? undefined : (await bridge.pair()).code;
+  await bridge.close();
+
+  const addon = signedAddonUrl(pkg.version);
+  const attached = await signedAddonAttached(pkg.version);
+
+  if (json) {
+    console.log(
+      JSON.stringify(
+        { version: pkg.version, firefoxAddon: addon, attached, daemon: { port: lock.port, pid: lock.pid }, alreadyPaired, pairingCode: code },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  console.log(`\n  Browsentic ${pkg.version}\n`);
+  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})\n`);
+
+  if (alreadyPaired) {
+    console.log(`  This Firefox is already paired, and it picks up each new build on its own —`);
+    console.log(`  about:addons → the gear → "Check for Updates" does it right now.\n`);
+    console.log(`  Adding another browser? Install the add-on there too, then run "browsentic pair".\n`);
+    return;
+  }
+
+  console.log(`  Firefox installs only what addons.mozilla.org has signed, so there is no folder to load.`);
+  console.log(`  Two steps are left. Both happen inside the browser, so only you can do them.\n`);
+  console.log(`  1. Open this link in Firefox:\n`);
+  console.log(`         ${addon}\n`);
+  console.log(`     It asks whether to let github.com install software, then whether to add`);
+  console.log(`     Browsentic — say yes to both. Or download it and use about:addons → the gear →`);
+  console.log(`     "Install Add-on From File…". Once installed, Firefox keeps it current on its own.\n`);
+  if (attached === false) {
+    console.log(`     That file is not attached to the ${pkg.version} release yet — Mozilla may still be`);
+    console.log(`     signing it. Give it a few minutes, or take the newest one from\n`);
+    console.log(`         ${RELEASES_PAGE}\n`);
+  }
+  if (code) {
+    console.log(`  2. Open the Browsentic popup and paste this code:\n`);
+    console.log(`         ${groupCode(code)}\n`);
+    console.log(`     Single use, expires in 10 minutes. Need another? "browsentic pair"\n`);
+  } else {
+    console.log(`  2. Run "browsentic pair" and paste the code into the Browsentic popup.\n`);
+  }
+  console.log(`  Then open the sidebar and say what you want.\n`);
 }
 
 /**

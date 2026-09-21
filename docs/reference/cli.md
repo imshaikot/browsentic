@@ -31,7 +31,7 @@ on every update.
 | `--dir <path>` | Install somewhere else. Needed for Flatpak or Snap browsers, which cannot read `~/browsentic` without a filesystem grant |
 | `--no-pair` | Install and start the daemon, mint no code |
 | `--force` | Rewrite every file even when the installed build already matches |
-| `--browser <name>` | `chrome` only for now. See [install](../guide/install.md) for the Firefox situation |
+| `--browser <name>` | `chrome` (the default) or `firefox`. Firefox has no folder to load: the command starts the daemon, prints the link to the signed add-on for this same version — and says so if Mozilla has not attached it to the release yet — then the pairing code. `update --browser firefox` only restarts the daemon, because Firefox updates the add-on on its own |
 | `--no-self-update` | Install what this copy carries, without asking the registry whether a newer one exists |
 | `--json` | Machine-readable result. Progress goes to stderr, so stdout stays parseable |
 
