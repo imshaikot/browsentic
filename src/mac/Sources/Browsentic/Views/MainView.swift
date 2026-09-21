@@ -46,6 +46,9 @@ private struct TabCapsule: View {
                     HStack(spacing: 6) {
                         Image(systemName: tab.icon).font(.system(size: 11, weight: .semibold))
                         Text(tab.label).font(.system(size: 12, weight: .medium))
+                        if tab == .overview, model.update != nil {
+                            Circle().fill(selected ? Palette.onBrand : Palette.brand).frame(width: 6, height: 6)
+                        }
                     }
                     .foregroundStyle(selected ? Palette.onBrand : Palette.inkDim)
                     .padding(.horizontal, 12)

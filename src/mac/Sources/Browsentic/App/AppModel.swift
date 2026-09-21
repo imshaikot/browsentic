@@ -62,13 +62,16 @@ final class AppModel: ObservableObject {
     @Published var logText = ""
     @Published var commandDir: String?
     @Published var foreignCommand: String?
-    @Published var latestRelease: String?
+    @Published var update: AppRelease?
+    @Published var updatePhase: UpdatePhase = .idle
+    @Published var lastUpdateCheck: Date?
     @Published var busy: Set<String> = []
     @Published var notice: Notice?
 
     private(set) var node: NodeInstall?
     private let control = ControlClient()
     private var poller: Task<Void, Never>?
+    private var updateWatcher: Task<Void, Never>?
 
     var cli: CLI? { node.map(CLI.init) }
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? Payload.bundledVersion ?? "dev" }
@@ -90,6 +93,11 @@ final class AppModel: ObservableObject {
             withAnimation(.spring(duration: 0.45)) { checks[id] = state }
         }
         preflightBusy = false
+        if finishingUpdate() {
+            await setUpEverything()
+            if phase == .main { say("Browsentic \(appVersion) is installed.") }
+            return
+        }
         if CheckID.allCases.filter(\.blocksEntry).allSatisfy({ checks[$0]?.isPassed == true }),
            !CheckID.allCases.contains(where: { checks[$0]?.needsAttention == true }) {
             await Self.pause(0.9)
@@ -134,6 +142,15 @@ final class AppModel: ObservableObject {
                 ? .advisory("None on your PATH. The side panel needs Claude Code, Codex or Antigravity.")
                 : .passed(found.joined(separator: ", "))
         }
+    }
+
+    /// After an in-app update the new bundle carries a newer command and extension than the ones
+    /// on disk, and the person already asked for them by pressing Update.
+    private func finishingUpdate() -> Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: AppUpdater.finishKey) else { return false }
+        defaults.removeObject(forKey: AppUpdater.finishKey)
+        return [CheckID.command, .extensionFiles].contains { checks[$0]?.isPassed != true } && checks[.node]?.isPassed == true
     }
 
     func setUpEverything() async {
@@ -196,8 +213,8 @@ final class AppModel: ObservableObject {
         Task {
             refreshCommandLink()
             if UserDefaults.standard.object(forKey: "startDaemonOnLaunch") as? Bool ?? true, daemon == .off { await setDaemon(on: true) }
-            await checkForUpdate()
         }
+        watchForUpdates()
     }
 
     // MARK: Daemon
@@ -393,22 +410,63 @@ final class AppModel: ObservableObject {
             CommandLink.unlink()
             _ = try await cli.uninstall(keepSkills: keepSkills)
             self.poller?.cancel()
+            self.updateWatcher?.cancel()
             self.markOff()
             self.phase = .preflight
         }
         await runPreflight()
     }
 
-    func checkForUpdate() async {
-        struct Release: Decodable { let tag_name: String }
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/imshaikot/browsentic/releases/latest")!)
-        request.timeoutInterval = 6
-        guard
-            let (data, _) = try? await URLSession.shared.data(for: request),
-            let release = try? JSONDecoder().decode(Release.self, from: data)
-        else { return }
-        let latest = release.tag_name.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
-        latestRelease = Version.isNewer(latest, than: appVersion) ? latest : nil
+    // MARK: Updates
+
+    private func watchForUpdates() {
+        updateWatcher?.cancel()
+        updateWatcher = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.checkForUpdate()
+                try? await Task.sleep(nanoseconds: 6 * 3_600 * 1_000_000_000)
+            }
+        }
+    }
+
+    func checkForUpdate(announce: Bool = false) async {
+        guard updatePhase == .idle else { return }
+        updatePhase = .checking
+        defer { if updatePhase == .checking { updatePhase = .idle } }
+        do {
+            let found = try await UpdateFeed.latest(after: appVersion)
+            lastUpdateCheck = Date()
+            if let found, found.version != update?.version {
+                say("Browsentic \(found.version) is out — you have \(appVersion). Update from the Overview tab.")
+            } else if announce, found == nil {
+                say("Browsentic \(appVersion) is the latest.")
+            }
+            update = found
+        } catch {
+            if announce { report(error) }
+        }
+    }
+
+    func installUpdate() async {
+        guard let update, update.hasMacBuild, !updatePhase.isInstalling else { return }
+        updatePhase = .downloading(0)
+        do {
+            let (staged, destination) = try await AppUpdater.stage(update) { phase in
+                Task { @MainActor [weak self] in
+                    if self?.updatePhase.isInstalling == true { self?.updatePhase = phase }
+                }
+            }
+            updatePhase = .relaunching
+            try AppUpdater.relaunch(into: staged, at: destination)
+            UserDefaults.standard.set(true, forKey: AppUpdater.finishKey)
+            NSApp.terminate(nil)
+        } catch {
+            updatePhase = .failed(error.localizedDescription)
+        }
+    }
+
+    func dismissUpdateFailure() {
+        if case .failed = updatePhase { updatePhase = .idle }
     }
 
     // MARK: Plumbing

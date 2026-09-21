@@ -5,6 +5,8 @@ struct OverviewView: View {
 
     var body: some View {
         VStack(spacing: 18) {
+            if model.update != nil { UpdateCard().transition(.opacity.combined(with: .offset(y: -8))) }
+
             Card(padding: 26) {
                 HStack(spacing: 28) {
                     PowerOrb(phase: model.daemon) { Task { await model.setDaemon(on: model.daemon == .off) } }
@@ -52,8 +54,10 @@ struct OverviewView: View {
 
             if model.daemon == .on, model.status?.pairedBrowsers == 0 || model.pairing != nil { ConnectCard() }
             ExtensionCard()
+            if model.update == nil { UpdateCard() }
         }
         .animation(.spring(duration: 0.45), value: model.daemon)
+        .animation(.spring(duration: 0.45), value: model.update)
         .animation(.spring(duration: 0.45), value: model.status)
     }
 
