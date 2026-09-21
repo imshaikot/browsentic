@@ -56,7 +56,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.test-d.ts', 'src/**/*.d.ts', 'src/daemon/test/**', 'src/daemon/dist/**'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.test-d.ts', 'src/**/*.d.ts', 'src/**/fixtures/**', 'src/daemon/test/**', 'src/daemon/dist/**'],
       reporter: ['json-summary', 'html'],
       thresholds: Object.fromEntries(COVERAGE_AREAS.map(({ glob, lines }) => [glob, { lines }])),
     },

@@ -1,0 +1,9 @@
+# Hand-written from antigravity.ts's reader, not recorded: agy is not installed where this was written. A run that streams its answer, calls one Browsentic tool and one of its own, and reports each step while it runs and again when it finishes.
+{"event":"init","conversation_id":"9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b"}
+{"event":"step_update","step_update":{"conversation_id":"9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b","step_index":0,"step_type":"tool","state":"running","tool_name":"browsentic/page_getPageInfo"}}
+{"event":"step_update","step_update":{"step_index":0,"step_type":"tool","state":"done","tool_name":"browsentic/page_getPageInfo"}}
+{"event":"step_update","step_update":{"step_index":1,"step_type":"tool","state":"running","tool_info":{"name":"search_web"}}}
+{"event":"step_update","step_update":{"step_index":1,"step_type":"tool","state":"done","tool_info":{"name":"search_web"}}}
+{"event":"step_update","step_update":{"step_index":2,"step_type":"response","text_delta":"It costs "}}
+{"event":"step_update","step_update":{"step_index":2,"step_type":"response","text_delta":"$12 a month."}}
+{"event":"result","result":{"conversation_id":"9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b","status":"success","response":"It costs $12 a month."}}

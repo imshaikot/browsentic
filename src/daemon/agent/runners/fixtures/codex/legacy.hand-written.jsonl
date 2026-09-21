@@ -1,0 +1,9 @@
+# Hand-written from codex.ts's reader, not recorded. The older msg-wrapped protocol: deltas, then the whole message again, which must not be said twice.
+{"id":"0","msg":{"type":"session_configured","session_id":"3e9a7b21-6c4d-4f80-b1a2-9d8e7f6c5b4a","model":"gpt-5.4"}}
+{"id":"1","msg":{"type":"task_started"}}
+{"id":"1","msg":{"type":"agent_message_delta","delta":"It costs "}}
+{"id":"1","msg":{"type":"agent_message_delta","delta":"$12."}}
+{"id":"1","msg":{"type":"agent_message","message":"It costs $12."}}
+{"id":"1","msg":{"type":"web_search_begin","query":"acme pricing"}}
+{"id":"1","msg":{"type":"token_count","info":{"total_token_usage":{"input_tokens":30000,"output_tokens":80},"last_token_usage":{"input_tokens":16000,"output_tokens":30}}}}
+{"id":"1","msg":{"type":"task_complete","last_agent_message":"It costs $12."}}
