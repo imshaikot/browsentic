@@ -31,7 +31,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic pair             issue a one-time code to type into the extension
   browsentic status           daemon, extension and agent state
   browsentic sessions         list paired browsers
-  browsentic revoke [origin]  unpair one browser, or all of them
+  browsentic revoke [id]      unpair one browser by the id "sessions" prints, or all of them
 
   browsentic agent            show which agent runs the side panel, and which are installed
   browsentic agent <name>     switch to claude, codex or antigravity
@@ -403,6 +403,7 @@ async function setup(argv: string[]): Promise<void> {
   if (alreadyPaired) {
     console.log(`  This browser is already paired. Press ↻ on the Browsentic card at`);
     console.log(`  chrome://extensions to pick up this build, and you are done.\n`);
+    console.log(`  Adding another browser? Load the same folder there, then run "browsentic pair".\n`);
     return;
   }
 
@@ -531,8 +532,8 @@ async function showSessions(): Promise<void> {
     return console.log('No paired browsers. Run "browsentic setup" to add one.');
   }
   for (const session of sessions) {
-    console.log(`${session.connected ? '●' : '○'} ${session.origin}`);
-    console.log(`    extension v${session.extensionVersion}, paired ${session.pairedAt}, last seen ${session.lastSeenAt}`);
+    console.log(`${session.connected ? '●' : '○'} ${session.browser ?? session.origin}  ${session.id}`);
+    console.log(`    ${session.origin}, extension v${session.extensionVersion}, paired ${session.pairedAt}, last seen ${session.lastSeenAt}`);
   }
 }
 
@@ -579,11 +580,11 @@ async function chooseAgent(first?: string, second?: string, third?: string): Pro
   console.log(`\nThe side panel runs on ${AGENTS[state.active].label}.`);
 }
 
-async function revoke(origin?: string): Promise<void> {
+async function revoke(browser?: string): Promise<void> {
   const bridge = await connect();
-  const revoked = await bridge.revoke(origin);
+  const revoked = await bridge.revoke(browser);
   await bridge.close();
-  if (!revoked) return console.log(origin ? `No session for ${origin}.` : 'Nothing to revoke.');
+  if (!revoked) return console.log(browser ? `No session for ${browser}.` : 'Nothing to revoke.');
   console.log(`Revoked ${revoked} session(s). Pair again with "browsentic pair".`);
 }
 

@@ -35,6 +35,7 @@ function fakeBridge(answers: Record<string, ActionResult> | Answer = {}, status:
       protocolVersion: 1,
       port: 0,
       manifestInSync: true,
+      connectedBrowsers: 1,
       pairedBrowsers: 1,
       pairingPending: false,
       ...status,

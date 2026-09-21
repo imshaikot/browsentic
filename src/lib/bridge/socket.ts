@@ -29,6 +29,7 @@ import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
+import { identify } from './identity';
 import { invokeForHarness } from './invoke';
 
 export const DAEMON_STATE_KEY = 'browsentic/daemon';
@@ -78,6 +79,7 @@ export interface DaemonState {
 }
 
 let socket: WebSocket | null = null;
+let welcomedSocket: WebSocket | null = null;
 let attempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let stableTimer: ReturnType<typeof setTimeout> | undefined;
@@ -422,14 +424,19 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
   const handshakeTimer = setTimeout(() => attempt.walk(), HANDSHAKE_TIMEOUT_MS);
 
   ws.onopen = () => {
-    send(ws, {
-      t: 'hello',
-      protocolVersion: SOCKET_PROTOCOL_VERSION,
-      extensionVersion: attempt.hello.extensionVersion,
-      manifestHash: attempt.hello.manifestHash,
-      auth: { kind: credential.kind },
-      nonce: attempt.hello.nonce,
-    });
+    void identify()
+      .then((identity) =>
+        send(ws, {
+          t: 'hello',
+          protocolVersion: SOCKET_PROTOCOL_VERSION,
+          extensionVersion: attempt.hello.extensionVersion,
+          manifestHash: attempt.hello.manifestHash,
+          auth: { kind: credential.kind },
+          nonce: attempt.hello.nonce,
+          ...identity,
+        }),
+      )
+      .catch(() => attempt.walk());
   };
 
   ws.onmessage = (event) => {
@@ -519,6 +526,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       if (!sessionKey && (sealed || attempt.credential.kind === 'pair')) return attempt.walk();
 
       attempt.done();
+      welcomedSocket = ws;
       // A link that is welcomed and then dropped at once has not recovered, and forgetting the
       // backoff on the welcome alone lets two peers take the link from each other every second.
       clearTimeout(stableTimer);
@@ -601,6 +609,11 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
     default:
       return;
   }
+}
+
+/** Held back until the daemon has welcomed us: mid-handshake it would be read as the proof. */
+export function reportFocus(): void {
+  if (socket && socket === welcomedSocket) post({ t: 'focus' });
 }
 
 function send(ws: WebSocket, frame: SocketFrame): void {

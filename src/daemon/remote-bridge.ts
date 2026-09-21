@@ -69,8 +69,10 @@ export class RemoteBridge implements Bridge {
     throw new Error('The Browsentic daemon did not answer about its agent');
   }
 
-  async revoke(origin?: string): Promise<number> {
-    const reply = await this.request({ id: randomUUID(), op: 'revoke', origin });
+  /** A browser is named by its session id; an origin still unpairs every browser presenting it. */
+  async revoke(browser?: string): Promise<number> {
+    const named = browser?.includes('://') ? { origin: browser } : { session: browser };
+    const reply = await this.request({ id: randomUUID(), op: 'revoke', ...named });
     return reply && 'revoked' in reply ? reply.revoked : 0;
   }
 

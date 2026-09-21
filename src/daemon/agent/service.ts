@@ -58,6 +58,8 @@ export interface AgentSessionDeps {
   ) => Promise<ActionResult>;
   emit: (runId: string, event: RunEvent) => void;
   draft: (runId: string, draft: import('@/lib/skills/site-map').SiteMapDraft) => void;
+  /** Runs going in every connected browser: the limit bounds agent processes on the machine. */
+  running?: () => number;
 }
 
 interface ActiveRun {
@@ -114,6 +116,14 @@ export class AgentSession {
         log(request.sessionId ? `agent conversation reset for session ${request.sessionId}` : 'agent conversations reset');
         return;
     }
+  }
+
+  get running(): number {
+    return this.runs.size;
+  }
+
+  owns(runId: string): boolean {
+    return this.runs.has(runId);
   }
 
   async invokeForRun(runId: string, action: string, input?: unknown): Promise<ActionResult> {
@@ -232,7 +242,7 @@ export class AgentSession {
 
     const config = readAgentConfig();
     const limit = maxConcurrentRuns(config);
-    if (this.runs.size >= limit) {
+    if ((this.deps.running?.() ?? this.runs.size) >= limit) {
       return emit({
         kind: 'error',
         code: 'RUN_LIMIT',
