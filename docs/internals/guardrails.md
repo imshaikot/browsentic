@@ -340,6 +340,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Claude Code** | `allowlist` | A per-run tool allowlist plus an explicit deny list. `Read` is denied for a browser run — it reads pages, never the disk |
 | **Codex** | `sandbox` | No per-run tool list; the read-only sandbox is the whole containment, **so the agent can still read any file the user can** |
 | **Antigravity** | `host` | No tool list and no sandbox flag; its built-in tools are governed by the user's own CLI settings, so a sealed environment is the only containment Browsentic applies |
+| **Mistral Vibe** | `allowlist` | `--enabled-tools` is the whole of what loads: Browsentic's MCP tools, plus web search and fetch on a research run. The shell and file tools never exist in the run, and `--auto-approve` is a forbidden flag |
 
 `localTools` records which case each runner is in, and the note is logged once per run, so the weak
 one is **visible in the log rather than assumed away**.
@@ -367,6 +368,7 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Claude Code | `ANTHROPIC_`, `CLAUDE_` |
 | Codex | `OPENAI_`, `CODEX_`, `AZURE_OPENAI_` |
 | Antigravity | `GEMINI_`, `GOOGLE_`, `ANTIGRAVITY_` |
+| Mistral Vibe | `MISTRAL_`, `VIBE_` |
 
 Plus **federated** cases, where a flag turns another prefix into the agent's own credentials: Claude
 Code on Bedrock authenticates with `AWS_*`, so sealing it would be sealing the agent out of its own
