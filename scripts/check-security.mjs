@@ -404,10 +404,13 @@ check('un-denying Read on a browser run is caught', vetPlan('claude', 'run', wit
 check('--dangerously-skip-permissions is caught', vetPlan('claude', 'run', plus(claudeRun, '--dangerously-skip-permissions'), stateDir).length, 1);
 
 const codexRun = planOf('codex', 'run');
-const unsandboxed = { ...codexRun, args: codexRun.args.map((a) => (a === 'read-only' ? 'danger-full-access' : a)) };
+const swapped = (plan, from, to) => ({ ...plan, args: plan.args.map((a) => (a === from ? to : a)) });
+const unsandboxed = swapped(codexRun, 'sandbox_mode="read-only"', 'sandbox_mode="danger-full-access"');
 check('losing the codex sandbox is caught', vetPlan('codex', 'run', unsandboxed, stateDir).length, 2);
 check('--full-auto is caught', vetPlan('codex', 'run', plus(codexRun, '--full-auto'), stateDir).length, 1);
-check('approval prompts turning back on is caught', vetPlan('codex', 'run', without(codexRun, 'never'), stateDir).length, 1);
+check('a writable codex sandbox is caught', vetPlan('codex', 'run', swapped(codexRun, 'sandbox_mode="read-only"', 'sandbox_mode="workspace-write"'), stateDir).length, 2);
+check('approval prompts turning back on is caught', vetPlan('codex', 'run', swapped(codexRun, 'approval_policy="never"', 'approval_policy="on-request"'), stateDir).length, 2);
+check('a later override of the codex sandbox is caught', vetPlan('codex', 'run', plus(codexRun, '-c', 'sandbox_mode="workspace-write"'), stateDir).length, 1);
 
 const agyRun = planOf('antigravity', 'run');
 check('losing the antigravity mcp config is caught', vetPlan('antigravity', 'run', { ...agyRun, files: [] }, stateDir).length, 2);

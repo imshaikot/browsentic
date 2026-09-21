@@ -321,7 +321,8 @@ runner's real plan without spawning anything.
 It checks: required arguments present, `--flag value` pairs correct, every tool in the deny list
 actually named, required workspace files written, and no argument matching `FORBIDDEN` —
 `--dangerously*`, `--yolo`, `--full-auto`, `--no-sandbox`, `--allow-all`, `danger-full-access`,
-`--sandbox=workspace-write`, `--permission-mode=bypassPermissions`, and friends. Every pattern is
+`--sandbox=workspace-write`, a `sandbox_mode=` or `approval_policy=` override that is not `"read-only"` / `"never"`,
+`--permission-mode=bypassPermissions`, and friends. Every pattern is
 checked against every runner, not just the one that owns the flag: the cost is nothing and it covers
 the runner nobody has written yet.
 

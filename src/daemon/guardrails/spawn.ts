@@ -92,6 +92,8 @@ const FORBIDDEN: readonly RegExp[] = [
   /^--allow-all/i,
   /danger-full-access/i,
   /^--sandbox=?(workspace-write|danger-full-access)$/i,
+  /^sandbox_mode=(?!"read-only"$)/i,
+  /^approval_policy=(?!"never"$)/i,
   /^--permission-mode=?(bypassPermissions|acceptEdits)$/i,
 ];
 
@@ -130,19 +132,13 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
     keepsEnv: ['OPENAI_', 'CODEX_', 'AZURE_OPENAI_'],
     note: 'no per-run tool list; the read-only sandbox is the whole containment, so the agent can still read any file the user can',
     run: {
-      required: [],
-      pairs: [
-        ['--sandbox', 'read-only'],
-        ['--ask-for-approval', 'never'],
-      ],
+      required: ['sandbox_mode="read-only"', 'approval_policy="never"'],
+      pairs: [],
       files: [],
     },
     task: {
-      required: ['mcp_servers={}'],
-      pairs: [
-        ['--sandbox', 'read-only'],
-        ['--ask-for-approval', 'never'],
-      ],
+      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'mcp_servers={}'],
+      pairs: [],
       files: [],
     },
   },

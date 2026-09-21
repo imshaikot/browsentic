@@ -91,7 +91,7 @@ Every runner is given the same four things, by whichever mechanism its CLI suppo
 | MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*` | `.agents/mcp_config.json` in its cwd |
 | System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd |
 | Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` |
-| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `--sandbox read-only`, `--ask-for-approval never` | its own permission rules |
+| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"` | its own permission rules |
 
 **Conversation continuity** is what makes "now click the second one" work: the runner reports
 whatever session id its CLI established (`session_id`, `thread_id`, `conversation_id`) and gets it

@@ -6,8 +6,12 @@ import { MCP_SERVER_NAME } from './claude';
 import { effortOf, parseJsonLine } from './util';
 import type { JsonContext, Plan, Runner, StreamContext, StreamReader } from './types';
 
-/** Codex has no per-run tool allowlist; the read-only sandbox is what keeps a run inside the browser. */
-const SANDBOX = ['--sandbox', 'read-only', '--ask-for-approval', 'never', '--skip-git-repo-check'];
+/**
+ * Codex has no per-run tool allowlist; the read-only sandbox is what keeps a run inside the browser.
+ * Set through `-c` because `exec resume` takes neither `--sandbox` nor `--ask-for-approval`, and
+ * `exec` itself dropped the latter.
+ */
+const SANDBOX = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never"', '--skip-git-repo-check'];
 
 const WEB_TOOL = 'web_search';
 

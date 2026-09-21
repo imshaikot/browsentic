@@ -41,7 +41,7 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 | Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) |
 | Default model | `claude-sonnet-5` | the CLI's own | the CLI's own |
 | Effort names | `low`…`max` | `minimal`…`high` | `low`…`high` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | `--sandbox read-only` | its own permission rules |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules |
 
 All three get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
