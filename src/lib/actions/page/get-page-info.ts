@@ -44,7 +44,7 @@ const LANDMARK_ROLES = new Set([
 export const getPageInfo = defineAction({
   name: 'page.getPageInfo',
   description:
-    'Snapshot the current page: document metadata, viewport and scroll state, a semantic layout tree with a text diagram, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step. Visible iframes come back under "frames"; nothing inside one is in this snapshot until page.switchFrame enters it, and "frame" then says which one is in focus.',
+    'Snapshot the current page: document metadata, viewport and scroll state, a text diagram of the landmark regions with a selector for each, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step. Visible iframes come back under "frames"; nothing inside one is in this snapshot until page.switchFrame enters it, and "frame" then says which one is in focus.',
   input: z.object({
     maxPerKind: z
       .number()
@@ -52,8 +52,14 @@ export const getPageInfo = defineAction({
       .positive()
       .default(30)
       .describe('Cap on links, buttons, fields, and forms listed per kind'),
+    geometry: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Add each element’s "bounds" in document pixels. Off by default: a selector or visible text is what the other tools target by, so ask only when you need coordinates — a point for page.trustedClick or page.dragElement.',
+      ),
   }),
-  execute({ maxPerKind }) {
+  execute({ maxPerKind, geometry }) {
     const { regions, owners } = layoutTree();
     const found = collect();
     tally(found, owners);
@@ -74,7 +80,7 @@ export const getPageInfo = defineAction({
         pageHeight: document.documentElement.scrollHeight,
       },
       selection: getSelection()?.toString().slice(0, 500) || undefined,
-      layout: { regions, diagram: renderDiagram(regions) },
+      layout: { diagram: renderDiagram(regions) },
       outline: [...document.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')]
         .filter(isExposed)
         .slice(0, 60)
@@ -82,15 +88,15 @@ export const getPageInfo = defineAction({
           level: Number(heading.tagName[1]),
           text: accessibleText(heading).slice(0, 120),
         })),
-      interactive: inventory(found, owners, maxPerKind),
-      frames: embeddedFrames(),
+      interactive: inventory(found, owners, maxPerKind, geometry),
+      frames: embeddedFrames(geometry),
     };
   },
 });
 
 const MAX_FRAMES = 20;
 
-function embeddedFrames() {
+function embeddedFrames(geometry: boolean) {
   const frames = [...document.querySelectorAll('iframe,frame')]
     .filter(isFrameElement)
     .filter(isExposed)
@@ -101,7 +107,7 @@ function embeddedFrames() {
       name: frame.name || undefined,
       title: frame.title || undefined,
       sandbox: sandboxOf(frame),
-      bounds: documentBounds(frame),
+      bounds: geometry ? documentBounds(frame) : undefined,
     }));
   return frames.length ? frames : undefined;
 }
@@ -174,7 +180,7 @@ function renderDiagram(regions: Region[]): string {
         .map((kind) => ` · ${contains[kind]} ${kind}`)
         .join('');
       lines.push(
-        `${indent}${last ? '└' : '├'} ${regionName(region)} · ${bounds.width}×${bounds.height} @ (${bounds.x},${bounds.y})${counts}`,
+        `${indent}${last ? '└' : '├'} ${regionName(region)} · ${bounds.width}×${bounds.height} @ (${bounds.x},${bounds.y})${counts} · selector: ${region.selector}`,
       );
       walk(region.children, indent + (last ? '  ' : '│ '));
     });
@@ -209,23 +215,29 @@ function inventory(
   found: ReturnType<typeof collect>,
   owners: Map<HTMLElement, Region>,
   cap: number,
+  geometry: boolean,
 ) {
   const regionFor = (el: HTMLElement) => {
     const owner = ownerOf(el, owners);
     return owner && regionName(owner);
   };
+  const entry = (el: HTMLElement, implied?: { tag: string; role: string }) => {
+    const { tag, role, bounds, ...rest } = describeElement(el);
+    const said = implied?.tag === tag && implied.role === role;
+    return { ...(said ? {} : { tag, role }), ...rest, ...(geometry ? { bounds } : {}) };
+  };
   return {
     links: found.links.slice(0, cap).map((link) => ({
-      ...describeElement(link),
+      ...entry(link, { tag: 'a', role: 'link' }),
       href: link.href,
       region: regionFor(link),
     })),
     buttons: found.buttons.slice(0, cap).map((button) => ({
-      ...describeElement(button),
+      ...entry(button, { tag: 'button', role: 'button' }),
       region: regionFor(button),
     })),
     fields: found.fields.slice(0, cap).map((field) => ({
-      ...describeElement(field),
+      ...entry(field),
       kind: field instanceof HTMLInputElement ? field.type : field.tagName.toLowerCase(),
       region: regionFor(field),
     })),

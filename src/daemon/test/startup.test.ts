@@ -28,6 +28,11 @@ describe('a daemon started in the sandbox', () => {
     expect(await response.json()).toEqual({ ok: true, pid: process.pid, version: '0.0.0-test', connected: false });
   });
 
+  test('does not list the page-code tools to a caller its policy would only refuse', async () => {
+    const names = (await daemon.describe()).tools.map((tool) => tool.name);
+    expect([names.includes('page.getPageInfo'), names.includes('page.injectCode'), names.includes('page.runCode')]).toEqual([true, false, false]);
+  });
+
   // fetch() will not send a Host of the caller's choosing, and a rebound page's Host is the whole point.
   test('turns away a host that is not loopback', async () => {
     const status = await new Promise((resolve, reject) => {

@@ -29,7 +29,7 @@ const RESOURCES = [
   {
     uri: 'browsentic://page/current',
     name: 'Active page snapshot',
-    description: 'Full page.getPageInfo snapshot of the active tab: metadata, layout tree, headings, interactive inventory.',
+    description: 'Full page.getPageInfo snapshot of the active tab: metadata, layout diagram, headings, interactive inventory.',
     mimeType: 'application/json',
   },
   {
@@ -116,6 +116,11 @@ const SAVE_SITE_MAP_TOOL = {
   },
 };
 
+const RESERVED_TOOLS = [
+  { action: SAVE_SITE_MAP_ACTION, descriptor: SAVE_SITE_MAP_TOOL },
+  { action: FOCUS_SHOT_ACTION, descriptor: FOCUS_SHOT_TOOL },
+];
+
 export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean } = {}): Server {
   // Page text is marked as data on the way out, for every client — the system prompt
   // that says so only reaches Browsentic's own runs. The tag is per-process so a page
@@ -142,7 +147,8 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const actions = await bridge.describe();
+    const { tools: actions, reserved = opts.agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [] } =
+      await bridge.describe();
     assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
     return {
       tools: [
@@ -157,7 +163,7 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
             'Report whether the Browsentic browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
           inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
         },
-        ...(opts.agentRun ? [SAVE_SITE_MAP_TOOL, FOCUS_SHOT_TOOL] : []),
+        ...RESERVED_TOOLS.filter((tool) => reserved.includes(tool.action)).map((tool) => tool.descriptor),
       ],
     };
   });
@@ -342,7 +348,7 @@ function splitDataUrl(dataUrl: string): [mimeType: string, base64: string] {
  */
 function render(result: ActionResult, fenceWith?: string) {
   if (result.ok) {
-    const body = sealSecrets(JSON.stringify(result.data, null, 2));
+    const body = sealSecrets(JSON.stringify(result.data));
     return { content: [{ type: 'text' as const, text: fenceWith ? fence(body, fenceWith) : body }] };
   }
   return {
