@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { ActionError, defineAction } from '../core';
 import { documentBounds, resolveTarget, targetSchema } from './dom';
 
+const DEFAULT_LONG_SIDE = 1600;
+
 export const screenshot = defineAction({
   name: 'page.screenshot',
   description:
@@ -33,9 +35,9 @@ export const screenshot = defineAction({
       .number()
       .int()
       .positive()
-      .default(1600)
+      .optional()
       .describe(
-        'Downscale the result so its longest side is at most this many pixels. The default is sized for reading a page, not for pixel-level inspection — raise it when fine detail matters.',
+        'Downscale the result so its longest side is at most this many pixels. Left out, a viewport capture you take to look at comes back at the page’s own CSS-pixel size — one image pixel per page pixel, so a position in the picture is a usable "point" — and anything else, a saved capture included, is capped at 1600. That is sized for reading a page, not for pixel-level inspection: raise it when fine detail matters.',
       ),
     save: z
       .boolean()
@@ -48,7 +50,7 @@ export const screenshot = defineAction({
       .optional()
       .describe('Base filename when saving; defaults to screenshot-<timestamp>.<ext>. Sanitized before use.'),
   }),
-  execute({ target, fullPage, format, quality, maxLongSide }) {
+  execute({ target, fullPage, format, quality, maxLongSide, save }) {
     if (quality !== undefined && format !== 'jpeg') {
       throw new ActionError('"quality" only applies when format is "jpeg"', 'INVALID_INPUT');
     }
@@ -77,6 +79,9 @@ export const screenshot = defineAction({
 
     const scroll = { x: Math.round(window.scrollX), y: Math.round(window.scrollY) };
 
-    return { mode, dpr, viewport, page, region, scroll, format, quality, maxLongSide };
+    const longSide =
+      maxLongSide ?? (mode === 'viewport' && !save ? Math.min(DEFAULT_LONG_SIDE, Math.max(viewport.w, viewport.h)) : DEFAULT_LONG_SIDE);
+
+    return { mode, dpr, viewport, page, region, scroll, format, quality, maxLongSide: longSide };
   },
 });

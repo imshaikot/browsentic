@@ -234,7 +234,7 @@ fail with `DEBUGGER_UNAVAILABLE` while DevTools is open on it.
 | `fullPage` | boolean | `false` | With no target: `false` captures the current viewport, `true` the entire scroll view by tiling |
 | `format` | `"png"` \| `"jpeg"` | `"jpeg"` | JPEG is far smaller and quicker to encode; PNG is lossless and keeps transparency |
 | `quality` | integer | `80` | JPEG quality, 1–100. Only valid when format is `"jpeg"` |
-| `maxLongSide` | integer | `1600` | Downscale so the longest side is at most this many pixels |
+| `maxLongSide` | integer | — | Downscale so the longest side is at most this many pixels. Left out, a viewport capture comes back at the page's CSS-pixel size, so a position in the image is a usable `point`; a full-page, element or saved capture is capped at `1600` |
 | `save` | boolean | `false` | Write the image to disk (done by the daemon, which adds `savedTo`). Set it only when the user wants a file to keep |
 | `filename` | string | — | Base filename when saving; defaults to `screenshot-<timestamp>.<ext>`. Sanitized before use |
 
