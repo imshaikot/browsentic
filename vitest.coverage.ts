@@ -8,11 +8,11 @@ import type { Reporter, Vitest } from 'vitest/node';
  * get a build through. UI code sits outside every area until UI tests exist.
  */
 export const COVERAGE_AREAS = [
-  { name: 'Guardrails, secrets, intent', glob: 'src/{daemon/guardrails,lib/secrets,lib/intent}/**', lines: 93 },
-  { name: 'Daemon', glob: 'src/daemon/{*.ts,!(guardrails)/**/*.ts}', lines: 16 },
-  { name: 'Shared lib', glob: 'src/lib/{*.ts,actions/*.ts,!(actions|bridge|intent|secrets)/**/*.ts}', lines: 22 },
+  { name: 'Guardrails, secrets, intent', glob: 'src/{daemon/guardrails,lib/secrets,lib/intent}/**', lines: 94 },
+  { name: 'Daemon', glob: 'src/daemon/{*.ts,!(guardrails)/**/*.ts}', lines: 61 },
+  { name: 'Shared lib', glob: 'src/lib/{*.ts,actions/*.ts,!(actions|bridge|intent|secrets)/**/*.ts}', lines: 37 },
   { name: 'Extension background', glob: 'src/lib/bridge/!(use-*).ts', lines: 1 },
-  { name: 'Page actions', glob: 'src/lib/actions/page/**', lines: 11 },
+  { name: 'Page actions', glob: 'src/lib/actions/page/**', lines: 12 },
 ];
 
 interface CoverageMap {
