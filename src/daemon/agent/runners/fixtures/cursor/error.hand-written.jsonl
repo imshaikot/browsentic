@@ -1,0 +1,3 @@
+# Hand-written. Cursor documents no distinct error event; a failure arrives as is_error on the closing result.
+{"type":"system","subtype":"init","session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8","model":"composer-2.5"}
+{"type":"result","subtype":"error","is_error":true,"error":"Model composer-9 is not available on this account.","session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8"}

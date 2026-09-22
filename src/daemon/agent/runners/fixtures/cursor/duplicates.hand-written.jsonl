@@ -1,0 +1,8 @@
+# Hand-written. The four assistant forms Cursor staff described on the forum: a delta carries timestamp_ms;
+# a buffered flush before a tool call adds model_call_id; a final flush carries neither and repeats everything.
+{"type":"system","subtype":"init","session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8","model":"composer-2.5"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Checking "}]},"session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8","timestamp_ms":1774846267524}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Checking the page."}]},"session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8","model_call_id":"mc-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"the page."}]},"session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8","timestamp_ms":1774846267702}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Checking the page."}]},"session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8"}
+{"type":"result","subtype":"success","is_error":false,"result":"Checking the page.","session_id":"0199b1c2-3d4e-5f60-7182-93a4b5c6d7e8"}

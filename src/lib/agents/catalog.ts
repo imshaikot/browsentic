@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -63,6 +63,17 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     install: 'curl -fsSL https://x.ai/cli/install.sh | bash',
     docs: 'https://docs.x.ai/build/overview',
     models: ['grok-4.7'],
+    beta: true,
+  },
+  cursor: {
+    kind: 'cursor',
+    label: 'Cursor CLI',
+    vendor: 'Anysphere',
+    bin: 'cursor-agent',
+    install: 'curl https://cursor.com/install -fsS | bash',
+    docs: 'https://cursor.com/docs/cli/overview',
+    // `cursor-agent models` lists the account's own set, but it needs a login, so these are curated.
+    models: ['composer-2.5', 'claude-opus-4-8', 'gpt-5', 'sonnet-4-thinking'],
     beta: true,
   },
 };

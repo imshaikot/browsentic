@@ -14,6 +14,7 @@ import { log } from '../../log';
 import { antigravityRunner } from './antigravity';
 import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
+import { cursorRunner } from './cursor';
 import { grokRunner } from './grok';
 import type { McpServer, Runner } from './types';
 import { vibeRunner } from './vibe';
@@ -24,6 +25,7 @@ export const RUNNERS: Record<AgentKind, Runner> = {
   antigravity: antigravityRunner,
   vibe: vibeRunner,
   grok: grokRunner,
+  cursor: cursorRunner,
 };
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');

@@ -11,10 +11,17 @@ import { agentState, grantRunner, mcpServerFor, RUNNERS, runnerFor } from './ind
 const bin = join(stateDir, 'stub-bin');
 const probes = join(stateDir, 'probes.log');
 
-/** A stand-in CLI that notes each time it is probed, then answers --version the given way. */
+/**
+ * A stand-in CLI that notes each version probe, then answers --version the given way. Only the
+ * version probe is recorded: a runner's `check()` may call the binary again — Cursor asks it
+ * whether it is signed in — and those are not what `rounds()` is counting.
+ */
 const stub = (name: string, { prints = `${name} 1.0.0`, exit = 0 } = {}) => {
   const path = join(bin, name);
-  writeFileSync(path, `#!/bin/sh\necho ${name} >> "${probes}"\necho "${prints}" >&2\nexit ${exit}\n`);
+  writeFileSync(
+    path,
+    `#!/bin/sh\ncase "$1" in --version) echo ${name} >> "${probes}" ;; esac\necho "${prints}" >&2\nexit ${exit}\n`,
+  );
   chmodSync(path, 0o755);
   return path;
 };
@@ -34,6 +41,7 @@ const configWith = (agents: Partial<Record<AgentKind, AgentSettings>>, agent: Ag
     antigravity: { bin: join(bin, 'agy') },
     vibe: { bin: join(bin, 'vibe') },
     grok: { bin: join(bin, 'grok') },
+    cursor: { bin: join(bin, 'cursor-agent') },
     ...agents,
   },
   requireApproval: [],
@@ -66,7 +74,7 @@ describe('the registry', () => {
 describe('readiness probes', () => {
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
-    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok']) stub(name);
+    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok', 'cursor-agent']) stub(name);
     stub('codex-expired', { prints: 'licence expired', exit: 3 });
   });
 
@@ -131,7 +139,7 @@ describe('readiness probes', () => {
   test('probes are reused for half a minute, even when only the active agent changed', async () => {
     await agentState(configWith({}), { refresh: true });
     const again = await agentState(configWith({}, 'antigravity'));
-    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'grok', 'vibe']], 'antigravity']);
+    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'vibe']], 'antigravity']);
   });
 
   test('asking for a refresh probes again', async () => {
@@ -144,8 +152,8 @@ describe('readiness probes', () => {
     await agentState(configWith({}), { refresh: true });
     await agentState(configWith({ claude: { bin: join(bin, 'claude-next') } }));
     expect(rounds()).toEqual([
-      ['agy', 'claude', 'codex', 'grok', 'vibe'],
-      ['agy', 'claude-next', 'codex', 'grok', 'vibe'],
+      ['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'vibe'],
+      ['agy', 'claude-next', 'codex', 'cursor-agent', 'grok', 'vibe'],
     ]);
   });
 
