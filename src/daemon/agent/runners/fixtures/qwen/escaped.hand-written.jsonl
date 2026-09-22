@@ -1,0 +1,8 @@
+# Hand-written; the CLI was not installed. Three init lines that each mean the containment did not
+# take: a denied built-in still registered, a second MCP server loaded, and the approval mode the
+# run was started in replaced. Each is read on its own, by a fresh reader.
+{"type":"system","subtype":"init","uuid":"4c2d3e4f-0000-4000-8000-000000000001","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","tools":["todo_write","run_shell_command","mcp__browsentic__page_getPageInfo"],"mcp_servers":[{"name":"browsentic","status":"connected"}],"permission_mode":"default"}
+{"type":"system","subtype":"init","uuid":"4c2d3e4f-0000-4000-8000-000000000002","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","tools":["todo_write"],"mcp_servers":[{"name":"browsentic","status":"connected"},{"name":"node-repl","status":"connected"}],"permission_mode":"default"}
+{"type":"system","subtype":"init","uuid":"4c2d3e4f-0000-4000-8000-000000000003","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","tools":["todo_write"],"mcp_servers":[{"name":"browsentic","status":"connected"}],"permission_mode":"yolo"}
+{"type":"system","subtype":"init","uuid":"4c2d3e4f-0000-4000-8000-000000000004","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","tools":["todo_write","computer_use__screenshot"],"mcp_servers":[{"name":"browsentic","status":"connected"}],"permission_mode":"default"}
+{"type":"system","subtype":"tool_set_refreshed","uuid":"4c2d3e4f-0000-4000-8000-000000000005","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","permission_mode":"auto"}

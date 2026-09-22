@@ -33,6 +33,7 @@ const DEFAULTS: AgentConfig = {
     vibe: { bin: 'vibe' },
     grok: { bin: 'grok' },
     cursor: { bin: 'cursor-agent' },
+    qwen: { bin: 'qwen' },
   },
   requireApproval: ['page.submitForm'],
 };

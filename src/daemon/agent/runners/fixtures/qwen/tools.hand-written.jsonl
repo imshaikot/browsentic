@@ -1,0 +1,7 @@
+# Hand-written; the CLI was not installed. A research run's own web search, beside an MCP call the
+# daemon already draws itself, and a delta belonging to a sub-agent's message.
+{"type":"stream_event","uuid":"2c2d3e4f-0000-4000-8000-000000000001","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","parent_tool_use_id":null,"event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_web_1","name":"web_search"}}}
+{"type":"stream_event","uuid":"2c2d3e4f-0000-4000-8000-000000000002","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","parent_tool_use_id":null,"event":{"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_mcp_1","name":"mcp__browsentic__page_getPageInfo"}}}
+{"type":"stream_event","uuid":"2c2d3e4f-0000-4000-8000-000000000003","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","parent_tool_use_id":"toolu_mcp_1","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"a sub-agent said this"}}}
+{"type":"vibe_check","note":"an event type this reader has never heard of"}
+not json at all

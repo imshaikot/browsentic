@@ -120,6 +120,8 @@ describe('spawn containment', () => {
     const grokTask = planOf('grok', 'task');
     const cursorRun = planOf('cursor', 'run');
     const cursorTask = planOf('cursor', 'task');
+    const qwenRun = planOf('qwen', 'run');
+    const qwenTask = planOf('qwen', 'task');
     const rewriting = (plan: Plan, path: string, edit: (content: string) => string): Plan => ({
       ...plan,
       files: plan.files?.map((file) => (file.path === path ? { ...file, content: edit(file.content) } : file)),
@@ -313,6 +315,59 @@ describe('spawn containment', () => {
     test('a cursor task that could reach an MCP server is caught', () => {
       const opened = rewriting(cursorTask, '.cursor/cli.json', (content) => content.replace('"Mcp(*)"', '"Mcp(browsentic:*)"'));
       expect(vetPlan('cursor', 'task', opened, stateDir)).toHaveLength(1);
+    });
+
+    // Without --safe-mode the user's own MCP servers, hooks, extensions and permission rules load
+    // beside the ones Browsentic passed, and their own browsentic entry reaches the browser ungated.
+    test('dropping --safe-mode is caught on both qwen modes', () => {
+      expect(vetPlan('qwen', 'run', without(qwenRun, '--safe-mode'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'task', without(qwenTask, '--safe-mode'), stateDir)).toHaveLength(1);
+    });
+
+    test('--bare, which reads like --safe-mode but un-denies the shell, is caught', () => {
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--bare'), stateDir)).toHaveLength(1);
+    });
+
+    test('--yolo and its -y alias are caught', () => {
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--yolo'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '-y'), stateDir)).toHaveLength(1);
+    });
+
+    test('skipping TLS verification is caught', () => {
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--insecure'), stateDir)).toHaveLength(1);
+    });
+
+    // The classifier mode approves what the deny list exists to refuse, and the inline spelling
+    // would slip past a check that only reads the value after the flag.
+    test('a later approval mode, in either spelling, is caught', () => {
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--approval-mode', 'auto'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--approval-mode=auto'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--approval-mode=yolo'), stateDir)).toHaveLength(1);
+    });
+
+    test('a second MCP server named for qwen is caught', () => {
+      expect(vetPlan('qwen', 'run', plus(qwenRun, '--allowed-mcp-server-names', 'node-repl'), stateDir)).toHaveLength(1);
+    });
+
+    // Qwen ships bundled browser-use and computer-use skills, so `skill` is a second browser and
+    // an unasked npm install, not a convenience.
+    test('un-denying the shell, the sub-agent or the skill tool is caught', () => {
+      expect(vetPlan('qwen', 'run', without(qwenRun, 'Bash'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'run', without(qwenRun, 'agent'), stateDir)).toHaveLength(1);
+      expect(vetPlan('qwen', 'run', without(qwenRun, 'skill'), stateDir)).toHaveLength(1);
+    });
+
+    test('a qwen run that could read the disk is caught', () => {
+      expect(vetPlan('qwen', 'run', without(qwenRun, 'Read'), stateDir)).toHaveLength(1);
+    });
+
+    test('a qwen task that could reach an MCP server is caught', () => {
+      expect(vetPlan('qwen', 'task', swapped(qwenTask, '{"mcpServers":{}}', '{"mcpServers":{"browsentic":{}}}'), stateDir)).toHaveLength(1);
+    });
+
+    test('a qwen run with web tools, or a task that reads a file, is still contained', () => {
+      expect(vetPlan('qwen', 'run', planOf('qwen', 'run', { research: true }), stateDir)).toEqual([]);
+      expect(vetPlan('qwen', 'task', planOf('qwen', 'task', { reads: true }), stateDir)).toEqual([]);
     });
 
     test('running outside the state dir is caught', () => {

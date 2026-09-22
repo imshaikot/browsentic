@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor', 'qwen'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -74,6 +74,18 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     docs: 'https://cursor.com/docs/cli/overview',
     // `cursor-agent models` lists the account's own set, but it needs a login, so these are curated.
     models: ['composer-2.5', 'claude-opus-4-8', 'gpt-5', 'sonnet-4-thinking'],
+    beta: true,
+  },
+  qwen: {
+    kind: 'qwen',
+    label: 'Qwen Code',
+    vendor: 'Alibaba',
+    bin: 'qwen',
+    install: 'npm i -g @qwen-code/qwen-code',
+    docs: 'https://qwenlm.github.io/qwen-code-docs/en/',
+    // Which of these an account can reach depends on the provider it is pointed at, and no
+    // subcommand lists them, so these are curated.
+    models: ['qwen3-coder-plus', 'qwen3.7-plus', 'qwen3.6-plus', 'qwen3-max-2026-01-23'],
     beta: true,
   },
 };

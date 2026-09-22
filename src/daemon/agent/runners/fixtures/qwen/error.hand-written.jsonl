@@ -1,0 +1,3 @@
+# Hand-written; the CLI was not installed. validateNonInterActiveAuth.ts emits the auth failure as
+# a terminal result in stream-json mode rather than on stderr.
+{"type":"result","subtype":"error_during_execution","uuid":"3c2d3e4f-0000-4000-8000-000000000001","session_id":"9a1d0f22-4c7e-4c1b-9b1e-2f6c5d8a0b31","is_error":true,"duration_ms":40,"duration_api_ms":0,"num_turns":0,"usage":{"input_tokens":0,"output_tokens":0},"permission_denials":[],"error":{"message":"No auth type is selected. Please configure an auth type (e.g. via settings or `--auth-type`) before running in non-interactive mode."}}

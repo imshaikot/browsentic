@@ -108,6 +108,7 @@ interface Containment {
 const FORBIDDEN: readonly RegExp[] = [
   /^--dangerously/i,
   /^--yolo$/i,
+  /^-y$/,
   /^--force$/i,
   /^-f$/,
   /^--auto-approve$/i,
@@ -124,6 +125,13 @@ const FORBIDDEN: readonly RegExp[] = [
 
 /** Local tools no run may ever have, whatever else it is allowed. */
 const NEVER = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep', 'Task'];
+
+/**
+ * The same, as Qwen spells it. `Edit` is its meta-rule for edit, write_file and notebook_edit;
+ * `agent` is its sub-agent tool and `skill` reaches its bundled browser-use and computer-use
+ * skills, which drive a second browser and install packages outside this run's gate.
+ */
+const NEVER_QWEN = ['Bash', 'exec', 'Edit', 'agent', 'skill', 'monitor'];
 
 /**
  * Grok takes these only from its environment. It loads Claude Code's and Cursor's MCP servers
@@ -271,6 +279,48 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       },
     },
   },
+
+  qwen: {
+    localTools: 'allowlist',
+    // The documented way to point Qwen at a provider is OPENAI_API_KEY with OPENAI_BASE_URL, so
+    // sealing that prefix would seal most installs out of their own model; Codex already keeps it.
+    // ANTHROPIC_ and GEMINI_ are auth types Qwen accepts and this does not hand it.
+    keepsEnv: ['QWEN_', 'DASHSCOPE_', 'BAILIAN_', 'OPENAI_'],
+    // `--bare` reads like a quieter --safe-mode and is the one flag that switches off the
+    // non-interactive refusal of shell, edit and write; `--insecure` drops TLS verification.
+    forbidden: [/^--bare$/i, /^--insecure$/i, /^--approval-mode=(?!default$)/i],
+    note:
+      'per-run tool allowlist over an explicit deny list, and only one MCP server may load; ' +
+      'the built-ins are closed by deny rules rather than by --core-tools, whose fail-closed ' +
+      'allowlist --safe-mode silently ignores, so a built-in a future Qwen release adds would ' +
+      'register — the init line names every tool that did, and the reader stops the run on one ' +
+      'Browsentic did not ask for',
+    run: {
+      // Without it the user's own MCP servers, hooks, extensions and permission rules all load.
+      required: ['--safe-mode', '--include-partial-messages'],
+      pairs: [
+        ['--approval-mode', 'default'],
+        ['--output-format', 'stream-json'],
+        ['--allowed-mcp-server-names', 'browsentic'],
+      ],
+      // A browser run reads pages, never the disk. `Read` and `Edit` are Qwen's own meta-rules.
+      denies: { flag: '--exclude-tools', tools: [...NEVER_QWEN, 'Read'] },
+      files: [],
+    },
+    task: {
+      required: ['--safe-mode'],
+      pairs: [
+        ['--approval-mode', 'default'],
+        ['--output-format', 'json'],
+        // Safe mode drops the user's own servers, so an empty set is the whole MCP surface:
+        // a one-shot cannot reach the browser at all. `Read` is left out of the deny list —
+        // some tasks are handed a file in the scratch workspace.
+        ['--mcp-config', '{"mcpServers":{}}'],
+      ],
+      denies: { flag: '--exclude-tools', tools: NEVER_QWEN },
+      files: [],
+    },
+  },
 };
 
 /**
@@ -355,6 +405,7 @@ const SECRET_PREFIX: readonly string[] = [
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
   'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'CURSOR_', 'HF_', 'HUGGINGFACE_',
+  'QWEN_', 'DASHSCOPE_', 'BAILIAN_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 
