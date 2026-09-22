@@ -45,11 +45,11 @@ const searching = (research: boolean): string[] => ['-c', `web_search=${tomlStri
  * say so watches the model answer from memory or a web search, because those it can see. Codex
  * also cuts a tool result at about 10,000 tokens, which a whole-page snapshot passes.
  */
-const REACHING_THE_BROWSER = `# Reaching the browser from Codex
+const reachingTheBrowser = (research: boolean) => `# Reaching the browser from Codex
 
 Your browsentic tools are not in your tool list yet, because Codex defers them. Before you plan anything, call \`tool_search\` for what this job needs — query "browsentic page", limit 20 — and search again for a tool you have not loaded. If the only way you can call a tool is \`exec\`, the same tools are there as \`tools.mcp__browsentic__<name>({ ... })\`: find them by filtering \`ALL_TOOLS\`, and pass a screenshot on with \`image(result.content[0])\`, because \`text()\` alone drops the picture.
 
-The page the user means is the one open in their browser. Read it with these tools. Never answer from memory, from a web search, or by fetching the page from the shell.
+The page the user means is the one open in their browser. Read it with these tools. Never answer from memory${research ? '' : ', from a web search,'} or by fetching the page from the shell${research ? ', and keep a web search to background the page cannot give you' : ''}.
 
 Codex truncates a tool result over roughly 10,000 tokens, so ask for less at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back — rather than one large read whose middle goes missing.`;
 
@@ -126,7 +126,7 @@ export const codexRunner: Runner = {
         '-c',
         `${server}.default_tools_approval_mode="approve"`,
         '-c',
-        `developer_instructions=${tomlString(`${context.systemPrompt.trim()}\n\n${REACHING_THE_BROWSER}`)}`,
+        `developer_instructions=${tomlString(`${context.systemPrompt.trim()}\n\n${reachingTheBrowser(research)}`)}`,
         ...searching(research),
         ...(settings.model ? ['--model', settings.model] : []),
         ...(effort ? ['-c', `model_reasoning_effort=${tomlString(effort)}`] : []),

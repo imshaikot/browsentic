@@ -112,6 +112,11 @@ describe('a streamed run', () => {
     expect(instructions).toMatch(/never answer from memory/i);
   });
 
+  // A mapping run is asked to research the domain, so its prompt cannot also forbid the search.
+  test('a research run may search the web for background, and any other run is told not to', () => {
+    expect([stream({ research: true }).args, stream().args].map((args) => instructionsIn(args).includes('from a web search'))).toEqual([false, true]);
+  });
+
   test('the chosen model and effort are passed through', () => {
     const args = codexRunner.stream(streamContext({ bin: 'codex', model: 'gpt-5.4', effort: 'xhigh' })).args;
     expect([args[args.indexOf('--model') + 1], args.find((arg) => arg.startsWith('model_reasoning_effort='))]).toEqual([
