@@ -119,6 +119,16 @@ describe('a streamed run', () => {
     });
   });
 
+  test('a failure the reader reports stops the agent, rather than leaving it running unwatched', async () => {
+    const stopped = join(stateDir, 'stopped-after-fail');
+    const script =
+      `process.on('SIGTERM', () => { require('node:fs').writeFileSync(${JSON.stringify(stopped)}, 'stopped'); process.exit(0); });` +
+      `${printing(['fail', 'AGENT_UNSAFE', 'offered the shell'])} setInterval(() => {}, 1000);`;
+    const refused = await failure(run(standIn(script)));
+    await vi.waitFor(() => expect(existsSync(stopped)).toBe(true));
+    expect(refused).toEqual({ code: 'AGENT_UNSAFE', message: 'offered the shell' });
+  });
+
   test("an agent that exits early fails with the runner's explanation of what it printed", async () => {
     expect(await failure(run(standIn(`process.stderr.write('Error: no credentials found\\n'); process.exit(1);`)))).toEqual({
       code: 'AGENT_FAILED',
