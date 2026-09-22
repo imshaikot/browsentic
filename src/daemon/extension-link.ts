@@ -33,6 +33,8 @@ export class ExtensionLink {
   readonly browser?: string;
   /** Which connected browser the user was last in, so a caller that names none reaches that one. */
   lastActiveAt = Date.now();
+  /** What this browser offers: a Firefox build lists fewer tools than a Chromium one, and a drifted build its own. */
+  tools: ToolDescriptor[] = [];
   private readonly pending = new Map<string, Pending>();
   private readonly ping: ReturnType<typeof setTimeout>;
   private closed = false;

@@ -42,6 +42,6 @@ The user is sitting at this browser. Handing them ten seconds of clicking is a n
 
 `DEBUGGER_UNAVAILABLE` means Chrome's debugger could not attach — almost always DevTools being open on that tab. Tell the user to close DevTools and retry; there is no fallback, because reading a closed shadow root is exactly what the debugger is for.
 
-`UNSUPPORTED` means Firefox, which does not expose a debugger to extensions. Neither tool works there. Say so and ask the user to deal with the captcha themselves.
+A Firefox build has neither tool: it exposes no debugger to extensions, so they are left off its tool list rather than offered to fail. If they are not in your list, do not go looking for them — say so and ask the user to deal with the captcha themselves. `UNSUPPORTED` means the same thing when an older instruction or recording still names one.
 
 Both are terminal conditions. Report them and move on to whatever else the task needs.

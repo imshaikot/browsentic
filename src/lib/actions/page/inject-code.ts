@@ -5,8 +5,9 @@ export const MAX_CODE_LENGTH = 32_768;
 
 export const injectCode = defineAction({
   name: 'page.injectCode',
+  chromiumOnly: true,
   description:
-    'Install a small toolkit of JavaScript functions into the page, to be called later with page.runCode. Reach for it only when the ordinary tools are the wrong shape: a step sequence you are about to repeat three or more times with different inputs (create 20 tags, delete every row), or a capability no tool covers (seek a video, read a canvas, drive a bespoke editor API). The user reviews and approves the code before it runs — one approval covers every later page.runCode call and survives page reloads, so batch work needs no further prompts. The toolkit is bound to the tab and origin it was approved on; navigating to another site voids it. Installing goes through Chrome’s debugger, so the browser shows a “Browsentic is debugging this browser” bar for the moment it takes, it cannot install on a tab that has DevTools open, and it is unavailable on Firefox — the calls afterwards are cheap and show nothing. For a one-off click or fill, the ordinary tools are always the better choice.',
+    'Install a small toolkit of JavaScript functions into the page, to be called later with page.runCode. Reach for it only when the ordinary tools are the wrong shape: a step sequence you are about to repeat three or more times with different inputs (create 20 tags, delete every row), or a capability no tool covers (seek a video, read a canvas, drive a bespoke editor API). The user reviews and approves the code before it runs — one approval covers every later page.runCode call and survives page reloads, so batch work needs no further prompts. The toolkit is bound to the tab and origin it was approved on; navigating to another site voids it. Installing goes through Chrome’s debugger, so the browser shows a “Browsentic is debugging this browser” bar for the moment it takes, and it cannot install on a tab that has DevTools open — the calls afterwards are cheap and show nothing. For a one-off click or fill, the ordinary tools are always the better choice.',
   input: z.object({
     purpose: z
       .string()

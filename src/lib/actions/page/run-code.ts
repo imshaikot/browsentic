@@ -4,6 +4,7 @@ import { callToolkit } from './toolkit';
 
 export const runCode = defineAction({
   name: 'page.runCode',
+  chromiumOnly: true,
   description:
     'Call one function from the toolkit page.injectCode installed in this tab, with fresh arguments. This is the cheap, repeatable half of the pair: the user approved the code once, so every call runs without another prompt, and a page reload re-installs the approved toolkit on its own. It refuses if nothing is installed here, or if the tab has moved to a different site than the one the code was approved on — inject again in either case. The function’s return value comes back as JSON.',
   input: z.object({

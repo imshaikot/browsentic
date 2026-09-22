@@ -269,8 +269,8 @@ selector can reach — inside a cross-origin iframe or a closed shadow root — 
 
 The click is dispatched through Chrome's debugger rather than from the page, so the browser shows a
 "Browsentic is debugging this browser" bar for the duration, the tool fails with
-`DEBUGGER_UNAVAILABLE` on a tab that already has DevTools attached, and it is `UNSUPPORTED` on
-Firefox. The extension resolves the click point *after* attaching, so the bar's own reflow is
+`DEBUGGER_UNAVAILABLE` on a tab that already has DevTools attached, and a Firefox build leaves it
+off its tool list. The extension resolves the click point *after* attaching, so the bar's own reflow is
 accounted for, and refuses with `INVALID_TARGET` when something covers that point rather than
 clicking whatever is on top. The result adds `trusted: true` and the viewport `point` that was
 clicked.
@@ -374,7 +374,7 @@ The drop point is measured before the drag starts, so a list that reflows as the
 it can land a slot out — raise `steps` and `settleMs`, then read `landedOn` back.
 
 `trusted: true` routes through Chrome's debugger like [page_trustedClick](#page_trustedclick), with
-the same costs: the debugging bar appears, DevTools must be closed, and Firefox is unsupported. It
+the same costs: the debugging bar appears, DevTools must be closed, and on Firefox it is `UNSUPPORTED`. It
 cannot drive HTML5 drag-and-drop, so it is refused with `INVALID_INPUT` when the mechanism resolves
 to `native`.
 
@@ -490,8 +490,8 @@ into it, and only its arguments change. There is deliberately no "always on this
 injection: it would authorise later code you never read. A different script asks again.
 
 Installing goes through Chrome's debugger, so the browser shows its "Browsentic is debugging this
-browser" bar for the moment it takes, it fails on a tab with DevTools open, and it is unavailable on
-Firefox. The calls afterwards use an ordinary event bridge and show nothing.
+browser" bar for the moment it takes, and it fails on a tab with DevTools open; a Firefox build
+leaves both tools off its list. The calls afterwards use an ordinary event bridge and show nothing.
 
 ### page_injectCode
 
@@ -739,7 +739,7 @@ Calls do not stack — each replaces the last, so re-applying with adjusted numb
 
 What the page **reports** rather than what it renders: `page_startDiagnostics` attaches Chrome's
 debugger and starts buffering, `page_readConsole` and `page_readNetwork` read the buffers, and
-`page_stopDiagnostics` detaches. Chrome only — all four return `UNSUPPORTED` on Firefox.
+`page_stopDiagnostics` detaches. Chrome only — a Firefox build leaves all four off its tool list.
 
 Console and network events are delivered only while attached and are not kept anywhere otherwise, so
 **start the recording before the thing you are diagnosing happens**. Chrome shows a "Browsentic is

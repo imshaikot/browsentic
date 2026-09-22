@@ -3,6 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const stopDiagnostics = defineAction({
   name: 'page.stopDiagnostics',
+  chromiumOnly: true,
   description:
     'Detach the debugger and take Chrome’s “Browsentic is debugging this browser” bar away. What was collected stays readable by page.readConsole and page.readNetwork afterwards, minus response bodies, which only exist while attached. ' +
     'Call this as soon as you have what you need rather than leaving the bar up.',

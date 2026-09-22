@@ -17,6 +17,8 @@ Reach for it in exactly two situations:
 
 Do **not** reach for it when the ordinary tools already fit. A one-off click is `page_clickElement`; two repetitions are still cheaper done directly than approved, installed and called. Reading data out of a page is `page_extractText` or `page_getPageInfo`. The injected path costs a user interruption (the approval), a visible "Browsentic is debugging this browser" bar on every call, and it does not work on Firefox or on a tab with DevTools open — so it has to earn its place.
 
+Installing needs Chrome's debugger, so a Firefox build leaves `page_injectCode` and `page_runCode` off its tool list. If they are not among your tools, the loop is done with the ordinary tools, and this skill's advice does not apply.
+
 The moment to decide is the moment you notice the repetition: after doing a task once by hand and seeing the same sequence coming again and again, stop and write the function rather than grinding through the loop.
 
 ## Writing the toolkit

@@ -11,6 +11,23 @@ import { FakeBrowser, type Profile } from './fake-browser';
 const unpacked = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
 const chrome: Profile = { origin: unpacked, installId: 'install-chrome-0001', browser: 'Google Chrome' };
 const brave: Profile = { origin: unpacked, installId: 'install-brave-00001', browser: 'Brave' };
+const firefox: Profile = {
+  origin: 'moz-extension://0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0',
+  installId: 'install-firefox-001',
+  browser: 'Firefox',
+  target: 'firefox',
+};
+// The nine tools a Firefox build leaves off, less the two page-code tools the default guardrails
+// already keep from any caller outside a run.
+const DEBUGGER_ONLY = [
+  'page.findCaptcha',
+  'page.readConsole',
+  'page.readNetwork',
+  'page.solveCaptcha',
+  'page.startDiagnostics',
+  'page.stopDiagnostics',
+  'page.trustedClick',
+];
 
 let daemon: Daemon;
 let opened: { close(): unknown }[] = [];
@@ -154,6 +171,44 @@ describe('a caller outside any browser', () => {
   test('with no browser connected, is told the extension is offline', async () => {
     const result = await (await control()).invoke('page.getPageInfo');
     expect(result.ok ? null : result.error.code).toBe('EXTENSION_OFFLINE');
+  });
+});
+
+describe('the tool list a caller is offered', () => {
+  const offeredTo = async (bridge: RemoteBridge) => (await bridge.describe()).tools.map(({ name }) => name);
+
+  test("is the list of the browser it would reach: Firefox's without the debugger tools, Chrome's whole", async () => {
+    const fox = await pair(firefox);
+    const second = await pair(chrome);
+    await settled();
+    await fox.focus();
+    const viaFirefox = await control();
+    const [foxTools, foxStatus] = [await offeredTo(viaFirefox), await viaFirefox.status()];
+    await second.focus();
+    const chromeTools = await offeredTo(await control());
+    expect([
+      foxStatus.manifestInSync,
+      chromeTools.filter((name) => !foxTools.includes(name)).sort(),
+      foxTools.filter((name) => !chromeTools.includes(name)),
+    ]).toEqual([true, DEBUGGER_ONLY, []]);
+  });
+
+  test('a drifted build is served what it reports, and only it', async () => {
+    const drifted: Profile = { ...brave, tools: [{ name: 'page.onlyHere', description: 'from a build we never saw', inputSchema: {} }] };
+    const odd = await pair(drifted);
+    const second = await pair(chrome);
+    await settled();
+    await odd.focus();
+    const viaDrifted = await control();
+    const [oddTools, oddStatus] = [await offeredTo(viaDrifted), await viaDrifted.status()];
+    await second.focus();
+    const chromeTools = await offeredTo(await control());
+    expect([oddStatus.manifestInSync, oddTools, chromeTools.includes('page.onlyHere'), chromeTools.includes('page.getPageInfo')]).toEqual([
+      false,
+      ['page.onlyHere'],
+      false,
+      true,
+    ]);
   });
 });
 
