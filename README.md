@@ -24,7 +24,7 @@ curl -fsSL https://browsentic.com/install.sh | sh
 npx browsentic setup
 ```
 
-Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. You also need one agent CLI logged in — `claude`, `codex` or `agy`. Details, updating and building from source are in the [install guide](docs/guide/install.md).
+Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex` or `agy`. Details, updating and building from source are in the [install guide](docs/guide/install.md).
 
 ## Key Capabilities
 

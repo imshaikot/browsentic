@@ -10,6 +10,10 @@ browsentic update
 
 That refreshes two things, in order: **the command itself**, then the extension it carries.
 
+The Firefox add-on is not carried by the package. It updates itself: every release publishes a
+signed `.xpi` and an `updates.json` beside it, Firefox polls that file about once a day, and
+**Check for Updates** in `about:addons` polls it now. `browsentic update` still refreshes the daemon.
+
 The first half matters more than it sounds. `npx browsentic setup` does not put anything on your
 `PATH` — it runs the package out of npm's own throwaway cache, and npm names that directory after
 the spec it was asked for, records the version it resolved *the first time*, and reuses it forever
@@ -68,6 +72,9 @@ the fresh build.
 ```sh
 browsentic uninstall
 ```
+
+On Firefox, remove the add-on from `about:addons` as well — it was installed from a file, not from
+the directory this command removes.
 
 It prints exactly what it is about to remove and asks before removing any of it:
 
