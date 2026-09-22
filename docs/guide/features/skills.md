@@ -89,7 +89,7 @@ browsentic skills    # everything the router can see, tagged with where it came 
 
 The `/` picker also lists the skills the active agent CLI keeps for itself — Claude Code's
 `~/.claude/skills/`, Codex's `~/.codex/skills/` and `~/.codex/prompts/`, the roots in Antigravity's
-`skills.txt`. Picking one attaches it to that message: the daemon reads the file at spawn time and
+`skills.txt`, and Grok Build's `~/.grok/skills/`, `~/.agents/skills/` and the Claude Code skills it also loads. Picking one attaches it to that message: the daemon reads the file at spawn time and
 appends it to the system prompt, clearly marked, with a note that browser tools are all the run
 has.
 
