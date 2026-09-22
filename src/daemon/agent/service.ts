@@ -12,7 +12,7 @@ import {
 } from '@/lib/actions/protocol';
 import { openTab } from '@/lib/actions/page/open-tab';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
-import { toolNameFor } from '@/lib/actions/tool-names';
+import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
@@ -60,6 +60,8 @@ export interface AgentSessionDeps {
   draft: (runId: string, draft: import('@/lib/skills/site-map').SiteMapDraft) => void;
   /** Runs going in every connected browser: the limit bounds agent processes on the machine. */
   running?: () => number;
+  /** The page actions on offer right now — the extension's list once it has drifted from the bundled one. */
+  actionNames: () => string[];
 }
 
 interface ActiveRun {
@@ -387,6 +389,7 @@ export class AgentSession {
         research: run.map ? run.map.settings.research : false,
         config: run.config,
         sessionId: resuming,
+        mcpTools: agentRunToolNames(this.deps.actionNames()),
         signal: run.abort.signal,
         emit,
       });

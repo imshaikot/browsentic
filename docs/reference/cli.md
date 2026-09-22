@@ -72,7 +72,7 @@ See [guide/pair.md](../guide/pair.md).
 | Command | Does |
 | --- | --- |
 | `browsentic agent` | Show which agent runs the side panel, and which are installed |
-| `browsentic agent <name>` | Switch to `claude`, `codex` or `antigravity` |
+| `browsentic agent <name>` | Switch to `claude`, `codex`, `antigravity` or `vibe` |
 | `browsentic agent fix <name>` | Let Browsentic fix what that agent still needs |
 | `browsentic agent model <name> [model]` | Pin that agent’s model in `config.json`; omit the model to go back to the CLI’s own default |
 

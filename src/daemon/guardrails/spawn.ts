@@ -52,6 +52,12 @@ interface ToolDenial {
   readonly tools: readonly string[];
 }
 
+interface ToolAllowance {
+  readonly flag: string;
+  /** Every value the plan passes after `flag` has to be one of these. */
+  readonly only: readonly string[];
+}
+
 interface Requirements {
   /** Arguments the plan must carry verbatim. */
   readonly required: readonly string[];
@@ -59,6 +65,8 @@ interface Requirements {
   readonly pairs: readonly (readonly [string, string])[];
   /** Tools the plan must name after a deny flag. */
   readonly denies?: ToolDenial;
+  /** The whole of what the plan may switch on, for a CLI whose tool flag is an allowlist. */
+  readonly allows?: ToolAllowance;
   /** Workspace files the plan must write before the CLI starts. */
   readonly files: readonly string[];
 }
@@ -87,6 +95,7 @@ interface Containment {
 const FORBIDDEN: readonly RegExp[] = [
   /^--dangerously/i,
   /^--yolo$/i,
+  /^--auto-approve$/i,
   /^--full-auto$/i,
   /^--no-sandbox$/i,
   /^--allow-all/i,
@@ -158,6 +167,25 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       files: ['.agents/mcp_config.json', 'AGENTS.md'],
     },
   },
+
+  vibe: {
+    localTools: 'allowlist',
+    keepsEnv: ['MISTRAL_', 'VIBE_'],
+    note: 'per-run tool allowlist; the shell and file tools are never loaded, and approvals follow a config Browsentic writes',
+    run: {
+      required: ['--trust'],
+      pairs: [['--agent', 'ask']],
+      allows: { flag: '--enabled-tools', only: ['browsentic_*', 'web_search', 'web_fetch'] },
+      files: ['.vibe/config.toml', 'AGENTS.md'],
+    },
+    task: {
+      required: ['--trust'],
+      pairs: [['--agent', 'ask']],
+      // A one-shot reaches no browser: nothing but the scratch-file reader, or a pattern that matches no tool.
+      allows: { flag: '--enabled-tools', only: ['read_file', 're:^$'] },
+      files: ['.vibe/config.toml', 'AGENTS.md'],
+    },
+  },
 };
 
 /**
@@ -182,6 +210,13 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     const named = variadic(plan.args, rules.denies.flag);
     const missing = rules.denies.tools.filter((tool) => !named.includes(tool));
     if (missing.length) problems.push(`${label} does not deny ${missing.join(', ')} via ${rules.denies.flag}.`);
+  }
+
+  if (rules.allows) {
+    const named = everyValueOf(plan.args, rules.allows.flag);
+    const extra = named.filter((tool) => !rules.allows?.only.includes(tool));
+    if (!named.length) problems.push(`${label} is spawned without ${rules.allows.flag}, which leaves every tool on.`);
+    if (extra.length) problems.push(`${label} switches on ${extra.join(', ')} via ${rules.allows.flag}.`);
   }
 
   for (const path of rules.files) {
@@ -219,7 +254,7 @@ const SECRET_PREFIX: readonly string[] = [
   'NPM_', 'YARN_', 'PYPI_', 'CARGO_', 'DOCKER_', 'KUBE_', 'HELM_',
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
-  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'HF_', 'HUGGINGFACE_',
+  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'HF_', 'HUGGINGFACE_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 
@@ -275,6 +310,11 @@ export function sealedAway(kind: AgentKind, env: NodeJS.ProcessEnv): string[] {
 function valueOf(args: readonly string[], flag: string): string | undefined {
   const at = args.indexOf(flag);
   return at === -1 ? undefined : args[at + 1];
+}
+
+/** The value after each occurrence of a flag that is repeated rather than variadic. */
+function everyValueOf(args: readonly string[], flag: string): string[] {
+  return args.flatMap((arg, at) => (arg === flag && at + 1 < args.length ? [args[at + 1]] : []));
 }
 
 /** Values following a flag, up to the next flag. */

@@ -15,11 +15,13 @@ import { antigravityRunner } from './antigravity';
 import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
 import type { McpServer, Runner } from './types';
+import { vibeRunner } from './vibe';
 
 export const RUNNERS: Record<AgentKind, Runner> = {
   claude: claudeRunner,
   codex: codexRunner,
   antigravity: antigravityRunner,
+  vibe: vibeRunner,
 };
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');

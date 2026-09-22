@@ -26,7 +26,7 @@ beforeEach(() => {
 
 const DEFAULTS: AgentConfig = {
   agent: 'claude',
-  agents: { claude: { bin: 'claude', model: 'claude-sonnet-5' }, codex: { bin: 'codex' }, antigravity: { bin: 'agy' } },
+  agents: { claude: { bin: 'claude', model: 'claude-sonnet-5' }, codex: { bin: 'codex' }, antigravity: { bin: 'agy' }, vibe: { bin: 'vibe' } },
   requireApproval: ['page.submitForm'],
 };
 

@@ -34,6 +34,8 @@ export interface StreamContext {
   sessionId: string | null;
   workspace: string;
   mcp: McpServer;
+  /** Every tool that server will offer, for a CLI that grants MCP tools one name at a time. */
+  mcpTools: string[];
 }
 
 export interface JsonContext {
@@ -69,6 +71,8 @@ export interface Runner {
   stream(context: StreamContext): Plan;
   /** Fresh per run — readers carry state across lines. */
   reader(): StreamReader;
+  /** This CLI's stream has no closing event, so exiting cleanly is how it says the turn is over. */
+  endsOnExit?: boolean;
   json(context: JsonContext): Plan;
   answer(stdout: string): { text?: string; error?: string };
   /** Turns a stderr tail into something more useful than "exited with code 1". */

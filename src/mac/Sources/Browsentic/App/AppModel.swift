@@ -139,7 +139,7 @@ final class AppModel: ObservableObject {
         case .agent:
             let found = AgentProbe.installed()
             return found.isEmpty
-                ? .advisory("None on your PATH. The side panel needs Claude Code, Codex or Antigravity.")
+                ? .advisory("None on your PATH. The side panel needs Claude Code, Codex, Antigravity or Mistral Vibe.")
                 : .passed(found.joined(separator: ", "))
         }
     }

@@ -553,6 +553,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       emit: (id, event) => source.send({ t: 'run', id, event }),
       draft: (id, draft) => source.send({ t: 'siteMapDraft', id, draft }),
       running: () => [...agents.values()].reduce((total, agent) => total + agent.running, 0),
+      actionNames: () => source.tools.map((tool) => tool.name),
     });
     agents.set(source, created);
     return created;

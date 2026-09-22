@@ -14,7 +14,7 @@ AI agent you already run locally.
 | --- | --- | --- |
 | **Node** | 20 or newer | `node --version` |
 | **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc) | — |
-| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [Antigravity](https://antigravity.google/docs/cli/install) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version` |
+| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install) or [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version` |
 
 Two things worth knowing before you start:
 

@@ -1,6 +1,6 @@
 # Choosing an agent
 
-The side panel runs on an agent CLI you already have logged in. Three are supported, and switching
+The side panel runs on an agent CLI you already have logged in. Four are supported, and switching
 is a click.
 
 This is only about the **side panel**. Driving Browsentic *from* another tool is
@@ -32,18 +32,18 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 
 ---
 
-## The three
+## The four
 
-| | Claude Code | Codex | Antigravity |
-| --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google |
-| Binary | `claude` | `codex` | `agy` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) |
+| --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI |
+| Binary | `claude` | `codex` | `agy` | `vibe` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` |
+| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded |
 
-All three get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
+All four get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
 the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
 for exactly what each flag buys.
@@ -51,6 +51,20 @@ for exactly what each flag buys.
 **Keep whichever you use reasonably current.** Browsentic passes flags that contain the run. A build
 too old to understand them fails the run with an explicit "update it" message rather than running
 uncontained.
+
+### Mistral Vibe is in beta
+
+It needs nothing set up beyond `vibe --setup` (or `MISTRAL_API_KEY` in `~/.vibe/.env`). Browsentic
+writes a project config into the run's own folder under `~/.browsentic` — the `browsentic` MCP server
+and an `always` permission for each of its tools — and starts Vibe there with `--trust`, so your
+`~/.vibe/config.toml` is read for your key and models but never written.
+
+Two things differ from the others. Vibe's headless stream carries whole messages, not tokens, so a
+reply **arrives a message at a time** instead of being typed out. And it reports no token counts, so
+the context card has none to show.
+
+A model you pick has to be an alias your Vibe config defines; `mistral-medium-3.5` is the one it
+ships with.
 
 ### Antigravity needs one permission rule
 
@@ -74,7 +88,8 @@ In `~/.browsentic/config.json`:
   "agents": {
     "claude": { "bin": "/opt/homebrew/bin/claude", "model": "claude-sonnet-5", "effort": "high" },
     "codex": { "bin": "codex", "model": "gpt-5.6-terra" },
-    "antigravity": { "bin": "agy" }
+    "antigravity": { "bin": "agy" },
+    "vibe": { "bin": "vibe" }
   }
 }
 ```

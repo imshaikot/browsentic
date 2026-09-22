@@ -18,12 +18,15 @@ const planOf = (kind: AgentKind, mode: 'run' | 'task', { research = false, reads
         sessionId: null,
         workspace: stateDir,
         mcp: mcpServerFor('run-1'),
+        mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
       })
     : RUNNERS[kind].json({ prompt: 'summarize this', settings: settingsFor(kind), workspace: stateDir, reads });
 
 const without = (plan: Plan, arg: string): Plan => ({ ...plan, args: plan.args.filter((value) => value !== arg) });
 const plus = (plan: Plan, ...args: string[]): Plan => ({ ...plan, args: [...plan.args, ...args] });
 const swapped = (plan: Plan, from: string, to: string): Plan => ({ ...plan, args: plan.args.map((arg) => (arg === from ? to : arg)) });
+const vibeConfig = (mode: 'run' | 'task', opts?: { research?: boolean; reads?: boolean }) =>
+  planOf('vibe', mode, opts).files?.find((file) => file.path === '.vibe/config.toml')?.content ?? '';
 
 // The page policy governs what a run may do to a page. Containment governs what the CLI the
 // daemon spawns may do to the machine, which no `page.*` decision ever sees.
@@ -44,8 +47,16 @@ describe('spawn containment', () => {
     expect(vetPlan('codex', 'run', planOf('codex', 'run', { research: true }), stateDir)).toEqual([]);
   });
 
+  test('vibe run with web tools is still contained', () => {
+    expect(vetPlan('vibe', 'run', planOf('vibe', 'run', { research: true }), stateDir)).toEqual([]);
+  });
+
   test('claude task that reads a file is still contained', () => {
     expect(vetPlan('claude', 'task', planOf('claude', 'task', { reads: true }), stateDir)).toEqual([]);
+  });
+
+  test('vibe task that reads a file is still contained', () => {
+    expect(vetPlan('vibe', 'task', planOf('vibe', 'task', { reads: true }), stateDir)).toEqual([]);
   });
 
   describe('a one-shot task cannot reach the browser at all', () => {
@@ -60,6 +71,29 @@ describe('spawn containment', () => {
     test('antigravity task writes an empty mcp config', () => {
       const config = planOf('antigravity', 'task').files?.find((file) => file.path === '.agents/mcp_config.json');
       expect(JSON.parse(config?.content ?? 'null')?.mcpServers).toEqual({});
+    });
+
+    test('vibe task carries no mcp server', () => {
+      expect(vibeConfig('task')).not.toContain('mcp_servers');
+    });
+
+    test('vibe task grants no browser tool', () => {
+      expect(vibeConfig('task', { reads: true })).not.toContain('browsentic_');
+    });
+  });
+
+  // Vibe looks a permission up by exact tool name, and headless turns an unanswered ask into a refusal.
+  describe('the vibe config grants each browser tool by name', () => {
+    test('every mcp tool is granted', () => {
+      expect(vibeConfig('run')).toContain('[tools."browsentic_page_clickElement"]');
+    });
+
+    test('the run id reaches the mcp server itself', () => {
+      expect(vibeConfig('run')).toContain('BROWSENTIC_AGENT_RUN = "run-1"');
+    });
+
+    test('a local tool is never granted', () => {
+      expect(vibeConfig('run', { research: true })).not.toMatch(/tools\."(bash|read_file|write_file|edit|grep)/);
     });
   });
 
@@ -107,6 +141,42 @@ describe('spawn containment', () => {
 
     test('a later override of the codex sandbox is caught', () => {
       expect(vetPlan('codex', 'run', plus(codexRun, '-c', 'sandbox_mode="workspace-write"'), stateDir)).toHaveLength(1);
+    });
+
+    const vibeRun = planOf('vibe', 'run');
+    const enabling = (plan: Plan, tool: string): Plan => plus(plan, '--enabled-tools', tool);
+    const notEnabling: Plan = { ...vibeRun, args: vibeRun.args.filter((arg, at, all) => arg !== '--enabled-tools' && all[at - 1] !== '--enabled-tools') };
+
+    test('switching on the vibe shell is caught', () => {
+      expect(vetPlan('vibe', 'run', enabling(vibeRun, 'bash'), stateDir)).toHaveLength(1);
+    });
+
+    test('switching on every vibe tool is caught', () => {
+      expect(vetPlan('vibe', 'run', enabling(vibeRun, '*'), stateDir)).toHaveLength(1);
+    });
+
+    test('dropping the vibe allowlist is caught', () => {
+      expect(vetPlan('vibe', 'run', notEnabling, stateDir)).toHaveLength(1);
+    });
+
+    test('a vibe task reaching the browser is caught', () => {
+      expect(vetPlan('vibe', 'task', enabling(planOf('vibe', 'task'), 'browsentic_*'), stateDir)).toHaveLength(1);
+    });
+
+    test('--auto-approve is caught', () => {
+      expect(vetPlan('vibe', 'run', plus(vibeRun, '--auto-approve'), stateDir)).toHaveLength(1);
+    });
+
+    test('--yolo is caught', () => {
+      expect(vetPlan('vibe', 'run', plus(vibeRun, '--yolo'), stateDir)).toHaveLength(1);
+    });
+
+    test('another vibe approval profile is caught', () => {
+      expect(vetPlan('vibe', 'run', swapped(vibeRun, 'ask', 'auto-approve'), stateDir)).toHaveLength(1);
+    });
+
+    test('losing the vibe config is caught', () => {
+      expect(vetPlan('vibe', 'run', { ...vibeRun, files: [] }, stateDir)).toHaveLength(2);
     });
 
     test('losing the antigravity mcp config is caught', () => {
@@ -157,6 +227,7 @@ describe('environment sealing', () => {
     ANTHROPIC_API_KEY: 'sk-ant',
     OPENAI_API_KEY: 'sk-oai',
     GEMINI_API_KEY: 'sk-gem',
+    MISTRAL_API_KEY: 'sk-mis',
     GOOGLE_APPLICATION_CREDENTIALS: '/creds.json',
   };
   const sealedFor = (kind: AgentKind) => sealEnv(kind, DIRTY);
@@ -218,6 +289,18 @@ describe('environment sealing', () => {
 
     test('antigravity keeps its google credentials', () => {
       expect(sealedFor('antigravity').GOOGLE_APPLICATION_CREDENTIALS).toBe('/creds.json');
+    });
+
+    test('vibe keeps its own key', () => {
+      expect(sealedFor('vibe').MISTRAL_API_KEY).toBe('sk-mis');
+    });
+
+    test('vibe loses the anthropic key', () => {
+      expect(sealedFor('vibe')).not.toHaveProperty('ANTHROPIC_API_KEY');
+    });
+
+    test('claude loses the mistral key', () => {
+      expect(sealedFor('claude')).not.toHaveProperty('MISTRAL_API_KEY');
     });
 
     test('claude loses those google credentials', () => {

@@ -16,6 +16,8 @@ export interface RunRequest {
   research?: boolean;
   /** A session this same agent established earlier in the conversation, or null to start fresh. */
   sessionId: string | null;
+  /** The tools the run's MCP server will offer, by the names it lists them under. */
+  mcpTools: string[];
   signal: AbortSignal;
   emit: (event: RunEvent) => void;
 }
@@ -33,6 +35,7 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
       sessionId: request.sessionId,
       workspace: runner.workspace('run'),
       mcp: mcpServerFor(request.runId),
+      mcpTools: request.mcpTools,
     },
     request.signal,
     request.emit,

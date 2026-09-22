@@ -160,6 +160,7 @@ export function runStream(
       release();
       if (settled) return;
       if (signal.aborted) return settle(() => reject(new RunError('CANCELLED', 'Run cancelled.')));
+      if (runner.endsOnExit && exitCode === 0) return sink.done('end_turn');
       const hint = runner.hint?.(stderrTail);
       settle(() =>
         reject(
