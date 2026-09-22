@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Loader2, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
+import { AgentMark } from '@/extension/components/agent-marks';
 import { StatusDot } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import {
@@ -154,7 +155,15 @@ function AgentRow({
         )}
       >
         <StatusDot tone={runner.ready ? 'live' : 'warn'} />
-        <span className="min-w-0 flex-1 truncate text-xs">{agent.label}</span>
+        <AgentMark kind={runner.kind} className="opacity-90" />
+        <span className="min-w-0 flex-1 truncate text-xs">
+          {agent.label}
+          {agent.beta && (
+            <span className="ml-1.5 rounded-sm border border-line px-1 font-mono text-[9px] tracking-wider text-ink-faint uppercase">
+              beta
+            </span>
+          )}
+        </span>
         <span className="font-mono text-[10px] tracking-wider uppercase opacity-70">{describe(runner)}</span>
         {busy ? <Loader2 className="size-3 animate-spin" /> : active && <Check className="size-3" />}
       </button>
