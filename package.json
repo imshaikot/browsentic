@@ -14,7 +14,7 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
-    "lint:firefox": "web-ext lint --source-dir dist/firefox-mv2",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox-mv2 --self-hosted",
     "sign:firefox": "web-ext sign --source-dir dist/firefox-mv2 --channel unlisted --artifacts-dir dist",
     "icons": "node scripts/generate-icons.mjs",
     "compile": "tsc --noEmit",

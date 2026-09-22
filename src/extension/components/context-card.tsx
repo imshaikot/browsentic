@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Clapperboard, Cpu, FileText, Globe, Layers, type LucideIcon } from 'lucide-react';
 
+import { AgentMark } from '@/extension/components/agent-marks';
 import { AGENTS } from '@/lib/agents/catalog';
 import type { ContextBreakdown } from '@/lib/bridge/commands';
 import { cn } from '@/lib/utils';
@@ -24,7 +25,8 @@ export function ContextCard({ breakdown }: { breakdown: ContextBreakdown }) {
         <span className="flex-1 truncate font-mono text-[10px] tracking-[0.14em] text-ink uppercase">
           Session context
         </span>
-        <span className="shrink-0 rounded-full bg-ground/60 px-2 py-0.5 font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-ground/60 px-2 py-0.5 font-mono text-[9px] tracking-[0.1em] text-ink-faint uppercase">
+          {breakdown.agent && <AgentMark kind={breakdown.agent} className="size-2.5" />}
           {agentLabel(breakdown)}
         </span>
       </div>

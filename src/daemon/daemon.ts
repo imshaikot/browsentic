@@ -463,7 +463,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   /** The browser the user was last in, for a caller that has no run to say which one it means. */
   function activeLink(): ExtensionLink | null {
     return openLinks().reduce<ExtensionLink | null>(
-      (latest, link) => (latest && latest.lastActiveAt >= link.lastActiveAt ? latest : link),
+      (latest, link) => (latest && latest.lastActive >= link.lastActive ? latest : link),
       null,
     );
   }

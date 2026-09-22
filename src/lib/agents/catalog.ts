@@ -13,6 +13,8 @@ export interface AgentDescriptor {
   docs: string;
   /** Model ids the picker offers, strongest first. Curated, not queried — the CLIs have no list command. */
   models: string[];
+  /** Shipped before a whole conversation was run against the real CLI; the picker and the docs say so. */
+  beta?: boolean;
 }
 
 export const AGENTS: Record<AgentKind, AgentDescriptor> = {
@@ -51,6 +53,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     install: 'uv tool install mistral-vibe',
     docs: 'https://github.com/mistralai/mistral-vibe',
     models: ['mistral-medium-3.5'],
+    beta: true,
   },
   grok: {
     kind: 'grok',
@@ -60,6 +63,7 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     install: 'curl -fsSL https://x.ai/cli/install.sh | bash',
     docs: 'https://docs.x.ai/build/overview',
     models: ['grok-4.7'],
+    beta: true,
   },
 };
 
