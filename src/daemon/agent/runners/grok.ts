@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
-import { effortOf, parseJsonLine, sweepRunDirs } from './util';
+import { conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
 /** Grok takes every setting a run needs as a flag except its MCP server, which only a project config can add. */
@@ -81,7 +81,7 @@ export const grokRunner: Runner = {
     // A conversation keeps one directory, so a resume finds its session wherever Grok files it.
     const conversation = context.sessionId ?? randomUUID();
     return {
-      cwd: join(base, conversation.replace(/[^\w-]/g, '_')),
+      cwd: conversationDir(base, conversation),
       env: { BROWSENTIC_AGENT_RUN: context.runId, ...SEALED, ...TRUSTED },
       files: [{ path: CONFIG, content: config(context.mcp) }],
       args: [

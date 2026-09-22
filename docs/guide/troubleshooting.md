@@ -57,6 +57,9 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | Mistral Vibe fails with *has no API key* | Vibe was never set up, or its key lives only in a shell the daemon was not started from | `vibe --setup`, which stores it in `~/.vibe/.env` |
 | Antigravity answers but never touches the page | Its permission rule was removed | `browsentic agent` — it reports *needs setup* again |
 | Codex fails with "not logged in" | The daemon inherits no session | `codex login`, then retry |
+| Codex answers about the page without opening it, or from a web search | Codex defers an MCP server's tools until the model searches for them, so a web search is the tool it can see; an older Browsentic also failed to switch that search off | Update Browsentic; the run now says where its browser tools are and switches web search off |
+| Codex sees only part of a long page | Codex cuts any tool result over about 10,000 tokens | Ask for less at a time: a smaller `maxPerKind`, or `page_extractText` group by group |
+| Mistral Vibe: every action on a follow-up turn fails with `RUN_INACTIVE` | Vibe re-reads a resumed session from the folder it began in, and an older Browsentic wrote each turn to a folder of its own | Update Browsentic — a conversation now keeps one folder, rewritten each turn |
 | Grok Build sits silent for minutes, then fails with *xAI did not answer* | The Grok account is rate-limited, as a free one is; Grok retries quietly before giving up | Wait, or upgrade the account |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them | Update Grok Build and Browsentic; report it if it persists |
 

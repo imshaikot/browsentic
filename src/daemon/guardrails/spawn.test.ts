@@ -11,6 +11,7 @@ const planOf = (kind: AgentKind, mode: 'run' | 'task', { research = false, reads
   mode === 'run'
     ? RUNNERS[kind].stream({
         runId: 'run-1',
+        conversation: 'conversation-1',
         instruction: 'what does this page cost',
         systemPrompt: 'You are Browsentic.',
         research,

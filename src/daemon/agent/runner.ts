@@ -10,6 +10,8 @@ export type { RunOutcome };
 
 export interface RunRequest {
   runId: string;
+  /** The conversation the panel is holding, which outlives this one run. */
+  conversation: string | null;
   instruction: string;
   systemPrompt: string;
   config: AgentConfig;
@@ -28,6 +30,7 @@ export function runInstruction(request: RunRequest): Promise<RunOutcome> {
     runner,
     {
       runId: request.runId,
+      conversation: request.conversation,
       instruction: request.instruction,
       systemPrompt: request.systemPrompt,
       research: request.research === true,

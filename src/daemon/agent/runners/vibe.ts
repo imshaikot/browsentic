@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
-import { parseJsonLine, sweepRunDirs } from './util';
+import { conversationDir, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
 
 /** Vibe reads MCP servers and tool permissions from a project config, and only from a folder it trusts. */
@@ -48,8 +48,12 @@ export const vibeRunner: Runner = {
     sweepRunDirs(base);
     const builtins = context.research ? WEB_TOOLS : [];
     const granted = [...context.mcpTools.map((tool) => `${MCP_SERVER_NAME}_${tool}`), ...builtins];
+    // A resumed session is re-read from the folder it began in, whatever folder Vibe is started
+    // in now — so a conversation keeps one, and every turn rewrites it. Give a run its own and
+    // the second turn calls the browser with the first turn's run id, which the daemon refuses,
+    // behind a system prompt that also stopped at the first turn.
     return {
-      cwd: join(base, context.runId),
+      cwd: conversationDir(base, context.conversation ?? context.runId),
       env: { BROWSENTIC_AGENT_RUN: context.runId },
       files: [
         { path: CONFIG, content: config(context.settings.model, context.mcp, granted) },

@@ -24,6 +24,14 @@ export function sweepRunDirs(base: string, ttlMs = RUN_DIR_TTL_MS): void {
   }
 }
 
+/**
+ * One directory per conversation, for a CLI that reads its settings from the folder a run starts
+ * in. The name is whatever identifies the conversation, spelled so it is safe as a path segment.
+ */
+export function conversationDir(base: string, key: string): string {
+  return join(base, key.replace(/[^\w-]/g, '_'));
+}
+
 /** Drops a reasoning-effort name the CLI would reject rather than letting it fail the run. */
 export function effortOf(settings: AgentSettings, accepted: string[]): string | undefined {
   const effort = settings.effort;

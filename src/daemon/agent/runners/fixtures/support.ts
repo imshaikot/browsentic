@@ -43,6 +43,7 @@ const mcp: McpServer = {
 
 export const streamContext = (settings: AgentSettings, overrides: Partial<StreamContext> = {}): StreamContext => ({
   runId: 'run-1',
+  conversation: 'conversation-1',
   instruction: 'what does this page cost',
   systemPrompt: 'You are Browsentic.',
   research: false,

@@ -52,12 +52,30 @@ for exactly what each flag buys.
 too old to understand them fails the run with an explicit "update it" message rather than running
 uncontained.
 
+### Codex keeps the browser tools out of sight
+
+Codex does not put an MCP server's tools in the model's list. They are deferred behind its
+`tool_search`, and on a code-mode model (`gpt-5.6-terra` and the like) they exist only inside its
+`exec` sandbox. Left to itself, a model answers a question about the page from the tools it *can*
+see — its own memory, or a web search — without ever looking at your browser.
+
+So a Codex run is given a section of prompt saying where its browser tools are and how to load them,
+and it is told to read the page rather than recall it. Web search is switched off unless the run is
+[mapping a site](features/site-maps.md), and sub-agents, goal memory, connector apps and plugin suggestions
+are switched off for good measure.
+
+One thing Browsentic cannot change: **Codex cuts any tool result longer than about 10,000 tokens**,
+which a whole-page snapshot can pass. The prompt asks for smaller reads, but on a dense page expect
+Codex to see less of it than the other agents do.
+
 ### Mistral Vibe is in beta
 
 It needs nothing set up beyond `vibe --setup` (or `MISTRAL_API_KEY` in `~/.vibe/.env`). Browsentic
-writes a project config into the run's own folder under `~/.browsentic` — the `browsentic` MCP server
-and an `always` permission for each of its tools — and starts Vibe there with `--trust`, so your
-`~/.vibe/config.toml` is read for your key and models but never written.
+writes a project config into the conversation's own folder under `~/.browsentic` — the `browsentic`
+MCP server and an `always` permission for each of its tools — and starts Vibe there with `--trust`,
+so your `~/.vibe/config.toml` is read for your key and models but never written. One folder per
+conversation, rewritten each turn, because Vibe re-reads a resumed session from the folder it began
+in rather than the one it is started in.
 
 Two things differ from the others. Vibe's headless stream carries whole messages, not tokens, so a
 reply **arrives a message at a time** instead of being typed out. And it reports no token counts, so
@@ -131,6 +149,8 @@ Claude runner's settings.
 | `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
 | `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
+| Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
+| Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic. An older one gave each turn its own folder, and Vibe kept re-reading the first turn's. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
