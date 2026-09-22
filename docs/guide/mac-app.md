@@ -65,7 +65,7 @@ The tabs float at the top; ⌘1–⌘7 switch between them.
 | --- | --- |
 | **Overview** | Turn the daemon on and off with the power button, restart it, see its address, version and whether the extension is connected and in sync. Copy the extension’s path, or open `chrome://extensions` in your browser with the path already on the clipboard |
 | **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser, unpair one or all |
-| **Agents** | See which of Claude Code, Codex and Antigravity are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
+| **Agents** | See which of Claude Code, Codex, Antigravity and Grok Build are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `~/.browsentic/daemon.log`, followed live |

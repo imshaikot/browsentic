@@ -59,6 +59,14 @@ describe('spawn containment', () => {
     expect(vetPlan('vibe', 'task', planOf('vibe', 'task', { reads: true }), stateDir)).toEqual([]);
   });
 
+  test('grok run with web tools is still contained', () => {
+    expect(vetPlan('grok', 'run', planOf('grok', 'run', { research: true }), stateDir)).toEqual([]);
+  });
+
+  test('grok task that reads a file is still contained', () => {
+    expect(vetPlan('grok', 'task', planOf('grok', 'task', { reads: true }), stateDir)).toEqual([]);
+  });
+
   describe('a one-shot task cannot reach the browser at all', () => {
     test('claude task carries no mcp server', () => {
       expect(planOf('claude', 'task').args).toContain('{"mcpServers":{}}');
@@ -66,6 +74,11 @@ describe('spawn containment', () => {
 
     test('codex task carries no mcp server', () => {
       expect(planOf('codex', 'task').args).toContain('mcp_servers={}');
+    });
+
+    test('grok task refuses every MCP call, whichever server the user configured', () => {
+      const args = planOf('grok', 'task').args;
+      expect(args.flatMap((arg, at) => (arg === '--deny' ? [args[at + 1]] : []))).toContain('MCPTool');
     });
 
     test('antigravity task writes an empty mcp config', () => {
@@ -102,6 +115,14 @@ describe('spawn containment', () => {
     const claudeRun = planOf('claude', 'run');
     const codexRun = planOf('codex', 'run');
     const agyRun = planOf('antigravity', 'run');
+    const grokRun = planOf('grok', 'run');
+    const grokTask = planOf('grok', 'task');
+    const withEnv = (plan: Plan, name: string, value?: string): Plan => {
+      const env = { ...plan.env };
+      if (value === undefined) delete env[name];
+      else env[name] = value;
+      return { ...plan, env };
+    };
 
     test('dropping --strict-mcp-config is caught', () => {
       expect(vetPlan('claude', 'run', without(claudeRun, '--strict-mcp-config'), stateDir)).toHaveLength(1);
@@ -183,6 +204,59 @@ describe('spawn containment', () => {
       expect(vetPlan('antigravity', 'run', { ...agyRun, files: [] }, stateDir)).toHaveLength(2);
     });
 
+    test('dropping the grok sandbox is caught', () => {
+      expect(vetPlan('grok', 'run', without(without(grokRun, '--sandbox'), 'workspace'), stateDir)).toHaveLength(1);
+    });
+
+    test('turning the grok sandbox off with a later flag is caught', () => {
+      expect(vetPlan('grok', 'run', plus(grokRun, '--sandbox', 'off'), stateDir)).toHaveLength(1);
+    });
+
+    test('--sandbox=off is caught', () => {
+      expect(vetPlan('grok', 'run', plus(grokRun, '--sandbox=off'), stateDir)).toHaveLength(1);
+    });
+
+    test('approving everything with a later permission mode is caught', () => {
+      expect(vetPlan('grok', 'run', plus(grokRun, '--permission-mode', 'bypassPermissions'), stateDir)).toHaveLength(1);
+    });
+
+    test('--always-approve is caught', () => {
+      expect(vetPlan('grok', 'run', plus(grokRun, '--always-approve'), stateDir)).toHaveLength(1);
+    });
+
+    test('dropping the grok tool list is caught', () => {
+      expect(vetPlan('grok', 'run', without(without(grokRun, '--tools'), 'todo_write'), stateDir)).toHaveLength(1);
+    });
+
+    // An empty list is how Grok spells every tool, the shell and file editing among them.
+    test('an empty grok tool list is caught', () => {
+      expect(vetPlan('grok', 'run', swapped(grokRun, 'todo_write', ''), stateDir)).toHaveLength(1);
+    });
+
+    test('switching the shell on through the grok tool list is caught', () => {
+      expect(vetPlan('grok', 'run', swapped(grokRun, 'todo_write', 'todo_write,run_terminal_command'), stateDir)).toHaveLength(1);
+    });
+
+    test('un-denying Read on a grok run is caught', () => {
+      expect(vetPlan('grok', 'run', without(grokRun, 'Read'), stateDir)).toHaveLength(1);
+    });
+
+    test("letting Grok load Claude Code's MCP servers is caught", () => {
+      expect(vetPlan('grok', 'run', withEnv(grokRun, 'GROK_CLAUDE_MCPS_ENABLED', 'true'), stateDir)).toHaveLength(1);
+    });
+
+    test("leaving Grok's memory on is caught", () => {
+      expect(vetPlan('grok', 'run', withEnv(grokRun, 'GROK_MEMORY'), stateDir)).toHaveLength(1);
+    });
+
+    test('losing the grok mcp config is caught', () => {
+      expect(vetPlan('grok', 'run', { ...grokRun, files: [] }, stateDir)).toHaveLength(1);
+    });
+
+    test('a grok task that could reach an MCP server is caught', () => {
+      expect(vetPlan('grok', 'task', without(grokTask, 'MCPTool'), stateDir)).toHaveLength(1);
+    });
+
     test('running outside the state dir is caught', () => {
       expect(vetPlan('antigravity', 'run', { ...agyRun, cwd: '/tmp/anywhere' }, stateDir)).toHaveLength(1);
     });
@@ -229,6 +303,7 @@ describe('environment sealing', () => {
     GEMINI_API_KEY: 'sk-gem',
     MISTRAL_API_KEY: 'sk-mis',
     GOOGLE_APPLICATION_CREDENTIALS: '/creds.json',
+    XAI_API_KEY: 'xai-key',
   };
   const sealedFor = (kind: AgentKind) => sealEnv(kind, DIRTY);
 
@@ -301,6 +376,18 @@ describe('environment sealing', () => {
 
     test('claude loses the mistral key', () => {
       expect(sealedFor('claude')).not.toHaveProperty('MISTRAL_API_KEY');
+    });
+
+    test('grok keeps its own key', () => {
+      expect(sealedFor('grok').XAI_API_KEY).toBe('xai-key');
+    });
+
+    test('claude loses the xai key', () => {
+      expect(sealedFor('claude')).not.toHaveProperty('XAI_API_KEY');
+    });
+
+    test('grok loses the anthropic key', () => {
+      expect(sealedFor('grok')).not.toHaveProperty('ANTHROPIC_API_KEY');
     });
 
     test('claude loses those google credentials', () => {

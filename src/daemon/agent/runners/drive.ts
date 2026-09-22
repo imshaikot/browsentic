@@ -36,7 +36,7 @@ export function launch(
   settings: AgentSettings,
   plan: Plan,
   signal: AbortSignal,
-): { child: Child; release: () => void } {
+): { child: Child; release: () => void; stop: () => void } {
   const problems = vetPlan(kind, mode, plan, stateDir);
   if (problems.length) {
     throw new RunError(
@@ -72,7 +72,7 @@ export function launch(
   };
   if (signal.aborted) kill();
   else signal.addEventListener('abort', kill, { once: true });
-  return { child, release: () => signal.removeEventListener('abort', kill) };
+  return { child, release: () => signal.removeEventListener('abort', kill), stop: kill };
 }
 
 function notInstalled(runner: Runner, settings: AgentSettings): RunError {
@@ -99,7 +99,7 @@ export function runStream(
   const label = AGENTS[runner.kind].label;
 
   return new Promise<RunOutcome>((resolve, reject) => {
-    const { child, release } = launch(runner.kind, 'run', context.settings, plan, signal);
+    const { child, release, stop } = launch(runner.kind, 'run', context.settings, plan, signal);
 
     let sessionId: string | null = null;
     let settled = false;
@@ -130,9 +130,11 @@ export function runStream(
           flush();
           resolve({ stopReason, sessionId });
         }),
+      // A run the reader has failed is over, and its process would otherwise go on spending and acting.
       fail: (code, message) =>
         settle(() => {
           flush();
+          stop();
           reject(new RunError(code, message));
         }),
     };

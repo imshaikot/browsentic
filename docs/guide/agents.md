@@ -1,7 +1,7 @@
 # Choosing an agent
 
-The side panel runs on an agent CLI you already have logged in. Four are supported, and switching
-is a click.
+The side panel runs on an agent CLI you already have logged in. Five are supported — Mistral Vibe
+and Grok Build in beta — and switching is a click.
 
 This is only about the **side panel**. Driving Browsentic *from* another tool is
 [MCP clients](mcp-clients.md), and that direction is fully agent-agnostic.
@@ -32,18 +32,18 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 
 ---
 
-## The four
+## The five
 
-| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) |
-| --- | --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google | Mistral AI |
-| Binary | `claude` | `codex` | `agy` | `vibe` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) |
+| --- | --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI |
+| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` |
+| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder |
 
-All four get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
+All five get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
 the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
 for exactly what each flag buys.
@@ -76,6 +76,21 @@ Pressing the button — or `browsentic agent fix antigravity` — appends exactl
 the rest of that file alone. Nothing is written until you press it. If you have a `deny` rule
 covering the same tools, Browsentic will not overrule it — remove it yourself.
 
+### Grok Build is in beta
+
+Browsentic's Grok runner was checked against `grok` 1.0.40 up to the model's first reply: every
+flag it passes, the containment, the browser tools reaching a run, and each error Grok reports. A
+whole conversation has not been run end to end yet, because the account it was built on was
+rate-limited before the model answered. Expect rough edges, and please report them.
+
+- **Sign in first.** Run `grok login`, or set `XAI_API_KEY`. Until then the popup shows *needs setup*.
+- **A free Grok account is rate-limited.** Grok retries quietly for several minutes before it gives
+  up, so a run can sit silent that long before it fails with *xAI did not answer*.
+- **It stays out of your other tools.** Grok normally loads Claude Code's and Cursor's MCP servers
+  and keeps a memory across sessions. A Browsentic run switches both off, so a page cannot reach
+  those servers or leave anything behind for your next Grok session. MCP servers you set up in
+  Grok itself still load; see [Spawn containment](../internals/guardrails.md#spawn-containment).
+
 ---
 
 ## Per-agent settings
@@ -89,7 +104,8 @@ In `~/.browsentic/config.json`:
     "claude": { "bin": "/opt/homebrew/bin/claude", "model": "claude-sonnet-5", "effort": "high" },
     "codex": { "bin": "codex", "model": "gpt-5.6-terra" },
     "antigravity": { "bin": "agy" },
-    "vibe": { "bin": "vibe" }
+    "vibe": { "bin": "vibe" },
+    "grok": { "bin": "grok", "model": "grok-4.7" }
   }
 }
 ```
@@ -113,10 +129,12 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools. Press the button, or `browsentic agent fix antigravity`. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
+| Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
+| `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them. Update Grok Build and Browsentic, and report it if it persists. |
 
 ---
 

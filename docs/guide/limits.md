@@ -63,11 +63,12 @@ contains it with whatever levers that CLI offers, and they are not equal:
 
 | Agent | Containment |
 | --- | --- |
-| Claude Code | A per-run tool allowlist plus an explicit deny list — the strongest of the three |
+| Claude Code | A per-run tool allowlist plus an explicit deny list — the strongest of them |
 | Codex | No per-run tool list; the read-only sandbox is the whole containment, so it can still read any file you can |
 | Antigravity | No tool list and no sandbox flag; its built-in tools are governed by your own CLI settings |
+| Grok Build (beta) | A per-run tool list, approvals that refuse anything not granted up front, and a sandbox that keeps its writes in its own folder; MCP servers you set up in Grok itself still load |
 
-The environment is sealed for all three — cloud keys, registry tokens and database URLs inherited
+The environment is sealed for all of them — cloud keys, registry tokens and database URLs inherited
 from your shell are removed before the spawn, keeping only what that agent needs to authenticate.
 Details in [internals/guardrails.md](../internals/guardrails.md#spawn-containment).
 

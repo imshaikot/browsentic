@@ -19,7 +19,7 @@ Start here if you want to run Browsentic on your own machine.
 | [Pair](guide/pair.md) | Connect your browser with a single-use code |
 | [First run](guide/first-run.md) | A tour of the side panel and your first instruction |
 | [Features](guide/features/) | One page per capability — what it does and when to reach for it |
-| [Choosing an agent](guide/agents.md) | Claude Code, Codex or Antigravity |
+| [Choosing an agent](guide/agents.md) | Claude Code, Codex, Antigravity or Grok Build |
 | [MCP clients](guide/mcp-clients.md) | Optional: drive the same browser from Claude Code, Cursor, Zed or Gemini CLI |
 | [Configuration](guide/configuration.md) | Every key in `~/.browsentic/config.json` |
 | [Approvals](guide/approvals.md) | What asks before it acts, and how to change that |

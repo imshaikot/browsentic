@@ -1,0 +1,2 @@
+{"type":"available_commands","tools":["todo_write","search_tool","use_tool"],"commands":[]}
+{"type":"error","message":"Internal error: {\n  \"message\": \"API error (status 500 Internal Server Error): API error (status 500 Internal Server Error): error: Service temporarily unavailable. The model did not respond to this request.\",\n  \"http_status\": 500\n}"}

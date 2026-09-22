@@ -50,12 +50,15 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `AGENT_MISSING` | The chosen CLI is not on the *daemon's* `PATH` | `browsentic agent` to see all three; set `agents.<name>.bin` to an absolute path in `config.json` |
+| `AGENT_MISSING` | The chosen CLI is not on the *daemon's* `PATH` | `browsentic agent` to see every agent; set `agents.<name>.bin` to an absolute path in `config.json` |
 | `AGENT_NEEDS_PERMISSION` | Antigravity has no rule allowing Browsentic's MCP tools | Press the button in the popup, or `browsentic agent fix antigravity` |
+| `AGENT_NEEDS_PERMISSION` for Grok Build | It is not signed in | `grok login`, or set `XAI_API_KEY` |
 | "does not understand the flags Browsentic uses" | The agent CLI is too old | Update it |
 | Mistral Vibe fails with *has no API key* | Vibe was never set up, or its key lives only in a shell the daemon was not started from | `vibe --setup`, which stores it in `~/.vibe/.env` |
 | Antigravity answers but never touches the page | Its permission rule was removed | `browsentic agent` — it reports *needs setup* again |
 | Codex fails with "not logged in" | The daemon inherits no session | `codex login`, then retry |
+| Grok Build sits silent for minutes, then fails with *xAI did not answer* | The Grok account is rate-limited, as a free one is; Grok retries quietly before giving up | Wait, or upgrade the account |
+| `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them | Update Grok Build and Browsentic; report it if it persists |
 
 ## Pages and tabs
 

@@ -314,14 +314,17 @@ Flags are the only lever those CLIs offer. That is worth having, but it is a **r
 enforcement**: a dropped flag, a renamed option, or a new runner written in a hurry leaves no trace at
 runtime and no failing check.
 
-So `vetPlan()` runs at `launch()` — the one place all three runners pass through — before `spawn()`.
+So `vetPlan()` runs at `launch()` — the one place every runner passes through — before `spawn()`.
 A plan that has lost its containment does not start. It is pure, so the test harness can assert every
 runner's real plan without spawning anything.
 
-It checks: required arguments present, `--flag value` pairs correct, every tool in the deny list
-actually named, required workspace files written, and no argument matching `FORBIDDEN` —
-`--dangerously*`, `--yolo`, `--full-auto`, `--no-sandbox`, `--allow-all`, `danger-full-access`,
-`--sandbox=workspace-write`, a `sandbox_mode=` or `approval_policy=` override that is not `"read-only"` / `"never"`,
+It checks: required arguments present; `--flag value` pairs correct, with no later repeat of the
+flag saying otherwise (a CLI takes the last one); every tool in the deny list actually named; an
+allowlist flag present, non-empty and naming nothing beyond what the runner may switch on; the
+environment switches a CLI only takes from its environment set; required workspace files written;
+and no argument matching `FORBIDDEN` — `--dangerously*`, `--yolo`, `--always-approve`, `--full-auto`,
+`--no-sandbox`, `--allow-all`, `danger-full-access`, `--sandbox=workspace-write` or `--sandbox=off`, a
+`sandbox_mode=` or `approval_policy=` override that is not `"read-only"` / `"never"`,
 `--permission-mode=bypassPermissions`, and friends. Every pattern is
 checked against every runner, not just the one that owns the flag: the cost is nothing and it covers
 the runner nobody has written yet.
@@ -341,6 +344,51 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Codex** | `sandbox` | No per-run tool list; the read-only sandbox is the whole containment, **so the agent can still read any file the user can** |
 | **Antigravity** | `host` | No tool list and no sandbox flag; its built-in tools are governed by the user's own CLI settings, so a sealed environment is the only containment Browsentic applies |
 | **Mistral Vibe** | `allowlist` | `--enabled-tools` is the whole of what loads: Browsentic's MCP tools, plus web search and fetch on a research run. The shell and file tools never exist in the run, and `--auto-approve` is a forbidden flag |
+| **Grok Build** | `allowlist` | A per-run built-in tool list, `--permission-mode dontAsk`, deny rules, and a kernel sandbox for writes. Reads are closed by the tool list and a `Read` deny rather than the sandbox, and MCP servers the user set up in Grok itself still load |
+
+#### Grok Build, and why not always-approve
+
+Headless Grok is usually run with `--always-approve`, which hands it the machine. Browsentic uses
+`--permission-mode dontAsk` instead: only what was allowed up front runs, and that is one rule,
+`MCPTool(browsentic__*)`. Everything else is layered on top, and each layer is a flag or a variable
+`vetPlan()` can see:
+
+| Layer | Run | Task |
+| --- | --- | --- |
+| Built-in tools (`--tools`) | `todo_write`, or `web_search,web_fetch` when researching | `todo_write`, or `read_file` when handed a file |
+| Deny rules (`--deny`) | `Bash`, `Edit`, `Write`, `Read` | `MCPTool`, `Bash`, `Edit`, `Write` |
+| Sandbox (`--sandbox`) | `workspace` — writes only to the run's own folder, `~/.grok` and temp | `read-only` |
+| Environment | `GROK_MEMORY=0`, `GROK_CLAUDE_MCPS_ENABLED=false`, `GROK_CURSOR_MCPS_ENABLED=false` | the same |
+
+Why each one is there:
+
+- **`--tools` is the real allowlist**, and an empty one means *every* tool — the shell and file
+  editing among them. So a run that needs no built-in names `todo_write`, which touches nothing, and
+  `vetPlan()` refuses a missing or empty list.
+- **Deny rules beat every allow rule Grok merges in**, and Grok merges a lot: its own config, the
+  project's, and Claude Code's `~/.claude/settings*.json`. `Read` also refuses `use_tool`'s
+  file-backed arguments, which would otherwise turn any JSON file on disk into a tool call's input.
+  A task's bare `MCPTool` deny refuses every MCP call from any server.
+- **The sandbox is `workspace`, not `read-only`**, because on Linux `read-only` also blocks the
+  network of child processes, and the `browsentic` MCP server is one: it reaches the daemon over
+  loopback. The sandbox confines writes; it does not stop reads, which is what the first two layers are for.
+- **Grok loads Claude Code's and Cursor's MCP servers by default** — including a `browsentic` entry
+  added for Claude Code, which reaches the browser without a run's gate. The environment switches drop
+  them. The run's own `browsentic` server is written to a project `.grok/config.toml`, which also
+  shadows any user entry of the same name.
+- **Its memory is off**, so what a page said cannot resurface in the user's next Grok session.
+
+A project config in a folder nobody trusted is skipped without a word, so a run sets
+`GROK_FOLDER_TRUST=0` for its own process. `--trust` would record every conversation folder in the
+user's `~/.grok/trusted_folders.toml` instead.
+
+The reader checks what Grok actually did. Grok lists its toolset before the model is called, and a
+run offered anything beyond the meta-tools, `todo_write` and the web tools fails with `AGENT_UNSAFE`
+before the model sees it. The process is stopped, not left running.
+
+**What remains:** MCP servers the user configured in Grok itself, natively or through a plugin, still
+load. Their tools run only if the user approved them ahead of time — but Grok's approvals include
+rules merged from Claude Code's settings.
 
 `localTools` records which case each runner is in, and the note is logged once per run, so the weak
 one is **visible in the log rather than assumed away**.
@@ -349,7 +397,7 @@ one is **visible in the log rather than assumed away**.
 
 `run` drives the browser. `task` is a one-shot — summarizing an attached file, turning a raw
 recording trace into steps — that must not reach the browser at all, which is asserted by requiring
-`{"mcpServers":{}}` (or `mcp_servers={}`) in its argv. `Read` is deliberately left out of `task`'s
+`{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv. `Read` is deliberately left out of `task`'s
 deny list, because some tasks are handed a file in the scratch workspace.
 
 ### Sealing the environment
@@ -369,6 +417,7 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Codex | `OPENAI_`, `CODEX_`, `AZURE_OPENAI_` |
 | Antigravity | `GEMINI_`, `GOOGLE_`, `ANTIGRAVITY_` |
 | Mistral Vibe | `MISTRAL_`, `VIBE_` |
+| Grok Build | `XAI_`, `GROK_` |
 
 Plus **federated** cases, where a flag turns another prefix into the agent's own credentials: Claude
 Code on Bedrock authenticates with `AWS_*`, so sealing it would be sealing the agent out of its own

@@ -14,7 +14,7 @@ AI agent you already run locally.
 | --- | --- | --- |
 | **Node** | 20 or newer | `node --version` |
 | **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc) | — |
-| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install) or [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version` |
+| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install), [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta) or [Grok Build](https://docs.x.ai/build/overview) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version`, `vibe --version`, `grok --version` |
 
 Two things worth knowing before you start:
 
@@ -22,8 +22,8 @@ Two things worth knowing before you start:
   instruction, so it is the one thing to have ready before your first run. See
   [Choosing an agent](agents.md). The only setup that needs no CLI is driving the browser solely
   from an [MCP client](mcp-clients.md), which is optional and spawns nothing.
-- **Only one of the three is needed.** Browsentic checks all three and tells you in the popup which
-  are installed. Switching is a click.
+- **Only one of them is needed.** Browsentic checks every one and tells you in the popup which are
+  installed. Switching is a click.
 
 ---
 

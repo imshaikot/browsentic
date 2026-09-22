@@ -81,20 +81,24 @@ directory and any files that CLI reads from disk. A shared driver (`runners/driv
 spawning, the abort wiring and the line reading; the runner only decides *what to say* and *how to
 read the answer back*.
 
-**Adding a fourth agent is one file plus one line in `runners/index.ts`.**
+**Adding an agent is one file plus one line in `runners/index.ts`.**
 
 Every runner is given the same four things, by whichever mechanism its CLI supports:
 
-| | Claude Code | Codex | Antigravity |
-| --- | --- | --- | --- |
-| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` |
-| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd |
-| System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd |
-| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` |
-| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"` | its own permission rules |
+| | Claude Code | Codex | Antigravity | Grok Build |
+| --- | --- | --- | --- | --- |
+| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` | `grok -p --output-format streaming-json` |
+| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` |
+| System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd | `--rules` |
+| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it |
+| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"` | its own permission rules | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` |
+
+Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a
+`browsentic__` prefix; the system prompt it is given says so, because the skills name tools the way
+the server lists them.
 
 **Conversation continuity** is what makes "now click the second one" work: the runner reports
-whatever session id its CLI established (`session_id`, `thread_id`, `conversation_id`) and gets it
+whatever session id its CLI established (`session_id`, `thread_id`, `conversation_id`, `sessionId`) and gets it
 back on the next turn. Session ids are agent-scoped — switching agents drops the held conversation
 rather than handing one agent another's id.
 
