@@ -23,6 +23,9 @@ const EXTENSION_VERSION = '0.0.0-test';
 export class FakeBrowser {
   readonly invoked: string[] = [];
   readonly closed: Promise<string>;
+  /** Resolves once this browser has answered the daemon's request for its manifest — a drifted build is asked right behind the welcome. */
+  readonly described: Promise<void>;
+  private tellDescribed!: () => void;
   private readonly pongs = new Map<string, () => void>();
 
   private constructor(
@@ -32,6 +35,7 @@ export class FakeBrowser {
     backlog: (SocketFrame | null)[],
   ) {
     this.closed = new Promise((resolve) => socket.once('close', (_code, reason) => resolve(String(reason))));
+    this.described = new Promise((resolve) => (this.tellDescribed = resolve));
     socket.on('message', (raw) => this.receive(parseFrame(String(raw))));
     for (const frame of backlog) this.receive(frame);
   }
@@ -94,7 +98,10 @@ export class FakeBrowser {
       this.pongs.get(frame.id)?.();
       this.pongs.delete(frame.id);
     }
-    if (frame?.t === 'describe') return send(this.socket, { t: 'manifest', id: frame.id, tools: toolsOf(this.profile) });
+    if (frame?.t === 'describe') {
+      send(this.socket, { t: 'manifest', id: frame.id, tools: toolsOf(this.profile) });
+      return this.tellDescribed();
+    }
     if (frame?.t !== 'invoke') return;
     this.invoked.push(frame.action);
     send(this.socket, { t: 'result', id: frame.id, result: { ok: true, data: { answeredBy: this.profile.installId } } });
