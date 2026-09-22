@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
-import { beforeAll, beforeEach, describe, expect, test } from 'vitest';
+import { basename, dirname, join } from 'node:path';
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { AGENT_KINDS, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import type { AgentConfig, AgentSettings } from '../config';
@@ -28,7 +28,14 @@ const rounds = () => {
 
 const configWith = (agents: Partial<Record<AgentKind, AgentSettings>>, agent: AgentKind = 'claude'): AgentConfig => ({
   agent,
-  agents: { claude: { bin: join(bin, 'claude') }, codex: { bin: join(bin, 'codex') }, antigravity: { bin: join(bin, 'agy') }, vibe: { bin: join(bin, 'vibe') }, ...agents },
+  agents: {
+    claude: { bin: join(bin, 'claude') },
+    codex: { bin: join(bin, 'codex') },
+    antigravity: { bin: join(bin, 'agy') },
+    vibe: { bin: join(bin, 'vibe') },
+    grok: { bin: join(bin, 'grok') },
+    ...agents,
+  },
   requireApproval: [],
 });
 
@@ -59,13 +66,20 @@ describe('the registry', () => {
 describe('readiness probes', () => {
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
-    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe']) stub(name);
+    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok']) stub(name);
     stub('codex-expired', { prints: 'licence expired', exit: 3 });
   });
 
   beforeEach(() => {
     rmSync(probes, { force: true });
     rmSync(join(homedir(), '.gemini'), { recursive: true, force: true });
+    rmSync(join(homedir(), '.grok'), { recursive: true, force: true });
+    vi.stubEnv('XAI_API_KEY', '');
+    vi.stubEnv('GROK_HOME', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   test('an installed agent is ready, with the version it printed', async () => {
@@ -96,10 +110,28 @@ describe('readiness probes', () => {
     });
   });
 
+  test('a Grok Build nobody signed in to is not ready, and says how to sign in', async () => {
+    expect(await runner('grok', configWith({}))).toMatchObject({
+      ready: false,
+      version: 'grok 1.0.0',
+      problem: { code: 'AGENT_NEEDS_PERMISSION', fix: 'grok login' },
+    });
+  });
+
+  test('a Grok Build that is signed in, or has an API key, is ready', async () => {
+    const signedIn = join(homedir(), '.grok', 'auth.json');
+    mkdirSync(dirname(signedIn), { recursive: true });
+    writeFileSync(signedIn, '{}');
+    const withLogin = await runner('grok', configWith({}));
+    rmSync(signedIn);
+    vi.stubEnv('XAI_API_KEY', 'xai-key');
+    expect([withLogin?.ready, (await runner('grok', configWith({})))?.ready]).toEqual([true, true]);
+  });
+
   test('probes are reused for half a minute, even when only the active agent changed', async () => {
     await agentState(configWith({}), { refresh: true });
     const again = await agentState(configWith({}, 'antigravity'));
-    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'vibe']], 'antigravity']);
+    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'grok', 'vibe']], 'antigravity']);
   });
 
   test('asking for a refresh probes again', async () => {
@@ -112,8 +144,8 @@ describe('readiness probes', () => {
     await agentState(configWith({}), { refresh: true });
     await agentState(configWith({ claude: { bin: join(bin, 'claude-next') } }));
     expect(rounds()).toEqual([
-      ['agy', 'claude', 'codex', 'vibe'],
-      ['agy', 'claude-next', 'codex', 'vibe'],
+      ['agy', 'claude', 'codex', 'grok', 'vibe'],
+      ['agy', 'claude-next', 'codex', 'grok', 'vibe'],
     ]);
   });
 

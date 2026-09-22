@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -51,6 +51,15 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     install: 'uv tool install mistral-vibe',
     docs: 'https://github.com/mistralai/mistral-vibe',
     models: ['mistral-medium-3.5'],
+  },
+  grok: {
+    kind: 'grok',
+    label: 'Grok Build',
+    vendor: 'xAI',
+    bin: 'grok',
+    install: 'curl -fsSL https://x.ai/cli/install.sh | bash',
+    docs: 'https://docs.x.ai/build/overview',
+    models: ['grok-4.7'],
   },
 };
 

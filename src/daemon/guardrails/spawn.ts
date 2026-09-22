@@ -11,8 +11,8 @@
  * Containment is delegated, because flags are the only lever those CLIs offer. That is
  * worth having, but it is a request rather than an enforcement: a dropped flag, a
  * renamed option, or a new runner written in a hurry leaves no trace at runtime and no
- * failing check. So the plan is vetted here — at `launch()`, the one place all three
- * runners pass through, before `spawn()` — and a plan that has lost its containment
+ * failing check. So the plan is vetted here — at `launch()`, the one place every
+ * runner passes through, before `spawn()` — and a plan that has lost its containment
  * does not start.
  *
  * `sealEnv` is the half that does not depend on the CLI cooperating at all. The daemon
@@ -35,6 +35,7 @@ export type SpawnMode = 'run' | 'task';
 export interface SpawnPlan {
   readonly args: readonly string[];
   readonly cwd: string;
+  readonly env?: Readonly<Record<string, string>>;
   readonly files?: readonly { readonly path: string; readonly content: string }[];
 }
 
@@ -54,19 +55,21 @@ interface ToolDenial {
 
 interface ToolAllowance {
   readonly flag: string;
-  /** Every value the plan passes after `flag` has to be one of these. */
+  /** Every value the plan passes after `flag`, comma lists included, has to be one of these. */
   readonly only: readonly string[];
 }
 
 interface Requirements {
   /** Arguments the plan must carry verbatim. */
   readonly required: readonly string[];
-  /** `--flag value` pairs the plan must carry. */
+  /** `--flag value` pairs the plan must carry, with no later occurrence of the flag saying otherwise. */
   readonly pairs: readonly (readonly [string, string])[];
   /** Tools the plan must name after a deny flag. */
   readonly denies?: ToolDenial;
   /** The whole of what the plan may switch on, for a CLI whose tool flag is an allowlist. */
   readonly allows?: ToolAllowance;
+  /** Variables the plan must set for a CLI that takes a switch only from its environment. */
+  readonly env?: Readonly<Record<string, string>>;
   /** Workspace files the plan must write before the CLI starts. */
   readonly files: readonly string[];
 }
@@ -88,7 +91,7 @@ interface Containment {
 }
 
 /**
- * Flags that hand a CLI the machine, in every spelling the three of them use. Checked
+ * Flags that hand a CLI the machine, in every spelling the runners use. Checked
  * against every runner rather than only the one that owns each flag: the cost is
  * nothing and it covers the runner nobody has written yet.
  */
@@ -96,11 +99,12 @@ const FORBIDDEN: readonly RegExp[] = [
   /^--dangerously/i,
   /^--yolo$/i,
   /^--auto-approve$/i,
+  /^--always-approve$/i,
   /^--full-auto$/i,
   /^--no-sandbox$/i,
   /^--allow-all/i,
   /danger-full-access/i,
-  /^--sandbox=?(workspace-write|danger-full-access)$/i,
+  /^--sandbox=?(workspace-write|danger-full-access|off)$/i,
   /^sandbox_mode=(?!"read-only"$)/i,
   /^approval_policy=(?!"never"$)/i,
   /^--permission-mode=?(bypassPermissions|acceptEdits)$/i,
@@ -108,6 +112,13 @@ const FORBIDDEN: readonly RegExp[] = [
 
 /** Local tools no run may ever have, whatever else it is allowed. */
 const NEVER = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep', 'Task'];
+
+/**
+ * Grok takes these only from its environment. It loads Claude Code's and Cursor's MCP servers
+ * by default — the user's own `browsentic` entry among them, which reaches the browser without
+ * a run's gate — and its memory would carry what a page said into the user's next session.
+ */
+const GROK_SEALED = { GROK_MEMORY: '0', GROK_CLAUDE_MCPS_ENABLED: 'false', GROK_CURSOR_MCPS_ENABLED: 'false' };
 
 export const CONTAINMENT: Record<AgentKind, Containment> = {
   claude: {
@@ -186,6 +197,37 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       files: ['.vibe/config.toml', 'AGENTS.md'],
     },
   },
+
+  grok: {
+    localTools: 'allowlist',
+    keepsEnv: ['XAI_', 'GROK_'],
+    note: 'per-run built-in tool list, approvals that refuse whatever was not granted up front, and a kernel sandbox that keeps writes in its own directory; reads are closed by the tool list and a Read deny rather than the sandbox, and MCP servers the user gave Grok itself still load',
+    run: {
+      required: ['--no-subagents'],
+      // `--always-approve` would be the headless default; dontAsk runs only what was allowed.
+      pairs: [
+        ['--permission-mode', 'dontAsk'],
+        ['--sandbox', 'workspace'],
+      ],
+      // Deny beats every allow Grok merges in, including the user's Claude Code rules.
+      denies: { flag: '--deny', tools: ['Bash', 'Edit', 'Write', 'Read'] },
+      allows: { flag: '--tools', only: ['todo_write', 'web_search', 'web_fetch'] },
+      env: GROK_SEALED,
+      files: ['.grok/config.toml'],
+    },
+    task: {
+      required: ['--no-subagents'],
+      pairs: [
+        ['--permission-mode', 'dontAsk'],
+        ['--sandbox', 'read-only'],
+      ],
+      // A bare MCPTool refuses every MCP call, from whichever server the user configured.
+      denies: { flag: '--deny', tools: ['MCPTool', 'Bash', 'Edit', 'Write'] },
+      allows: { flag: '--tools', only: ['todo_write', 'read_file'] },
+      env: GROK_SEALED,
+      files: [],
+    },
+  },
 };
 
 /**
@@ -202,21 +244,28 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     if (!plan.args.includes(arg)) problems.push(`${label} is spawned without ${arg}.`);
   }
 
+  // A CLI takes the last of a repeated flag, so every occurrence has to say the same thing.
   for (const [flag, value] of rules.pairs) {
-    if (valueOf(plan.args, flag) !== value) problems.push(`${label} is spawned without ${flag} ${value}.`);
+    const given = everyValueOf(plan.args, flag);
+    if (!given.length || given.some((other) => other !== value)) problems.push(`${label} is spawned without ${flag} ${value}.`);
   }
 
   if (rules.denies) {
-    const named = variadic(plan.args, rules.denies.flag);
+    const named = [...variadic(plan.args, rules.denies.flag), ...everyValueOf(plan.args, rules.denies.flag)];
     const missing = rules.denies.tools.filter((tool) => !named.includes(tool));
     if (missing.length) problems.push(`${label} does not deny ${missing.join(', ')} via ${rules.denies.flag}.`);
   }
 
   if (rules.allows) {
-    const named = everyValueOf(plan.args, rules.allows.flag);
-    const extra = named.filter((tool) => !rules.allows?.only.includes(tool));
-    if (!named.length) problems.push(`${label} is spawned without ${rules.allows.flag}, which leaves every tool on.`);
-    if (extra.length) problems.push(`${label} switches on ${extra.join(', ')} via ${rules.allows.flag}.`);
+    const { flag, only } = rules.allows;
+    const named = everyValueOf(plan.args, flag).flatMap((value) => value.split(',').map((tool) => tool.trim()));
+    const extra = named.filter((tool) => tool && !only.includes(tool));
+    if (!named.length || named.includes('')) problems.push(`${label} is spawned without a ${flag} list, which leaves every tool on.`);
+    if (extra.length) problems.push(`${label} switches on ${extra.join(', ')} via ${flag}.`);
+  }
+
+  for (const [name, value] of Object.entries(rules.env ?? {})) {
+    if (plan.env?.[name] !== value) problems.push(`${label} is spawned without ${name}=${value}.`);
   }
 
   for (const path of rules.files) {
@@ -254,7 +303,7 @@ const SECRET_PREFIX: readonly string[] = [
   'NPM_', 'YARN_', 'PYPI_', 'CARGO_', 'DOCKER_', 'KUBE_', 'HELM_',
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
-  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'HF_', 'HUGGINGFACE_',
+  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'HF_', 'HUGGINGFACE_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 
@@ -305,11 +354,6 @@ function enabled(value: string | undefined): boolean {
 export function sealedAway(kind: AgentKind, env: NodeJS.ProcessEnv): string[] {
   const sealed = sealEnv(kind, env);
   return Object.keys(env).filter((name) => !(name in sealed));
-}
-
-function valueOf(args: readonly string[], flag: string): string | undefined {
-  const at = args.indexOf(flag);
-  return at === -1 ? undefined : args[at + 1];
 }
 
 /** The value after each occurrence of a flag that is repeated rather than variadic. */

@@ -1,0 +1,7 @@
+# Hand-written from the streaming-json section of grok 1.0.40's own docs (~/.grok/docs/user-guide/14-headless-mode.md), not recorded: the free account it was written on is rate-limited before the model answers. A turn that thinks, says its answer in two chunks and finishes.
+{"type":"available_commands","tools":["todo_write","search_tool","use_tool"],"commands":[]}
+{"type":"thought","data":"The price is in the page heading."}
+{"type":"text","data":"It costs "}
+{"type":"text","data":"$12 a month."}
+{"type":"usage","messageId":"resp_1","stopReason":"end_turn","usage":{"input_tokens":812,"output_tokens":45,"cache_read_input_tokens":4000,"cache_creation_input_tokens":0,"reasoning_tokens":12},"signature":"sig_1"}
+{"type":"end","stopReason":"end_turn","sessionId":"0199a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","requestId":"req_1","usage":{"input_tokens":812,"output_tokens":45,"cache_read_input_tokens":4000,"cache_creation_input_tokens":0,"reasoning_tokens":12,"total_tokens":4857},"num_turns":1}

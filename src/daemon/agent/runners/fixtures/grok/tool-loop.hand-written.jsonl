@@ -1,0 +1,18 @@
+# Hand-written from the streaming-json section of grok 1.0.40's own docs, not recorded: the free account it was written on is rate-limited before the model answers. A research turn over three model responses: it looks tools up, calls a Browsentic tool, searches the web, reaches another server's tool, and reports each call while it runs and again when it finishes.
+{"type":"available_commands","tools":["web_search","web_fetch","search_tool","use_tool"],"commands":[]}
+{"type":"text","data":"Let me read the page first."}
+{"type":"tool_call","toolCallId":"call_1","title":"search_tool","kind":"search","status":"in_progress","toolName":"search_tool","rawInput":{"query":"page info"},"content":[],"locations":[]}
+{"type":"tool_call_update","toolCallId":"call_1","status":"completed","content":[],"rawOutput":{"tools":["browsentic__page_getPageInfo"]},"locations":[]}
+{"type":"tool_call","toolCallId":"call_2","title":"use_tool","kind":"other","status":"in_progress","toolName":"use_tool","rawInput":{"tool_name":"browsentic__page_getPageInfo","tool_input":{"maxPerKind":30}},"content":[],"locations":[]}
+{"type":"tool_call_update","toolCallId":"call_2","status":"completed","content":[],"rawOutput":{"ok":true},"locations":[]}
+{"type":"usage","messageId":"resp_1","stopReason":"tool_use","usage":{"input_tokens":900,"output_tokens":30,"cache_read_input_tokens":3000,"cache_creation_input_tokens":0,"reasoning_tokens":0},"signature":"sig_1"}
+{"type":"tool_call","toolCallId":"call_3","title":"web_search","kind":"search","status":"in_progress","toolName":"web_search","rawInput":{"query":"acme pro plan price"},"content":[],"locations":[]}
+{"type":"tool_call","toolCallId":"call_3","title":"web_search","kind":"search","status":"completed","toolName":"web_search","rawInput":{"query":"acme pro plan price"},"content":[],"locations":[]}
+{"type":"tool_call","toolCallId":"call_4","title":"use_tool","kind":"other","status":"pending","toolName":"use_tool","content":[],"locations":[]}
+{"type":"tool_call","toolCallId":"call_4","title":"use_tool","kind":"other","status":"in_progress","toolName":"use_tool","rawInput":{"tool_name":"github__create_issue","tool_input":{"title":"price"}},"content":[],"locations":[]}
+{"type":"usage","messageId":"resp_2","stopReason":"tool_use","usage":{"input_tokens":400,"output_tokens":20,"cache_read_input_tokens":3900,"cache_creation_input_tokens":0,"reasoning_tokens":0},"signature":"sig_2"}
+{"type":"plan","entries":[{"content":"Compare the prices","status":"completed"}]}
+{"type":"text","data":"It costs $12 a month."}
+{"type":"usage","messageId":"resp_3","stopReason":"end_turn","usage":{"input_tokens":150,"output_tokens":10,"cache_read_input_tokens":4300,"cache_creation_input_tokens":0,"reasoning_tokens":0},"signature":"sig_3"}
+{"type":"auto_compact_started"}
+{"type":"end","stopReason":"end_turn","sessionId":"0199a3c4-5b6d-7e8f-9a0b-1c2d3e4f5a6b","requestId":"req_2","num_turns":3}
