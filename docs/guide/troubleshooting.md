@@ -65,6 +65,9 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | Cursor CLI reaches an MCP server you did not expect | A project `.cursor/mcp.json` does not replace your global one, so every server you gave Cursor loads too | Browsentic denies each by name for the run; if one still answers, update Browsentic and report it |
 | Cursor CLI is less fenced off on Windows | Cursor's kernel sandbox has no Windows backend | Nothing to do — the deny rules still apply; treat a Windows run as `host`-class |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them | Update Grok Build and Browsentic; report it if it persists |
+| Qwen Code fails with *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier ended on 2026-04-15 | Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL` |
+| Qwen Code cannot see an API key you exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; the rest are sealed away | Point Qwen at one of those four providers |
+| `AGENT_UNSAFE`: *Qwen Code registered …* / *loaded the MCP server …* | Qwen's own startup line named a tool or a server Browsentic denied, so the run was stopped before the model saw it | Update Qwen Code and Browsentic; report it if it persists |
 
 ## Pages and tabs
 

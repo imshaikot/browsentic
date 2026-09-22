@@ -72,6 +72,6 @@ Check in this order:
 ## Where to go next
 
 - **[Features](features/)** — one page per capability
-- **[Choosing an agent](agents.md)** — if you would rather run Codex, Antigravity or Grok Build
+- **[Choosing an agent](agents.md)** — if you would rather run one of the other six
 - **[Configuration](configuration.md)** — `~/.browsentic/config.json`
 - **[Limits](limits.md)** — worth reading early rather than discovering

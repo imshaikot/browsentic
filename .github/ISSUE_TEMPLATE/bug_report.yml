@@ -42,7 +42,7 @@ body:
     attributes:
       label: Agent
       description: Which agent CLI runs your side panel, if the bug involves a run.
-      placeholder: claude / codex / agy, and its version
+      placeholder: claude / codex / agy / vibe / grok / cursor-agent / qwen, and its version
   - type: input
     id: environment
     attributes:
