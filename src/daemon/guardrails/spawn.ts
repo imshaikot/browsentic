@@ -152,12 +152,13 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
     keepsEnv: ['OPENAI_', 'CODEX_', 'AZURE_OPENAI_'],
     note: 'no per-run tool list; the read-only sandbox is the whole containment, so the agent can still read any file the user can',
     run: {
-      required: ['sandbox_mode="read-only"', 'approval_policy="never"'],
+      // Sub-agents are spawned outside the run's gate and report nothing to the panel.
+      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'features.multi_agent=false'],
       pairs: [],
       files: [],
     },
     task: {
-      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'mcp_servers={}'],
+      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'mcp_servers={}', 'features.multi_agent=false'],
       pairs: [],
       files: [],
     },

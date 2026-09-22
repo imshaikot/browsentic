@@ -3,17 +3,29 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { stateDir } from '../../lockfile';
 import { codexRunner } from './codex';
+import type { Plan } from './types';
 import { jsonContext, readThrough, shown, streamContext, transcript } from './fixtures/support';
 
 const settings = { bin: 'codex' };
 const stream = (overrides: Parameters<typeof streamContext>[1] = {}) => codexRunner.stream(streamContext(settings, overrides));
+
+const INSTRUCTIONS = 'developer_instructions=';
+
+/** The prompt is asserted on its own below; a snapshot of the flags reads better without it. */
+const flagsOf = (plan: Plan): Plan => ({
+  ...plan,
+  args: plan.args.map((arg) => (arg.startsWith(INSTRUCTIONS) ? `${INSTRUCTIONS}<prompt>` : arg)),
+});
+
+const instructionsIn = (args: string[]): string =>
+  JSON.parse(args.find((arg) => arg.startsWith(INSTRUCTIONS))?.slice(INSTRUCTIONS.length) ?? '""') as string;
 const read = (name: string, only?: Parameters<typeof readThrough>[2]) => readThrough(codexRunner, transcript('codex', name), only);
 const readLines = (...lines: object[]) => readThrough(codexRunner, lines.map((line) => JSON.stringify(line)));
 const recorded = (name: string) => transcript('codex', name).join('\n');
 
 describe('a streamed run', () => {
   test('a fresh run registers the browser as its only server and stays in a read-only sandbox', () => {
-    expect(shown(stream())).toMatchInlineSnapshot(`
+    expect(flagsOf(shown(stream()))).toMatchInlineSnapshot(`
       {
         "args": [
           "exec",
@@ -23,6 +35,14 @@ describe('a streamed run', () => {
           "-c",
           "approval_policy="never"",
           "--skip-git-repo-check",
+          "-c",
+          "features.multi_agent=false",
+          "-c",
+          "features.goals=false",
+          "-c",
+          "features.tool_suggest=false",
+          "-c",
+          "include_apps_instructions=false",
           "-c",
           "mcp_servers.browsentic.command="/usr/local/bin/node"",
           "-c",
@@ -34,9 +54,9 @@ describe('a streamed run', () => {
           "-c",
           "mcp_servers.browsentic.default_tools_approval_mode="approve"",
           "-c",
-          "developer_instructions="You are Browsentic."",
+          "developer_instructions=<prompt>",
           "-c",
-          "tools.web_search=false",
+          "web_search="disabled"",
           "--",
           "what does this page cost",
         ],
@@ -62,11 +82,34 @@ describe('a streamed run', () => {
     expect(stream().args).toContain('mcp_servers.browsentic.default_tools_approval_mode="approve"');
   });
 
+  // The `tools.web_search` this used to pass is a key Codex 0.155 no longer knows, and an unknown
+  // key is ignored in silence — so every run had web search, and reached for it before the browser.
   test('research turns web search on, and it is off otherwise', () => {
-    expect([stream({ research: true }).args, stream().args].map((args) => args.find((arg) => arg.startsWith('tools.web_search=')))).toEqual([
-      'tools.web_search=true',
-      'tools.web_search=false',
+    expect([stream({ research: true }).args, stream().args].map((args) => args.find((arg) => arg.startsWith('web_search=')))).toEqual([
+      'web_search="live"',
+      'web_search="disabled"',
     ]);
+    expect(stream().args.some((arg) => arg.startsWith('tools.web_search'))).toBe(false);
+  });
+
+  test('a run is not offered sub-agents, goals, connector apps or plugin suggestions', () => {
+    expect(stream().args.filter((arg) => arg.startsWith('features.') || arg.startsWith('include_'))).toEqual([
+      'features.multi_agent=false',
+      'features.goals=false',
+      'features.tool_suggest=false',
+      'include_apps_instructions=false',
+    ]);
+  });
+
+  // Codex defers an MCP server's tools behind tool_search, so a run that says nothing about them
+  // watches the model answer from the tools it can see: its own memory and a web search.
+  test('the prompt says how to reach tools Codex has not loaded, and to read the page rather than recall it', () => {
+    const instructions = instructionsIn(stream().args);
+    expect(instructions.startsWith('You are Browsentic.')).toBe(true);
+    expect(instructions).toContain('tool_search');
+    expect(instructions).toContain('tools.mcp__browsentic__');
+    expect(instructions).toContain('image(result.content[0])');
+    expect(instructions).toMatch(/never answer from memory/i);
   });
 
   test('the chosen model and effort are passed through', () => {
@@ -87,8 +130,10 @@ describe('a streamed run', () => {
   });
 
   test('a system prompt with quotes and line breaks survives as one TOML string', () => {
-    const instructions = stream({ systemPrompt: 'Rule one.\nSay "done" when done.' }).args.find((arg) => arg.startsWith('developer_instructions='));
-    expect(instructions).toBe('developer_instructions="Rule one.\\nSay \\"done\\" when done."');
+    const args = stream({ systemPrompt: 'Rule one.\nSay "done" when done.' }).args;
+    const raw = args.find((arg) => arg.startsWith('developer_instructions='));
+    expect(raw?.startsWith('developer_instructions="Rule one.\\nSay \\"done\\" when done.\\n\\n')).toBe(true);
+    expect(instructionsIn(args).startsWith('Rule one.\nSay "done" when done.\n\n')).toBe(true);
   });
 
   test('it runs in the state directory, where its saved threads are looked up', () => {
@@ -110,9 +155,17 @@ describe('a one-shot task', () => {
           "approval_policy="never"",
           "--skip-git-repo-check",
           "-c",
+          "features.multi_agent=false",
+          "-c",
+          "features.goals=false",
+          "-c",
+          "features.tool_suggest=false",
+          "-c",
+          "include_apps_instructions=false",
+          "-c",
           "mcp_servers={}",
           "-c",
-          "tools.web_search=false",
+          "web_search="disabled"",
           "--",
           "summarize this",
         ],
