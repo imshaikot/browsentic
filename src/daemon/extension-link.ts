@@ -25,6 +25,10 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
 }
 
+let activity = 0;
+/** A counter rather than a clock: two browsers can be touched within one millisecond, and the later one has to win. */
+const touched = () => ++activity;
+
 export class ExtensionLink {
   readonly extensionVersion: string;
   readonly manifestHash: string;
@@ -32,7 +36,7 @@ export class ExtensionLink {
   readonly id: string;
   readonly browser?: string;
   /** Which connected browser the user was last in, so a caller that names none reaches that one. */
-  lastActiveAt = Date.now();
+  lastActive = touched();
   /** What this browser offers: a Firefox build lists fewer tools than a Chromium one, and a drifted build its own. */
   tools: ToolDescriptor[] = [];
   private readonly pending = new Map<string, Pending>();
@@ -112,9 +116,9 @@ export class ExtensionLink {
     if (!frame) return log('dropped unparseable frame from extension');
     if (frame.t === 'ping') return this.send({ t: 'pong', id: frame.id });
     if (frame.t === 'pong') return;
-    if (frame.t === 'focus') return void (this.lastActiveAt = Date.now());
+    if (frame.t === 'focus') return void (this.lastActive = touched());
     if (isExtensionRequest(frame)) {
-      this.lastActiveAt = Date.now();
+      this.lastActive = touched();
       return this.onRequest?.(frame, this);
     }
 

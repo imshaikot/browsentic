@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { clearAuth } from '../auth-store';
 import { startDaemon, type Daemon } from '../daemon';
 import { readLockfile, stateDir } from '../lockfile';
@@ -145,6 +145,22 @@ describe('a caller outside any browser', () => {
       chrome.installId,
       brave.installId,
     ]);
+  });
+
+  test('follows the browser focused last, even when both were focused within the same millisecond', async () => {
+    const first = await pair(chrome);
+    const second = await pair(brave);
+    await settled();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      await first.focus();
+      await second.focus();
+      const viaSecond = await answeredBy(await control());
+      await first.focus();
+      expect([viaSecond, await answeredBy(await control())]).toEqual([brave.installId, chrome.installId]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('moves to the browser still connected when its own goes away', async () => {
