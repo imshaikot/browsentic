@@ -197,7 +197,8 @@ describe('the tool list a caller is offered', () => {
     const drifted: Profile = { ...brave, tools: [{ name: 'page.onlyHere', description: 'from a build we never saw', inputSchema: {} }] };
     const odd = await pair(drifted);
     const second = await pair(chrome);
-    await settled();
+    // The daemon adopts the list once the reply reaches it; the pong behind `focus` proves it has.
+    await odd.described;
     await odd.focus();
     const viaDrifted = await control();
     const [oddTools, oddStatus] = [await offeredTo(viaDrifted), await viaDrifted.status()];
