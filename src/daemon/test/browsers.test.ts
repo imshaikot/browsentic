@@ -184,6 +184,7 @@ describe('the tool list a caller is offered', () => {
     await fox.focus();
     const viaFirefox = await control();
     const [foxTools, foxStatus] = [await offeredTo(viaFirefox), await viaFirefox.status()];
+    await settled();
     await second.focus();
     const chromeTools = await offeredTo(await control());
     expect([
@@ -202,6 +203,8 @@ describe('the tool list a caller is offered', () => {
     await odd.focus();
     const viaDrifted = await control();
     const [oddTools, oddStatus] = [await offeredTo(viaDrifted), await viaDrifted.status()];
+    // Two focuses inside one millisecond tie on lastActiveAt, and a tie keeps the older browser.
+    await settled();
     await second.focus();
     const chromeTools = await offeredTo(await control());
     expect([oddStatus.manifestInSync, oddTools, chromeTools.includes('page.onlyHere'), chromeTools.includes('page.getPageInfo')]).toEqual([
