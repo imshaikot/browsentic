@@ -40,7 +40,7 @@ A busy page logs hundreds of lines and makes hundreds of requests, and almost no
 ## What you will not get
 
 - **Response bodies are refused by default.** `includeBodies` comes back `BLOCKED`, because a response body carries session tokens and other people's personal data wholesale. Status, timing, headers and the browser's own error text answer nearly every real question. If the user genuinely needs bodies they can allow `network-body-read` in the guardrail settings; ask, do not push.
-- **Firefox has no CDP**, so all four tools return `UNSUPPORTED` there. There is no fallback — say so plainly.
+- **Firefox has no CDP**, so a Firefox build leaves all four tools off its list. If they are not among your tools there is no fallback — say so plainly rather than searching for them. `UNSUPPORTED` means the same when an older instruction still names one.
 - **DevTools wins.** If the user has DevTools open on that tab, attaching fails with `DEBUGGER_UNAVAILABLE`. Ask them to close it and try again.
 
 ## Answering

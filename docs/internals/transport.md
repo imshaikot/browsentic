@@ -68,7 +68,12 @@ The extension connects to nothing until you pair it.
    three ports, and sends `hello` — which names *which* secret it holds and a fresh nonce, never the
    secret itself.
 3. The daemon answers `challenge` with a nonce of its own. Both sides now share a transcript:
-   protocol version, extension version, manifest hash, and the two nonces.
+   protocol version, extension version, manifest hash, and the two nonces. The manifest hash
+   names the tool list this build offers — a Chromium build's or a Firefox build's, which leaves
+   off the nine tools that need Chrome's debugger. The daemon knows both lists and serves the one
+   the hash names; an unknown hash is a drifted build, which is asked for its list and served
+   that. Either way the list belongs to that browser alone: a run is offered its own browser's
+   tools, and a caller outside any run is offered those of the browser its next call would reach.
 4. The extension replies `prove` with `HMAC(secret, "browsentic/client" ‖ transcript)`. For a
    pairing code the key is not the code but `PBKDF2(code, nonces, 250 000)`, so recording one
    handshake does not let anyone grind an 8-character code offline.

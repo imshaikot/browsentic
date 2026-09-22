@@ -99,12 +99,14 @@ Full-page capture stitches viewport tiles, capped at 48 tiles and a 16 384 px ca
 that the bottom is cut off and the result reports `truncated: true`, rather than silently returning
 a partial image.
 
-## Six tools need Chrome's debugger, and Firefox has none
+## Nine tools need Chrome's debugger, and Firefox has none
 
-`page_trustedClick`, the two captcha tools and the four
-[diagnostics](features/diagnostics.md) tools are built on the Chrome DevTools Protocol, which
-Firefox does not expose. They return `UNSUPPORTED` there, with a hint, and there is no fallback for
-the diagnostics ones — a page's console and network activity are not reachable any other way.
+`page_trustedClick`, the two captcha tools, the four [diagnostics](features/diagnostics.md) tools
+and the two [page-code](features/page-actions.md) tools are built on the Chrome DevTools Protocol,
+which Firefox does not expose. A Firefox build leaves them off the list it offers, so an agent
+running there never sees them and the daemon reports the shorter list as in sync. A stale skill or
+recording that still names one gets `UNSUPPORTED`, with a hint. There is no fallback for the
+diagnostics ones — a page's console and network activity are not reachable any other way.
 
 On Chrome they carry two visible costs: Chrome shows a **"Browsentic is debugging this browser"**
 bar for as long as a debugger is attached, and attaching **fails while DevTools is open** on that

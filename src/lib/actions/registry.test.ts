@@ -1,5 +1,40 @@
 import { describe, expect, test } from 'vitest';
-import { describeActions } from './registry';
+import { actions, describeActions } from './registry';
+
+const DEBUGGER_ONLY = [
+  'page.trustedClick',
+  'page.findCaptcha',
+  'page.solveCaptcha',
+  'page.startDiagnostics',
+  'page.readConsole',
+  'page.readNetwork',
+  'page.stopDiagnostics',
+  'page.injectCode',
+  'page.runCode',
+];
+
+const names = (tools: { name: string }[]) => tools.map(({ name }) => name);
+
+describe('the list a build offers', () => {
+  test('Chromium is offered every action', () => {
+    expect(names(describeActions('chromium'))).toEqual([...actions.keys()]);
+    expect(names(describeActions())).toEqual(names(describeActions('chromium')));
+  });
+
+  test("Firefox is offered everything but the tools that need Chrome's debugger", () => {
+    const offered = names(describeActions('firefox'));
+    const hidden = [...actions.keys()].filter((name) => !offered.includes(name));
+    expect(hidden.sort()).toEqual([...DEBUGGER_ONLY].sort());
+  });
+
+  test('a hidden tool is still invocable, so a stale caller gets its own hint', () => {
+    for (const name of DEBUGGER_ONLY) expect(actions.has(name)).toBe(true);
+  });
+
+  test('no description still tells Chrome about Firefox', () => {
+    expect(JSON.stringify(describeActions('chromium'))).not.toContain('Firefox');
+  });
+});
 
 const schemaOf = (name: string) =>
   describeActions().find((action) => action.name === name)!.inputSchema as {

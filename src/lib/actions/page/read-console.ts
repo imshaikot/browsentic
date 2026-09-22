@@ -4,6 +4,7 @@ import { ActionError, defineAction } from '../core';
 
 export const readConsole = defineAction({
   name: 'page.readConsole',
+  chromiumOnly: true,
   description:
     'Read the console messages and uncaught exceptions a page has reported since page.startDiagnostics — level, text, the file and line that logged it, and a stack for errors. ' +
     'Newest last. Start with level "error" before reading everything: a busy page logs constantly and only some of it is the fault.',

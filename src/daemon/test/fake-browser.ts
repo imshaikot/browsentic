@@ -1,14 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { clientProof, newNonce, openSessionKey, pairingSecret, type Transcript } from '@/lib/actions/handshake';
-import { hashManifest } from '@/lib/actions/manifest';
+import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { SOCKET_PROTOCOL_VERSION, parseFrame, type SocketFrame } from '@/lib/actions/protocol';
-import { describeActions } from '@/lib/actions/registry';
+import { describeActions, type BrowserTarget } from '@/lib/actions/registry';
 
 export interface Profile {
   origin: string;
   installId: string;
   browser?: string;
+  /** Which build this browser runs; a Firefox build offers fewer tools. */
+  target?: BrowserTarget;
+  /** What a drifted build reports instead of the registry's list. */
+  tools?: ToolDescriptor[];
 }
 
 export type Credential = { kind: 'pair'; code: string } | { kind: 'session'; key: string };
@@ -25,9 +29,11 @@ export class FakeBrowser {
     private readonly socket: WebSocket,
     readonly profile: Profile,
     readonly sessionKey: string,
+    backlog: (SocketFrame | null)[],
   ) {
     this.closed = new Promise((resolve) => socket.once('close', (_code, reason) => resolve(String(reason))));
     socket.on('message', (raw) => this.receive(parseFrame(String(raw))));
+    for (const frame of backlog) this.receive(frame);
   }
 
   static async connect(port: number, profile: Profile, credential: Credential): Promise<FakeBrowser> {
@@ -35,7 +41,7 @@ export class FakeBrowser {
     const inbox = frames(socket);
     await new Promise((resolve, reject) => socket.once('open', resolve).once('error', reject));
 
-    const hello = { extensionVersion: EXTENSION_VERSION, manifestHash: hashManifest(describeActions()), nonce: newNonce() };
+    const hello = { extensionVersion: EXTENSION_VERSION, manifestHash: hashManifest(toolsOf(profile)), nonce: newNonce() };
     send(socket, {
       t: 'hello',
       protocolVersion: SOCKET_PROTOCOL_VERSION,
@@ -60,9 +66,10 @@ export class FakeBrowser {
     const verdict = await inbox.next();
     if (verdict?.t === 'unauthorized') throw new Error(verdict.reason);
     if (verdict?.t !== 'welcome') throw new Error(`expected a welcome, got ${verdict?.t}`);
-    inbox.stop();
     const minted = verdict.sealedSessionKey ? await openSessionKey(secret, transcript, verdict.sealedSessionKey) : null;
-    return new FakeBrowser(socket, profile, minted ?? secret);
+    // The daemon asks a drifted build for its manifest right behind the welcome, so whatever
+    // arrived while the key was being opened is handed over rather than dropped.
+    return new FakeBrowser(socket, profile, minted ?? secret, inbox.stop());
   }
 
   get isOpen(): boolean {
@@ -87,17 +94,23 @@ export class FakeBrowser {
       this.pongs.get(frame.id)?.();
       this.pongs.delete(frame.id);
     }
+    if (frame?.t === 'describe') return send(this.socket, { t: 'manifest', id: frame.id, tools: toolsOf(this.profile) });
     if (frame?.t !== 'invoke') return;
     this.invoked.push(frame.action);
     send(this.socket, { t: 'result', id: frame.id, result: { ok: true, data: { answeredBy: this.profile.installId } } });
   }
 }
 
+function toolsOf(profile: Profile): ToolDescriptor[] {
+  return profile.tools ?? describeActions(profile.target);
+}
+
 function send(socket: WebSocket, frame: SocketFrame): void {
   socket.send(JSON.stringify(frame));
 }
 
-function frames(socket: WebSocket): { next(): Promise<SocketFrame | null>; stop(): void } {
+/** Frames in arrival order while the handshake runs; `stop` returns whatever was never read. */
+function frames(socket: WebSocket): { next(): Promise<SocketFrame | null>; stop(): (SocketFrame | null)[] } {
   const queued: (SocketFrame | null)[] = [];
   const waiting: ((frame: SocketFrame | null) => void)[] = [];
   const deliver = (frame: SocketFrame | null) => (waiting.length ? waiting.shift()!(frame) : void queued.push(frame));
@@ -106,6 +119,9 @@ function frames(socket: WebSocket): { next(): Promise<SocketFrame | null>; stop(
   socket.on('message', onMessage).once('close', onClose);
   return {
     next: () => (queued.length ? Promise.resolve(queued.shift()!) : new Promise((resolve) => waiting.push(resolve))),
-    stop: () => void socket.off('message', onMessage).off('close', onClose),
+    stop: () => {
+      socket.off('message', onMessage).off('close', onClose);
+      return queued.splice(0);
+    },
   };
 }
