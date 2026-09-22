@@ -345,6 +345,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Antigravity** | `host` | No tool list and no sandbox flag; its built-in tools are governed by the user's own CLI settings, so a sealed environment is the only containment Browsentic applies |
 | **Mistral Vibe** | `allowlist` | `--enabled-tools` is the whole of what loads: Browsentic's MCP tools, plus web search and fetch on a research run. The shell and file tools never exist in the run, and `--auto-approve` is a forbidden flag |
 | **Grok Build** | `allowlist` | A per-run built-in tool list, `--permission-mode dontAsk`, deny rules, and a kernel sandbox for writes. Reads are closed by the tool list and a `Read` deny rather than the sandbox, and MCP servers the user set up in Grok itself still load |
+| **Cursor CLI** | `allowlist` | Deny rules in a project `.cursor/cli.json`, where **a deny beats every allow** — including the user's own. Measured against 2026.09.18: a headless run asked to `echo` a marker got `permissionDenied`, twice, and gave up. `--sandbox enabled` is asked for as well but not depended on, and it has no Windows backend. This is the first runner whose containment lives in a file rather than in argv, which is why `vetPlan` checks file *content* and not only that the file was written. `--trust` is **required**, not forbidden: headless Cursor refuses to start in a folder nobody trusted, and the folder is one Browsentic created and wrote every file in — it grants no tool permission of its own |
 
 #### Grok Build, and why not always-approve
 
@@ -418,6 +419,7 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Antigravity | `GEMINI_`, `GOOGLE_`, `ANTIGRAVITY_` |
 | Mistral Vibe | `MISTRAL_`, `VIBE_` |
 | Grok Build | `XAI_`, `GROK_` |
+| Cursor CLI | `CURSOR_` |
 
 Plus **federated** cases, where a flag turns another prefix into the agent's own credentials: Claude
 Code on Bedrock authenticates with `AWS_*`, so sealing it would be sealing the agent out of its own
