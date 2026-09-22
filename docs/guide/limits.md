@@ -66,11 +66,26 @@ contains it with whatever levers that CLI offers, and they are not equal:
 | Claude Code | A per-run tool allowlist plus an explicit deny list — the strongest of them |
 | Codex | No per-run tool list; the read-only sandbox is the whole containment, so it can still read any file you can |
 | Antigravity | No tool list and no sandbox flag; its built-in tools are governed by your own CLI settings |
+| Mistral Vibe (beta) | A per-run tool allowlist; its shell and file tools are never loaded, and every browser tool is granted by name |
 | Grok Build (beta) | A per-run tool list, approvals that refuse anything not granted up front, and a sandbox that keeps its writes in its own folder; MCP servers you set up in Grok itself still load |
 
 The environment is sealed for all of them — cloud keys, registry tokens and database URLs inherited
 from your shell are removed before the spawn, keeping only what that agent needs to authenticate.
 Details in [internals/guardrails.md](../internals/guardrails.md#spawn-containment).
+
+## Two of the agents are beta
+
+Mistral Vibe and Grok Build were built by reading each CLI and checking every flag, the containment
+and the error texts against the real binary — but neither has carried a whole conversation end to
+end yet, so the popup, the docs and the release notes say *beta*. What that means in practice:
+
+- a run that fails says why, with the command that fixes it, rather than hanging;
+- Vibe's replies arrive a message at a time rather than typed out, and it reports no token counts;
+- a free Grok account is rate-limited, and Grok retries quietly for minutes before it gives up;
+- the other three agents are untouched: the hooks the two share are covered by the spawn and
+  drive tests.
+
+[Choosing an agent](agents.md) has the per-agent detail. Please report what you find.
 
 ## MCP clients cannot answer a prompt
 

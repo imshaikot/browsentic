@@ -1,4 +1,4 @@
-![Browsentic: your browser's superpower, free and open source](docs/assets/social-card.png?v=0.4.11)
+![Browsentic: your browser's superpower, free and open source](docs/assets/social-card.png?v=0.7.0)
 
 # Browsentic – a completely integrated agentic browser extension
 
@@ -8,7 +8,24 @@
 [![node](https://img.shields.io/node/v/browsentic)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/browsentic)](LICENSE)
 
-Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install) or [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta) — whichever you already have logged in — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
+Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on the agent CLI you already have logged in — five are supported — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
+
+<p>
+  <strong>Works in</strong>&ensp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/chrome.svg" width="18" height="18" alt="Chrome"></a>&nbsp;Chrome&ensp;·&ensp;
+  <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="18" height="18" alt="Firefox"></a>&nbsp;Firefox&ensp;·&ensp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/edge.svg" width="18" height="18" alt="Edge"></a>&nbsp;Edge&ensp;·&ensp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/brave.svg" width="18" height="18" alt="Brave"></a>&nbsp;Brave&ensp;·&ensp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/arc.svg" width="18" height="18" alt="Arc"></a>&nbsp;Arc
+</p>
+<p>
+  <strong>Runs on</strong>&ensp;
+  <img src="https://browsentic.com/icons/claude.svg" width="18" height="18" alt="">&nbsp;<a href="https://claude.com/claude-code">Claude Code</a>&ensp;·&ensp;
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/openai-dark.svg"><img src="https://browsentic.com/icons/openai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://developers.openai.com/codex/cli">Codex</a>&ensp;·&ensp;
+  <img src="https://browsentic.com/icons/antigravity.svg" width="18" height="18" alt="">&nbsp;<a href="https://antigravity.google/docs/cli/install">Antigravity</a>&ensp;·&ensp;
+  <img src="https://browsentic.com/icons/mistral.svg" width="18" height="18" alt="">&nbsp;<a href="https://github.com/mistralai/mistral-vibe">Mistral Vibe</a> <sup>beta</sup>&ensp;·&ensp;
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://docs.x.ai/build/overview">Grok Build</a> <sup>beta</sup>
+</p>
 
 ## Quick Start
 
@@ -24,7 +41,7 @@ curl -fsSL https://browsentic.com/install.sh | sh
 npx browsentic setup
 ```
 
-Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex`, `agy` or `grok` (beta). Details, updating and building from source are in the [install guide](docs/guide/install.md).
+Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex`, `agy`, `vibe` (beta) or `grok` (beta). Windows and Linux follow the same two steps; the folder is under your home directory there too. Details, updating and building from source are in the [install guide](docs/guide/install.md).
 
 ## Key Capabilities
 
@@ -43,14 +60,14 @@ Either way two steps are left, both inside the browser: **Load unpacked** `~/bro
 
 ## How It Works
 
-![How an instruction becomes a click](https://raw.githubusercontent.com/imshaikot/browsentic/website/public/flow.png)
+![How an instruction becomes a click](https://browsentic.com/flow.png)
 
 <details>
 <summary>The same flow, as text</summary>
 
 ```
 You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI
-                            ▲                                        (claude │ codex │ agy)
+                            ▲                              (claude │ codex │ agy │ vibe │ grok)
                             └──────────────── page actions ─────────────────────┘
 
 Any MCP client ──stdio──> browsentic mcp ──> the same daemon ──> the same browser

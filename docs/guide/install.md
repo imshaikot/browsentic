@@ -13,7 +13,8 @@ AI agent you already run locally.
 | | Requirement | Check |
 | --- | --- | --- |
 | **Node** | 20 or newer | `node --version` |
-| **Browser** | Chrome, or another Chromium browser (Edge, Brave, Arc) | — |
+| **Browser** | Chrome or another Chromium browser (Edge, Brave, Arc), or Firefox 140 or newer | — |
+| **System** | macOS, Windows or Linux. macOS also has an [app](mac-app.md) | — |
 | **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install), [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta) or [Grok Build](https://docs.x.ai/build/overview) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version`, `vibe --version`, `grok --version` |
 
 Two things worth knowing before you start:
@@ -49,7 +50,8 @@ Two steps are left. Both happen inside the browser, so only you can do them.
 
 **1. Load the extension.** Open `chrome://extensions`, turn on **Developer mode** (top right),
 press **Load unpacked**, and choose the folder the command printed. On macOS you can press ⇧⌘G in
-the folder picker and paste the path.
+the folder picker and paste the path; on Linux, Ctrl+L. On Windows the folder is
+`%USERPROFILE%\browsentic\extension\chrome-mv3`. Using Firefox instead? Skip to [Firefox](#firefox).
 
 Pin Browsentic to the toolbar so the popup is one click away.
 
