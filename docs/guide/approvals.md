@@ -53,7 +53,7 @@ depend on declaration order.
 | `file-upload` | `page_attachFile` — putting one of your files into a page | confirm |
 | `file-download` | `page_captureDownload` — letting a page write a file to your disk | confirm |
 | `leaves-pinned-tab` | Moving to a tab the run was not pointed at | confirm |
-| `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box | confirm |
+| `captcha-solve` | `page_solveCaptcha` — ticking a site's "I am a human" box and answering its image challenge; one yes covers the rest of the run | confirm |
 | `code-injection` | `page_injectCode` — installing JavaScript the agent wrote into the page | confirm |
 | `external-code-injection` | `page_injectCode` called by an MCP client rather than the side panel | **deny** |
 | `external-code-execution` | `page_runCode` called by an MCP client rather than the side panel | **deny** |

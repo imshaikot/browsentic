@@ -223,6 +223,46 @@ agent with the next message.
 
 ---
 
+## The captcha analyst
+
+`page.solveCaptcha` is the one action the daemon keeps a hand in after the extension has answered.
+`invokeOn` routes it through `solveCaptchaWithAnalyst` in
+[`captcha-solver.ts`](../../src/daemon/agent/captcha-solver.ts), for side-panel runs and MCP
+clients alike:
+
+```
+caller ──solveCaptcha {}──► daemon ──► extension   tick the checkbox; a challenge opens
+                                   ◄── state: challenge + photo of the grid
+                            answerChallenge ──runAgentJson (task mode, Read only, effort low)
+                                   ──► extension   solveCaptcha { tiles | points | reload }
+                                   ◄── next round … or state: solved
+caller ◄── solved, analystRounds: n
+```
+
+1. **One session per round.** `answerChallenge()` in
+   [`captcha-analyst.ts`](../../src/daemon/agent/captcha-analyst.ts) writes the round's JPEG to the
+   task workspace at `0600`, asks for one JSON object after `=== ANSWER ===`, and stops the CLI the
+   moment `readAnswer()` accepts its output. The file is deleted in `finally`; nothing carries into
+   the next round. A tile outside the grid or a point off the picture makes the whole answer
+   unusable rather than half-clicked.
+2. **Only where it can see.** It runs when the active runner lists `image` in `Runner.opens` —
+   Claude Code today — at effort `low` whatever the conversation uses.
+3. **Handing back.** An answer the caller supplies itself is passed straight through. When the
+   analyst returns nothing, hits ten rounds, or the budget (`timeoutMs`, 120 s by default, shared
+   by every round) runs low, the open challenge goes back to the caller with its photo, which
+   `server.ts` renders as an MCP image block, and a note that it is now theirs to answer.
+
+The extension side is [`captcha.ts`](../../src/lib/bridge/captcha.ts) on top of
+[`frame-graph.ts`](../../src/lib/bridge/frame-graph.ts): every frame in the tab through
+`Page.getFrameTree` on the root and each auto-attached out-of-process session, a frame's viewport
+origin composed through `DOM.getFrameOwner` of each ancestor, and `DOM.getDocument` with `pierce`
+plus `DOM.querySelectorAll` per shadow root to reach inside closed ones. Page code runs in an
+isolated world per frame. A challenge is photographed only once every tile has finished swapping
+and fading in — reCAPTCHA reports a tile ready about a second before its new picture arrives, so
+the wait is for each clicked tile's picture to change, not for the loading class to go.
+
+---
+
 ## Skill routing
 
 Skills are markdown with YAML-ish front matter, loaded from three directories, later shadowing

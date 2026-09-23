@@ -93,6 +93,12 @@ how many links, buttons and fields its subtree holds and ends with its selector,
 `page_extractText` to that region, and `interactive.counts` reports the true
 totals before `maxPerKind` truncates the lists.
 
+When the page holds a captcha that needs answering, the result carries a `captcha` field —
+`vendor`, `label`, `solved`, and while unsolved a `next` step pointing at
+[`page_solveCaptcha`](#page_solvecaptcha). It is read from every frame, including ones inside
+closed shadow roots, without Chrome's debugger, and it is left out when there is none or only an
+invisible scoring captcha.
+
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `maxPerKind` | integer | `30` | Cap on links, buttons, fields, and forms listed per kind |
@@ -291,8 +297,8 @@ clicked.
 
 Report what captcha is on the page, without touching it. Ordinary targeting cannot see one:
 vendors build the widget as a closed shadow root holding a cross-origin iframe holding another
-shadow root, so `page_getPageInfo` shows nothing where the checkbox visibly is. This reads through
-all of it with Chrome's debugger.
+shadow root, often inside further frames. This reads through all of it with Chrome's debugger.
+To get past one, call [`page_solveCaptcha`](#page_solvecaptcha) directly; this is for re-checking.
 
 Recognises Cloudflare Turnstile (including the full-page interstitial), reCAPTCHA v2 and v3,
 hCaptcha, GeeTest, Arkose FunCaptcha and AWS WAF. Takes no parameters.
@@ -302,34 +308,50 @@ hCaptcha, GeeTest, Arkose FunCaptcha and AWS WAF. Takes no parameters.
 | `found` | boolean | Whether any known captcha is on the page |
 | `vendor`, `label` | string | Which one, e.g. `turnstile` / "Cloudflare Turnstile" |
 | `kind` | `"checkbox"` \| `"interactive"` \| `"invisible"` | What the widget asks for |
-| `state` | `"idle"` \| `"pending"` \| `"solved"` \| `"needsHuman"` \| `"invisible"` | Where it has got to |
+| `state` | `"idle"` \| `"loading"` \| `"hidden"` \| `"pending"` \| `"solved"` \| `"challenge"` \| `"needsHuman"` \| `"invisible"` | Where it has got to |
 | `solved`, `hasToken` | boolean | Whether it is satisfied, and whether the response field is filled |
-| `bounds` | `{ x, y, width, height }` | The widget's box in viewport coordinates, for a screenshot |
-| `point` | `{ x, y }` | Where its checkbox is, composed across the frame boundary. Absent when there is nothing to click |
+| `frameDepth` | integer | How many frames deep the widget sits, when it is inside any |
+| `bounds` | `{ x, y, width, height }` | The widget's box — or the open challenge's — in viewport coordinates |
+| `point` | `{ x, y }` | Where its checkbox is, composed across every frame boundary. Absent when there is nothing to click |
+| `challenge` | object | While an image challenge is open: its `kind`, `prompt`, and for a grid `rows`, `columns`, `tiles`, `selected` and `dynamic` |
 | `note` | string | Why, when there is no `point` or the state needs explaining |
 
 Read-only, so it is allowed during a site-mapping run.
 
+`page_getPageInfo` reports the same thing more cheaply as its `captcha` field — vendor, `solved`
+and a `next` step — read from every frame without the debugger, and absent when there is none.
+
 ### page_solveCaptcha
 
-Tick a captcha's "I am a human" checkbox with a real browser-level click and wait for the widget to
-settle. The checkbox only responds to genuine pointer input, which is the point of it, so no
-synthetic click reaches it.
+Get past a captcha. It finds the widget in any frame at any depth, waits out one that is still
+loading, scrolls it into view, ticks the checkbox with a real browser-level click, and sees an
+image challenge through.
 
-**Confirm-gated.** Ticking another site's human check is the user's decision; an external MCP
-client with no approval channel gets `DECLINED` under the default `unattended` policy.
+**Confirm-gated.** Answering another site's human check is the user's decision. One approval
+covers every call of this tool for the rest of that run, since a challenge takes a call per
+round. An external MCP client with no approval channel gets `DECLINED` under the default
+`unattended` policy.
 
-When the vendor escalates to a challenge a person has to answer — an image grid, Arkose, AWS WAF —
-it returns `state: "needsHuman"` with the widget `bounds` and **does not attempt the challenge**.
-Screenshot that region, tell the user, and poll `page_findCaptcha` until they have solved it.
+**Image challenges.** When the configured agent can read images (Claude Code), the daemon answers
+each round with a one-shot vision session that is stopped as soon as it has answered, and the call
+returns only once the widget is satisfied or the analyst gives up. Otherwise — or after ten rounds,
+or when the budget runs out — the result has `state: "challenge"` and carries the challenge as an
+image: an MCP image block beside the JSON. Answer it by calling this tool again with `tiles`,
+`points` or `reload`, and repeat until `solved`.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `waitMs` | integer 0–120000 | `20000` | How long to wait after clicking for the widget to report a verdict |
-| `timeoutMs` | integer 1000–180000 | `60000` | Overall budget for the attempt, including finding the widget |
+| `tiles` | array of integers 1–25 | — | Answer to a `kind: "tiles"` challenge: every matching tile, numbered as painted on the image (1 top-left, along each row). The whole selection; `[]` for none |
+| `points` | array of `{ x, y }`, 1–16 | — | Answer to a `kind: "points"` challenge: where to tap, in pixels on the image as delivered |
+| `reload` | boolean | — | Swap the open challenge for another instead of answering it |
+| `waitMs` | integer 0–120000 | `20000` | How long to wait after each click for the widget to report a verdict |
+| `timeoutMs` | integer 1000–300000 | `120000` | Overall budget for the attempt, image rounds included |
 
-Returns the same fields as `page_findCaptcha`, plus `clicked`. Fails with `CAPTCHA_NOT_FOUND` when
-there is no widget to act on.
+Returns the same fields as `page_findCaptcha`, plus `clicked` and, when the analyst ran,
+`analystRounds`. While a challenge is open, `challenge` adds `image`, `imageWidth`,
+`imageHeight`, `errors` (the vendor refused the last answer) and, for a grid that swaps picked
+tiles, `fresh` (the tiles that just changed). Fails with `CAPTCHA_NOT_FOUND` when there is no
+widget to act on, and with `INVALID_INPUT` for an answer that does not fit the open challenge.
 
 ### page_hoverElement
 
