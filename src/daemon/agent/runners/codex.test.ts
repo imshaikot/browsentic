@@ -57,6 +57,8 @@ describe('a streamed run', () => {
           "developer_instructions=<prompt>",
           "-c",
           "web_search="disabled"",
+          "-c",
+          "tool_output_token_limit=25000",
           "--",
           "what does this page cost",
         ],
@@ -110,6 +112,12 @@ describe('a streamed run', () => {
     expect(instructions).toContain('tools.mcp__browsentic__');
     expect(instructions).toContain('image(result.content[0])');
     expect(instructions).toMatch(/never answer from memory/i);
+  });
+
+  test('a tool result reaches the model whole up to the size a Claude run gets, and a code-mode script is told how to ask for it', () => {
+    const args = stream().args;
+    expect(args).toContain('tool_output_token_limit=25000');
+    expect(instructionsIn(args)).toContain('// @exec: {"max_output_tokens": 25000}');
   });
 
   // A mapping run is asked to research the domain, so its prompt cannot also forbid the search.

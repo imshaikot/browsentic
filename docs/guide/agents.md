@@ -64,9 +64,10 @@ and it is told to read the page rather than recall it. Web search is switched of
 [mapping a site](features/site-maps.md), and sub-agents, goal memory, connector apps and plugin suggestions
 are switched off for good measure.
 
-One thing Browsentic cannot change: **Codex cuts any tool result longer than about 10,000 tokens**,
-which a whole-page snapshot can pass. The prompt asks for smaller reads, but on a dense page expect
-Codex to see less of it than the other agents do.
+**Codex cuts a tool result at 10,000 tokens** by default, which a whole-page snapshot can pass.
+Browsentic raises that to 25,000, the ceiling Claude Code puts on the same result. A code-mode model
+also has to ask for it at the top of every `exec` script, which the prompt tells it to do. A result
+past 25,000 is still cut, so the prompt asks for smaller reads too.
 
 ### Mistral Vibe is in beta
 
@@ -150,7 +151,7 @@ Claude runner's settings.
 | `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
-| Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic. An older one gave each turn its own folder, and Vibe kept re-reading the first turn's. |
+| Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |

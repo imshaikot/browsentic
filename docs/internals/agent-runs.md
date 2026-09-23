@@ -100,8 +100,11 @@ Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`
 `tools.mcp__browsentic__*`, where an image reaches the model only if the script passes it to
 `image()`. Left unsaid, a model answers from what it can see — its memory, or the web search Codex
 switches on by default, which is why a run now passes `web_search="disabled"` unless it is mapping.
-Codex also truncates any tool result over about 10,000 tokens, a limit its model catalog sets and no
-flag raises, so its prompt asks for page reads in pieces.
+Codex also cuts any tool result at 10,000 tokens by default, which its model catalog sets.
+`tool_output_token_limit=25000` raises that to the ceiling Claude Code puts on an MCP result. Inside
+`exec` the result is still cut at 10,000 unless the script's first line is
+`// @exec: {"max_output_tokens": 25000}`, and only the prompt can ask for that, so it does. It also
+asks for page reads in pieces.
 
 **A CLI that re-reads its own folder gets one per conversation, not one per run.** Vibe restores a
 resumed session from the folder it began in, whatever folder it is started in now, so a folder per
