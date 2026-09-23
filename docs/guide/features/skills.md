@@ -87,9 +87,19 @@ browsentic skills    # everything the router can see, tagged with where it came 
 
 ## The agent's own skills
 
-The `/` picker also lists the skills the active agent CLI keeps for itself — Claude Code's
-`~/.claude/skills/`, Codex's `~/.codex/skills/` and `~/.codex/prompts/`, the roots in Antigravity's
-`skills.txt`, and Grok Build's `~/.grok/skills/`, `~/.agents/skills/` and the Claude Code skills it also loads. Picking one attaches it to that message: the daemon reads the file at spawn time and
+The `/` picker also lists the skills the active agent CLI keeps for itself:
+
+| Agent | Where it looks |
+| --- | --- |
+| Claude Code | `~/.claude/skills/` |
+| Codex | `~/.codex/skills/`, `~/.codex/prompts/` |
+| Antigravity | the roots listed in `~/.gemini/antigravity/skills.txt` |
+| Mistral Vibe | `~/.vibe/skills/`, `~/.agents/skills/` |
+| Grok Build | `~/.grok/skills/`, `~/.agents/skills/`, and the Claude Code skills it also loads |
+| Cursor CLI | `~/.cursor/skills/`, `~/.agents/skills/` |
+| Qwen Code | `~/.qwen/skills/`, `~/.agents/skills/` |
+
+Picking one attaches it to that message: the daemon reads the file at spawn time and
 appends it to the system prompt, clearly marked, with a note that browser tools are all the run
 has.
 

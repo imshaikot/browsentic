@@ -68,21 +68,26 @@ contains it with whatever levers that CLI offers, and they are not equal:
 | Antigravity | No tool list and no sandbox flag; its built-in tools are governed by your own CLI settings |
 | Mistral Vibe (beta) | A per-run tool allowlist; its shell and file tools are never loaded, and every browser tool is granted by name |
 | Grok Build (beta) | A per-run tool list, approvals that refuse anything not granted up front, and a sandbox that keeps its writes in its own folder; MCP servers you set up in Grok itself still load |
+| Cursor CLI (beta) | Per-run deny rules, where a deny beats every allow including your own; a kernel sandbox is asked for too, but it has no Windows backend and is not depended on |
+| Qwen Code (beta) | `--safe-mode` drops every setting of your own — hooks, extensions, bundled skills, MCP servers, permission rules — and deny rules close the shell, the disk and the tools that reach either; because that mode also disables Qwen's own fail-closed tool allowlist, the run's startup line is read back and anything unexpected stops it |
 
 The environment is sealed for all of them — cloud keys, registry tokens and database URLs inherited
 from your shell are removed before the spawn, keeping only what that agent needs to authenticate.
 Details in [internals/guardrails.md](../internals/guardrails.md#spawn-containment).
 
-## Two of the agents are beta
+## Four of the agents are beta
 
-Mistral Vibe and Grok Build were built by reading each CLI and checking every flag, the containment
-and the error texts against the real binary — but neither has carried a whole conversation end to
-end yet, so the popup, the docs and the release notes say *beta*. What that means in practice:
+Mistral Vibe, Grok Build, Cursor CLI and Qwen Code were built by reading each CLI and checking its
+flags, its containment and its error texts — but none has carried a whole conversation end to end
+yet, so the popup, the docs and the release notes say *beta*. What that means in practice:
 
 - a run that fails says why, with the command that fixes it, rather than hanging;
 - Vibe's replies arrive a message at a time rather than typed out, and it reports no token counts;
 - a free Grok account is rate-limited, and Grok retries quietly for minutes before it gives up;
-- the other three agents are untouched: the hooks the two share are covered by the spawn and
+- Cursor is less fenced off on Windows, where its kernel sandbox has no backend;
+- Qwen was written against its source rather than a running binary — no provider was configured on
+  the machine it was built on — and it needs one configured before it will answer at all;
+- the other three agents are untouched: the hooks the four share are covered by the spawn and
   drive tests.
 
 [Choosing an agent](agents.md) has the per-agent detail. Please report what you find.

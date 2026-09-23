@@ -345,6 +345,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Antigravity** | `host` | No tool list and no sandbox flag; its built-in tools are governed by the user's own CLI settings, so a sealed environment is the only containment Browsentic applies |
 | **Mistral Vibe** | `allowlist` | `--enabled-tools` is the whole of what loads: Browsentic's MCP tools, plus web search and fetch on a research run. The shell and file tools never exist in the run, and `--auto-approve` is a forbidden flag |
 | **Grok Build** | `allowlist` | A per-run built-in tool list, `--permission-mode dontAsk`, deny rules, and a kernel sandbox for writes. Reads are closed by the tool list and a `Read` deny rather than the sandbox, and MCP servers the user set up in Grok itself still load |
+| **Qwen Code** | `allowlist` | `--allowed-tools mcp__browsentic` is what a run may call without being asked, and a headless turn refuses everything it would otherwise have prompted for. `--safe-mode` is what makes the rest hold: it drops the user's hooks, extensions, bundled skills, `settings.json` MCP servers, `.mcp.json` and permission rules, while keeping `--mcp-config` — an explicit per-invocation argument rather than ambient state. Its cost is that it also **silently ignores `--core-tools`**, the fail-closed allowlist over Qwen's twenty-one core tools, so the built-ins are closed with `--exclude-tools` deny rules instead. A deny list cannot be fail-closed, so the `init` line is read back: it names every tool and MCP server that actually registered, and the reader ends the run with `AGENT_UNSAFE` on anything Browsentic did not ask for, before the model has spoken |
 | **Cursor CLI** | `allowlist` | Deny rules in a project `.cursor/cli.json`, where **a deny beats every allow** — including the user's own. Measured against 2026.09.18: a headless run asked to `echo` a marker got `permissionDenied`, twice, and gave up. `--sandbox enabled` is asked for as well but not depended on, and it has no Windows backend. This is the first runner whose containment lives in a file rather than in argv, which is why `vetPlan` checks file *content* and not only that the file was written. `--trust` is **required**, not forbidden: headless Cursor refuses to start in a folder nobody trusted, and the folder is one Browsentic created and wrote every file in — it grants no tool permission of its own |
 
 #### Grok Build, and why not always-approve
@@ -420,6 +421,20 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Mistral Vibe | `MISTRAL_`, `VIBE_` |
 | Grok Build | `XAI_`, `GROK_` |
 | Cursor CLI | `CURSOR_` |
+| Qwen Code | `QWEN_`, `DASHSCOPE_`, `BAILIAN_`, `OPENAI_` |
+
+Qwen Code is the awkward one: it authenticates through whichever provider it is pointed at, and the
+documented mainstream setup is `OPENAI_API_KEY` with `OPENAI_BASE_URL` at a DashScope endpoint, so
+sealing that prefix would seal most installs out of their own model — and Codex already keeps it.
+The `anthropic` and `gemini` auth types Qwen also accepts are **not** widened for: handing one
+vendor's agent another vendor's key is what this exists to prevent, so `check()` reports a Qwen with
+only `ANTHROPIC_API_KEY` set as *needs setup* rather than promising a login that cannot happen.
+
+Sealing is also not absolute for Qwen, and it is worth saying so plainly: Qwen loads the first
+`.env` it finds walking up from its working directory, then `~/.qwen/.env` and `~/.env`, for
+variables not already present — so a key `sealEnv` stripped can come back from disk. It reaches the
+model provider rather than the model, because the shell and file tools are denied, but the guarantee
+is weaker there than for the other six.
 
 Plus **federated** cases, where a flag turns another prefix into the agent's own credentials: Claude
 Code on Bedrock authenticates with `AWS_*`, so sealing it would be sealing the agent out of its own

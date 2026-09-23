@@ -83,15 +83,15 @@ read the answer back*.
 
 **Adding an agent is one file plus one line in `runners/index.ts`.**
 
-Every runner is given the same four things, by whichever mechanism its CLI supports:
+Every runner is given the same five things, by whichever mechanism its CLI supports:
 
-| | Claude Code | Codex | Antigravity | Grok Build |
-| --- | --- | --- | --- | --- |
-| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` | `grok -p --output-format streaming-json` |
-| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` |
-| System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd | `--rules` |
-| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it |
-| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.multi_agent=false` | its own permission rules | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` |
+| | Claude Code | Codex | Antigravity | Mistral Vibe | Grok Build | Cursor CLI | Qwen Code |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` |
+| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, allowed as `Mcp(browsentic:*)` with every other server denied by name | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk |
+| System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` |
+| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` | `--resume <session>`, re-read from the folder the session began in | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it | `--resume <session>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it |
+| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.multi_agent=false` | its own permission rules | `--enabled-tools`, which is an allowlist | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` | deny rules in `.cursor/cli.json`, plus `--sandbox enabled` | `--safe-mode`, `--exclude-tools`, `--approval-mode default` |
 
 **Two CLIs do not put the browser tools in the model's list, and both are told so in the prompt.**
 Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a

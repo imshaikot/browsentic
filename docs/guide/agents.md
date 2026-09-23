@@ -1,7 +1,7 @@
 # Choosing an agent
 
-The side panel runs on an agent CLI you already have logged in. Six are supported — Mistral Vibe,
-Grok Build and Cursor CLI in beta — and switching is a click.
+The side panel runs on an agent CLI you already have logged in. Seven are supported — Mistral Vibe,
+Grok Build, Cursor CLI and Qwen Code in beta — and switching is a click.
 
 This is only about the **side panel**. Driving Browsentic *from* another tool is
 [MCP clients](mcp-clients.md), and that direction is fully agent-agnostic.
@@ -32,18 +32,18 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 
 ---
 
-## The six
+## The seven
 
-| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) |
-| --- | --- | --- | --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere |
-| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) | Qwen Code (beta) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba |
+| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` |
+| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either |
 
-All six get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
+All seven get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
 the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
 for exactly what each flag buys.
@@ -136,6 +136,44 @@ Expect rough edges there, and please report them.
 
 ---
 
+### Qwen Code is in beta
+
+Browsentic's Qwen runner was written against `qwen-code` 0.24.4's own source rather than against a
+running binary: no Qwen provider was configured on the machine it was built on, so nothing here has
+been through a real turn. The flags, the stream shapes and the containment all come from the repo.
+Expect rough edges, and please report them.
+
+- **Configure a provider first.** Qwen OAuth's free tier ended on 2026-04-15 and its requests are
+  now rejected, so "install it and log in" is no longer enough. Run `qwen` and use `/auth`, or
+  export `OPENAI_API_KEY` with `OPENAI_BASE_URL` pointed at your endpoint. Until then the popup
+  says *needs setup* and a run fails with *No auth type is selected*.
+- **Only some keys reach a run.** Browsentic keeps `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and
+  `OPENAI_*` in the run's environment and seals the rest away, so the `anthropic` and `gemini` auth
+  types Qwen also accepts will not find their keys. That is deliberate: handing one vendor's agent
+  another vendor's credential is what [sealing](../internals/guardrails.md#the-environment-a-run-sees)
+  exists to prevent.
+- **Every setting of your own is switched off for the run.** Browsentic passes `--safe-mode`, which
+  drops your hooks, extensions, bundled skills, `settings.json` MCP servers, `.mcp.json` and
+  permission rules, and passes its own MCP server as an explicit argument instead. Your own
+  `browsentic` entry cannot load beside it, and nothing you configured for Qwen widens a run.
+- **The bundled browser-use and computer-use skills are denied.** Qwen ships a skill that drives
+  your Chrome through an extension of its own — a second browser Browsentic never sees — and one
+  that runs `qwen mcp add` and `npm install` by itself on first use. Both reach the model through
+  the `skill` tool, which a run does not get. The side panel's `/` picker still lists your own
+  skills from `~/.qwen/skills` and `~/.agents/skills`; it reads them off disk itself.
+- **The run is stopped if the deny list did not take.** Qwen prints every tool and MCP server that
+  actually registered, and Browsentic reads that line back before the model has spoken. Anything it
+  did not ask for ends the run with `AGENT_UNSAFE` rather than letting it act.
+- **Reasoning effort has no flag.** Set `agents.qwen.model` instead.
+- **Two things sealing does not cover.** Qwen loads the first `.env` it finds walking up from its
+  working directory, then `~/.qwen/.env` and `~/.env`, for variables not already set — so a key
+  Browsentic sealed away can come back from disk. It reaches the model provider, not the model,
+  because the shell and file tools are denied. And an `@path` in what you type is expanded by Qwen
+  into the prompt before the run starts, which reads a file without a tool call; that is your own
+  typed text, but it is worth knowing.
+
+---
+
 ## Per-agent settings
 
 In `~/.browsentic/config.json`:
@@ -149,7 +187,8 @@ In `~/.browsentic/config.json`:
     "antigravity": { "bin": "agy" },
     "vibe": { "bin": "vibe" },
     "grok": { "bin": "grok", "model": "grok-4.7" },
-    "cursor": { "bin": "cursor-agent", "model": "composer-2.5" }
+    "cursor": { "bin": "cursor-agent", "model": "composer-2.5" },
+    "qwen": { "bin": "qwen", "model": "qwen3-coder-plus" }
   }
 }
 ```
@@ -173,7 +212,7 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
@@ -183,6 +222,9 @@ Claude runner's settings.
 | Cursor CLI: *Authentication required* | The daemon inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
 | Cursor CLI on Windows | Cursor's sandbox has no Windows backend, so only the deny rules apply there. The browser still works; the machine is less fenced off than on macOS or Linux. |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them. Update Grok Build and Browsentic, and report it if it persists. |
+| Qwen Code: *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier has ended. Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL`. |
+| Qwen Code cannot find a key you have exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; `ANTHROPIC_*` and `GEMINI_*` are sealed away. Point Qwen at one of the first four. |
+| `AGENT_UNSAFE`: *Qwen Code registered …* or *loaded the MCP server …* | Qwen's own `init` line named a tool or a server Browsentic denied, so the run was stopped. Update Qwen Code and Browsentic, and report it if it persists. |
 
 ---
 
