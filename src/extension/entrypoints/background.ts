@@ -6,13 +6,13 @@ import { serveDebuggerEvents } from '@/lib/bridge/cdp';
 import { serveCodeToolkits } from '@/lib/bridge/code-toolkit';
 import { serveDiagnostics } from '@/lib/bridge/diagnostics';
 import { serveFrameFocus } from '@/lib/bridge/frame-focus';
-import { analyzeStoredFile } from '@/lib/bridge/file-store';
+import { resumePendingFiles } from '@/lib/bridge/file-store';
 import { pushSkill, removeSkill, resyncSkills } from '@/lib/bridge/skill-store';
 import { nameStoredSession } from '@/lib/bridge/session-store';
 import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
-import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions } from '@/lib/bridge/run-port';
+import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions, sweepFiles } from '@/lib/bridge/run-port';
 import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { serveTimers } from '@/lib/bridge/timer';
 import { serveToast } from '@/lib/bridge/toast';
@@ -50,11 +50,6 @@ export default defineBackground(() => {
         .then(sendResponse)
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
-    }
-    if (message.op === 'analyzeFile' && typeof message.fileId === 'string') {
-      void analyzeStoredFile(message.fileId);
-      sendResponse(success(true));
-      return;
     }
     if (message.op === 'saveSkill' && typeof message.skillId === 'string') {
       void pushSkill(message.skillId);
@@ -162,7 +157,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"analyzeFile"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;
@@ -218,7 +213,9 @@ export default defineBackground(() => {
   onWelcome(() => {
     void resyncSkills();
     void resumePendingAnalyses();
+    void resumePendingFiles();
   });
+  void sweepFiles();
 
   void connectDaemon();
   browser.runtime.onStartup.addListener(() => void connectDaemon());

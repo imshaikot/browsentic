@@ -76,6 +76,7 @@ export const claudeRunner: Runner = {
   kind: 'claude',
   versionArgs: ['--version'],
   efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+  opens: ['text', 'pdf', 'image'],
 
   workspace: () => stateDir,
 
@@ -182,6 +183,7 @@ export const claudeRunner: Runner = {
         context.prompt,
         '--output-format',
         'json',
+        '--no-session-persistence',
         '--mcp-config',
         '{"mcpServers":{}}',
         '--strict-mcp-config',

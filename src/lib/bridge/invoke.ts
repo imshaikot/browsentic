@@ -277,7 +277,7 @@ async function listStoredFiles(input: unknown): Promise<ActionResult> {
   const needle = typeof filter === 'string' ? filter.toLowerCase() : null;
   const files = (await listMeta())
     .filter((f) => !needle || f.name.toLowerCase().includes(needle))
-    .map(({ id, name, mime, size, status, summary, addedAt }) => ({ id, name, mime, size, status, summary, addedAt }));
+    .map(({ id, name, mime, size, status, report, addedAt }) => ({ id, name, mime, size, status, summary: report?.summary, addedAt }));
   return success({ files });
 }
 

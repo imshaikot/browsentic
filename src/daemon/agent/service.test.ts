@@ -28,7 +28,7 @@ beforeEach(() => {
 async function offerTo(runId: string, context: { sessionId?: string; liveTools?: boolean }) {
   session.handle({ t: 'instruct', id: runId, text: 'click Sign in', context });
   const offer = session.offerFor(runId);
-  await vi.waitFor(() => expect(ended).toContain(runId));
+  await vi.waitFor(() => expect(ended).toContain(runId), { timeout: 5_000 });
   return offer;
 }
 

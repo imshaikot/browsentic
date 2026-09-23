@@ -1,5 +1,6 @@
 import type { ToolDescriptor } from './manifest';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { FileReport, FileVerdict } from '@/lib/files/report';
 import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
@@ -10,7 +11,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 17;
+export const SOCKET_PROTOCOL_VERSION = 18;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -28,7 +29,6 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'pair'; token: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'disconnect' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'panelOpened' }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'analyzeFile'; fileId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveSkill'; skillId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'nameSession'; sessionId: string }
@@ -56,6 +56,7 @@ export type RunEvent =
   | { kind: 'approval'; toolId: string; action: string; input: unknown; site?: string }
   | { kind: 'toolResult'; toolId: string; ok: boolean; summary: string }
   | { kind: 'session'; agent: AgentKind; agentSessionId: string | null }
+  | { kind: 'attachments'; files: HandedFile[] }
   | { kind: 'usage'; usage: TokenUsage }
   | { kind: 'done'; stopReason: string }
   | { kind: 'error'; code: string; message: string };
@@ -76,9 +77,18 @@ export interface AttachedFile {
   name: string;
   mime: string;
   size: number;
-  status: 'pending' | 'ready' | 'error';
-  summary?: string;
-  digest?: string;
+  /** Absent while the file analyst is still reading it. */
+  report?: FileReport;
+  /** The conversation's agent session already holds this report, so it is not handed over again. */
+  delivered: boolean;
+}
+
+/** A report handed to the agent with this turn. */
+export interface HandedFile {
+  id: string;
+  name: string;
+  verdict: FileVerdict;
+  code?: string;
 }
 
 /** An element the user pointed at with A-Eye. It rides along with the next instruction and scopes it. */
@@ -200,8 +210,19 @@ export type SocketFrame =
   | { t: 'decision'; id: string; toolId: string; allow: boolean; remember?: boolean }
   | { t: 'reset'; sessionId?: string }
   | { t: 'run'; id: string; event: RunEvent }
-  | { t: 'analyzeFile'; id: string; name: string; mime: string; size: number; content: string }
-  | { t: 'fileSummary'; id: string; result: ActionResult<{ summary: string; digest?: string }> }
+  | {
+      t: 'analyzeFile';
+      id: string;
+      fileId: string;
+      sessionId: string;
+      name: string;
+      mime: string;
+      size: number;
+      /** Base64, and empty for a file over MAX_STORED_FILE_BYTES — its size alone is enough to reject it. */
+      content: string;
+    }
+  | { t: 'fileReport'; id: string; result: ActionResult<FileReport> }
+  | { t: 'cancelAnalysis'; id: string; fileId: string }
   | { t: 'saveSkill'; id: string; skill: SkillDraft }
   | { t: 'deleteSkill'; id: string; name: string }
   | { t: 'deleteSiteMap'; id: string; name: string }
@@ -241,6 +262,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'decision',
   'reset',
   'analyzeFile',
+  'cancelAnalysis',
   'saveSkill',
   'deleteSkill',
   'deleteSiteMap',

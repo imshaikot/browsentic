@@ -47,7 +47,7 @@ import {
   type Session,
 } from './auth-store';
 import { AgentSession } from './agent/service';
-import { summarizeFile } from './agent/analyze';
+import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
 import { configPath, readAgentConfig, writeActiveAgent, writeAgentModel, writeGuardrailSetting } from './agent/config';
@@ -163,6 +163,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   let offered = bundled;
   const links = new Map<string, ExtensionLink>();
   const agents = new Map<ExtensionLink, AgentSession>();
+  const analyses = new FileAnalyses();
   const controls = new Set<WebSocket>();
   let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
@@ -354,6 +355,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       (closing) => {
         agents.get(closing)?.dispose();
         agents.delete(closing);
+        analyses.cancelOwnedBy(closing);
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
         scheduleIdleExit();
@@ -361,11 +363,16 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       },
       (request, source) => {
         if (request.t === 'analyzeFile') {
-          void summarizeFile(request, readAgentConfig())
-            .then((result) => source.send({ t: 'fileSummary', id: request.id, result }))
+          void analyses
+            .start(request, readAgentConfig(), source)
+            .then((report) => source.send({ t: 'fileReport', id: request.id, result: success(report) }))
             .catch((error) =>
-              source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
+              source.send({ t: 'fileReport', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
             );
+          return;
+        }
+        if (request.t === 'cancelAnalysis') {
+          analyses.cancel(request.fileId);
           return;
         }
         if (request.t === 'nameSession') {
@@ -554,6 +561,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       draft: (id, draft) => source.send({ t: 'siteMapDraft', id, draft }),
       running: () => [...agents.values()].reduce((total, agent) => total + agent.running, 0),
       actionNames: () => source.tools.map((tool) => tool.name),
+      awaitAnalysis: (fileId, signal) => analyses.wait(fileId, signal),
     });
     agents.set(source, created);
     return created;

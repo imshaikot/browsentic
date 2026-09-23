@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { RunEvent } from '@/lib/actions/protocol';
 import type { AgentConfig } from './config';
-import { runJson, runStream } from './runners/drive';
+import { runJson, runStream, type JsonOptions } from './runners/drive';
 import { mcpServerFor, runnerFor } from './runners';
 import { RunError, type RunOutcome } from './runners/types';
 
@@ -50,15 +50,10 @@ export function runAgentJson(
   prompt: string,
   config: AgentConfig,
   signal: AbortSignal,
-  { reads = false, timedOut, empty }: { reads?: boolean; timedOut: string; empty: string },
+  { reads = false, ...options }: JsonOptions & { reads?: boolean },
 ): Promise<string> {
   const { runner, settings } = runnerFor(config);
-  return runJson(
-    runner,
-    { prompt, settings, reads, workspace: runner.workspace('task') },
-    signal,
-    { timedOut, empty },
-  );
+  return runJson(runner, { prompt, settings, reads, workspace: runner.workspace('task') }, signal, options);
 }
 
 /** Where a one-shot's scratch files go — inside the agent's own workspace, so it is allowed to read them. */

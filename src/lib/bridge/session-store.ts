@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind } from '@/lib/agents/catalog';
+import { removeFilesFor } from './file-store';
 import type { RunItem } from './run-items';
 import { nameSession } from './socket';
 
@@ -62,7 +63,10 @@ export async function putSession(fields: SessionFields, items: RunItem[]): Promi
   const existing = list.find((s) => s.id === fields.id);
   const kept = [{ ...existing, ...fields }, ...list.filter((s) => s.id !== fields.id)];
   const dropped = kept.slice(MAX_SESSIONS);
-  if (dropped.length) await browser.storage.local.remove(dropped.map((s) => transcriptKey(s.id)));
+  if (dropped.length) {
+    await browser.storage.local.remove(dropped.map((s) => transcriptKey(s.id)));
+    await removeFilesFor(dropped.map((s) => s.id));
+  }
   await writeIndex(kept.slice(0, MAX_SESSIONS));
 }
 
