@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
@@ -52,6 +52,10 @@ export function launch(
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     writeFileSync(path, file.content, { mode: 0o600 });
   }
+  // The sweep ages a workspace by its folder's time, which rewriting a file already in it leaves
+  // alone — so a conversation's folder would be swept a day after its first turn, not its last.
+  const now = new Date();
+  utimesSync(plan.cwd, now, now);
 
   const dropped = sealedAway(kind, process.env);
   if (dropped.length) log(`sealed ${dropped.length} credential-shaped variables out of the ${kind} environment`);

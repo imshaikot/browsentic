@@ -341,7 +341,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | Agent | Mode | What that means |
 | --- | --- | --- |
 | **Claude Code** | `allowlist` | A per-run tool allowlist plus an explicit deny list. `Read` is denied for a browser run — it reads pages, never the disk |
-| **Codex** | `sandbox` | No per-run tool list; the read-only sandbox is the whole containment, **so the agent can still read any file the user can** |
+| **Codex** | `sandbox` | No per-run tool list; the read-only sandbox is the whole containment, **so the agent can still read any file the user can**. `features.multi_agent=false` is required too: a sub-agent is spawned outside the run's gate and reports nothing to the panel |
 | **Antigravity** | `host` | No tool list and no sandbox flag; its built-in tools are governed by the user's own CLI settings, so a sealed environment is the only containment Browsentic applies |
 | **Mistral Vibe** | `allowlist` | `--enabled-tools` is the whole of what loads: Browsentic's MCP tools, plus web search and fetch on a research run. The shell and file tools never exist in the run, and `--auto-approve` is a forbidden flag |
 | **Grok Build** | `allowlist` | A per-run built-in tool list, `--permission-mode dontAsk`, deny rules, and a kernel sandbox for writes. Reads are closed by the tool list and a `Read` deny rather than the sandbox, and MCP servers the user set up in Grok itself still load |

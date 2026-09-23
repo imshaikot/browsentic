@@ -384,6 +384,7 @@ export class AgentSession {
     try {
       const outcome = await runInstruction({
         runId,
+        conversation: sessionId ?? null,
         instruction: instructionText,
         systemPrompt: built.prompt,
         research: run.map ? run.map.settings.research : false,

@@ -13,7 +13,51 @@ import type { JsonContext, Plan, Runner, StreamContext, StreamReader } from './t
  */
 const SANDBOX = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never"', '--skip-git-repo-check'];
 
+/**
+ * Codex features a browsing run has no use for, each of which costs a tool or a block of
+ * instructions in every turn: sub-agents, its goal memory, connector apps, and the list of
+ * plugins it suggests installing. A feature name Codex no longer knows is ignored rather than
+ * refused, so these stay harmless as it moves on.
+ */
+const QUIETED = [
+  '-c',
+  'features.multi_agent=false',
+  '-c',
+  'features.goals=false',
+  '-c',
+  'features.tool_suggest=false',
+  '-c',
+  'include_apps_instructions=false',
+];
+
 const WEB_TOOL = 'web_search';
+
+/**
+ * Codex 0.155 dropped `tools.web_search` for a top-level mode and ignores a key it does not know
+ * without saying so, which left web search switched on for every run — the one tool a model whose
+ * browser tools are deferred can still see, and so the one it reached for.
+ */
+const searching = (research: boolean): string[] => ['-c', `web_search=${tomlString(research ? 'live' : 'disabled')}`];
+
+/**
+ * Codex cuts a tool result at 10,000 tokens, which a dense page snapshot passes. This raises it to
+ * the 25,000 Claude Code allows an MCP result. A code-mode model's `exec` keeps its own 10,000
+ * unless the script's first line asks for more, which only the prompt can tell it to do.
+ */
+const RESULT_TOKENS = 25_000;
+
+/**
+ * Codex keeps an MCP server's tools out of the model's tool list: they are deferred behind
+ * `tool_search`, and a code-mode model reaches them only from inside `exec`. A run that does not
+ * say so watches the model answer from memory or a web search, because those it can see.
+ */
+const reachingTheBrowser = (research: boolean) => `# Reaching the browser from Codex
+
+Your browsentic tools are not in your tool list yet, because Codex defers them. Before you plan anything, call \`tool_search\` for what this job needs — query "browsentic page", limit 20 — and search again for a tool you have not loaded. If the only way you can call a tool is \`exec\`, the same tools are there as \`tools.mcp__browsentic__<name>({ ... })\`: find them by filtering \`ALL_TOOLS\`, and pass a screenshot on with \`image(result.content[0])\`, because \`text()\` alone drops the picture.
+
+The page the user means is the one open in their browser. Read it with these tools. Never answer from memory${research ? '' : ', from a web search,'} or by fetching the page from the shell${research ? ', and keep a web search to background the page cannot give you' : ''}.
+
+When you reach the tools through \`exec\`, start every script that reads the page with the line \`// @exec: {"max_output_tokens": ${RESULT_TOKENS}}\`, or its output is cut at 10,000 tokens. Even then a tool result over ${RESULT_TOKENS} tokens comes back cut, so ask for less at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back — rather than one large read whose middle goes missing.`;
 
 interface Item {
   id?: string;
@@ -75,6 +119,7 @@ export const codexRunner: Runner = {
         ...(context.sessionId ? ['resume', context.sessionId] : []),
         '--json',
         ...SANDBOX,
+        ...QUIETED,
         '-c',
         `${server}.command=${tomlString(mcp.command)}`,
         '-c',
@@ -87,9 +132,10 @@ export const codexRunner: Runner = {
         '-c',
         `${server}.default_tools_approval_mode="approve"`,
         '-c',
-        `developer_instructions=${tomlString(context.systemPrompt)}`,
+        `developer_instructions=${tomlString(`${context.systemPrompt.trim()}\n\n${reachingTheBrowser(research)}`)}`,
+        ...searching(research),
         '-c',
-        `tools.web_search=${research}`,
+        `tool_output_token_limit=${RESULT_TOKENS}`,
         ...(settings.model ? ['--model', settings.model] : []),
         ...(effort ? ['-c', `model_reasoning_effort=${tomlString(effort)}`] : []),
         '--',
@@ -202,10 +248,10 @@ export const codexRunner: Runner = {
         '--json',
         '--ephemeral',
         ...SANDBOX,
+        ...QUIETED,
         '-c',
         'mcp_servers={}',
-        '-c',
-        'tools.web_search=false',
+        ...searching(false),
         ...(settings.model ? ['--model', settings.model] : []),
         ...(effort ? ['-c', `model_reasoning_effort=${tomlString(effort)}`] : []),
         '--',

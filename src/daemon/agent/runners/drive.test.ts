@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -106,6 +106,15 @@ describe('a streamed run', () => {
       instructions: statSync(join(cwd, 'AGENTS.md')).mode & 0o777,
       mcpConfig: statSync(join(cwd, '.agents', 'mcp_config.json')).mode & 0o777,
     }).toEqual({ said: 'You are Browsentic.\n', directory: 0o700, instructions: 0o600, mcpConfig: 0o600 });
+  });
+
+  test("a folder a conversation keeps is new again on every turn, so the sweep ages it from its last", async () => {
+    const cwd = join(antigravityRunner.workspace('run'), 'kept-run');
+    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-run' });
+    const nearlyADayAgo = new Date(Date.now() - 23 * 60 * 60_000);
+    utimesSync(cwd, nearlyADayAgo, nearlyADayAgo);
+    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-run' });
+    expect(statSync(cwd).mtimeMs).toBeGreaterThan(Date.now() - 60_000);
   });
 
   test('a run that finished is not undone by the exit code that follows', async () => {

@@ -91,11 +91,27 @@ Every runner is given the same four things, by whichever mechanism its CLI suppo
 | MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` |
 | System prompt | `--append-system-prompt` | `-c developer_instructions` | `AGENTS.md` in its cwd | `--rules` |
 | Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it |
-| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"` | its own permission rules | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` |
+| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.multi_agent=false` | its own permission rules | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` |
 
+**Two CLIs do not put the browser tools in the model's list, and both are told so in the prompt.**
 Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a
-`browsentic__` prefix; the system prompt it is given says so, because the skills name tools the way
-the server lists them.
+`browsentic__` prefix. Codex defers them behind its own `tool_search`, and a code-mode model
+(`tool_mode: "code_mode_only"` in its model catalog) reaches them only from inside `exec`, as
+`tools.mcp__browsentic__*`, where an image reaches the model only if the script passes it to
+`image()`. Left unsaid, a model answers from what it can see — its memory, or the web search Codex
+switches on by default, which is why a run now passes `web_search="disabled"` unless it is mapping.
+Codex also cuts any tool result at 10,000 tokens by default, which its model catalog sets.
+`tool_output_token_limit=25000` raises that to the ceiling Claude Code puts on an MCP result. Inside
+`exec` the result is still cut at 10,000 unless the script's first line is
+`// @exec: {"max_output_tokens": 25000}`, and only the prompt can ask for that, so it does. It also
+asks for page reads in pieces.
+
+**A CLI that re-reads its own folder gets one per conversation, not one per run.** Vibe restores a
+resumed session from the folder it began in, whatever folder it is started in now, so a folder per
+run left every follow-up turn calling the browser with the first turn's `BROWSENTIC_AGENT_RUN` —
+refused as `RUN_INACTIVE` — behind a system prompt frozen at the first turn. `StreamContext`
+carries the conversation for exactly this: `conversationDir()` names the folder after it, and every
+turn rewrites what is in it.
 
 **Conversation continuity** is what makes "now click the second one" work: the runner reports
 whatever session id its CLI established (`session_id`, `thread_id`, `conversation_id`, `sessionId`) and gets it

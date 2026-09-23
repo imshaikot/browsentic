@@ -26,6 +26,8 @@ export interface Plan {
 
 export interface StreamContext {
   runId: string;
+  /** The panel conversation this run belongs to, which every turn of it shares — unlike `runId`. */
+  conversation: string | null;
   instruction: string;
   systemPrompt: string;
   research: boolean;
