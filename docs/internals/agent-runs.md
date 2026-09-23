@@ -150,7 +150,9 @@ point — see [Guardrails § Spawn containment](guardrails.md#spawn-containment)
    for that agent, and the file is re-read at spawn time. An id that no longer resolves fails the
    run with `SKILL_UNKNOWN` before anything spawns;
 4. optional **fetched data** (a site's own `robots.txt`/`sitemap.xml`, during mapping);
-5. optional **attached files** — notes Browsentic made when each file was attached, capped at 8 KB;
+5. optional **attached files** — one line for each file whose report this conversation's agent
+   already holds, with the id `page_attachFile` takes. The reports themselves travel in the
+   message ([below](#the-file-analyst));
 6. optional **recordings** index, capped at 4 KB;
 7. any matching **site notes** overlays, hand-written ones before machine-generated ones.
 
@@ -158,6 +160,66 @@ The whole thing is capped at **64 KB**. Overlays that would push it over are dro
 side panel is told which ones — a silently truncated prompt is worse than a visibly incomplete one.
 
 Every untrusted block gets its own framing paragraph re-stating that its contents are data.
+
+---
+
+## The file analyst
+
+Attaching a file in the panel starts a **file analyst**: a one-shot session of the active agent CLI,
+one per file, detached from any run — `FileAnalyses` in
+[`file-analyst.ts`](../../src/daemon/agent/file-analyst.ts).
+
+```
+panel ──putBytes──► storage.local                        the bytes, under the file's own key
+panel ──attach────► background ──indexFile               sessionId = the tab's conversation
+                               ──analyzeFile──► daemon ──screenFile──► rejected, unread
+                                                        └─runAgentJson (task mode, Read only)
+                               ◄──fileReport── report    process stopped, copy deleted, entry dropped
+```
+
+1. **Screening, before anything spawns.** `screenFile()` decides the kind from the bytes — `%PDF-`,
+   the PNG, JPEG, GIF and WebP signatures, and otherwise UTF-8 with no NUL in the first 64 KB is
+   text — never from the name or the browser's MIME type. An empty file, a ZIP or any other binary,
+   a file over the store cap (10 MB, which arrives as a size with no bytes) or over its kind's limit
+   (text 5 MB, PDF 10 MB, image 5 MB), and a kind the active runner does not list in `Runner.opens`
+   all come back `rejected` without an agent being started.
+2. **The one-shot.** The file is written to the runner's task workspace at `0600`, named for the
+   kind its bytes proved, because an agent picks how to open a file by its extension. The prompt
+   frames the file as untrusted data and asks for one JSON object after `=== REPORT ===` — summary,
+   outline, facts, notes, coverage — or a `rejected` verdict when the file will not open.
+   `validateFileReport()` clamps every field, and an answer that does not parse is `failed`.
+3. **Ending it.** `runJson()` takes an `accept` callback: the moment stdout holds an answer it
+   accepts, the task settles and the CLI is stopped (SIGTERM, then SIGKILL after 5 s) rather than
+   waited out. `finally` deletes the scratch copy and drops the registry entry; the report alone is
+   kept for up to two minutes, for a turn sent while it was still being written. Claude Code is run
+   with `--no-session-persistence` and Codex with `--ephemeral`, so neither keeps the session; the
+   other five have no such flag and keep it in their own history, as they do for titles.
+4. **Bounds.** Two analysts run at once and the rest queue. Removing the chip, ending the
+   conversation or the browser disconnecting aborts one with `CANCELLED`, which is told apart from
+   the 60-second `TIMEOUT`.
+
+Every outcome is a `FileReport` with a verdict: `analyzed`, `rejected` (trying again changes
+nothing) or `failed` (it may).
+
+### Handing a report over
+
+A report travels **once**, inside the next instruction of the conversation the file was attached in
+— `handOver()` in [`attachments.ts`](../../src/daemon/agent/attachments.ts) — under an
+`# Attached files` heading framed as untrusted, ahead of `# The user's message`. That puts it in the
+agent CLI's own session history, so every resumed turn still has it, and the system prompt only has
+to name the file.
+
+- `AttachedFile.delivered` is the browser's record: the file's `deliveredTo` matches the
+  conversation's `agentSessionId`. The background sets it when a run that carried the report — its
+  `attachments` event — ends in `done`.
+- The daemon has the last word. A turn that is not resuming a session treats every file as fresh,
+  so a different agent, or a conversation that could not be resumed, is given every report again.
+- A file with no report yet is waited for through `awaitAnalysis()`, with a `browsentic.readFile`
+  row on the timeline. One that no analyst is reading any more goes over as `failed`.
+- The block is capped at 16 KB. Reports that do not fit stay fresh for the next turn.
+
+A headless CLI takes nothing on stdin once it is running, so a file attached mid-run reaches the
+agent with the next message.
 
 ---
 

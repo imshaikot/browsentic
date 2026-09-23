@@ -101,6 +101,22 @@ refuses it again.
 | `DOWNLOAD_MISSING` | Daemon | It was captured but is no longer on disk — swept, or deleted. Capture it again |
 | `DOWNLOAD_SAVE_FAILED` | Daemon | The file could not be moved into the download folder. The message carries the reason |
 
+## Attached files
+
+These are not tool errors. They are the reason on a file analyst's report: shown on the file's chip,
+and handed to the agent with the file so it can say why it cannot answer from it.
+
+| Code | Verdict | Meaning and next move |
+| --- | --- | --- |
+| `UNSUPPORTED_TYPE` | rejected | Not text, a PDF or an image — an archive, an Office file, a program — or a PDF or image the active agent cannot open. The message names the agents that can |
+| `FILE_TOO_LARGE` | rejected | Over 10 MB, or over its kind's limit: text 5 MB, PDF 10 MB, image 5 MB |
+| `EMPTY` | rejected | The file has no bytes |
+| `UNREADABLE` | rejected | The analyst opened it and could not read it — encrypted, password-protected or corrupted |
+| `TIMEOUT` | failed | The analyst took longer than 60 seconds. **Retry** on the chip reads it again |
+| `CANCELLED` | failed | The file was removed, its conversation ended, or the browser disconnected while it was being read |
+| `FILE_NOT_FOUND` | failed | The browser no longer holds the file's bytes. Attach it again |
+| `AGENT_FAILED` | failed | The agent could not start, or returned something that was not a report. The message says which |
+
 ---
 
 ## See also
