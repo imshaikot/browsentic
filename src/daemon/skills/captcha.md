@@ -1,47 +1,44 @@
 ---
 name: captcha
-description: Get past a “verify you are human” block — read what the widget is, tick its checkbox, hand a real challenge to the user.
+description: Get past a “verify you are human” block — tick the checkbox, see an image challenge through, hand over only the puzzles nothing can answer.
 triggers: [captcha, recaptcha, hcaptcha, turnstile, cloudflare, verify you are human, prove you are human, i am not a robot, checking your browser, just a moment, are you a robot, human verification, challenge, bot check, blocked by, security check]
 ---
 
-A captcha is the one thing on a page that ordinary targeting cannot see. Vendors build the widget as a closed shadow root holding a cross-origin iframe holding another shadow root, so `page_getPageInfo` reports nothing where the checkbox visibly is, and `page_clickElement` has no element to aim at. Two tools read through that; nothing else on the page changes how you work.
+A captcha is the one thing on a page that ordinary targeting cannot reach. The widget sits in a closed shadow root inside a cross-origin iframe, often several frames deep, so `page_clickElement` has nothing to aim at. `page_solveCaptcha` reaches it wherever it is. When a captcha is in the way, getting past it is part of the task — do it, do not stop to report it.
 
-## 1. Notice you are blocked
+## 1. Notice it — then act at once
 
-The signs are a page that never finishes ("Checking your browser", "Just a moment…"), a form that refuses without saying why, a visible checkbox no snapshot lists, or a `TARGET_NOT_FOUND` for something you can plainly see in a screenshot. Any of those, stop guessing selectors and call `page_findCaptcha {}`.
+`page_getPageInfo` carries a `captcha` field whenever a page holds one that needs answering: the vendor, whether it is already `solved`, and a `next` step. Other signs: a page that never finishes ("Checking your browser", "Just a moment…"), a form that refuses without saying why, a checkbox you can see in a screenshot but no snapshot lists.
 
-Do not call it speculatively on every page. It attaches Chrome's debugger for a moment, which flashes the "Browsentic is debugging this browser" bar at the user, so it earns its place only once something is actually stuck.
+**Call `page_solveCaptcha {}` straight away.** Do not look for the checkbox with selectors, do not screenshot it first, do not ask the user whether to try. It is gated for approval, so the user decides there; one yes covers every round of the same captcha in this run. If it comes back `DECLINED`, that is their answer — say so and stop.
 
-## 2. Read it before you touch it
+If `captcha.solved` is true, the widget is satisfied already — carry on with the task.
 
-`page_findCaptcha` never clicks. It reports `vendor` and `label` (Cloudflare Turnstile, reCAPTCHA v2/v3, hCaptcha, GeeTest, Arkose, AWS WAF), the widget's on-screen `bounds`, a viewport `point` for its checkbox when it has one, and a `state`:
+## 2. Read the state it returns
 
-- **`solved`** — already satisfied. The block is something else; re-snapshot and carry on.
-- **`idle`** — a checkbox is waiting. This is the case §3 handles.
-- **`invisible`** — a scoring captcha like reCAPTCHA v3. **There is nothing to click and nothing to wait for.** If the page still refuses you, the site has judged the session, and no amount of retrying changes that — say so and stop.
-- **`needsHuman`** — a challenge a person has to answer. Go to §4.
-- **`found: false`** — no captcha here at all, so whatever is blocking you is a different problem.
+- **`solved`** — done. Re-snapshot and continue the task; a form may now need submitting.
+- **`challenge`** — an image challenge is open and waiting on you. §3.
+- **`pending`** — the widget took the click but had not settled. Wait a few seconds, then `page_findCaptcha {}` to re-check; call `page_solveCaptcha {}` again only if it is back to `idle`.
+- **`invisible`** — a scoring captcha (reCAPTCHA v3 and the like) with nothing to click. If the page still refuses you, the site has judged the session; say so and stop.
+- **`needsHuman`** — a puzzle Browsentic does not answer (Arkose, AWS WAF, a drag-to-fit). §4.
+- **`CAPTCHA_NOT_FOUND`** — no captcha on the page, so the block is something else.
 
-## 3. Tick the checkbox
+## 3. An image challenge
 
-`page_solveCaptcha {}` finds the widget, clicks its checkbox with a real browser-level mouse event, and waits for the verdict. A synthetic click cannot do this: the checkbox only reacts to genuine pointer input, which is the whole point of it.
+Browsentic's own vision analyst answers reCAPTCHA and hCaptcha challenges inside the call — a fresh one-shot session per round, stopped as soon as it has answered — so most of the time `page_solveCaptcha {}` returns `solved` without you seeing a grid. When it cannot finish, the result has state `challenge`, a note saying so, and the challenge as an **image** beside its description. Answer it yourself:
 
-It is gated for approval, because ticking a site's human check is the user's call rather than yours. **If it comes back `DECLINED`, that is an answer — say so and stop, do not look for another way through.**
+- **`kind: "tiles"`** — a grid with each tile's number painted in its corner (1 top-left, counting along each row). Call `page_solveCaptcha {"tiles": [...]}` with every tile that matches `prompt`. It is the whole selection, not a change to it; `[]` means none match. When `dynamic` is true, each tile you pick is swapped for a new picture and the result comes back with the grid again — keep answering; `[]` verifies it once no tile matches. For a 4×4 slice of one photo, include every tile showing any part of the object.
+- **`kind: "points"`** — a picture to tap on. Call `page_solveCaptcha {"points": [{"x": …, "y": …}]}` with pixel positions on that image (it is `imageWidth` × `imageHeight`), aiming for the centre of each thing to tap.
+- **Cannot make it out?** `page_solveCaptcha {"reload": true}` swaps it for another.
 
-Read `state` on the result the same way as in §2. `pending` means the widget took the click but had not settled inside the wait; call `page_findCaptcha {}` again a few seconds later rather than clicking twice. Raise `waitMs` when a site is habitually slow.
+Repeat with each new result until `solved`. `errors` on a result means the last answer was refused — look again more carefully. Vendors often want several rounds; that is normal, not a failure.
 
-## 4. When it needs the user, hand it over
+## 4. When it needs the user
 
-`needsHuman` means the vendor escalated to an image grid, a puzzle, or a slider — Arkose and AWS WAF do this every time, reCAPTCHA and hCaptcha do it when they are suspicious. **Do not attempt the challenge.** It is a test that a person is present, you are not one, and answering it is not a capability you have.
-
-What to do instead, in order: `page_screenshot {}` so you can see the challenge and describe it, then tell the user plainly that this one needs them and that they can solve it in the browser window already in front of them. Do not pass `save: true` — they are looking at the real thing, and a file of it helps nobody. Then wait: poll `page_findCaptcha {}` every several seconds until `state` becomes `solved`, and continue the task from there. If they do not solve it within a reasonable spell, report that you are still waiting rather than looping forever in silence.
-
-The user is sitting at this browser. Handing them ten seconds of clicking is a normal step in a task, not a failure to report apologetically.
+`needsHuman` is the one case to hand over. `page_screenshot {}` to see it, tell the user plainly this one needs them and that they can solve it in the browser window in front of them, then poll `page_findCaptcha {}` every several seconds until `solved` and carry on. If they have not solved it after a reasonable while, say you are still waiting rather than looping in silence.
 
 ## 5. When the tools cannot run
 
-`DEBUGGER_UNAVAILABLE` means Chrome's debugger could not attach — almost always DevTools being open on that tab. Tell the user to close DevTools and retry; there is no fallback, because reading a closed shadow root is exactly what the debugger is for.
+`DEBUGGER_UNAVAILABLE` means Chrome's debugger could not attach — almost always DevTools open on that tab. Ask the user to close DevTools, then retry.
 
-A Firefox build has neither tool: it exposes no debugger to extensions, so they are left off its tool list rather than offered to fail. If they are not in your list, do not go looking for them — say so and ask the user to deal with the captcha themselves. `UNSUPPORTED` means the same thing when an older instruction or recording still names one.
-
-Both are terminal conditions. Report them and move on to whatever else the task needs.
+A Firefox build has neither tool; if they are not in your list, ask the user to solve the captcha themselves. `UNSUPPORTED` means the same when an older instruction names them.

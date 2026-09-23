@@ -15,6 +15,7 @@ import { log } from './log';
 
 const SCREENSHOT_TOOL = 'page_screenshot';
 const PICK_TOOL = 'page_pickElement';
+const CAPTCHA_TOOL = 'page_solveCaptcha';
 
 const FOCUS_SHOT_TOOL = {
   name: toolNameFor(FOCUS_SHOT_ACTION),
@@ -174,6 +175,7 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     if (params.name === SCREENSHOT_TOOL) return renderScreenshot(result);
     if (params.name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
     if (params.name === PICK_TOOL) return renderPick(result, shouldFence(action, policy) ? tag : undefined);
+    if (params.name === CAPTCHA_TOOL) return renderCaptcha(result, shouldFence(action, policy) ? tag : undefined);
     return render(result, shouldFence(action, policy) ? tag : undefined);
   });
 
@@ -310,6 +312,30 @@ function renderPick(result: ActionResult, fenceWith?: string) {
       {
         type: 'text' as const,
         text: `${IMAGE_NOTE} This is the picked element photographed at the instant the user clicked it.`,
+      },
+    ],
+  };
+}
+
+/** An open challenge comes back as a picture beside its description, so the caller can answer it by looking. */
+function renderCaptcha(result: ActionResult, fenceWith?: string) {
+  if (!result.ok) return render(result, fenceWith);
+  const data = result.data as { challenge?: { image?: unknown } & Record<string, unknown> } & Record<string, unknown>;
+  const image = data.challenge?.image;
+  if (typeof image !== 'string') return render(result, fenceWith);
+
+  const { image: _image, ...challenge } = data.challenge!;
+  const [mimeType, base64] = splitDataUrl(image);
+  const rendered = render({ ok: true, data: { ...data, challenge } }, fenceWith);
+  return {
+    content: [
+      ...rendered.content,
+      { type: 'image' as const, data: base64, mimeType },
+      {
+        type: 'text' as const,
+        text: `${IMAGE_NOTE} This is the open captcha challenge, ${challenge.imageWidth}×${challenge.imageHeight} pixels${
+          challenge.kind === 'tiles' ? ', each tile numbered in its corner' : ''
+        }.`,
       },
     ],
   };

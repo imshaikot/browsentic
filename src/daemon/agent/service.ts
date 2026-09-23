@@ -17,6 +17,7 @@ import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
   blocked,
+  CAPTCHA_ACTION,
   decide,
   declined,
   describe as describeDecision,
@@ -85,9 +86,14 @@ interface ActiveRun {
   focusShot?: string;
   /** The composer's “Live tool” switch, as it stood when this instruction was sent. */
   liveTools: boolean;
+  /** Actions the user allowed once in this run that stay allowed for the rest of it. */
+  approved: Set<string>;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
+
+/** Getting past a captcha takes a call per round; one yes covers every round of that run. */
+const HELD_FOR_RUN = new Set([CAPTCHA_ACTION]);
 
 interface Decision {
   allow: boolean;
@@ -219,7 +225,7 @@ export class AgentSession {
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
       return blocked(decision);
     }
-    if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site))) {
+    if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site)) && !run.approved.has(action)) {
       emit({ kind: 'approval', toolId, action, input, site: run.site });
       const answer = await this.awaitDecision(run, toolId);
       if (!answer.allow) {
@@ -228,6 +234,7 @@ export class AgentSession {
         return declined();
       }
       if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
+      if (HELD_FOR_RUN.has(action)) run.approved.add(action);
     }
 
     const result = await this.deps.invoke(action, input, { runId, hosts: scope.hosts });
@@ -324,6 +331,7 @@ export class AgentSession {
       ownedTabIds: [],
       focusShot: context?.focus?.shot,
       liveTools: context?.liveTools === true,
+      approved: new Set(),
     };
     this.runs.set(runId, run);
     if (run.liveTools && sessionId) this.codeListed.add(sessionId);
@@ -673,6 +681,11 @@ function summarize(input: unknown, result: ActionResult): string {
   if (shot && typeof shot.dataUrl === 'string') {
     const saved = typeof shot.savedTo === 'string' ? ` → ${shot.savedTo.split('/').pop()}` : '';
     return clip(`image ${shot.width ?? '?'}×${shot.height ?? '?'}${saved}`);
+  }
+
+  const captcha = result.data as { vendor?: unknown; label?: unknown; state?: unknown } | null;
+  if (typeof captcha?.vendor === 'string' && typeof captcha.label === 'string' && typeof captcha.state === 'string') {
+    return clip(`${captcha.label}: ${captcha.state}`);
   }
 
   const submits = (result.data as { submits?: unknown } | null)?.submits === true ? ' — submits a form' : '';

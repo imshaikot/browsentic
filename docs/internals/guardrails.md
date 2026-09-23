@@ -397,8 +397,9 @@ one is **visible in the log rather than assumed away**.
 
 ### Two spawn modes
 
-`run` drives the browser. `task` is a one-shot — the file analyst reading an attached file, turning
-a raw recording trace into steps — that must not reach the browser at all, which is asserted by
+`run` drives the browser. `task` is a one-shot — the file analyst reading an attached file, the
+captcha analyst looking at one round of a challenge, turning a raw recording trace into steps — that
+must not reach the browser at all, which is asserted by
 requiring `{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv. `Read`
 is deliberately left out of `task`'s deny list, because some tasks are handed a file in the scratch
 workspace.

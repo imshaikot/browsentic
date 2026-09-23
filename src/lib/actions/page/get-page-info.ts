@@ -44,7 +44,7 @@ const LANDMARK_ROLES = new Set([
 export const getPageInfo = defineAction({
   name: 'page.getPageInfo',
   description:
-    'Snapshot the current page: document metadata, viewport and scroll state, a text diagram of the landmark regions with a selector for each, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step. Visible iframes come back under "frames"; nothing inside one is in this snapshot until page.switchFrame enters it, and "frame" then says which one is in focus.',
+    'Snapshot the current page: document metadata, viewport and scroll state, a text diagram of the landmark regions with a selector for each, the heading outline, and an inventory of interactive elements — each carrying its ARIA role, its live state (disabled, checked, expanded, filled, aria-current) and the landmark region it sits in. When the site registers WebMCP tools, the result also carries a siteTools list — prefer page.callSiteTool over clicking wherever a listed tool covers the step. Visible iframes come back under "frames"; nothing inside one is in this snapshot until page.switchFrame enters it, and "frame" then says which one is in focus. A "captcha" field appears when the page holds one to answer — call page.solveCaptcha then.',
   input: z.object({
     maxPerKind: z
       .number()

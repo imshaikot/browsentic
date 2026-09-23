@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { PICK_DEFAULT_TIMEOUT_MS, pickElement } from '@/lib/actions/page/pick-element';
+import { SOLVE_CAPTCHA_TIMEOUT_MS, solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { failure, type ActionResult } from '@/lib/actions/protocol';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
@@ -122,5 +123,6 @@ function invokeTimeoutFor(action: string, input?: unknown): number {
   if (typeof declared === 'number' && declared > 0) return declared + 10_000;
   if (action === awaitMonitor.name) return AWAIT_DEFAULT_TIMEOUT_MS + 10_000;
   if (action === pickElement.name) return PICK_DEFAULT_TIMEOUT_MS + 10_000;
+  if (action === solveCaptcha.name) return SOLVE_CAPTCHA_TIMEOUT_MS + 10_000;
   return REQUEST_TIMEOUT_MS;
 }

@@ -75,7 +75,8 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | --- | --- | --- |
 | `TAB_UNREACHABLE` on a normal site | The extension needs reloading | ↻ at `chrome://extensions`; ordinary sites otherwise self-heal |
 | `TAB_UNREACHABLE` on `chrome://`, the Web Store, the new-tab page | Those pages cannot host a content script | `page_navigate` to an http(s) page — it still works there |
-| `TARGET_NOT_FOUND` for something clearly on screen | The page changed since the snapshot, or it is inside a captcha widget's shadow root | Re-snapshot with `page_getPageInfo`; for a captcha use [`page_findCaptcha`](features/captcha.md) |
+| `TARGET_NOT_FOUND` for something clearly on screen | The page changed since the snapshot, or it is inside a captcha widget's shadow root | Re-snapshot with `page_getPageInfo`; for a captcha use [`page_solveCaptcha`](features/captcha.md) |
+| A captcha keeps setting new image challenges | The vendor distrusts the browser, however well each round is answered — common with automated or headless browsers | Solve one round yourself in the page; a person's answer usually clears the distrust. See [Captchas](features/captcha.md#image-challenges) |
 | `DEBUGGER_UNAVAILABLE` | DevTools is open on that tab | Close DevTools, or use `page_clickElement` instead of `page_trustedClick` |
 | `RUN_IN_PROGRESS` | One instruction at a time per tab | Cancel the running one, or use another tab |
 | `TAB_IN_USE` | That tab belongs to another Browsentic conversation | Switch to it from the Sessions strip |
