@@ -15,4 +15,6 @@ delete process.env.BROWSENTIC_AGENT_RUN;
 
 if (homedir() === realHome) throw new Error(`the test sandbox did not move HOME away from ${realHome}`);
 
-afterAll(() => rmSync(home, { recursive: true, force: true }));
+// An agent CLI installed on PATH can still be answering a readiness probe, writing its own
+// ~/.grok or ~/.cursor into this home, while the directory is being removed.
+afterAll(() => rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
