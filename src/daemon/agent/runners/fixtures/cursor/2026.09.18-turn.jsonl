@@ -1,0 +1,13 @@
+# Recorded from cursor-agent 2026.09.18-9a7762b. The working directory was replaced with a
+# Browsentic one; nothing else is edited.
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/Users/you/.browsentic/agents/cursor/run/conversation-1","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","model":"Auto","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply with exactly: hello from cursor"}]},"session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8"}
+{"type":"thinking","subtype":"delta","text":"The user requested the","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396934}
+{"type":"thinking","subtype":"delta","text":" exact phrase \"hello","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396938}
+{"type":"thinking","subtype":"delta","text":" from cursor\".","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396938}
+{"type":"thinking","subtype":"completed","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396939}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]},"session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396939}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" from"}]},"session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396939}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" cursor"}]},"session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","timestamp_ms":1790115396939}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello from cursor"}]},"session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8"}
+{"type":"result","subtype":"success","duration_ms":3168,"duration_api_ms":3168,"is_error":false,"result":"hello from cursor","session_id":"5b09e9df-48b5-48e8-9a26-0357cd158ea8","request_id":"0beb8544-4f23-48e7-be95-1cdc8f44c7d1","usage":{"inputTokens":18119,"outputTokens":51,"cacheReadTokens":512,"cacheWriteTokens":0}}

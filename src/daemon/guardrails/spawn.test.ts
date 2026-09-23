@@ -118,6 +118,12 @@ describe('spawn containment', () => {
     const agyRun = planOf('antigravity', 'run');
     const grokRun = planOf('grok', 'run');
     const grokTask = planOf('grok', 'task');
+    const cursorRun = planOf('cursor', 'run');
+    const cursorTask = planOf('cursor', 'task');
+    const rewriting = (plan: Plan, path: string, edit: (content: string) => string): Plan => ({
+      ...plan,
+      files: plan.files?.map((file) => (file.path === path ? { ...file, content: edit(file.content) } : file)),
+    });
     const withEnv = (plan: Plan, name: string, value?: string): Plan => {
       const env = { ...plan.env };
       if (value === undefined) delete env[name];
@@ -256,6 +262,57 @@ describe('spawn containment', () => {
 
     test('a grok task that could reach an MCP server is caught', () => {
       expect(vetPlan('grok', 'task', without(grokTask, 'MCPTool'), stateDir)).toHaveLength(1);
+    });
+
+    test('dropping the cursor sandbox flag is caught', () => {
+      expect(vetPlan('cursor', 'run', without(without(cursorRun, '--sandbox'), 'enabled'), stateDir)).toHaveLength(1);
+    });
+
+    test('turning the cursor sandbox off with a later flag is caught', () => {
+      expect(vetPlan('cursor', 'run', plus(cursorRun, '--sandbox', 'disabled'), stateDir)).toHaveLength(1);
+    });
+
+    test('--force, which Cursor also spells --yolo, is caught', () => {
+      expect(vetPlan('cursor', 'run', plus(cursorRun, '--force'), stateDir)).toHaveLength(1);
+      expect(vetPlan('cursor', 'run', plus(cursorRun, '-f'), stateDir)).toHaveLength(1);
+    });
+
+    // Both Cursor and Vibe require --trust, which is why it can never join the global list:
+    // headless Cursor refuses to start in a folder nobody trusted, and the folder is ours.
+    test('dropping --trust is caught on both the CLIs that need it', () => {
+      expect(vetPlan('cursor', 'run', without(cursorRun, '--trust'), stateDir)).toHaveLength(1);
+      expect(vetPlan('vibe', 'run', without(vibeRun, '--trust'), stateDir)).toHaveLength(1);
+    });
+
+    test('approving every MCP server the user configured is caught', () => {
+      expect(vetPlan('cursor', 'run', plus(cursorRun, '--approve-mcps'), stateDir)).toHaveLength(1);
+    });
+
+    test('handing the decision to the auto-review classifier is caught', () => {
+      expect(vetPlan('cursor', 'run', plus(cursorRun, '--auto-review'), stateDir)).toHaveLength(1);
+    });
+
+    // The file is the containment, so an emptied deny list has to fail even though the path is there.
+    test('emptying the cursor deny list is caught, though the file is still written', () => {
+      const gutted = rewriting(cursorRun, '.cursor/cli.json', () => JSON.stringify({ permissions: { allow: [], deny: [] } }));
+      expect(vetPlan('cursor', 'run', gutted, stateDir)).toHaveLength(1);
+    });
+
+    test('un-denying the shell in the cursor config is caught', () => {
+      const shelled = rewriting(cursorRun, '.cursor/cli.json', (content) => content.replace('"Shell(*)"', '"Shell(ls)"'));
+      expect(vetPlan('cursor', 'run', shelled, stateDir)).toHaveLength(1);
+    });
+
+    test('a writable cursor sandbox profile is caught', () => {
+      const writable = rewriting(cursorRun, '.cursor/sandbox.json', (content) =>
+        content.replace('workspace_readonly', 'workspace_readwrite'),
+      );
+      expect(vetPlan('cursor', 'run', writable, stateDir)).toHaveLength(1);
+    });
+
+    test('a cursor task that could reach an MCP server is caught', () => {
+      const opened = rewriting(cursorTask, '.cursor/cli.json', (content) => content.replace('"Mcp(*)"', '"Mcp(browsentic:*)"'));
+      expect(vetPlan('cursor', 'task', opened, stateDir)).toHaveLength(1);
     });
 
     test('running outside the state dir is caught', () => {

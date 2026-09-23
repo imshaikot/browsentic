@@ -8,7 +8,7 @@
 [![node](https://img.shields.io/node/v/browsentic)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/browsentic)](LICENSE)
 
-Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on the agent CLI you already have logged in — five are supported — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
+Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on the agent CLI you already have logged in — six are supported — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
 
 <p>
   <strong>Works in</strong>&ensp;
@@ -24,7 +24,8 @@ Hand your real, logged-in browser to the AI agent you already run. Browsentic is
   <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/openai-dark.svg"><img src="https://browsentic.com/icons/openai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://developers.openai.com/codex/cli">Codex</a>&ensp;·&ensp;
   <img src="https://browsentic.com/icons/antigravity.svg" width="18" height="18" alt="">&nbsp;<a href="https://antigravity.google/docs/cli/install">Antigravity</a>&ensp;·&ensp;
   <img src="https://browsentic.com/icons/mistral.svg" width="18" height="18" alt="">&nbsp;<a href="https://github.com/mistralai/mistral-vibe">Mistral Vibe</a> <sup>beta</sup>&ensp;·&ensp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://docs.x.ai/build/overview">Grok Build</a> <sup>beta</sup>
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://docs.x.ai/build/overview">Grok Build</a> <sup>beta</sup>&ensp;·&ensp;
+  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/cursor-dark.svg"><img src="https://browsentic.com/icons/cursor.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://cursor.com/docs/cli/overview">Cursor CLI</a> <sup>beta</sup>
 </p>
 
 ## Quick Start
@@ -41,13 +42,13 @@ curl -fsSL https://browsentic.com/install.sh | sh
 npx browsentic setup
 ```
 
-Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex`, `agy`, `vibe` (beta) or `grok` (beta). Windows and Linux follow the same two steps; the folder is under your home directory there too. Details, updating and building from source are in the [install guide](docs/guide/install.md).
+Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex`, `agy`, `vibe` (beta), `grok` (beta) or `cursor-agent` (beta). Windows and Linux follow the same two steps; the folder is under your home directory there too. Details, updating and building from source are in the [install guide](docs/guide/install.md).
 
 ## Key Capabilities
 
 - **A Side Panel, Not a Terminal**: Open it beside any tab, type or dictate, and watch every action land on a timeline with approvals where you are looking. The terminal is optional: the same daemon doubles as an MCP server for Claude Code, Cursor or Zed
 - **Your Real Browser, Not a Headless One**: Drives the tab in front of you, in your own profile, with your own logins and sessions
-- **Bring Your Own Agent**: Runs on the agent CLI you already have and are already signed in to — switch between Claude Code, Codex, Antigravity, Mistral Vibe and Grok Build with one click, and pick the model each one runs
+- **Bring Your Own Agent**: Runs on the agent CLI you already have and are already signed in to — switch between Claude Code, Codex, Antigravity, Mistral Vibe, Grok Build and Cursor CLI with one click, and pick the model each one runs
 - **52 Page Capabilities**: Reading, clicking, typing, dragging, on-site search, form submission, navigation, stepping into iframes, screenshots, file upload and download, captchas, theming and accessibility, console and network diagnostics, background progress monitoring, scheduled and repeating jobs, pointing at an element, and calling the tools a WebMCP site registers for agents
 - **Live Tools, Off By Default**: For work that repeats twenty times or needs something no tool covers, flip the **Live tool** switch and the agent may write a small script for the page — you read the code in the panel and approve it before a line of it runs
 - **Keep What It Wrote**: A script that worked can be kept as a tool of your own, named after the site it belongs to (`youtube.com:watch:darken-page-except-video-player`) and run later by typing `/`. The code stays in the browser; no MCP client can reach it

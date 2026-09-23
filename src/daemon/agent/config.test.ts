@@ -32,6 +32,7 @@ const DEFAULTS: AgentConfig = {
     antigravity: { bin: 'agy' },
     vibe: { bin: 'vibe' },
     grok: { bin: 'grok' },
+    cursor: { bin: 'cursor-agent' },
   },
   requireApproval: ['page.submitForm'],
 };

@@ -36,7 +36,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic revoke [id]      unpair one browser by the id "sessions" prints, or all of them
 
   browsentic agent            show which agent runs the side panel, and which are installed
-  browsentic agent <name>     switch to claude, codex, antigravity, vibe or grok
+  browsentic agent <name>     switch to claude, codex, antigravity, vibe, grok or cursor
   browsentic agent fix <name> let Browsentic fix what that agent still needs
   browsentic agent model <name> [model]   pin that agent's model, or omit it for the CLI's default
 

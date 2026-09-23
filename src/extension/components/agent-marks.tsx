@@ -24,6 +24,10 @@ const MARKS: Record<AgentKind, { viewBox: string; path: string }> = {
     viewBox: '0 0 466.04 516.93',
     path: 'M0.12 182.71L234.14 516.92H338.15L104.13 182.71ZM0 516.92H104.08L156.08 442.67L104.04 368.34ZM466.04 0H361.96L182.1 256.86L234.15 331.18ZM380.78 516.92H466.04V37.16L380.78 158.92Z',
   },
+  cursor: {
+    viewBox: '0 0 24 24',
+    path: 'M11.925 24l10.425-6-10.425-6L1.5 18l10.425 6zM22.35 18V6L11.925 0v12l10.425 6zM11.925 12V0L1.5 6v12l10.425-6z',
+  },
 };
 
 /** The vendor's mark in the current text colour, so it follows the row's state and the theme. */

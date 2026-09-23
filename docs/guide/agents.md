@@ -1,7 +1,7 @@
 # Choosing an agent
 
-The side panel runs on an agent CLI you already have logged in. Five are supported — Mistral Vibe
-and Grok Build in beta — and switching is a click.
+The side panel runs on an agent CLI you already have logged in. Six are supported — Mistral Vibe,
+Grok Build and Cursor CLI in beta — and switching is a click.
 
 This is only about the **side panel**. Driving Browsentic *from* another tool is
 [MCP clients](mcp-clients.md), and that direction is fully agent-agnostic.
@@ -32,18 +32,18 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 
 ---
 
-## The five
+## The six
 
-| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) |
-| --- | --- | --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI |
-| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere |
+| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` |
+| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on |
 
-All five get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
+All six get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
 the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
 for exactly what each flag buys.
@@ -112,6 +112,30 @@ rate-limited before the model answered. Expect rough edges, and please report th
 
 ---
 
+### Cursor CLI is in beta
+
+Browsentic's Cursor runner was checked against `cursor-agent 2026.09.18-9a7762b`: every flag it
+passes is accepted, a real turn was read back from its stream, and the deny rules were measured
+refusing a shell command in a headless run. What has not been through it yet is a whole
+conversation in the side panel — the browser tools reaching a page, and a follow-up turn resuming.
+Expect rough edges there, and please report them.
+
+- **Sign in first.** Run `cursor-agent login`, or set `CURSOR_API_KEY`. Until then a run fails with
+  *Authentication required*.
+- **Your own Cursor MCP servers are denied by name.** A project config does not replace the global
+  `~/.cursor/mcp.json`, so every server you configured for Cursor itself would otherwise load
+  beside Browsentic's — including your own `browsentic` entry, which reaches the browser without a
+  run's approval gate. Browsentic reads that file and denies each of them for the run. It never
+  writes to it.
+- **Reasoning effort goes in the model id.** Cursor has no effort flag; it takes bracket overrides
+  instead, so set `agents.cursor.model` to something like `claude-opus-4-8[effort=high]`.
+- **On Windows, only the deny rules apply.** Cursor's kernel sandbox is macOS and Linux only.
+- **Each conversation leaves an entry in `~/.cursor/projects`.** Cursor records a project per
+  directory it is run in, and Browsentic gives each conversation its own. They are swept with the
+  conversation's workspace after a day.
+
+---
+
 ## Per-agent settings
 
 In `~/.browsentic/config.json`:
@@ -124,7 +148,8 @@ In `~/.browsentic/config.json`:
     "codex": { "bin": "codex", "model": "gpt-5.6-terra" },
     "antigravity": { "bin": "agy" },
     "vibe": { "bin": "vibe" },
-    "grok": { "bin": "grok", "model": "grok-4.7" }
+    "grok": { "bin": "grok", "model": "grok-4.7" },
+    "cursor": { "bin": "cursor-agent", "model": "composer-2.5" }
   }
 }
 ```
@@ -155,6 +180,8 @@ Claude runner's settings.
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
+| Cursor CLI: *Authentication required* | The daemon inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
+| Cursor CLI on Windows | Cursor's sandbox has no Windows backend, so only the deny rules apply there. The browser still works; the machine is less fenced off than on macOS or Linux. |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them. Update Grok Build and Browsentic, and report it if it persists. |
 
 ---

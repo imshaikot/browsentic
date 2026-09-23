@@ -72,6 +72,11 @@ interface Requirements {
   readonly env?: Readonly<Record<string, string>>;
   /** Workspace files the plan must write before the CLI starts. */
   readonly files: readonly string[];
+  /**
+   * Substrings each workspace file must contain, for a CLI whose containment lives on disk
+   * rather than in argv. `files` alone proves a path was written, not that it still says no.
+   */
+  readonly fileContains?: Readonly<Record<string, readonly string[]>>;
 }
 
 interface Containment {
@@ -84,6 +89,11 @@ interface Containment {
    * its own model, and the failure would read as a login problem rather than a policy.
    */
   readonly federated?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Flags that hand *this* CLI the machine but are legitimate elsewhere, so they cannot join
+   * the global list. Vibe requires `--trust`; for Cursor the same spelling is an escape hatch.
+   */
+  readonly forbidden?: readonly RegExp[];
   /** Why this runner is only as contained as it is. Logged once per run. */
   readonly note: string;
   readonly run: Requirements;
@@ -98,6 +108,8 @@ interface Containment {
 const FORBIDDEN: readonly RegExp[] = [
   /^--dangerously/i,
   /^--yolo$/i,
+  /^--force$/i,
+  /^-f$/,
   /^--auto-approve$/i,
   /^--always-approve$/i,
   /^--full-auto$/i,
@@ -229,6 +241,36 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       files: [],
     },
   },
+
+  cursor: {
+    localTools: 'allowlist',
+    keepsEnv: ['CURSOR_'],
+    // `--trust` skips the workspace-trust prompt and `--approve-mcps` approves every server the
+    // user ever configured; `--auto-review` hands the decision to a server-side classifier.
+    forbidden: [/^--approve-mcps$/i, /^--auto-review$/i],
+    note: 'per-run deny rules in a project .cursor/cli.json, where deny beats allow — measured refusing a shell command in a headless run; the OS sandbox is asked for as well but not depended on',
+    run: {
+      // Headless refuses to start in an untrusted folder; the folder is Browsentic's own.
+      required: ['--trust'],
+      pairs: [['--sandbox', 'enabled']],
+      files: ['.cursor/mcp.json', '.cursor/cli.json', '.cursor/sandbox.json', 'AGENTS.md'],
+      // The deny rules are the containment, so the file has to still carry them at spawn.
+      fileContains: {
+        '.cursor/cli.json': ['"Shell(*)"', '"Write(**)"', '"Read(**)"', '"Mcp(browsentic:*)"'],
+        '.cursor/sandbox.json': ['"workspace_readonly"'],
+      },
+    },
+    task: {
+      required: ['--trust'],
+      pairs: [['--sandbox', 'enabled']],
+      // No .cursor/mcp.json at all, and a bare Mcp(*) deny in case the user's global one loads.
+      files: ['.cursor/cli.json', '.cursor/sandbox.json'],
+      fileContains: {
+        '.cursor/cli.json': ['"Shell(*)"', '"Write(**)"', '"Mcp(*)"'],
+        '.cursor/sandbox.json': ['"workspace_readonly"'],
+      },
+    },
+  },
 };
 
 /**
@@ -275,8 +317,16 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     }
   }
 
+  for (const [path, needles] of Object.entries(rules.fileContains ?? {})) {
+    const content = plan.files?.find((file) => file.path === path)?.content;
+    if (content === undefined) continue;
+    const missing = needles.filter((needle) => !content.includes(needle));
+    if (missing.length) problems.push(`${label} writes a ${path} missing ${missing.join(', ')}.`);
+  }
+
+  const banned = [...FORBIDDEN, ...(CONTAINMENT[kind].forbidden ?? [])];
   for (const arg of plan.args) {
-    if (FORBIDDEN.some((pattern) => pattern.test(arg))) {
+    if (banned.some((pattern) => pattern.test(arg))) {
       problems.push(`${label} is spawned with ${arg}, which disables its own containment.`);
     }
   }
@@ -304,7 +354,7 @@ const SECRET_PREFIX: readonly string[] = [
   'NPM_', 'YARN_', 'PYPI_', 'CARGO_', 'DOCKER_', 'KUBE_', 'HELM_',
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
-  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'HF_', 'HUGGINGFACE_',
+  'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'CURSOR_', 'HF_', 'HUGGINGFACE_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 

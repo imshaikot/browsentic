@@ -61,6 +61,9 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | Codex sees only part of a long page | Codex cuts a tool result over 25,000 tokens; an older Browsentic left its 10,000 default in place | Update Browsentic, then ask for less at a time: a smaller `maxPerKind`, or `page_extractText` group by group |
 | Mistral Vibe: every action on a follow-up turn fails with `RUN_INACTIVE` | Vibe re-reads a resumed session from the folder it began in, and an older Browsentic wrote each turn to a folder of its own | Update Browsentic, then start a new conversation: one begun before the update keeps its first folder |
 | Grok Build sits silent for minutes, then fails with *xAI did not answer* | The Grok account is rate-limited, as a free one is; Grok retries quietly before giving up | Wait, or upgrade the account |
+| Cursor CLI fails with *Authentication required* | The daemon inherits no session | `cursor-agent login`, or set `CURSOR_API_KEY` |
+| Cursor CLI reaches an MCP server you did not expect | A project `.cursor/mcp.json` does not replace your global one, so every server you gave Cursor loads too | Browsentic denies each by name for the run; if one still answers, update Browsentic and report it |
+| Cursor CLI is less fenced off on Windows | Cursor's kernel sandbox has no Windows backend | Nothing to do — the deny rules still apply; treat a Windows run as `host`-class |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them | Update Grok Build and Browsentic; report it if it persists |
 
 ## Pages and tabs
