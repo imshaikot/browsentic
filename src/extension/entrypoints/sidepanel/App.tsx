@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, PanelRightClose, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
@@ -6,6 +6,7 @@ import { invokeInActiveTab } from '@/lib/actions/client';
 import { isRemoveToolsCommand } from '@/lib/bridge/commands';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
+import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { Wordmark } from '@/extension/components/brand';
 import { Composer, type AttachedSkill } from '@/extension/components/composer';
 import { ConnectionSheet } from '@/extension/components/connection-sheet';
@@ -26,7 +27,7 @@ import { StatusPill, describeStatus } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import { ScrollArea } from '@/extension/components/ui/scroll-area';
 import { pickFocus } from '@/lib/bridge/aeye';
-import { putFile, removeFile } from '@/lib/bridge/file-store';
+import { putBytes } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
@@ -42,14 +43,13 @@ import { useStoredSkills } from '@/lib/bridge/use-stored-skills';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const PINNED_SLACK_PX = 56;
 
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
-  const files = useStoredFiles();
+  const storedFiles = useStoredFiles();
   const sessions = useStoredSessions();
   const recordings = useStoredRecordings();
   const skills = useStoredSkills();
@@ -68,6 +68,10 @@ export default function App() {
   const [pinned, setPinned] = useState(true);
 
   const connected = daemon?.connected ?? false;
+  const files = useMemo(
+    () => storedFiles.filter((file) => file.sessionId !== undefined && file.sessionId === run.sessionId),
+    [storedFiles, run.sessionId],
+  );
 
   const dragging = useFileDrop({
     active: connected,
@@ -180,35 +184,22 @@ export default function App() {
   }
 
   async function attachFiles(incoming: File[]) {
-    const tooBig = incoming.filter((file) => file.size > MAX_FILE_BYTES);
-    const limit = `${MAX_FILE_BYTES / 1024 / 1024} MB`;
-    setAttachError(
-      tooBig.length === 0
-        ? null
-        : tooBig.length === 1
-          ? `“${tooBig[0].name}” is larger than ${limit}.`
-          : `${tooBig.length} of those files are larger than ${limit}.`,
-    );
-    for (const file of incoming) {
-      if (file.size <= MAX_FILE_BYTES) await storeFile(file);
-    }
+    setAttachError(null);
+    for (const file of incoming) await storeFile(file);
   }
 
+  /** A file over the cap is handed over by name and size only, so the analyst can say why it was not read. */
   async function storeFile(file: File) {
-    const id = crypto.randomUUID();
-    const content = await readAsBase64(file);
-    await putFile(
-      {
-        id,
-        name: file.name,
-        mime: file.type || 'application/octet-stream',
-        size: file.size,
-        status: 'pending',
-        addedAt: Date.now(),
-      },
-      content,
-    );
-    await browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'analyzeFile', fileId: id });
+    const stored = { id: crypto.randomUUID(), name: file.name, mime: file.type || 'application/octet-stream', size: file.size };
+    if (file.size <= MAX_STORED_FILE_BYTES) {
+      try {
+        await putBytes({ id: stored.id, name: stored.name, mime: stored.mime, content: await readAsBase64(file) });
+      } catch (error) {
+        setAttachError(`Couldn’t store “${file.name}”: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+    }
+    run.attachFile(stored);
   }
 
   function toggleVoice() {
@@ -396,12 +387,13 @@ export default function App() {
             onClearFocus={() => setFocus(null)}
             onAttachPage={() => void attachPageContext()}
             onAttachFile={(file) => void attachFiles([file])}
-            onRemoveFile={(id) => void removeFile(id)}
+            onRemoveFile={run.detachFile}
+            onRetryFile={run.reanalyzeFile}
           />
         </footer>
       )}
 
-      {dragging && <DropMask connected={connected} maxBytes={MAX_FILE_BYTES} />}
+      {dragging && <DropMask connected={connected} maxBytes={MAX_STORED_FILE_BYTES} />}
     </div>
   );
 }

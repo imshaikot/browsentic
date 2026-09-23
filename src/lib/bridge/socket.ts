@@ -26,6 +26,7 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { FileReport } from '@/lib/files/report';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
@@ -106,16 +107,11 @@ export function sendInstruction(text: string, context?: RunContext): string | nu
 
 const ANALYZE_TIMEOUT_MS = 90_000;
 
-type FileNotes = { summary: string; digest?: string };
+const pendingAnalyses = new Map<string, (result: ActionResult<FileReport>) => void>();
 
-const pendingAnalyses = new Map<string, (result: ActionResult<FileNotes>) => void>();
-
-export function analyzeFile(file: {
-  name: string;
-  mime: string;
-  size: number;
-  content: string;
-}): Promise<ActionResult<FileNotes>> {
+export function analyzeFile(
+  file: Omit<Extract<SocketFrame, { t: 'analyzeFile' }>, 't' | 'id'>,
+): Promise<ActionResult<FileReport>> {
   const id = crypto.randomUUID();
   if (!post({ t: 'analyzeFile', id, ...file })) {
     return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
@@ -123,13 +119,18 @@ export function analyzeFile(file: {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingAnalyses.delete(id);
-      resolve(failure('TIMEOUT', 'The daemon did not return a summary in time.'));
+      resolve(failure('TIMEOUT', 'The daemon did not return a report in time.'));
     }, ANALYZE_TIMEOUT_MS);
     pendingAnalyses.set(id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
   });
+}
+
+/** Stops the analyst reading a file that is going away. Nothing to stop when the daemon is gone. */
+export function cancelAnalysis(fileId: string): void {
+  post({ t: 'cancelAnalysis', id: crypto.randomUUID(), fileId });
 }
 
 const RECORDING_TIMEOUT_MS = 120_000;
@@ -559,7 +560,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
     case 'run':
       return runListener?.(frame.id, frame.event);
 
-    case 'fileSummary': {
+    case 'fileReport': {
       pendingAnalyses.get(frame.id)?.(frame.result);
       pendingAnalyses.delete(frame.id);
       return;

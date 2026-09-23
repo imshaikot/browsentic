@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
+import { Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCw, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/components/skill-menu';
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
@@ -44,6 +44,7 @@ export function Composer({
   onAttachPage,
   onAttachFile,
   onRemoveFile,
+  onRetryFile,
 }: {
   voice: Voice;
   voiceEnabled: boolean;
@@ -70,6 +71,7 @@ export function Composer({
   onAttachPage: () => void;
   onAttachFile: (file: File) => void;
   onRemoveFile: (fileId: string) => void;
+  onRetryFile: (fileId: string) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -155,7 +157,7 @@ export function Composer({
         </div>
       )}
 
-      <FileChips files={files} onRemove={onRemoveFile} />
+      <FileChips files={files} onRemove={onRemoveFile} onRetry={onRetryFile} />
       <VoiceStatus voice={voice} voiceEnabled={voiceEnabled} />
 
       <div
@@ -416,7 +418,15 @@ function VoiceStatus({ voice, voiceEnabled }: { voice: Voice; voiceEnabled: bool
   return null;
 }
 
-function FileChips({ files, onRemove }: { files: StoredFileMeta[]; onRemove: (fileId: string) => void }) {
+function FileChips({
+  files,
+  onRemove,
+  onRetry,
+}: {
+  files: StoredFileMeta[];
+  onRemove: (fileId: string) => void;
+  onRetry: (fileId: string) => void;
+}) {
   if (files.length === 0) return null;
   return (
     <div className="mb-2 flex max-h-40 flex-col gap-1.5 overflow-y-auto">
@@ -436,13 +446,31 @@ function FileChips({ files, onRemove }: { files: StoredFileMeta[]; onRemove: (fi
                 <Loader2 className="size-3 animate-spin" /> Analyzing…
               </span>
             )}
-            {file.status === 'ready' && file.summary && (
-              <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-dim">{file.summary}</p>
+            {file.status === 'analyzed' && file.report?.summary && (
+              <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-dim">{file.report.summary}</p>
             )}
-            {file.status === 'error' && (
-              <span className="mt-0.5 block text-[11px] text-destructive">{file.error ?? 'Analysis failed'}</span>
+            {file.status === 'rejected' && (
+              <span className="mt-0.5 block text-[11px] text-amber">
+                Not read — {file.report?.reason?.message ?? 'Browsentic does not read this kind of file.'}
+              </span>
+            )}
+            {file.status === 'failed' && (
+              <span className="mt-0.5 block text-[11px] text-destructive">
+                {file.report?.reason?.message ?? 'The file could not be read.'}
+              </span>
             )}
           </div>
+          {file.status === 'failed' && (
+            <button
+              type="button"
+              onClick={() => onRetry(file.id)}
+              aria-label={`Read ${file.name} again`}
+              title="Read it again"
+              className="mt-0.5 shrink-0 rounded-full p-1 text-ink-faint transition-colors hover:bg-surface hover:text-ink"
+            >
+              <RotateCw className="size-3" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onRemove(file.id)}

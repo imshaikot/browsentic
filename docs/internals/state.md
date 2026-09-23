@@ -41,13 +41,19 @@ re-checking the registry. It therefore behaves like state: it decides which vers
 survives deleting both directories above, and it is why a reinstall could land on a months-old
 build. `browsentic update` replaces it; `browsentic uninstall` deletes it.
 
-## The three exceptions
+## The exceptions
 
 **Held secrets** never reach disk at all. A credential the sanitizer seals out of a page is kept in
 the extension's `browser.storage.session` under `browsentic/secrets`, capped at 64 entries, expiring
 after two hours and emptied by the browser on restart. The daemon never receives one.
 
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
+
+**Attached files** stay there too: the bytes under `browsentic:file:<id>`, and the index under
+`browsentic:files`, where each entry records the conversation it belongs to, the file analyst's
+report and the agent session that report was handed to. A conversation's files are deleted when it
+leaves history. The daemon holds a copy only while the analyst reads it, in the agent's task
+workspace at `0600`, and deletes it when the report is in.
 
 **Tab sessions** live in `browser.storage.session` under `browsentic/tabSessions`, so they are gone
 when the browser closes. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and

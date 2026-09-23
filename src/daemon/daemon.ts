@@ -17,6 +17,7 @@ import {
 } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
+import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
@@ -47,7 +48,8 @@ import {
   type Session,
 } from './auth-store';
 import { AgentSession } from './agent/service';
-import { summarizeFile } from './agent/analyze';
+import { solveCaptchaWithAnalyst } from './agent/captcha-solver';
+import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
 import { configPath, readAgentConfig, writeActiveAgent, writeAgentModel, writeGuardrailSetting } from './agent/config';
@@ -163,6 +165,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   let offered = bundled;
   const links = new Map<string, ExtensionLink>();
   const agents = new Map<ExtensionLink, AgentSession>();
+  const analyses = new FileAnalyses();
   const controls = new Set<WebSocket>();
   let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
@@ -354,6 +357,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       (closing) => {
         agents.get(closing)?.dispose();
         agents.delete(closing);
+        analyses.cancelOwnedBy(closing);
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
         scheduleIdleExit();
@@ -361,11 +365,16 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       },
       (request, source) => {
         if (request.t === 'analyzeFile') {
-          void summarizeFile(request, readAgentConfig())
-            .then((result) => source.send({ t: 'fileSummary', id: request.id, result }))
+          void analyses
+            .start(request, readAgentConfig(), source)
+            .then((report) => source.send({ t: 'fileReport', id: request.id, result: success(report) }))
             .catch((error) =>
-              source.send({ t: 'fileSummary', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
+              source.send({ t: 'fileReport', id: request.id, result: failure('AGENT_FAILED', String(error)) }),
             );
+          return;
+        }
+        if (request.t === 'cancelAnalysis') {
+          analyses.cancel(request.fileId);
           return;
         }
         if (request.t === 'nameSession') {
@@ -554,6 +563,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       draft: (id, draft) => source.send({ t: 'siteMapDraft', id, draft }),
       running: () => [...agents.values()].reduce((total, agent) => total + agent.running, 0),
       actionNames: () => source.tools.map((tool) => tool.name),
+      awaitAnalysis: (fileId, signal) => analyses.wait(fileId, signal),
     });
     agents.set(source, created);
     return created;
@@ -747,7 +757,11 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         'The Browsentic extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
-    const result = await link.invoke(action, resolved.data, { tabId: opts?.tabId, runId: opts?.runId });
+    const route = { tabId: opts?.tabId, runId: opts?.runId };
+    const result =
+      action === solveCaptcha.name
+        ? await solveCaptchaWithAnalyst((next) => link.invoke(action, next, route), resolved.data, readAgentConfig())
+        : await link.invoke(action, resolved.data, route);
     return persistDownload(action, persistScreenshot(action, input, result, opts?.saveTo), opts?.hosts);
   }
 

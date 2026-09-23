@@ -108,6 +108,7 @@ describe('a one-shot task', () => {
           "summarize this",
           "--output-format",
           "json",
+          "--no-session-persistence",
           "--mcp-config",
           "{"mcpServers":{}}",
           "--strict-mcp-config",

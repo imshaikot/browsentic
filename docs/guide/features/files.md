@@ -7,17 +7,59 @@ Getting a file into a page, and getting one back out.
 ## Files you hand it
 
 Attach a file in the side panel — press **Attach a file** on the composer, or **drop one anywhere on
-the panel**, which takes several at once. Browsentic reads each **once, at attach time**, and keeps
-notes about what it is. Anything over 10 MB is refused.
+the panel**, which takes several at once. The file belongs to **the conversation in that tab**: its
+chip shows there and nowhere else, and only that conversation's agent hears about it.
 
-From then on the agent sees those notes — never your filesystem — plus two tools:
+Each file gets its own **file analyst** — a separate, one-shot session of the agent you picked,
+started the moment you attach, with no browser and nothing to open but that one file. It writes a
+report and ends: the process is stopped as soon as the report is in, its copy of the file is
+deleted, and Claude Code and Codex are told not to keep the session.
+
+What it reads:
+
+| Kind | Up to | On |
+| --- | --- | --- |
+| Text — CSV, JSON, Markdown, logs, code, anything in UTF-8 | 5 MB | every agent |
+| PDF | 10 MB | Claude Code |
+| Images — PNG, JPEG, GIF, WebP | 5 MB | Claude Code |
+
+The bytes decide the kind, not the name: a PNG called `notes.txt` is read as an image. Anything else
+— a ZIP archive, which Word, Excel and PowerPoint files are too, a program, audio or video — is
+turned away before any agent starts, and so is anything over 10 MB, which the browser does not
+even store.
+
+Every file ends with one of three verdicts, and its chip says which:
+
+| Verdict | The chip shows | |
+| --- | --- | --- |
+| **analyzed** | its summary | Read. The report holds a summary, the file's outline, the specifics worth keeping and terse notes |
+| **rejected** | the reason, in amber | Not a file Browsentic reads, or one that would not open — encrypted, corrupted. Trying again changes nothing |
+| **failed** | the reason, in red, and **Retry** | The analyst broke — it timed out, or the agent could not start. Retry reads it again |
+
+The report reaches the agent **once**, inside the next message you send in that conversation, so it
+becomes part of the agent's own session and every later turn still has it. A rejected or failed
+file is reported too, with its reason, so the agent can tell you why it cannot answer from it. The
+timeline marks the hand-over:
+
+```
+Handed to the agent: expenses.csv — analyzed · backup.zip — rejected (unsupported type)
+```
+
+Send while a file is still being read and the turn waits for it, with a `readFile` row on the
+timeline. A file attached while a run is going reaches the agent with your next message — a running
+agent cannot be given anything new. Switch to another agent, or start a conversation it cannot
+resume, and it is given every report again, since it holds none of them.
+
+The agent never sees your filesystem, and never the file itself — only the report, plus two tools:
 
 | | |
 | --- | --- |
-| `page_listFiles` | Re-read the list, with each file's summary |
+| `page_listFiles` | List the stored files, with each one's summary |
 | `page_attachFile` | Put one into an `<input type="file">` on the page |
 
 So the agent knows what it is uploading without being able to open anything you did not hand it.
+Removing a chip stops its analyst if it is still reading, and a conversation's files are deleted
+with it when it leaves history.
 
 ---
 

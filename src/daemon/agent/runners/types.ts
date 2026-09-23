@@ -1,5 +1,6 @@
 import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind, AgentProblem } from '@/lib/agents/catalog';
+import type { FileKind } from '@/lib/files/report';
 import type { AgentSettings } from '../config';
 
 /** `run` drives the browser and resumes conversations; `task` is a one-shot with no browser. */
@@ -76,6 +77,8 @@ export interface Runner {
   /** This CLI's stream has no closing event, so exiting cleanly is how it says the turn is over. */
   endsOnExit?: boolean;
   json(context: JsonContext): Plan;
+  /** What a one-shot of this CLI is known to open when handed a file. Text alone when unsaid. */
+  opens?: readonly FileKind[];
   answer(stdout: string): { text?: string; error?: string };
   /** Turns a stderr tail into something more useful than "exited with code 1". */
   hint?(stderrTail: string): string | null;

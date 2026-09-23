@@ -19,6 +19,17 @@ export function scrub(value: unknown, limit: number): string {
     .slice(0, limit);
 }
 
+export function scrubLines(value: unknown, limit: number): string {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(CONTROL_CHARS, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, limit);
+}
+
 export function looksLikeInstruction(text: string): boolean {
   return /\b(?:ignore (?:all |any )?previous|disregard (?:the |all )?(?:above|previous)|you (?:must|should|will) (?:now|always|never)|instead(?:,)? (?:navigate|go|send|email|transfer|click)|do not tell|without asking|system prompt|new instructions?)\b/i.test(
     text,

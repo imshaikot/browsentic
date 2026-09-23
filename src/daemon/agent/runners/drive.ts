@@ -180,44 +180,65 @@ export function runStream(
   });
 }
 
+export interface JsonOptions {
+  timedOut: string;
+  empty: string;
+  /** A complete answer ends the task there and then: the CLI is stopped rather than waited out. */
+  accept?: (text: string) => boolean;
+}
+
 export function runJson(
   runner: Runner,
   context: JsonContext,
   signal: AbortSignal,
-  { timedOut, empty }: { timedOut: string; empty: string },
+  { timedOut, empty, accept }: JsonOptions,
 ): Promise<string> {
   const plan = runner.json(context);
   const label = AGENTS[runner.kind].label;
 
   return new Promise<string>((resolve, reject) => {
-    const { child, release } = launch(runner.kind, 'task', context.settings, plan, signal);
+    const { child, release, stop } = launch(runner.kind, 'task', context.settings, plan, signal);
     let stdout = '';
     let stderrTail = '';
+    let settled = false;
+
+    const settle = (outcome: () => void) => {
+      if (settled) return;
+      settled = true;
+      release();
+      outcome();
+    };
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
+      if (!accept || settled) return;
+      const text = runner.answer(stdout).text?.trim();
+      if (text && accept(text)) {
+        settle(() => {
+          stop();
+          resolve(text);
+        });
+      }
     });
     child.stderr.on('data', (chunk: Buffer) => {
       stderrTail = (stderrTail + chunk.toString()).slice(-2_000);
     });
 
-    child.on('error', (error: NodeJS.ErrnoException) => {
-      release();
-      reject(spawnError(runner, context.settings, error));
-    });
+    child.on('error', (error: NodeJS.ErrnoException) => settle(() => reject(spawnError(runner, context.settings, error))));
 
-    child.on('close', () => {
-      release();
-      if (signal.aborted) return reject(new RunError('TIMEOUT', timedOut));
-      const answer = runner.answer(stdout);
-      if (answer.error) return reject(new RunError('AGENT_FAILED', answer.error));
-      const text = answer.text?.trim();
-      if (!text) {
-        const hint = runner.hint?.(stderrTail);
-        return reject(new RunError('AGENT_FAILED', hint ?? (stderrTail.trim() ? `${label}: ${stderrTail.trim()}` : empty)));
-      }
-      resolve(text);
-    });
+    child.on('close', () =>
+      settle(() => {
+        if (signal.aborted) return reject(signal.reason instanceof RunError ? signal.reason : new RunError('TIMEOUT', timedOut));
+        const answer = runner.answer(stdout);
+        if (answer.error) return reject(new RunError('AGENT_FAILED', answer.error));
+        const text = answer.text?.trim();
+        if (!text) {
+          const hint = runner.hint?.(stderrTail);
+          return reject(new RunError('AGENT_FAILED', hint ?? (stderrTail.trim() ? `${label}: ${stderrTail.trim()}` : empty)));
+        }
+        resolve(text);
+      }),
+    );
   });
 }
 

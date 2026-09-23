@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { existsSync, readFileSync, statSync, utimesSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -280,6 +280,29 @@ describe('a one-shot task', () => {
 
   test('an agent that is not installed is missing', async () => {
     expect(await failure(task(standIn(''), { bin: join(stateDir, 'no-such-agy') }))).toMatchObject({ code: 'AGENT_MISSING' });
+  });
+
+  test('an answer the caller accepts ends the task there, and the agent is stopped rather than waited out', async () => {
+    const marker = join(stateDir, 'stopped-after-answering');
+    rmSync(marker, { force: true });
+    const lingering = standIn(
+      `process.on('SIGTERM', () => { require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'stopped'); process.exit(0); });` +
+        `${printing({ result: { status: 'success', response: 'A pricing page.' } })} setInterval(() => {}, 1000);`,
+    );
+    const answer = await runJson(lingering, jsonContext(node), new AbortController().signal, {
+      timedOut: 'The summary took too long.',
+      empty: 'The agent said nothing.',
+      accept: (text) => text.endsWith('.'),
+    });
+    await vi.waitFor(() => expect(existsSync(marker)).toBe(true));
+    expect(answer).toBe('A pricing page.');
+  });
+
+  test('a task stopped for a reason of its own fails with that reason, not as a timeout', async () => {
+    const controller = new AbortController();
+    const running = task(standIn('setInterval(() => {}, 1000);'), { signal: controller.signal });
+    controller.abort(new RunError('CANCELLED', 'The file was removed before it was read.'));
+    expect(await failure(running)).toEqual({ code: 'CANCELLED', message: 'The file was removed before it was read.' });
   });
 });
 

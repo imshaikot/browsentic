@@ -3,7 +3,6 @@ import {
   failure,
   success,
   type ActionResult,
-  type AttachedFile,
   type FocusedElement,
   type SavedRecording,
   type ExtensionRequest,
@@ -13,10 +12,12 @@ import {
 import { openTab } from '@/lib/actions/page/open-tab';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
+import type { FileReport } from '@/lib/files/report';
 import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
   blocked,
+  CAPTCHA_ACTION,
   decide,
   declined,
   describe as describeDecision,
@@ -35,7 +36,8 @@ import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
-import { buildSystemPrompt } from './prompt';
+import { handOver, type Handover } from './attachments';
+import { buildSystemPrompt, withReports } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState } from './runners';
 import {
@@ -62,6 +64,8 @@ export interface AgentSessionDeps {
   running?: () => number;
   /** The page actions on offer right now — the extension's list once it has drifted from the bundled one. */
   actionNames: () => string[];
+  /** The report on a file the analyst is still reading, or null when nothing is reading it. */
+  awaitAnalysis?: (fileId: string, signal: AbortSignal) => Promise<FileReport | null>;
 }
 
 interface ActiveRun {
@@ -82,9 +86,14 @@ interface ActiveRun {
   focusShot?: string;
   /** The composer's “Live tool” switch, as it stood when this instruction was sent. */
   liveTools: boolean;
+  /** Actions the user allowed once in this run that stay allowed for the rest of it. */
+  approved: Set<string>;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
+
+/** Getting past a captcha takes a call per round; one yes covers every round of that run. */
+const HELD_FOR_RUN = new Set([CAPTCHA_ACTION]);
 
 interface Decision {
   allow: boolean;
@@ -216,7 +225,7 @@ export class AgentSession {
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
       return blocked(decision);
     }
-    if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site))) {
+    if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site)) && !run.approved.has(action)) {
       emit({ kind: 'approval', toolId, action, input, site: run.site });
       const answer = await this.awaitDecision(run, toolId);
       if (!answer.allow) {
@@ -225,6 +234,7 @@ export class AgentSession {
         return declined();
       }
       if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
+      if (HELD_FOR_RUN.has(action)) run.approved.add(action);
     }
 
     const result = await this.deps.invoke(action, input, { runId, hosts: scope.hosts });
@@ -321,6 +331,7 @@ export class AgentSession {
       ownedTabIds: [],
       focusShot: context?.focus?.shot,
       liveTools: context?.liveTools === true,
+      approved: new Set(),
     };
     this.runs.set(runId, run);
     if (run.liveTools && sessionId) this.codeListed.add(sessionId);
@@ -338,8 +349,14 @@ export class AgentSession {
       });
     }
 
+    const holding = sessionId ? this.held.get(sessionId) : undefined;
+    const held = holding?.agent === config.agent ? holding.sessionId : null;
+    const supplied = mapping ? null : sessionFrom(context, config.agent);
+    const resuming = mapping ? null : (supplied ?? held);
+
     let built: { prompt: string; dropped: string[] };
     let instructionText = routed.text;
+    let handover: Handover = { handed: [] };
     try {
       if (mapping) {
         const prepared = await this.prepareMapping(run, routed.base, context, emit);
@@ -347,12 +364,21 @@ export class AgentSession {
         built = prepared.built;
         instructionText = prepared.instruction;
       } else {
+        // A session that is not being resumed has been handed nothing, whatever the browser recorded.
+        const files = resuming ? context?.files : context?.files?.map((file) => ({ ...file, delivered: false }));
+        handover = await handOver(files, {
+          agent: config.agent,
+          signal: run.abort.signal,
+          emit,
+          wait: (fileId, signal) => this.deps.awaitAnalysis?.(fileId, signal) ?? Promise.resolve(null),
+        });
         built = buildSystemPrompt(routed.base, routed.overlays, {
           attached,
           focus: focusBlock(context?.focus),
-          attachments: filesBlock(context?.files),
+          attachments: handover.known,
           recordings: recordingsBlock(context?.recordings),
         });
+        instructionText = withReports(routed.text, handover.reports);
       }
     } catch (error) {
       this.release(run);
@@ -374,11 +400,11 @@ export class AgentSession {
         (run.map ? ` mapping ${run.map.target.host}` : ''),
     );
     emit({ kind: 'started', skill: routed.base.name, attached: applied, overlays: [...overlayNames, ...built.dropped.map((n) => `${n} (too large — not applied)`)] });
+    if (handover.handed.length) {
+      log(`agent run ${runId} carries ${handover.handed.length} file report(s)`);
+      emit({ kind: 'attachments', files: handover.handed });
+    }
 
-    const holding = sessionId ? this.held.get(sessionId) : undefined;
-    const held = holding?.agent === config.agent ? holding.sessionId : null;
-    const supplied = mapping ? null : sessionFrom(context, config.agent);
-    const resuming = mapping ? null : (supplied ?? held);
     const budget = run.map ? setTimeout(() => run.abort.abort(), run.map.settings.timeoutMs) : undefined;
 
     try {
@@ -576,39 +602,6 @@ function focusBlock(focus: FocusedElement | undefined): string | undefined {
   return lines.join('\n');
 }
 
-const MAX_FILES_BLOCK = 8 * 1024;
-
-function filesBlock(files: AttachedFile[] | undefined): string | undefined {
-  if (!files?.length) return undefined;
-  const sections: string[] = [];
-  let used = 0;
-  let dropped = 0;
-
-  for (const file of files) {
-    const lines = [`## ${flatten(file.name)} (${file.mime || 'unknown type'}, ${Math.ceil(file.size / 1024)} KB)`, ''];
-    lines.push(`File id for page_attachFile: ${flatten(file.id)}`);
-    if (file.status === 'pending') lines.push('', 'Browsentic is still reading this file; no notes yet.');
-    else if (file.status === 'error') lines.push('', 'Browsentic could not read this file, so there are no notes on it.');
-    if (file.summary) lines.push('', `Summary: ${flatten(file.summary)}`);
-    if (file.digest) lines.push('', 'Notes from reading the file:', '', file.digest.trim());
-
-    const section = lines.join('\n');
-    if (used + section.length > MAX_FILES_BLOCK) {
-      dropped++;
-      continue;
-    }
-    used += section.length;
-    sections.push(section);
-  }
-
-  if (!sections.length) return undefined;
-  if (dropped) {
-    log(`attached-file context is full; left out ${dropped} file(s)`);
-    sections.push(`(${dropped} more attached file(s) did not fit here — page_listFiles still lists them.)`);
-  }
-  return sections.join('\n\n');
-}
-
 const MAX_RECORDINGS_BLOCK = 4 * 1024;
 
 function recordingsBlock(recordings: SavedRecording[] | undefined): string | undefined {
@@ -688,6 +681,11 @@ function summarize(input: unknown, result: ActionResult): string {
   if (shot && typeof shot.dataUrl === 'string') {
     const saved = typeof shot.savedTo === 'string' ? ` → ${shot.savedTo.split('/').pop()}` : '';
     return clip(`image ${shot.width ?? '?'}×${shot.height ?? '?'}${saved}`);
+  }
+
+  const captcha = result.data as { vendor?: unknown; label?: unknown; state?: unknown } | null;
+  if (typeof captcha?.vendor === 'string' && typeof captcha.label === 'string' && typeof captcha.state === 'string') {
+    return clip(`${captcha.label}: ${captcha.state}`);
   }
 
   const submits = (result.data as { submits?: unknown } | null)?.submits === true ? ' — submits a form' : '';

@@ -277,6 +277,7 @@ const ICONS: Record<string, LucideIcon> = {
   extractText: Eye,
   pickElement: ScanEye,
   'browsentic.focusShot': ScanEye,
+  'browsentic.readFile': Paperclip,
   findProgress: Eye,
   clickElement: MousePointerClick,
   trustedClick: MousePointerClick,

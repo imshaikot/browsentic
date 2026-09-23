@@ -6,6 +6,7 @@ import {
   type RunEvent,
   type SavedRecording,
 } from '@/lib/actions/protocol';
+import { isDelivered } from '@/lib/files/report';
 import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
@@ -16,7 +17,17 @@ import { listSavedTools, withoutCode, type SavedToolMeta } from './saved-tools';
 import { dropTool, keepTool } from './tool-registry';
 import { tryFastPath } from './fast-path';
 import { dropDiagnosticsForSession } from './diagnostics';
-import { listMeta } from './file-store';
+import {
+  cancelAnalysesFor,
+  discardFile,
+  filesFor,
+  indexFile,
+  removeFile,
+  requestAnalysis,
+  sweepOrphanFiles,
+  updateMeta,
+  type NewFile,
+} from './file-store';
 import { invokeForHarness } from './invoke';
 import {
   acknowledgeCompleted,
@@ -92,7 +103,10 @@ export type RunCommand =
   | { op: 'dismissTool'; toolkitId: string }
   | { op: 'forgetTool'; id: string }
   | { op: 'runTool'; id: string; tab: TabAnchor }
-  | { op: 'listTools' };
+  | { op: 'listTools' }
+  | { op: 'attach'; file: NewFile; tab: TabAnchor }
+  | { op: 'detach'; fileId: string }
+  | { op: 'reanalyze'; fileId: string };
 
 export type RunMessage =
   | { op: 'event'; sessionId?: string; runId: string; event: RunEvent }
@@ -337,7 +351,37 @@ function handle(command: RunCommand): void {
     case 'listTools':
       void publishTools();
       return;
+    case 'attach':
+      void serialized(() => attach(command.file, command.tab));
+      return;
+    case 'detach':
+      void discardFile(command.fileId);
+      return;
+    case 'reanalyze':
+      void serialized(async () => {
+        await requestAnalysis(command.fileId);
+      });
+      return;
   }
+}
+
+/** A file belongs to the conversation of the tab it was dropped on, which is started here if need be. */
+async function attach(file: NewFile, anchor: TabAnchor): Promise<void> {
+  const ensured = await ensureSessionForTab(anchor);
+  if (!ensured.ok) {
+    await removeFile(file.id);
+    broadcast({ op: 'event', runId: LOCAL_RUN, event: { kind: 'error', code: 'SESSION_LIMIT', message: ensured.message } });
+    return;
+  }
+  await indexFile(file, ensured.session.sessionId);
+  await requestAnalysis(file.id);
+}
+
+/** Clears out files whose conversation has left both the open tabs and history. */
+export async function sweepFiles(): Promise<void> {
+  const open = Object.keys(await readTabSessions());
+  const stored = (await listSessions().catch(() => [])).map((meta) => meta.id);
+  await sweepOrphanFiles([...open, ...stored]);
 }
 
 /** A saved-tool run shows on the timeline like any other step, marked local since it was. */
@@ -367,6 +411,10 @@ async function absorb(runId: string, event: RunEvent): Promise<void> {
 
   if (event.kind === 'session') {
     await patchSession(sessionId, { agent: event.agent, agentSessionId: event.agentSessionId ?? undefined });
+  } else if (event.kind === 'attachments') {
+    await patchSession(sessionId, { handing: event.files.map((file) => file.id) });
+  } else if (event.kind === 'done' && event.stopReason !== 'cancelled') {
+    await markHandedOver(sessionId);
   } else if (event.kind === 'approval') {
     await patchSession(sessionId, {
       pendingApproval: { toolId: event.toolId, action: event.action, input: event.input, site: event.site },
@@ -381,11 +429,21 @@ async function absorb(runId: string, event: RunEvent): Promise<void> {
   else schedulePersist(sessionId);
 }
 
+/** A finished turn put its reports in the agent's own session, so the next turn need not carry them. */
+async function markHandedOver(sessionId: string): Promise<void> {
+  const session = (await readTabSessions())[sessionId];
+  if (!session?.handing?.length) return;
+  if (session.agentSessionId) {
+    for (const fileId of session.handing) await updateMeta(fileId, { deliveredTo: session.agentSessionId });
+  }
+  await patchSession(sessionId, { handing: undefined });
+}
+
 async function settle(sessionId: string): Promise<void> {
   clearTimeout(cancelTimers.get(sessionId));
   cancelTimers.delete(sessionId);
   await dropDiagnosticsForSession(sessionId);
-  await patchSession(sessionId, { runId: null, pendingApproval: undefined });
+  await patchSession(sessionId, { runId: null, pendingApproval: undefined, handing: undefined });
   await syncRunIndicator();
 
   const session = (await readTabSessions())[sessionId];
@@ -465,7 +523,7 @@ async function startTurn(
       agentSkillId,
       focus,
       liveTools,
-      files: await attachedFiles(),
+      files: await attachedFiles(session),
       recordings: await attachedRecordings(),
     });
     if (!runId) {
@@ -540,6 +598,7 @@ function orphanDrafts(sessionId: string): void {
 async function endSession(sessionId: string): Promise<void> {
   const session = (await readTabSessions())[sessionId];
   if (session?.runId) cancelRun(session.runId);
+  cancelAnalysesFor(await filesFor(sessionId));
   await dropDiagnosticsForSession(sessionId);
   await dropTimersForSession(sessionId);
   clearTimeout(cancelTimers.get(sessionId));
@@ -652,6 +711,7 @@ export function serveTabSessions(): void {
     void serialized(async () => {
       const { closed } = await releaseTab(tabId);
       if (!closed) return await syncRunIndicator();
+      cancelAnalysesFor(await filesFor(closed.sessionId));
       if (closed.runId) {
         cancelRun(closed.runId);
         await append(closed.sessionId, notice('error', 'CANCELLED: The tab was closed, so that run is over.'));
@@ -701,19 +761,17 @@ async function beginRecording(captureValues: boolean): Promise<void> {
 const focusLabel = (focus: FocusedElement): string =>
   [focus.role ?? focus.tag, focus.label].filter(Boolean).join(' · ');
 
-const MAX_CONTEXT_FILES = 6;
-const MAX_DIGEST_CHARS = 2_000;
+const MAX_CONTEXT_FILES = 12;
 
-async function attachedFiles(): Promise<AttachedFile[]> {
+async function attachedFiles(session: TabSession): Promise<AttachedFile[]> {
   try {
-    return (await listMeta()).slice(0, MAX_CONTEXT_FILES).map((file) => ({
+    return (await filesFor(session.sessionId)).slice(0, MAX_CONTEXT_FILES).map((file) => ({
       id: file.id,
       name: file.name,
       mime: file.mime,
       size: file.size,
-      status: file.status,
-      summary: file.summary,
-      digest: file.digest?.slice(0, MAX_DIGEST_CHARS),
+      report: file.report,
+      delivered: isDelivered(file.deliveredTo, session.agentSessionId),
     }));
   } catch {
     return [];
@@ -745,7 +803,7 @@ async function contextBreakdown(session: TabSession, items: RunItem[]): Promise<
     } else if (item.kind === 'tool') messages.tools += 1;
     else if (item.kind === 'notice') messages.notices += 1;
   }
-  const files = await listMeta().catch(() => []);
+  const files = await filesFor(session.sessionId).catch(() => []);
   const ready = (await listRecordings().catch(() => [])).filter((recording) => recording.status === 'ready');
   return {
     agent: session.agent,

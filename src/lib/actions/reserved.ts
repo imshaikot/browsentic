@@ -5,6 +5,7 @@ export const START_RECORDING_ACTION = `${RESERVED_PREFIX}startRecording` as cons
 export const STOP_RECORDING_ACTION = `${RESERVED_PREFIX}stopRecording` as const;
 export const READ_SITEMAP_ACTION = `${RESERVED_PREFIX}readSitemap` as const;
 export const FOCUS_SHOT_ACTION = `${RESERVED_PREFIX}focusShot` as const;
+export const READ_FILE_ACTION = `${RESERVED_PREFIX}readFile` as const;
 
 export const RESERVED_ACTIONS = [
   SAVE_SITE_MAP_ACTION,
@@ -12,4 +13,5 @@ export const RESERVED_ACTIONS = [
   STOP_RECORDING_ACTION,
   READ_SITEMAP_ACTION,
   FOCUS_SHOT_ACTION,
+  READ_FILE_ACTION,
 ] as const;

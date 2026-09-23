@@ -5,6 +5,7 @@ import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
 import type { ToolOffer } from './code-toolkit';
+import type { NewFile } from './file-store';
 import type { SavedToolMeta } from './saved-tools';
 import { attachPreview, notice, reduce, type RunItem } from './run-items';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
@@ -53,6 +54,10 @@ export interface Run {
   dismissTool: () => void;
   forgetTool: (id: string) => void;
   runTool: (id: string) => void;
+  /** Gives a file the panel has stored to the conversation of the tab in front, which reads it. */
+  attachFile: (file: NewFile) => void;
+  detachFile: (fileId: string) => void;
+  reanalyzeFile: (fileId: string) => void;
 }
 
 export function useRun(): Run {
@@ -267,6 +272,16 @@ export function useRun(): Run {
       },
       [post, tab],
     ),
+    attachFile: useCallback(
+      (file: NewFile) => {
+        if (tab.tabId != null) {
+          post({ op: 'attach', file, tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title } });
+        }
+      },
+      [post, tab],
+    ),
+    detachFile: useCallback((fileId: string) => post({ op: 'detach', fileId }), [post]),
+    reanalyzeFile: useCallback((fileId: string) => post({ op: 'reanalyze', fileId }), [post]),
     monitors,
     stopMonitor: useCallback(
       (monitorId: string) => {

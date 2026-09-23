@@ -1,5 +1,6 @@
 import { screenshot } from '@/lib/actions/page/screenshot';
 import type { RunEvent } from '@/lib/actions/protocol';
+import { verdictLabel } from '@/lib/files/report';
 import type { MonitorState } from '@/lib/monitor/events';
 import type { ContextBreakdown } from './commands';
 import { redactInput } from './redact';
@@ -65,6 +66,11 @@ export function reduce(items: RunItem[], event: RunEvent): RunItem[] {
     case 'session':
     case 'usage':
       return items;
+
+    case 'attachments': {
+      const handed = event.files.map((file) => `${file.name} — ${verdictLabel(file.verdict, file.code)}`).join(' · ');
+      return [...items, { kind: 'notice', id: nextId(), tone: 'info', text: `Handed to the agent: ${handed}` }];
+    }
 
     case 'done':
       return event.stopReason === 'end_turn'

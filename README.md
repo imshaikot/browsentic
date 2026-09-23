@@ -55,6 +55,7 @@ Either way two steps are left, both inside the browser: **Load unpacked** `~/bro
 - **Keep What It Wrote**: A script that worked can be kept as a tool of your own, named after the site it belongs to (`youtube.com:watch:darken-page-except-video-player`) and run later by typing `/`. The code stays in the browser; no MCP client can reach it
 - **Voice, Text, or Demonstration**: Dictate in the side panel, type anywhere, or record yourself doing a job once and later say "do it like last time"
 - **Point at What You Mean (A-Eye)**: Press the lens, hover the page, click the thing — the element and its content ride along with your next message, and the agent can hand the lens back when *it* needs you to pick
+- **Hand It a File**: Drop a CSV, a log or — on Claude Code — a PDF or a screenshot on the panel, and a separate, short-lived session of your agent reads it and writes a report into that conversation. An archive, a program or anything over 10 MB is turned away with the reason before any agent starts
 - **Teach It a Site Once**: Point it at a site and it explores and writes reusable notes, so every later session already knows its way around
 - **Instant Commands**: "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent round trip
 - **Guardrails, Not Vibes**: A declarative policy gates consequential actions, confines each run to the sites it is about, and marks every byte of page text as untrusted data — tunable per rule from a Settings tab, with nothing overridden until you say so

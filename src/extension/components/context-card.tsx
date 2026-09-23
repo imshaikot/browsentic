@@ -80,7 +80,8 @@ export function ContextCard({ breakdown }: { breakdown: ContextBreakdown }) {
                 <span className="text-ink">{file.name}</span>
                 <span className="font-mono text-[10px] text-ink-faint"> · {formatBytes(file.size)}</span>
                 {file.status === 'pending' && <span className="text-ink-faint"> · analyzing</span>}
-                {file.status === 'error' && <span className="text-destructive"> · analysis failed</span>}
+                {file.status === 'rejected' && <span className="text-amber"> · not read</span>}
+                {file.status === 'failed' && <span className="text-destructive"> · analysis failed</span>}
               </Row>
             ))}
             {filesOmitted > 0 && (

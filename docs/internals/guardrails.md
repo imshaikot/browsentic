@@ -397,10 +397,20 @@ one is **visible in the log rather than assumed away**.
 
 ### Two spawn modes
 
-`run` drives the browser. `task` is a one-shot — summarizing an attached file, turning a raw
-recording trace into steps — that must not reach the browser at all, which is asserted by requiring
-`{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv. `Read` is deliberately left out of `task`'s
-deny list, because some tasks are handed a file in the scratch workspace.
+`run` drives the browser. `task` is a one-shot — the file analyst reading an attached file, the
+captcha analyst looking at one round of a challenge, turning a raw recording trace into steps — that
+must not reach the browser at all, which is asserted by
+requiring `{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv. `Read`
+is deliberately left out of `task`'s deny list, because some tasks are handed a file in the scratch
+workspace.
+
+The file analyst adds three things to that. A file is screened before anything spawns, so an
+archive, an executable or an oversized file never reaches an agent at all. The one-shot is stopped
+the moment its answer is in rather than left to exit, and its copy of the file is deleted. And the
+session is not kept where the CLI allows it: Claude Code runs a task with
+`--no-session-persistence` and Codex with `--ephemeral`. Antigravity, Mistral Vibe, Grok Build,
+Cursor CLI and Qwen Code have no such switch, so a task's session stays in that CLI's own history,
+inside the per-mode task workspace it was started in.
 
 ### Sealing the environment
 

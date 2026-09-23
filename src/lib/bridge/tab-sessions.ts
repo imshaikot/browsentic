@@ -33,6 +33,8 @@ export interface TabSession {
   createdAt: number;
   lastActivityAt: number;
   pendingApproval?: PendingApproval;
+  /** Files whose reports the running turn carries, marked handed over once it finishes. */
+  handing?: string[];
 }
 
 export type TabSessionMap = Record<string, TabSession>;

@@ -167,6 +167,36 @@ describe('a screenshot', () => {
   });
 });
 
+describe('an open captcha challenge', () => {
+  test('comes back fenced, with the challenge attached as its picture', async () => {
+    const client = await connect(
+      fakeBridge({
+        'page.solveCaptcha': success({
+          state: 'challenge',
+          challenge: { kind: 'tiles', prompt: 'Select all images with a bus', tiles: 9, image: PNG, imageWidth: 788, imageHeight: 788 },
+        }),
+      }).bridge,
+    );
+    const result = await call(client, 'page_solveCaptcha');
+    expect({
+      fenced: result.content[0].text?.includes('untrusted-page-data'),
+      carriesImage: result.content[0].text?.includes('base64'),
+      image: result.content[1],
+      note: result.content[2].text,
+    }).toEqual({
+      fenced: true,
+      carriesImage: false,
+      image: { type: 'image', data: 'iVBORw0KGgo=', mimeType: 'image/png' },
+      note: `${IMAGE_NOTE} This is the open captcha challenge, 788×788 pixels, each tile numbered in its corner.`,
+    });
+  });
+
+  test('a solved captcha is only the result', async () => {
+    const client = await connect(fakeBridge({ 'page.solveCaptcha': success({ state: 'solved', solved: true }) }).bridge);
+    expect((await call(client, 'page_solveCaptcha')).content).toHaveLength(1);
+  });
+});
+
 describe('a picked element', () => {
   test('comes back fenced, with its photograph attached', async () => {
     const client = await connect(fakeBridge({ 'page.pickElement': success({ selector: 'button#buy', text: 'Buy now', shot: { dataUrl: PNG } }) }).bridge);
