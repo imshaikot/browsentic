@@ -21,6 +21,7 @@ export { ANYWHERE, hostAllowed, hostBearingUrl, normalizeHost, scopeFor, targetU
 export type { NavigationTarget, Scope, ScopeSeed } from './scope';
 
 export {
+  CAPTCHA_ACTION,
   CONDITIONS,
   DEFAULT_RULES,
   DOWNLOAD_ACTION,

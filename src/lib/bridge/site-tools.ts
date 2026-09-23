@@ -14,6 +14,7 @@ import { invokeInTab } from '@/lib/actions/client';
 import { callSiteTool } from '@/lib/actions/page/call-site-tool';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { captchaOnPage } from './captcha-probe';
 import { originOf } from './code-toolkit';
 import { focusedFrame, framePath } from './frame-focus';
 import { focusOf } from './frames';
@@ -161,14 +162,16 @@ export async function probeSiteTools(tabId: number) {
 }
 
 export async function pageInfoWithSiteTools(tabId: number, topUrl: string | undefined, input: unknown): Promise<ActionResult> {
-  const [info, siteTools, path] = await Promise.all([
+  const [info, siteTools, path, captcha] = await Promise.all([
     invokeInTab(tabId, getPageInfo.name, input),
     probeSiteTools(tabId),
     framePath(tabId),
+    captchaOnPage(tabId),
   ]);
   if (!info.ok) return info;
   return success({
     ...(info.data as object),
+    ...(captcha ? { captcha } : {}),
     ...(siteTools ? { siteTools } : {}),
     ...(path.length ? focusOf(path, topUrl) : {}),
   });

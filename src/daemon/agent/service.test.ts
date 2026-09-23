@@ -52,3 +52,37 @@ describe("what a run's tool list holds", () => {
     expect([switchedOff?.withheld, afterReset?.withheld]).toEqual([[], CODE_TOOLS]);
   });
 });
+
+describe('answering a captcha', () => {
+  test('asks once, then lets the rest of that run’s rounds through without asking again', async () => {
+    const agent = `${dirname(configPath)}/agent-that-waits.sh`;
+    writeFileSync(agent, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
+    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    const events: RunEvent[] = [];
+    const invoked: string[] = [];
+    const waiting = new AgentSession({
+      invoke: async (action) => {
+        invoked.push(action);
+        return failure('CAPTCHA_NOT_FOUND', 'none');
+      },
+      emit: (_runId: string, event: RunEvent) => void events.push(event),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    waiting.handle({ t: 'instruct', id: 'r1', text: 'sign me up', context: { sessionId: 's1' } });
+    await vi.waitFor(() => expect(waiting.offerFor('r1')).not.toBeNull());
+
+    const first = waiting.invokeForRun('r1', 'page.solveCaptcha', {});
+    await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
+    const asked = events.find((event) => event.kind === 'approval') as Extract<RunEvent, { kind: 'approval' }>;
+    waiting.handle({ t: 'decision', id: 'r1', toolId: asked.toolId, allow: true });
+    await first;
+    await waiting.invokeForRun('r1', 'page.solveCaptcha', { tiles: [1, 4] });
+    waiting.dispose();
+
+    expect({ prompts: events.filter((event) => event.kind === 'approval').length, invoked }).toEqual({
+      prompts: 1,
+      invoked: ['page.solveCaptcha', 'page.solveCaptcha'],
+    });
+  });
+});

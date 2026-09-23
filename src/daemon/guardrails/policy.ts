@@ -305,15 +305,15 @@ export const DEFAULT_RULES: readonly Rule[] = [
     reason: 'That tab is not the one this run was pointed at, and may hold a different logged-in session.',
   },
   {
-    // A captcha is another site's check that a person is present. Ticking its checkbox is
-    // something the user can authorise for their own browsing, but never something to do
-    // on their behalf unasked — so it confirms for a watched run, and `unattended: deny`
-    // keeps an external MCP client from doing it silently.
+    // A captcha is another site's check that a person is present. Answering it is something
+    // the user can authorise for their own browsing, but never something to do on their
+    // behalf unasked — so it confirms for a watched run, and `unattended: deny` keeps an
+    // external MCP client from doing it silently.
     id: 'captcha-solve',
     when: 'answersCaptcha',
     effect: 'confirm',
     title: 'Answers a captcha',
-    reason: 'That ticks a site’s “I am a human” check on your behalf.',
+    reason: 'That ticks a site’s “I am a human” check, and answers any image challenge it sets, on your behalf.',
   },
   {
     id: 'secret-release',

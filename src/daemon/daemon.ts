@@ -17,6 +17,7 @@ import {
 } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
+import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
@@ -47,6 +48,7 @@ import {
   type Session,
 } from './auth-store';
 import { AgentSession } from './agent/service';
+import { solveCaptchaWithAnalyst } from './agent/captcha-solver';
 import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
@@ -755,7 +757,11 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         'The Browsentic extension is not connected — open your browser with the extension loaded, then retry',
       );
     }
-    const result = await link.invoke(action, resolved.data, { tabId: opts?.tabId, runId: opts?.runId });
+    const route = { tabId: opts?.tabId, runId: opts?.runId };
+    const result =
+      action === solveCaptcha.name
+        ? await solveCaptchaWithAnalyst((next) => link.invoke(action, next, route), resolved.data, readAgentConfig())
+        : await link.invoke(action, resolved.data, route);
     return persistDownload(action, persistScreenshot(action, input, result, opts?.saveTo), opts?.hosts);
   }
 
