@@ -1,4 +1,4 @@
-![Browsentic: your browser's superpower, free and open source](docs/assets/social-card.png?v=0.7.0)
+https://github.com/user-attachments/assets/307afa62-5fbd-47ac-822c-baee491ddfe3
 
 <div align="center">
 
