@@ -1,41 +1,49 @@
 ![Browsentic: your browser's superpower, free and open source](docs/assets/social-card.png?v=0.7.0)
 
+<div align="center">
+
 # Browsentic – a completely integrated agentic browser extension
 
-[![npm version](https://img.shields.io/npm/v/browsentic)](https://www.npmjs.com/package/browsentic)
-[![npm downloads](https://img.shields.io/npm/dm/browsentic)](https://www.npmjs.com/package/browsentic)
-[![CI](https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/ci.yml?branch=main&label=CI)](https://github.com/imshaikot/browsentic/actions/workflows/ci.yml)
-[![node](https://img.shields.io/node/v/browsentic)](https://nodejs.org)
-[![license](https://img.shields.io/npm/l/browsentic)](LICENSE)
-
-Hand your real, logged-in browser to the AI agent you already run. Browsentic is a browser extension with an AI side panel, plus a small local daemon: open the panel beside any tab, say what you want and it drives the page, ask a question and it reads the page and answers. It runs on the agent CLI you already have logged in — seven are supported — and doubles as an [MCP server](docs/guide/mcp-clients.md) so any MCP client can drive the same browser. No account, no API key, no cloud service.
-
 <p>
-  <strong>Works in</strong>&ensp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/chrome.svg" width="18" height="18" alt="Chrome"></a>&nbsp;Chrome&ensp;·&ensp;
-  <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="18" height="18" alt="Firefox"></a>&nbsp;Firefox&ensp;·&ensp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/edge.svg" width="18" height="18" alt="Edge"></a>&nbsp;Edge&ensp;·&ensp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/brave.svg" width="18" height="18" alt="Brave"></a>&nbsp;Brave&ensp;·&ensp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/arc.svg" width="18" height="18" alt="Arc"></a>&nbsp;Arc
+  <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/v/browsentic?logo=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/dm/browsentic?logo=npm" alt="npm downloads"></a>
+  <a href="https://github.com/imshaikot/browsentic/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white" alt="CI"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/browsentic?logo=nodedotjs&logoColor=white" alt="node"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/browsentic" alt="license"></a>
 </p>
 <p>
-  <strong>Runs on</strong>&ensp;
-  <img src="https://browsentic.com/icons/claude.svg" width="18" height="18" alt="">&nbsp;<a href="https://claude.com/claude-code">Claude Code</a>&ensp;·&ensp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/openai-dark.svg"><img src="https://browsentic.com/icons/openai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://developers.openai.com/codex/cli">Codex</a>&ensp;·&ensp;
-  <img src="https://browsentic.com/icons/antigravity.svg" width="18" height="18" alt="">&nbsp;<a href="https://antigravity.google/docs/cli/install">Antigravity</a>&ensp;·&ensp;
-  <img src="https://browsentic.com/icons/mistral.svg" width="18" height="18" alt="">&nbsp;<a href="https://github.com/mistralai/mistral-vibe">Mistral Vibe</a> <sup>beta</sup>&ensp;·&ensp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://docs.x.ai/build/overview">Grok Build</a> <sup>beta</sup>&ensp;·&ensp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/cursor-dark.svg"><img src="https://browsentic.com/icons/cursor.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://cursor.com/docs/cli/overview">Cursor CLI</a> <sup>beta</sup>&ensp;·&ensp;
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/qwen-dark.svg"><img src="https://browsentic.com/icons/qwen.svg" width="18" height="18" alt=""></picture>&nbsp;<a href="https://qwenlm.github.io/qwen-code-docs/en/">Qwen Code</a> <sup>beta</sup>
+  <a href="docs/guide/install.md"><img src="https://img.shields.io/badge/manifest-V3-4285F4?logo=googlechrome&logoColor=white" alt="Manifest V3"></a>
+  <a href="https://github.com/imshaikot/browsentic/releases/latest"><img src="https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/release.yml?label=macOS%20build&logo=apple" alt="macOS build"></a>
+  <a href="https://github.com/imshaikot/browsentic/releases/latest"><img src="https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/release.yml?label=Firefox%20build&logo=firefoxbrowser&logoColor=white" alt="Firefox build"></a>
 </p>
+
+**No account · No auth · No API key · No cloud · No telemetry · Local first**
+
+Your real, logged-in browser, driven from an AI side panel by the agent CLI you already have.<br>
+Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can drive the same browser.
+
+<p>
+  <strong>Works in</strong><br>
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/chrome.svg" width="40" height="40" alt="Chrome" title="Chrome"></a>&emsp;
+  <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="40" height="40" alt="Firefox" title="Firefox"></a>&emsp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/brave.svg" width="40" height="40" alt="Brave" title="Brave"></a>&emsp;
+  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/arc.svg" width="40" height="40" alt="Arc" title="Arc"></a>
+</p>
+<p>
+  <strong>Runs on</strong><br>
+  <a href="https://claude.com/claude-code"><img src="https://browsentic.com/icons/claude.svg" width="40" height="40" alt="Claude Code" title="Claude Code"></a>&emsp;
+  <a href="https://developers.openai.com/codex/cli"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/openai-dark.svg"><img src="https://browsentic.com/icons/openai.svg" width="40" height="40" alt="Codex" title="Codex"></picture></a>&emsp;
+  <a href="https://antigravity.google/docs/cli/install"><img src="https://browsentic.com/icons/antigravity.svg" width="40" height="40" alt="Antigravity" title="Antigravity"></a>&emsp;
+  <a href="https://github.com/mistralai/mistral-vibe"><img src="https://browsentic.com/icons/mistral.svg" width="40" height="40" alt="Mistral Vibe (beta)" title="Mistral Vibe (beta)"></a>&emsp;
+  <a href="https://docs.x.ai/build/overview"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="40" height="40" alt="Grok Build (beta)" title="Grok Build (beta)"></picture></a>&emsp;
+  <a href="https://cursor.com/docs/cli/overview"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/cursor-dark.svg"><img src="https://browsentic.com/icons/cursor.svg" width="40" height="40" alt="Cursor CLI (beta)" title="Cursor CLI (beta)"></picture></a>&emsp;
+  <a href="https://qwenlm.github.io/qwen-code-docs/en/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/qwen-dark.svg"><img src="https://browsentic.com/icons/qwen.svg" width="40" height="40" alt="Qwen Code (beta)" title="Qwen Code (beta)"></picture></a>
+</p>
+
+</div>
 
 ## Quick Start
-
-**macOS** — one line installs [Browsentic.app](docs/guide/mac-app.md), and the app installs everything else, Node included, and runs it from a window:
-
-```sh
-curl -fsSL https://browsentic.com/install.sh | sh
-```
 
 **Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
 
@@ -43,23 +51,43 @@ curl -fsSL https://browsentic.com/install.sh | sh
 npx browsentic setup
 ```
 
-Either way two steps are left, both inside the browser: **Load unpacked** `~/browsentic/extension/chrome-mv3` at `chrome://extensions`, then paste the pairing code into the Browsentic popup. On Firefox, run `npx browsentic setup --browser firefox` instead: it links the signed `.xpi` from the [release](https://github.com/imshaikot/browsentic/releases/latest), and there is no folder to load. You also need one agent CLI logged in — `claude`, `codex`, `agy`, `vibe` (beta), `grok` (beta), `cursor-agent` (beta) or `qwen` (beta). Windows and Linux follow the same two steps; the folder is under your home directory there too. Details, updating and building from source are in the [install guide](docs/guide/install.md).
+**macOS** — one line installs [Browsentic.app](docs/guide/mac-app.md), which brings Node and everything else:
+
+```sh
+curl -fsSL https://browsentic.com/install.sh | sh
+```
+
+Full install and setup guide, Firefox included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
 
 ## Key Capabilities
 
-- **A Side Panel, Not a Terminal**: Open it beside any tab, type or dictate, and watch every action land on a timeline with approvals where you are looking. The terminal is optional: the same daemon doubles as an MCP server for Claude Code, Cursor or Zed
-- **Your Real Browser, Not a Headless One**: Drives the tab in front of you, in your own profile, with your own logins and sessions
-- **Bring Your Own Agent**: Runs on the agent CLI you already have and are already signed in to — switch between Claude Code, Codex, Antigravity, Mistral Vibe, Grok Build, Cursor CLI and Qwen Code with one click, and pick the model each one runs
-- **52 Page Capabilities**: Reading, clicking, typing, dragging, on-site search, form submission, navigation, stepping into iframes, screenshots, file upload and download, captchas, theming and accessibility, console and network diagnostics, background progress monitoring, scheduled and repeating jobs, pointing at an element, and calling the tools a WebMCP site registers for agents
-- **Live Tools, Off By Default**: For work that repeats twenty times or needs something no tool covers, flip the **Live tool** switch and the agent may write a small script for the page — you read the code in the panel and approve it before a line of it runs
-- **Keep What It Wrote**: A script that worked can be kept as a tool of your own, named after the site it belongs to (`youtube.com:watch:darken-page-except-video-player`) and run later by typing `/`. The code stays in the browser; no MCP client can reach it
-- **Voice, Text, or Demonstration**: Dictate in the side panel, type anywhere, or record yourself doing a job once and later say "do it like last time"
-- **Point at What You Mean (A-Eye)**: Press the lens, hover the page, click the thing — the element and its content ride along with your next message, and the agent can hand the lens back when *it* needs you to pick
-- **Hand It a File**: Drop a CSV, a log or — on Claude Code — a PDF or a screenshot on the panel, and a separate, short-lived session of your agent reads it and writes a report into that conversation. An archive, a program or anything over 10 MB is turned away with the reason before any agent starts
-- **Teach It a Site Once**: Point it at a site and it explores and writes reusable notes, so every later session already knows its way around
-- **Instant Commands**: "Go back", "scroll to the top", "open github.com" run in the browser in milliseconds instead of becoming an agent round trip
-- **Guardrails, Not Vibes**: A declarative policy gates consequential actions, confines each run to the sites it is about, and marks every byte of page text as untrusted data — tunable per rule from a Settings tab, with nothing overridden until you say so
-- **Off By Default**: A fresh install contacts nothing until you redeem a one-time pairing code
+<table>
+  <tr>
+    <td>🧭 <a href="docs/guide/features/conversations.md"><b>Side panel, human in the loop</b></a></td>
+    <td>🤖 <a href="docs/guide/agents.md"><b>Every major agent CLI</b></a></td>
+    <td>🎯 <a href="docs/guide/features/page-actions.md"><b>50+ deterministic tools</b></a></td>
+  </tr>
+  <tr>
+    <td>🌐 <a href="docs/guide/install.md"><b>All Chromium + Firefox</b></a></td>
+    <td>🗺️ <a href="docs/guide/features/page-actions.md#moving-around"><b>Full browser navigation</b></a></td>
+    <td>🧩 <a href="docs/guide/features/captcha.md"><b>Solves captchas on the way</b></a></td>
+  </tr>
+  <tr>
+    <td>📄 <a href="docs/guide/features/files.md#files-you-hand-it"><b>Reads files, acts on them</b></a></td>
+    <td>↕️ <a href="docs/guide/features/files.md#download-here-upload-there"><b>Uploads & downloads</b></a></td>
+    <td>🧠 <a href="docs/guide/features/site-maps.md"><b>Creates its own skills</b></a></td>
+  </tr>
+  <tr>
+    <td>⚡ <a href="docs/guide/features/page-actions.md#repeating-a-job-and-doing-what-no-tool-covers"><b>Writes & runs live tools</b></a></td>
+    <td>🎙️ <a href="docs/guide/features/recordings.md"><b>Voice, text or show it once</b></a></td>
+    <td>👁️ <a href="docs/guide/features/a-eye.md"><b>Point at what you mean</b></a></td>
+  </tr>
+  <tr>
+    <td>⏱️ <a href="docs/guide/features/scheduling.md"><b>Monitors & schedules</b></a></td>
+    <td>🛡️ <a href="docs/guide/approvals.md"><b>Guardrails & approvals</b></a></td>
+    <td>🔌 <a href="docs/guide/mcp-clients.md"><b>Optional MCP server</b></a></td>
+  </tr>
+</table>
 
 ## How It Works
 
