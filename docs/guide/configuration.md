@@ -51,8 +51,11 @@ Nothing here is required; this shows every key in one place.
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex`, `antigravity`, `vibe`, `grok`, `cursor`, `qwen` or `opencode` |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary |
-| `agents.<name>.model` | `claude-sonnet-5` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it |
+| `agents.<name>.model` | `sonnet` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it. One starting with a dash or holding a space is ignored |
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |
+
+Which models the select offers is not configured: Codex, Antigravity, Grok Build and Cursor CLI are
+asked for their own list, the rest offer a short one Browsentic ships.
 
 Full detail, including the Antigravity permission rule: [Choosing an agent](agents.md).
 
