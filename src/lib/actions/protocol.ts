@@ -17,6 +17,9 @@ export const EXTERNAL_RUN_ID = 'external';
 
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
 
+/** The native messaging host the extension asks to start the daemon when no port answers. */
+export const NATIVE_HOST_NAME = 'com.browsentic.daemon';
+
 export interface ActionInvocation {
   channel: typeof ACTION_CHANNEL;
   action: string;

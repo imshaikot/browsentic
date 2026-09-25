@@ -25,7 +25,7 @@ export default defineConfig({
     description: 'Reimagine browsing as agentic — driven by the AI agent you already run, in your own logged-in browser.',
     permissions: [
       'storage', 'unlimitedStorage', 'activeTab', 'contextMenus', 'alarms', 'scripting',
-      'notifications', 'downloads',
+      'notifications', 'downloads', 'nativeMessaging',
       // Firefox has no sidePanel or debugger permission, and addons.mozilla.org flags each name it does not know.
       ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger']),
     ],

@@ -32,6 +32,7 @@ import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { identify } from './identity';
 import { invokeForHarness } from './invoke';
+import { wakeDaemon } from './native-wake';
 
 export const DAEMON_STATE_KEY = 'browsentic/daemon';
 export const RECONNECT_ALARM = 'browsentic/reconnect';
@@ -42,6 +43,7 @@ const MAX_DELAY_MS = 30_000;
 const STABLE_AFTER_MS = 30_000;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
 const PAIRING_TIMEOUT_MS = 20_000;
+const WOKEN_RETRY_MS = 500;
 
 /** The secret itself stays here; only a proof derived from it ever reaches the socket. */
 interface Credential {
@@ -477,7 +479,13 @@ function giveUp(credential: Credential, refusal?: Refusal): void {
     return;
   }
   settlePairing({ ok: false, error: refusal?.reason ?? 'No Browsentic daemon is running.' });
-  if (credential.kind === 'session') scheduleRetry(credential);
+  if (credential.kind !== 'session') return;
+  if (refusal) return scheduleRetry(credential);
+  void wakeDaemon().then((woken) => {
+    if (!woken) return scheduleRetry(credential);
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => dial(credential, 0), WOKEN_RETRY_MS);
+  });
 }
 
 function transcriptOf(attempt: Attempt): Transcript {

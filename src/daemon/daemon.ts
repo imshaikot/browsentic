@@ -60,6 +60,7 @@ import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
+import { refreshNativeHost } from './native-host';
 import {
   ANYWHERE,
   INJECT_ACTION,
@@ -307,6 +308,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       const session = createSession(install);
       sealedSessionKey = await sealSessionKey(secret, transcript, session.key);
       log(`paired ${install.browser ?? install.origin} (extension ${hello.extensionVersion})`);
+      refreshNativeHost();
     } else if (hello.auth?.kind === 'session') {
       const session = await matchSession(proven.proof, transcript, install);
       if (!session) {
