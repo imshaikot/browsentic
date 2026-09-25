@@ -16,6 +16,7 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
+import type { TaskList } from '@/lib/schedules/task';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { describeActions } from '@/lib/actions/registry';
@@ -60,6 +61,7 @@ import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 import { ExtensionLink } from './extension-link';
+import { startScheduler } from './schedules/scheduler';
 import { refreshNativeHost } from './native-host';
 import {
   ANYWHERE,
@@ -80,6 +82,7 @@ import { daemonPorts } from './ports';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
 type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
+type TaskFrame = Extract<SocketFrame, { t: 'tasks' | 'saveTask' | 'deleteTask' | 'pauseTasks' }>;
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
 const BINDING_IDLE_MS = 2 * 60 * 1000;
@@ -171,6 +174,15 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduler = startScheduler({
+    linkFor: (browser) => {
+      const link = browser ? links.get(browser) : activeLink();
+      return link?.isOpen ? link : null;
+    },
+    publish: (list) => {
+      for (const link of openLinks()) link.send({ t: 'taskList', id: '', result: success(list) });
+    },
+  });
 
   const lock: Lockfile = {
     pid: process.pid,
@@ -359,6 +371,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       (closing) => {
         agents.get(closing)?.dispose();
         agents.delete(closing);
+        scheduler.linkClosed(closing.id);
         analyses.cancelOwnedBy(closing);
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
@@ -419,6 +432,13 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         if (request.t === 'guardrails' || request.t === 'setGuardrail') {
           return source.send({ t: 'guardrailInfo', id: request.id, result: settleGuardrail(request) });
         }
+        if (request.t === 'taskDone') return scheduler.finished(request.taskId, request.result);
+        if (request.t === 'runTaskNow') {
+          return source.send({ t: 'taskList', id: request.id, result: scheduler.runNow(request.taskId, source) });
+        }
+        if (request.t === 'tasks' || request.t === 'saveTask' || request.t === 'deleteTask' || request.t === 'pauseTasks') {
+          return source.send({ t: 'taskList', id: request.id, result: settleTasks(request) });
+        }
         if (request.t === 'saveSkill') {
           source.send({ t: 'skillResult', id: request.id, result: saveSkill(request.skill) });
           return shareSkillCatalog();
@@ -461,6 +481,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     void pushAgentState(accepted);
     watchModels();
     pushSkillCatalog(accepted);
+    accepted.send({ t: 'taskList', id: '', result: success(scheduler.list()) });
     if (!known) await adoptExtensionManifest(accepted);
   }
 
@@ -546,6 +567,13 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     }
     const config = readAgentConfig();
     return success(guardrailSettings(config.guardrails ?? {}, config.requireApproval, configPath));
+  }
+
+  function settleTasks(request: TaskFrame): ActionResult<TaskList> {
+    if (request.t === 'saveTask') return scheduler.save(request.task);
+    if (request.t === 'deleteTask') return scheduler.remove(request.taskId);
+    if (request.t === 'pauseTasks') return scheduler.pause(request.paused === true);
+    return success(scheduler.list());
   }
 
   async function pushAgentState(target: ExtensionLink): Promise<void> {
@@ -840,6 +868,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
 
   async function stop(): Promise<void> {
     if (idleTimer) clearTimeout(idleTimer);
+    scheduler.stop();
     for (const link of [...links.values()]) link.close('daemon shutting down');
     for (const ws of controls) ws.close(1001, 'daemon shutting down');
     wss.close();

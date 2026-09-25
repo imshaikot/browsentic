@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCw, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
+import { CalendarClock, Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCw, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/components/skill-menu';
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
@@ -32,6 +32,8 @@ export function Composer({
   picking,
   liveTools,
   onToggleLiveTools,
+  scheduling,
+  onToggleScheduling,
   onAttachSkill,
   onCommand,
   tools,
@@ -59,6 +61,8 @@ export function Composer({
   picking: boolean;
   liveTools: boolean;
   onToggleLiveTools: () => void;
+  scheduling: boolean;
+  onToggleScheduling: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onCommand: (command: string) => void;
   tools: SavedToolMeta[];
@@ -210,7 +214,13 @@ export function Composer({
               onSend();
             }
           }}
-          placeholder={connected ? 'Tell me what to do on this page…' : 'Pair the browser to get started'}
+          placeholder={
+            !connected
+              ? 'Pair the browser to get started'
+              : scheduling
+                ? 'Say what to do, then pick when…'
+                : 'Tell me what to do on this page…'
+          }
           disabled={!connected}
           rows={2}
           className="max-h-48 min-h-14 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-0 focus-visible:border-0"
@@ -266,6 +276,22 @@ export function Composer({
             <Code2 className="size-3.5" />
           </Button>
           <Button
+            variant={scheduling ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            role="switch"
+            aria-checked={scheduling}
+            aria-label={scheduling ? 'Send now instead of scheduling' : 'Schedule this for later'}
+            title={
+              scheduling
+                ? 'Scheduling is on — sending opens the schedule for this message instead of running it now.'
+                : 'Schedule — run this later, or on repeat, instead of now.'
+            }
+            onClick={onToggleScheduling}
+            disabled={!connected}
+          >
+            <CalendarClock className="size-3.5" />
+          </Button>
+          <Button
             variant={voiceEnabled && !voice.error ? 'subtle' : 'ghost'}
             size="icon-sm"
             aria-label={voiceEnabled ? 'Turn voice off' : 'Turn voice on'}
@@ -280,7 +306,7 @@ export function Composer({
             {voiceEnabled && !voice.error ? <Mic className="size-3.5" /> : <MicOff className="size-3.5" />}
           </Button>
 
-          {running ? (
+          {running && !scheduling ? (
             <Button size="icon-sm" variant="destructive" className="ml-auto" aria-label="Stop the agent" onClick={onStop}>
               <Square className="size-3 fill-current" />
             </Button>
@@ -288,11 +314,12 @@ export function Composer({
             <Button
               size="icon-sm"
               className="ml-auto"
-              aria-label="Send message"
+              aria-label={scheduling ? 'Schedule this…' : 'Send message'}
+              title={scheduling ? 'Schedule this…' : undefined}
               onClick={onSend}
               disabled={!voice.input.trim() || !connected}
             >
-              <Send className="size-3.5" />
+              {scheduling ? <CalendarClock className="size-3.5" /> : <Send className="size-3.5" />}
             </Button>
           )}
         </div>

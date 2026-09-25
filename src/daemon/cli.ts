@@ -10,6 +10,8 @@ import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
+import { describeMoment, describeRule } from '@/lib/schedules/rule';
+import { findTask, readSchedules, setEnabled, setPaused, updateSchedules } from './schedules/store';
 import { clearDownloads, downloadDir, storedDownloads } from './downloads';
 import { readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
@@ -47,6 +49,9 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
   browsentic approvals clear [host]   forget them, all of them or one site's
+  browsentic tasks            list the scheduled tasks, when each runs next, and how it last went
+  browsentic tasks pause|resume [id]   pause or resume one task, or every task at once
+  browsentic tasks delete <id>         delete a task
   browsentic downloads        list the files captured from pages, and where they were saved
   browsentic downloads clear  delete all of them
   browsentic tools            print the bundled tool manifest (no browser needed)
@@ -56,7 +61,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic restart          stop the daemon and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
 
-  agent, skills, approvals and downloads take --json, which is what the macOS app reads.
+  agent, skills, approvals, tasks and downloads take --json, which is what the macOS app reads.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -132,6 +137,9 @@ switch (command) {
     break;
   case 'downloads':
     manageDownloads(positional[0]);
+    break;
+  case 'tasks':
+    manageTasks(positional[0], positional[1]);
     break;
   case 'logs':
     showLogs();
@@ -743,6 +751,66 @@ function manageDownloads(sub?: string): void {
     console.log(`  ${download.name.padEnd(32)} ${download.notes.padEnd(34)} ${download.capturedAt.slice(0, 10)}`);
   }
   console.log('\nDelete them all with "browsentic downloads clear".');
+}
+
+function manageTasks(sub?: string, id?: string): void {
+  const now = Date.now();
+  if (sub === 'pause' || sub === 'resume') {
+    const enabled = sub === 'resume';
+    if (!id) {
+      updateSchedules((state) => setPaused(state, !enabled, now));
+      console.log(enabled ? 'Scheduled tasks resumed.' : 'Every scheduled task is paused. "browsentic tasks resume" starts them again.');
+      return;
+    }
+    const name = updateSchedules((state) => {
+      const task = findTask(state, id);
+      if (task) setEnabled(task, enabled, now);
+      return task?.name;
+    });
+    if (!name) return noSuchTask(id);
+    console.log(`${enabled ? 'Resumed' : 'Paused'} “${name}”.`);
+    return;
+  }
+  if (sub === 'delete') {
+    const name = id
+      ? updateSchedules((state) => {
+          const task = findTask(state, id);
+          state.tasks = state.tasks.filter((kept) => kept !== task);
+          return task?.name;
+        })
+      : undefined;
+    if (!name) return noSuchTask(id);
+    console.log(`Deleted “${name}”.`);
+    return;
+  }
+  if (sub) {
+    console.log(`Unknown command "tasks ${sub}". Use "tasks", "tasks pause|resume [id]" or "tasks delete <id>".`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const { paused, tasks } = readSchedules();
+  if (wantsJson) {
+    console.log(JSON.stringify({ paused, tasks }, null, 2));
+    return;
+  }
+  if (!tasks.length) {
+    console.log('No scheduled tasks. Create one from the Schedules tab in the side panel.');
+    return;
+  }
+  console.log(`${tasks.length} scheduled task${tasks.length === 1 ? '' : 's'}${paused ? ' — all paused' : ''}:\n`);
+  for (const task of tasks) {
+    const when = !task.enabled ? 'paused' : task.nextRunAt ? `next ${describeMoment(task.nextRunAt)}` : 'no more runs';
+    console.log(`  ${task.id.slice(0, 8)}  ${task.name.slice(0, 28).padEnd(28)} ${describeRule(task.rule).padEnd(30)} ${when}`);
+    const [last] = task.runs;
+    if (last) console.log(`            last: ${last.outcome}${last.headline || last.reason ? ` — ${last.headline ?? last.reason}` : ''}`);
+  }
+  console.log('\nPause one with "browsentic tasks pause <id>", or all of them with "tasks pause". An id prefix is enough.');
+}
+
+function noSuchTask(id?: string): void {
+  console.log(id ? `No task matches "${id}". "browsentic tasks" lists them with their ids.` : 'Say which task — "browsentic tasks" lists their ids.');
+  process.exitCode = 1;
 }
 
 function manageApprovals(sub?: string, host?: string): void {

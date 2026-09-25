@@ -30,12 +30,14 @@ import type { FileReport } from '@/lib/files/report';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
+import type { TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
 import { identify } from './identity';
 import { invokeForHarness } from './invoke';
 import { wakeDaemon } from './native-wake';
 
 export const DAEMON_STATE_KEY = 'browsentic/daemon';
 export const RECONNECT_ALARM = 'browsentic/reconnect';
+export const TASKS_KEY = 'browsentic/tasks';
 const SESSION_KEY_STORE = 'browsentic/sessionKey';
 
 const BASE_DELAY_MS = 1_000;
@@ -89,6 +91,11 @@ let stableTimer: ReturnType<typeof setTimeout> | undefined;
 let runListener: ((runId: string, event: RunEvent) => void) | null = null;
 const welcomeListeners = new Set<() => void>();
 let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
+let taskRunner: ((order: TaskOrder) => Promise<ActionResult>) | null = null;
+
+export function onTaskOrder(runner: (order: TaskOrder) => Promise<ActionResult>): void {
+  taskRunner = runner;
+}
 
 export function onSiteMapDraft(listener: (runId: string, draft: SiteMapDraft) => void): void {
   draftListener = listener;
@@ -305,6 +312,32 @@ function guardrailOp(
       resolve(result);
     });
   });
+}
+
+const pendingTaskOps = new Map<string, (result: ActionResult<TaskList>) => void>();
+
+type TaskOp = Extract<SocketFrame, { t: 'tasks' | 'saveTask' | 'deleteTask' | 'runTaskNow' | 'pauseTasks' }>;
+type TaskOpInput = TaskOp extends infer Frame ? (Frame extends TaskOp ? Omit<Frame, 'id'> : never) : never;
+
+export function taskOp(request: TaskOpInput): Promise<ActionResult<TaskList>> {
+  const frame = { ...request, id: crypto.randomUUID() } as TaskOp;
+  if (!post(frame)) {
+    return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — scheduled tasks live there, so start it or pair the browser.'));
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingTaskOps.delete(frame.id);
+      resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
+    }, AGENT_TIMEOUT_MS);
+    pendingTaskOps.set(frame.id, (result) => {
+      clearTimeout(timer);
+      resolve(result);
+    });
+  });
+}
+
+export function reportTaskDone(taskId: string, result: TaskResult): boolean {
+  return post({ t: 'taskDone', id: crypto.randomUUID(), taskId, result });
 }
 
 export function cancelRun(id: string): boolean {
@@ -614,6 +647,22 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
     case 'siteMapDraft':
       return draftListener?.(frame.id, frame.draft);
+
+    case 'taskList': {
+      pendingTaskOps.get(frame.id)?.(frame.result);
+      pendingTaskOps.delete(frame.id);
+      if (frame.result.ok) await browser.storage.local.set({ [TASKS_KEY]: frame.result.data });
+      return;
+    }
+
+    case 'runTask':
+      return send(ws, {
+        t: 'result',
+        id: frame.id,
+        result: taskRunner
+          ? await taskRunner(frame.order).catch((error) => failure('BRIDGE_ERROR', String(error)))
+          : failure('UNSUPPORTED', 'This browser is not ready to run scheduled tasks yet.'),
+      });
 
     default:
       return;

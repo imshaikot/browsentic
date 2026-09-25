@@ -9,6 +9,7 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
+import type { TaskOrder } from '@/lib/schedules/task';
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { PICK_DEFAULT_TIMEOUT_MS, pickElement } from '@/lib/actions/page/pick-element';
 import { SOLVE_CAPTCHA_TIMEOUT_MS, solveCaptcha } from '@/lib/actions/page/solve-captcha';
@@ -20,6 +21,7 @@ import { log } from './log';
 const PING_INTERVAL_MS = 20_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DESCRIBE_TIMEOUT_MS = 10_000;
+const RUN_TASK_TIMEOUT_MS = 30_000;
 
 interface Pending {
   resolve: (result: ActionResult) => void;
@@ -80,6 +82,10 @@ export class ExtensionLink {
   async describe(): Promise<ToolDescriptor[] | null> {
     const result = await this.request({ t: 'describe', id: randomUUID() }, DESCRIBE_TIMEOUT_MS);
     return result.ok ? (result.data as ToolDescriptor[]) : null;
+  }
+
+  runTask(order: TaskOrder): Promise<ActionResult> {
+    return this.request({ t: 'runTask', id: randomUUID(), order }, RUN_TASK_TIMEOUT_MS);
   }
 
   send(frame: SocketFrame): void {

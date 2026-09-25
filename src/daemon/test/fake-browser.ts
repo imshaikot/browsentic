@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { clientProof, newNonce, openSessionKey, pairingSecret, type Transcript } from '@/lib/actions/handshake';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
-import { SOCKET_PROTOCOL_VERSION, parseFrame, type SocketFrame } from '@/lib/actions/protocol';
+import {
+  SOCKET_PROTOCOL_VERSION,
+  parseFrame,
+  type ActionResult,
+  type ExtensionRequest,
+  type SocketFrame,
+} from '@/lib/actions/protocol';
+import type { TaskList, TaskOrder } from '@/lib/schedules/task';
 import { describeActions, type BrowserTarget } from '@/lib/actions/registry';
 
 export interface Profile {
@@ -22,6 +29,13 @@ const EXTENSION_VERSION = '0.0.0-test';
 /** The extension's half of the socket: it proves itself, then answers every invoke with its own name. */
 export class FakeBrowser {
   readonly invoked: string[] = [];
+  /** Every scheduled run the daemon handed this browser. */
+  readonly orders: TaskOrder[] = [];
+  /** What the next `runTask` is answered with. */
+  taskReply: ActionResult = { ok: true, data: { sessionId: 'fake-session' } };
+  /** The task list the daemon last pushed or answered with. */
+  tasks: TaskList | null = null;
+  private readonly replies = new Map<string, (frame: SocketFrame) => void>();
   readonly closed: Promise<string>;
   /** Resolves once this browser has answered the daemon's request for its manifest — a drifted build is asked right behind the welcome. */
   readonly described: Promise<void>;
@@ -93,7 +107,28 @@ export class FakeBrowser {
     this.socket.close(1000, 'test over');
   }
 
+  /** Sends what the side panel would, and resolves with the daemon's answer to it. */
+  ask(request: Extract<ExtensionRequest, { id: string }>): Promise<SocketFrame> {
+    const answered = new Promise<SocketFrame>((resolve) => this.replies.set(request.id, resolve));
+    send(this.socket, request);
+    return answered;
+  }
+
+  tell(request: Extract<ExtensionRequest, { id: string }>): void {
+    send(this.socket, request);
+  }
+
   private receive(frame: SocketFrame | null): void {
+    if (frame?.t === 'taskList' && frame.result.ok) this.tasks = frame.result.data;
+    const waiting = frame && 'id' in frame ? this.replies.get(frame.id) : undefined;
+    if (waiting && frame && 'id' in frame) {
+      this.replies.delete(frame.id);
+      return waiting(frame);
+    }
+    if (frame?.t === 'runTask') {
+      this.orders.push(frame.order);
+      return send(this.socket, { t: 'result', id: frame.id, result: this.taskReply });
+    }
     if (frame?.t === 'pong') {
       this.pongs.get(frame.id)?.();
       this.pongs.delete(frame.id);

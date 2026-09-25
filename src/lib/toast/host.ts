@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { RAIL_PALETTES, RAIL_TONES } from '@/lib/rail/events';
-import { MAX_TOASTS, TOAST_CHANNEL, isToastCommand, type ToastView } from './events';
+import { APPROVAL_ARMED_AFTER_MS, MAX_TOASTS, TOAST_CHANNEL, isToastCommand, type ToastView } from './events';
 
 export { TOAST_CHANNEL } from './events';
 
@@ -100,7 +100,11 @@ export function exposeToast(): void {
     card.querySelector<HTMLElement>('.body')!.textContent = view.body;
 
     const cue = card.querySelector<HTMLElement>('.cue')!;
-    if (view.tabId == null) cue.remove();
+    if (view.approval) {
+      cue.remove();
+      card.setAttribute('role', 'alertdialog');
+      card.append(approvalControls(view));
+    } else if (view.tabId == null) cue.remove();
     else {
       cue.textContent = 'Click to open the tab';
       card.classList.add('go');
@@ -118,7 +122,8 @@ export function exposeToast(): void {
       dismiss(view.toastId);
     });
 
-    card.querySelector<HTMLElement>('.bar i')!.style.animationDuration = `${view.durationMs}ms`;
+    const lifetime = view.approval ? Math.max(view.approval.expiresAt - Date.now(), 0) : view.durationMs;
+    card.querySelector<HTMLElement>('.bar i')!.style.animationDuration = `${lifetime}ms`;
 
     stack!.append(card);
     while (stack!.childElementCount > MAX_TOASTS) {
@@ -127,8 +132,50 @@ export function exposeToast(): void {
       dismissNow(oldest);
     }
 
-    arm(card, view.toastId, view.durationMs);
+    if (view.approval) {
+      const handle = setTimeout(() => dismiss(view.toastId), lifetime);
+      timers.set(view.toastId, () => clearTimeout(handle));
+    } else arm(card, view.toastId, view.durationMs);
     return true;
+  }
+
+  /* The card sits inside a page that may want the answer to be yes. Only a real click counts —
+     a page can dispatch clicks but cannot make them trusted — and none counts in the first
+     moment after the card appears, so a click aimed at the page cannot land on Allow. */
+  function approvalControls(view: ToastView): HTMLElement {
+    const { approval } = view;
+    const shownAt = performance.now();
+    const row = document.createElement('div');
+    row.className = 'answers';
+    const detail = document.createElement('p');
+    detail.className = 'detail';
+    detail.textContent = [approval!.action, approval!.detail].filter(Boolean).join(' · ');
+
+    const choices: { label: string; allow: boolean; remember: boolean; kind: string }[] = [
+      ...(approval!.site ? [{ label: `Always on ${approval!.site}`, allow: true, remember: true, kind: 'answer quiet' }] : []),
+      { label: 'Deny', allow: false, remember: false, kind: 'answer' },
+      { label: 'Allow', allow: true, remember: false, kind: 'answer primary' },
+    ];
+    for (const choice of choices) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = choice.kind;
+      button.textContent = choice.label;
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!event.isTrusted || performance.now() - shownAt < APPROVAL_ARMED_AFTER_MS) return;
+        void browser.runtime
+          .sendMessage({ channel: TOAST_CHANNEL, op: 'answer', toastId: view.toastId, allow: choice.allow, remember: choice.remember })
+          .catch(() => undefined);
+        dismiss(view.toastId);
+      });
+      row.append(button);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.append(detail, row);
+    return wrap;
   }
 
   /* Ten seconds of a minimized window is ten seconds nobody saw. The countdown — and the
@@ -205,6 +252,27 @@ const STYLES = `
   }
   .body { margin-top: 4px; font: 400 12px/1.45 inherit; color: var(--inkDim); }
   .cue { display: block; margin-top: 6px; font: 500 11px/1.4 inherit; color: var(--brand); }
+  .detail {
+    margin-top: 6px;
+    font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  .answers { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+  .answer {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 5px 10px;
+    background: transparent;
+    color: var(--ink);
+    font: 600 11px/1.2 inherit;
+    cursor: pointer;
+  }
+  .answer:hover { background: var(--surface); }
+  .answer.primary { border-color: transparent; background: var(--tone); color: var(--ground); }
+  .answer.primary:hover { filter: brightness(1.08); background: var(--tone); }
+  .answer.quiet { margin-right: auto; border-color: transparent; padding-inline: 2px; color: var(--inkDim); font-weight: 500; }
+  .answer.quiet:hover { background: transparent; color: var(--ink); text-decoration: underline; }
   .close {
     position: absolute;
     top: 8px;

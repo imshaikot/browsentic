@@ -32,6 +32,7 @@ export interface Run {
   sessions: TabSession[];
   send: (text: string, opts?: SendOptions) => void;
   cancel: () => void;
+  stopSession: (sessionId: string) => void;
   decide: (toolId: string, allow: boolean, remember?: boolean) => void;
   clear: () => void;
   restore: (sessionId: string) => Promise<void>;
@@ -292,6 +293,7 @@ export function useRun(): Run {
     cancel: useCallback(() => {
       if (sessionId) post({ op: 'cancel', sessionId });
     }, [post, sessionId]),
+    stopSession: useCallback((target: string) => post({ op: 'cancel', sessionId: target }), [post]),
     decide: useCallback(
       (toolId: string, allow: boolean, remember?: boolean) => {
         if (sessionId) post({ op: 'decision', sessionId, toolId, allow, remember });

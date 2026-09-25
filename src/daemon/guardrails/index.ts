@@ -36,7 +36,7 @@ export {
 } from './policy';
 export type { Caller, Condition, ConditionName, Effect, FencePolicy, GuardrailConfig, GuardrailRequest, Policy, Rule } from './policy';
 
-export { DECLINED_MESSAGE, blocked, decide, declined, describe, summary } from './decide';
+export { DECLINED_MESSAGE, blocked, decide, declined, describe, summary, unanswered } from './decide';
 export type { Decision } from './decide';
 
 export { FENCE_NOTE, IMAGE_NOTE, fence, fenceTag, shouldFence } from './fence';
