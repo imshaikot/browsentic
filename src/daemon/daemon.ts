@@ -54,7 +54,7 @@ import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
 import { configPath, readAgentConfig, writeActiveAgent, writeAgentModel, writeGuardrailSetting } from './agent/config';
 import { agentSkills } from './agent/agent-skills';
-import { agentState, grantRunner } from './agent/runners';
+import { agentState, grantRunner, refreshModelLists } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
@@ -457,6 +457,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
     scheduleIdleExit();
     void pushAgentState(accepted);
+    watchModels();
     pushSkillCatalog(accepted);
     if (!known) await adoptExtensionManifest(accepted);
   }
@@ -506,12 +507,28 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (request.t === 'setAgentModel') {
       // A model change keeps held conversations — every CLI resumes a session under a new model.
       const model = typeof request.model === 'string' ? request.model : null;
-      writeAgentModel(request.agent, model);
+      if (!writeAgentModel(request.agent, model)) {
+        return failure('INVALID_INPUT', `"${String(model)}" is not a model id: it has to start with a letter or digit and hold no spaces.`);
+      }
       log(`${AGENTS[request.agent].label} model set to ${model?.trim() || 'the default'}`);
     }
     if (request.t === 'grantAgent') await grantRunner(request.agent);
-    const refresh = request.t !== 'agentState' || request.refresh === true;
-    return success(await agentState(readAgentConfig(), { refresh }));
+    const recheck = request.t === 'agentState' && request.refresh === true;
+    const state = await agentState(readAgentConfig(), { refresh: request.t !== 'agentState' || recheck });
+    watchModels({ force: recheck });
+    return success(state);
+  }
+
+  /**
+   * Reads each agent's own model list after the state has gone out, and sends the state again
+   * when one changed. A forced read sends it regardless, so the list's age is current.
+   */
+  function watchModels({ force = false } = {}): void {
+    void refreshModelLists(readAgentConfig(), { force })
+      .then((changed) => {
+        if (changed || force) for (const link of openLinks()) void pushAgentState(link);
+      })
+      .catch((error: unknown) => log(`could not refresh the model lists: ${String(error)}`));
   }
 
   function settleGuardrail(request: GuardrailFrame): ActionResult<GuardrailSettings> {
@@ -687,8 +704,11 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           log(`control ${client} set the agent to ${AGENTS[request.set].label}`);
         }
         if (request.grant) await grantRunner(request.grant);
-        const state = await agentState(readAgentConfig(), { refresh: !!changed });
-        if (changed) announceAgent();
+        const listed = isAgentKind(request.models);
+        if (listed) await refreshModelLists(readAgentConfig(), { force: true, only: request.models });
+        const state = await agentState(readAgentConfig(), { refresh: !!changed || listed });
+        if (changed || listed) announceAgent();
+        else watchModels();
         return send(ws, { id: request.id, op: 'agent', state });
       }
       if (request.op === 'revoke') {

@@ -1,0 +1,4 @@
+# `cursor-agent models` 2026.09.18-9a7762b with an empty HOME, recorded 2026-09-25.
+# exit 1
+# stderr
+Error: Authentication required. Run 'agent login', pass --api-key/--auth-token, or set CURSOR_API_KEY/CURSOR_AUTH_TOKEN.

@@ -7,7 +7,7 @@ import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { MCP_SERVER_NAME } from './claude';
 import { effortOf, parseJsonLine, sweepRunDirs } from './util';
-import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
+import type { JsonContext, Listing, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
 
 /** Antigravity reads MCP servers and instructions from the directory it runs in, not from flags. */
 const MCP_CONFIG = '.agents/mcp_config.json';
@@ -67,6 +67,8 @@ export const antigravityRunner: Runner = {
   efforts: ['low', 'medium', 'high'],
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'antigravity', mode),
+
+  models: { args: ['models'], parse: listedModels },
 
   skillDirs: () => {
     try {
@@ -274,3 +276,12 @@ function lastFrame(stdout: string): Frame | null {
 }
 
 const ownTool = (name: string) => /browsentic|^mcp/i.test(name);
+
+/** `agy models` prints one `id<TAB>label` line per model, and exits 1 when signed out. */
+function listedModels({ stdout, code }: Listing): string[] | null {
+  if (code !== 0) return null;
+  return stdout.split('\n').flatMap((line) => {
+    const [id, label] = line.split('\t');
+    return label !== undefined && id.trim() ? [id.trim()] : [];
+  });
+}

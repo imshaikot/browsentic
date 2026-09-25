@@ -27,7 +27,7 @@ beforeEach(() => {
 const DEFAULTS: AgentConfig = {
   agent: 'claude',
   agents: {
-    claude: { bin: 'claude', model: 'claude-sonnet-5' },
+    claude: { bin: 'claude', model: 'sonnet' },
     codex: { bin: 'codex' },
     antigravity: { bin: 'agy' },
     vibe: { bin: 'vibe' },
@@ -72,6 +72,12 @@ describe('reading config.json', () => {
   test('the per-agent spelling wins over the old one', () => {
     store({ model: 'claude-opus-5', agents: { claude: { model: 'claude-haiku-4-5' } } });
     expect(readAgentConfig().agents.claude.model).toBe('claude-haiku-4-5');
+  });
+
+  test('a model a CLI could read as a flag is left out, so the run falls back to the default instead', () => {
+    store({ agents: { claude: { model: '--dangerously-skip-permissions' }, codex: { model: 'gpt 5' }, cursor: { model: 'claude-opus-4-8[effort=high]' } } });
+    const { agents } = readAgentConfig();
+    expect([agents.claude.model, agents.codex.model, agents.cursor.model]).toEqual(['sonnet', undefined, 'claude-opus-4-8[effort=high]']);
   });
 
   test('keys the daemon does not model are carried through', () => {
@@ -129,7 +135,16 @@ describe('writing config.json', () => {
   test("clearing Claude Code's model also removes the pre-0.2 spelling, so it cannot come back", () => {
     store({ model: 'claude-opus-5', agents: { claude: { model: 'claude-opus-5' } } });
     writeAgentModel('claude', '');
-    expect([stored(), readAgentConfig().agents.claude.model]).toEqual([{}, 'claude-sonnet-5']);
+    expect([stored(), readAgentConfig().agents.claude.model]).toEqual([{}, 'sonnet']);
+  });
+
+  test('a model a CLI could read as a flag is refused, and nothing is written', () => {
+    store({ agents: { codex: { model: 'gpt-5.5' } } });
+    expect([writeAgentModel('codex', '-c sandbox_mode=off'), writeAgentModel('codex', 'gpt\n5'), stored()]).toEqual([
+      false,
+      false,
+      { agents: { codex: { model: 'gpt-5.5' } } },
+    ]);
   });
 
   describe('guardrail overrides', () => {

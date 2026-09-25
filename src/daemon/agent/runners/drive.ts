@@ -59,9 +59,7 @@ export function launch(
 
   const dropped = sealedAway(kind, process.env);
   if (dropped.length) log(`sealed ${dropped.length} credential-shaped variables out of the ${kind} environment`);
-  const env: NodeJS.ProcessEnv = sealEnv(kind, process.env);
-  for (const key of STRIPPED) delete env[key];
-  Object.assign(env, plan.env);
+  const env = { ...childEnv(kind), ...plan.env };
 
   const child = spawn(settings.bin, plan.args, {
     cwd: plan.cwd,
@@ -77,6 +75,13 @@ export function launch(
   if (signal.aborted) kill();
   else signal.addEventListener('abort', kill, { once: true });
   return { child, release: () => signal.removeEventListener('abort', kill), stop: kill };
+}
+
+/** The environment any process of this agent's CLI starts with, before a plan adds its own. */
+export function childEnv(kind: AgentKind): NodeJS.ProcessEnv {
+  const env = sealEnv(kind, process.env);
+  for (const key of STRIPPED) delete env[key];
+  return env;
 }
 
 function notInstalled(runner: Runner, settings: AgentSettings): RunError {

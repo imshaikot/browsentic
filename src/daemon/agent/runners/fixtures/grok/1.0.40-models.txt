@@ -1,0 +1,8 @@
+# `grok models` 1.0.40, signed in with grok.com, recorded 2026-09-25.
+# exit 0
+You are logged in with grok.com.
+
+Default model: grok-4.7
+
+Available models:
+  * grok-4.7 (default)

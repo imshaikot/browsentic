@@ -446,6 +446,20 @@ describe('spawn containment', () => {
     });
   });
 
+  describe('a model a CLI could read as a flag', () => {
+    for (const kind of AGENT_KINDS) {
+      test(`is refused for ${kind}`, () => {
+        const problems = vetPlan(kind, 'run', plus(planOf(kind, 'run'), '--model', '-p'), stateDir);
+        expect(problems.some((problem) => problem.includes('could read as a flag'))).toBe(true);
+      });
+    }
+
+    test("is not Cursor's bracketed override", () => {
+      const plan = plus(planOf('cursor', 'run'), '--model', 'claude-opus-4-8[context=1m,effort=high]');
+      expect(vetPlan('cursor', 'run', plan, stateDir)).toEqual([]);
+    });
+  });
+
   describe('every agent the catalog knows about declares containment', () => {
     for (const kind of AGENT_KINDS) {
       test(`${kind} declares containment`, () => {

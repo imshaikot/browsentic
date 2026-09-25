@@ -16,6 +16,7 @@ import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
 import { cursorRunner } from './cursor';
 import { grokRunner } from './grok';
+import { modelsFor, refreshModels } from './models';
 import { opencodeRunner } from './opencode';
 import { qwenRunner } from './qwen';
 import type { McpServer, Runner } from './types';
@@ -76,6 +77,25 @@ function forgetProbes(): void {
   cached = null;
 }
 
+/**
+ * Re-reads the model lists that are due, for every installed agent, or only the one named. One still
+ * to be set up is read too, so its list is there the moment it is. Resolves to whether any list the
+ * picker shows changed — the caller's cue to push the state again.
+ */
+export async function refreshModelLists(
+  config: AgentConfig,
+  { force = false, only }: { force?: boolean; only?: AgentKind } = {},
+): Promise<boolean> {
+  const state = await agentState(config);
+  const reads = state.runners
+    .filter((status) => (status.ready || status.problem?.code === 'AGENT_NEEDS_PERMISSION') && (!only || status.kind === only))
+    .map((status) => refreshModels(RUNNERS[status.kind], config.agents[status.kind], status.version, { force }));
+  const changed = (await Promise.all(reads)).some(Boolean);
+  // A forced read restamps the list even when it came back the same, and the next state should say so.
+  if (changed || force) forgetProbes();
+  return changed;
+}
+
 export async function grantRunner(kind: AgentKind): Promise<AgentProblem | null> {
   const problem = (await RUNNERS[kind].grant?.()) ?? null;
   forgetProbes();
@@ -122,6 +142,7 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
     model: settings.model,
     ready: !problem,
     version: found.detail,
+    models: modelsFor(runner.kind),
     problem: problem ?? undefined,
   };
 }

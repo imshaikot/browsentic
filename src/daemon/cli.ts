@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
-import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind } from '@/lib/agents/catalog';
+import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type ModelList } from '@/lib/agents/catalog';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
+import { formatWhen } from '@/lib/format-when';
 import { basename, join } from 'node:path';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
@@ -39,6 +40,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic agent <name>     switch to claude, codex, antigravity, vibe, grok, cursor, qwen or opencode
   browsentic agent fix <name> let Browsentic fix what that agent still needs
   browsentic agent model <name> [model]   pin that agent's model, or omit it for the CLI's default
+  browsentic agent models <name>          list the models that agent offers; --refresh asks its CLI again
 
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
@@ -593,9 +595,13 @@ async function chooseAgent(first?: string, second?: string, third?: string): Pro
       console.error(`Name the agent whose model to set. Pick one of: ${AGENT_KINDS.join(', ')}`);
       process.exit(1);
     }
-    writeAgentModel(second, third ?? null);
+    if (!writeAgentModel(second, third ?? null)) {
+      console.error(`"${third}" is not a model id: it has to start with a letter or digit and hold no spaces.`);
+      process.exit(1);
+    }
     first = second = undefined;
   }
+  if (first === 'models') return listModels(second);
 
   // Renamed to "fix" because `browsentic setup` now means something else entirely. The old
   // spelling stays as an undocumented alias for one release.
@@ -621,6 +627,7 @@ async function chooseAgent(first?: string, second?: string, third?: string): Pro
     const mark = runner.kind === state.active ? '●' : '○';
     const version = runner.version ? ` — ${runner.version}` : '';
     console.log(`${mark} ${agent.label.padEnd(12)} ${runner.ready ? 'ready' : 'unavailable'}${version}`);
+    if (runner.ready && runner.models) console.log(`    models: ${modelSource(runner.kind, runner.models)}`);
     if (runner.problem) {
       console.log(`    ${runner.problem.message}`);
       if (runner.problem.fix) console.log(`    ${runner.problem.fix}`);
@@ -628,6 +635,34 @@ async function chooseAgent(first?: string, second?: string, third?: string): Pro
     }
   }
   console.log(`\nThe side panel runs on ${AGENTS[state.active].label}.`);
+}
+
+async function listModels(named?: string): Promise<void> {
+  if (!isAgentKind(named)) {
+    console.error(`Name the agent whose models to list. Pick one of: ${AGENT_KINDS.join(', ')}`);
+    process.exit(1);
+  }
+  const bridge = await connect();
+  const state = await bridge.agent(process.argv.includes('--refresh') ? { models: named } : undefined);
+  await bridge.close();
+
+  const runner = state.runners.find((status) => status.kind === named);
+  const models: ModelList = runner?.models ?? { ids: AGENTS[named].models, from: 'catalog' };
+  if (wantsJson) {
+    console.log(JSON.stringify({ agent: named, model: runner?.model ?? null, ...models }, null, 2));
+    return;
+  }
+  for (const id of models.ids) console.log(`${id === runner?.model ? '●' : ' '} ${id}`);
+  if (runner?.model && !models.ids.includes(runner.model)) console.log(`● ${runner.model}  (pinned, not listed)`);
+  console.log(`\n${modelSource(named, models)}`);
+}
+
+function modelSource(kind: AgentKind, models: ModelList): string {
+  const source =
+    models.from === 'cli' && models.at !== undefined
+      ? `${models.ids.length} listed by ${AGENTS[kind].bin}, ${formatWhen(models.at)}`
+      : `Browsentic's built-in list of ${models.ids.length}`;
+  return models.error ? `${source}. The last read failed: ${models.error}` : `${source}.`;
 }
 
 async function revoke(browser?: string): Promise<void> {

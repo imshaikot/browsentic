@@ -33,7 +33,7 @@ export type ControlRequest =
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
   | { id: string; op: 'revoke'; session?: string; origin?: string }
-  | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind };
+  | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind; models?: AgentKind };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[] }

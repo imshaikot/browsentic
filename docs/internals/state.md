@@ -10,6 +10,7 @@ Nothing lives in the repository.
 ├── auth.json      0600        outstanding pairing code, session keys per browser
 ├── config.json                optional, hand-written
 ├── approvals.json 0600        "always on this site" grants, one action + host per entry
+├── models.json    0600        each agent CLI's own model list, as last read
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
 ├── skills/                    hand-written skill overrides
 ├── cli/                       macOS app only: the command, the daemon, bundled skills, the extension payload
@@ -30,6 +31,7 @@ Nothing lives in the repository.
 | `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
 | `config.json` | You, and the agent picker | Re-read before every run — no restart needed. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
+| `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `cli/`, `bin/`, `runtime/` | [Browsentic.app](../guide/mac-app.md) | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 

@@ -1,0 +1,5 @@
+# `agy models` 1.2.11 with an empty HOME, recorded 2026-09-25.
+# exit 1
+# stderr
+Fetching available models...
+Error: Please sign in to view available models. Launch the CLI without arguments to sign in.

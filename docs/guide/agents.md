@@ -19,12 +19,36 @@ own; picking a model is remembered per agent and applies from the next instructi
 agents, changing the model keeps the conversation being held open — every CLI resumes a session
 under a new model.
 
+### Where the models come from
+
+Where a CLI can say which models your account has, the select offers those:
+
+| Agent | Read from |
+| --- | --- |
+| Codex | the model cache Codex keeps itself, `~/.codex/models_cache.json` |
+| Antigravity | `agy models` |
+| Grok Build | `grok models` |
+| Cursor CLI | `cursor-agent models` — over 200, so the select becomes a filter, with Browsentic's picks first |
+
+The other four have no such command, so the select offers a short list Browsentic ships. For Claude
+Code those are its aliases — `fable`, `opus`, `sonnet`, `haiku` — which it resolves to the newest
+model of each family.
+
+The daemon reads a list in the background and never holds the popup up for one. A list it has read
+is kept for six hours, and read again at once when the CLI is updated; *Recheck* reads it again now.
+When a read fails — the CLI is signed out, times out, or prints something Browsentic cannot parse —
+the last list that read cleanly stays, or the shipped one when there is none, and the line under the
+select says why. A model you pinned yourself is never changed: if the CLI stops listing it, it stays
+selected, marked *not listed*.
+
 The same thing from a terminal:
 
 ```sh
 browsentic agent                  # what is installed, and what runs the side panel
 browsentic agent codex            # switch
 browsentic agent fix antigravity
+browsentic agent models cursor    # the models the select offers, and where they came from
+browsentic agent models cursor --refresh
 ```
 
 Switching takes effect on the next instruction. It also drops the conversation being held open:
@@ -39,7 +63,7 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 | Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba | Anomaly |
 | Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` | `opencode` |
 | Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
+| Default model | `sonnet`, the newest Sonnet | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
 | Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever | a variant the model defines, e.g. `high` or `max` |
 | Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
 
@@ -236,7 +260,7 @@ In `~/.browsentic/config.json`:
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on. The agent picker writes this. |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. |
-| `agents.<name>.model` | `claude-sonnet-5` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. |
+| `agents.<name>.model` | `sonnet` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. A value that starts with a dash or holds a space is ignored, so a typo cannot pass the CLI a flag. |
 | `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
 Changes apply to the next run — the config is re-read each time, no daemon restart needed.
@@ -266,6 +290,8 @@ Claude runner's settings.
 | `AGENT_UNSAFE`: *Qwen Code registered …* or *loaded the MCP server …* | Qwen's own `init` line named a tool or a server Browsentic denied, so the run was stopped. Update Qwen Code and Browsentic, and report it if it persists. |
 | OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. Run `opencode auth login`, then pick that provider's model in the popup. |
 | OpenCode: *could not start this turn* | Usually a model OpenCode does not know. Pick one as `opencode models` lists it, `provider/model`. |
+| The model select says *built-in list*, with a reason | Browsentic could not read that CLI's own list, usually because it is signed out. Sign it in, then press *Recheck*. The shipped list works meanwhile. |
+| A model shows *not listed* | You pinned it, and the CLI no longer lists it. It is still passed to the CLI; pick a listed one if runs start failing. |
 | OpenCode cannot find a key you have exported | Only `OPENCODE_*` reaches a run. Run `opencode auth login` instead, which keeps the key in OpenCode's own file. |
 | `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped. Update OpenCode and Browsentic, and report it. |
 

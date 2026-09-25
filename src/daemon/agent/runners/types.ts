@@ -62,6 +62,20 @@ export interface StreamSink {
 
 export type StreamReader = (line: string, sink: StreamSink) => void;
 
+export interface Listing {
+  stdout: string;
+  stderr: string;
+  code: number | null;
+}
+
+/**
+ * Where a CLI lists the models its account can use: a subcommand it prints them from, or a file
+ * it keeps them in. `parse` answers null for anything but a clean list — signed out included.
+ */
+export type ModelLister =
+  | { args: string[]; parse(listing: Listing): string[] | null }
+  | { file(): string; parse(content: string): string[] | null };
+
 export interface Runner {
   kind: AgentKind;
   /** Arguments that make the binary print its version, used to prove it is installed. */
@@ -71,6 +85,8 @@ export interface Runner {
   workspace(mode: RunMode): string;
   /** Directories where this CLI keeps the user's own skills, feeding the panel's skill picker. */
   skillDirs?(): string[];
+  /** Absent: the picker offers the catalog's curated models. */
+  models?: ModelLister;
   stream(context: StreamContext): Plan;
   /** Fresh per run — readers carry state across lines. */
   reader(): StreamReader;

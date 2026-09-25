@@ -107,6 +107,12 @@ export const codexRunner: Runner = {
 
   skillDirs: () => [join(homedir(), '.codex', 'skills'), join(homedir(), '.codex', 'prompts')],
 
+  // Codex keeps the account's models in a cache it refreshes itself, so reading them spawns nothing.
+  models: {
+    file: () => join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'models_cache.json'),
+    parse: listedModels,
+  },
+
   stream(context: StreamContext): Plan {
     const { settings, mcp, research } = context;
     const server = `mcp_servers.${MCP_SERVER_NAME}`;
@@ -312,3 +318,21 @@ const tomlTable = (values: Record<string, string>): string =>
   `{${Object.entries(values)
     .map(([key, value]) => `${key}=${tomlString(value)}`)
     .join(',')}}`;
+
+interface CachedModel {
+  slug?: unknown;
+  visibility?: unknown;
+  priority?: unknown;
+}
+
+/** The models Codex's own picker offers, in its order. Hidden ones are Codex's internal helpers. */
+function listedModels(content: string): string[] | null {
+  const models = parseJsonLine<{ models?: CachedModel[] }>(content)?.models;
+  if (!Array.isArray(models)) return null;
+  return models
+    .filter((model) => model.visibility === 'list' && typeof model.slug === 'string')
+    .sort((a, b) => rank(a) - rank(b))
+    .map((model) => model.slug as string);
+}
+
+const rank = (model: CachedModel) => (typeof model.priority === 'number' ? model.priority : Number.MAX_SAFE_INTEGER);
