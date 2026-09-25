@@ -6,7 +6,7 @@ import { AGENT_KINDS, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import type { AgentConfig, AgentSettings } from '../config';
 import { MCP_RULE, settingsPath } from './antigravity';
-import { agentState, grantRunner, mcpServerFor, RUNNERS, runnerFor } from './index';
+import { agentState, grantRunner, mcpServerFor, refreshModelLists, RUNNERS, runnerFor } from './index';
 
 const bin = join(stateDir, 'stub-bin');
 const probes = join(stateDir, 'probes.log');
@@ -168,6 +168,46 @@ describe('readiness probes', () => {
       [MCP_RULE],
       true,
     ]);
+  });
+
+  test('an installed agent offers the curated models until its own list has been read', async () => {
+    rmSync(join(stateDir, 'models.json'), { force: true });
+    expect((await runner('codex', configWith({})))?.models).toEqual({ ids: AGENTS.codex.models, from: 'catalog', error: undefined });
+  });
+
+  test("once read, an agent offers its CLI's list, and the probe is taken again so the picker sees it", async () => {
+    rmSync(join(stateDir, 'models.json'), { force: true });
+    const codexHome = join(stateDir, 'codex-home');
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(
+      join(codexHome, 'models_cache.json'),
+      JSON.stringify({ models: [{ slug: 'gpt-next', visibility: 'list', priority: 1 }, { slug: 'gpt-5.5', visibility: 'list', priority: 2 }] }),
+    );
+    vi.stubEnv('CODEX_HOME', codexHome);
+    const config = configWith({});
+    await agentState(config, { refresh: true });
+    const changed = await refreshModelLists(config);
+    expect([changed, (await agentState(config)).runners.find((status) => status.kind === 'codex')?.models]).toMatchObject([
+      true,
+      { ids: ['gpt-5.5', 'gpt-next'], from: 'cli' },
+    ]);
+  });
+
+  test('a forced read that finds the same list still shows when it was read', async () => {
+    rmSync(join(stateDir, 'models.json'), { force: true });
+    const codexHome = join(stateDir, 'codex-home');
+    mkdirSync(codexHome, { recursive: true });
+    writeFileSync(join(codexHome, 'models_cache.json'), JSON.stringify({ models: [{ slug: 'gpt-5.5', visibility: 'list' }] }));
+    vi.stubEnv('CODEX_HOME', codexHome);
+    const config = configWith({});
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    await refreshModelLists(config, { force: true });
+    await agentState(config);
+    now.mockReturnValue(2_000);
+    const changed = await refreshModelLists(config, { force: true });
+    const codex = (await agentState(config)).runners.find((status) => status.kind === 'codex');
+    now.mockRestore();
+    expect([changed, codex?.models?.at]).toEqual([false, 2_000]);
   });
 
   test('an agent with nothing to set up reports no problem', async () => {

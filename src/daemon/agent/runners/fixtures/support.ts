@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import type { AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../../lockfile';
 import type { AgentSettings } from '../../config';
-import type { JsonContext, McpServer, Plan, Runner, StreamContext, StreamSink } from '../types';
+import type { JsonContext, Listing, McpServer, Plan, Runner, StreamContext, StreamSink } from '../types';
 
 export type Signal = keyof StreamSink;
 export type Call = [Signal, ...unknown[]];
@@ -12,6 +12,20 @@ export function transcript(agent: AgentKind, name: string): string[] {
   return readFileSync(new URL(`./${agent}/${name}`, import.meta.url), 'utf8')
     .split('\n')
     .filter((line) => line.trim() && !line.startsWith('#'));
+}
+
+/** A recorded `models` listing: stdout, then stderr after a `# stderr` line, and the code from `# exit`. */
+export function listing(agent: AgentKind, name: string): Listing {
+  const streams = { stdout: [] as string[], stderr: [] as string[] };
+  let into: keyof typeof streams = 'stdout';
+  let code = 0;
+  for (const line of readFileSync(new URL(`./${agent}/${name}`, import.meta.url), 'utf8').split('\n')) {
+    const exit = /^# exit (\d+)$/.exec(line);
+    if (exit) code = Number(exit[1]);
+    else if (line === '# stderr') into = 'stderr';
+    else if (!line.startsWith('#')) streams[into].push(line);
+  }
+  return { stdout: streams.stdout.join('\n'), stderr: streams.stderr.join('\n'), code };
 }
 
 /** Every sink call a fresh reader makes for these lines, in order. */

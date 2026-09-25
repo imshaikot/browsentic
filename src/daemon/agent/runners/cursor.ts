@@ -7,7 +7,7 @@ import { stateDir } from '../../lockfile';
 import type { AgentSettings } from '../config';
 import { MCP_SERVER_NAME } from './claude';
 import { conversationDir, parseJsonLine, sweepRunDirs } from './util';
-import type { JsonContext, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
+import type { JsonContext, Listing, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
 /**
  * Cursor takes its MCP server, its permissions and its sandbox from files in the folder it starts
@@ -57,6 +57,8 @@ export const cursorRunner: Runner = {
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'cursor', mode),
 
   skillDirs: () => [join(cursorHome(), 'skills'), join(homedir(), '.agents', 'skills')],
+
+  models: { args: ['models'], parse: listedModels },
 
   stream(context: StreamContext): Plan {
     const { settings, research } = context;
@@ -305,4 +307,13 @@ function lastResult(stdout: string): Event | null {
     if (parsed?.type === 'result') return parsed;
   }
   return null;
+}
+
+/** `cursor-agent models` prints `id - label` lines under a heading, and exits 1 when signed out. */
+function listedModels({ stdout, code }: Listing): string[] | null {
+  if (code !== 0) return null;
+  const lines = plain(stdout).split('\n');
+  const heading = lines.findIndex((line) => /^available models$/i.test(line.trim()));
+  if (heading === -1) return null;
+  return lines.slice(heading + 1).flatMap((line) => /^(\S+) - \S/.exec(line.trim())?.slice(1, 2) ?? []);
 }
