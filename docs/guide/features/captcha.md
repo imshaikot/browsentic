@@ -2,7 +2,7 @@
 
 What Browsentic does at a "verify you are human" block.
 
-<video src="../../assets/captcha-demo.mp4" controls muted playsinline preload="metadata"></video>
+<video src="https://github.com/user-attachments/assets/7818f665-be35-4fa3-84cc-32100880b7ee" controls muted playsinline preload="metadata"></video>
 
 ---
 
