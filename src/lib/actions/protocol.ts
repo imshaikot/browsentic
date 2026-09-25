@@ -7,15 +7,19 @@ import type { RecordingWorkflow } from '@/lib/recordings/workflow';
 import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
 import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
+import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
 
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 19;
+export const SOCKET_PROTOCOL_VERSION = 20;
 
 export const EXTERNAL_RUN_ID = 'external';
 
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
+
+/** The native messaging host the extension asks to start the daemon when no port answers. */
+export const NATIVE_HOST_NAME = 'com.browsentic.daemon';
 
 export interface ActionInvocation {
   channel: typeof ACTION_CHANNEL;
@@ -43,7 +47,12 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgentModel'; agent: AgentKind; model: string | null }
   | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind }
   | { channel: typeof BRIDGE_CHANNEL; op: 'guardrails' }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'setGuardrail'; setting: string; value: GuardrailValue };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'setGuardrail'; setting: string; value: GuardrailValue }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'tasks' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'saveTask'; task: unknown }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'deleteTask'; taskId: string }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'runTaskNow'; taskId: string }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'pauseTasks'; paused: boolean };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }
@@ -146,6 +155,8 @@ export interface RunContext {
    * simply there.
    */
   liveTools?: boolean;
+  /** Set when a schedule started this run: nobody is watching it, and it should end on one line saying what it found. */
+  task?: TaskContext;
 }
 
 /** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */
@@ -243,7 +254,15 @@ export type SocketFrame =
   | { t: 'skillCatalog'; id: string; result: ActionResult<SkillCatalog> }
   | { t: 'guardrails'; id: string }
   | { t: 'setGuardrail'; id: string; setting: string; value: GuardrailValue }
-  | { t: 'guardrailInfo'; id: string; result: ActionResult<GuardrailSettings> };
+  | { t: 'guardrailInfo'; id: string; result: ActionResult<GuardrailSettings> }
+  | { t: 'tasks'; id: string }
+  | { t: 'saveTask'; id: string; task: unknown }
+  | { t: 'deleteTask'; id: string; taskId: string }
+  | { t: 'runTaskNow'; id: string; taskId: string }
+  | { t: 'pauseTasks'; id: string; paused: boolean }
+  | { t: 'taskDone'; id: string; taskId: string; result: TaskResult }
+  | { t: 'taskList'; id: string; result: ActionResult<TaskList> }
+  | { t: 'runTask'; id: string; order: TaskOrder };
 
 export interface RecordingAnalysis {
   workflow: RecordingWorkflow;
@@ -277,6 +296,12 @@ export const EXTENSION_REQUEST_FRAMES = [
   'listSkills',
   'guardrails',
   'setGuardrail',
+  'tasks',
+  'saveTask',
+  'deleteTask',
+  'runTaskNow',
+  'pauseTasks',
+  'taskDone',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

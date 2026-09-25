@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Clapperboard, Globe, KeyRound, Loader2, Pencil, Play, X } from 'lucide-react';
+import { CalendarClock, Check, Clapperboard, Globe, KeyRound, Loader2, Pencil, Play, X } from 'lucide-react';
 import { Badge } from '@/extension/components/ui/badge';
 import { Input } from '@/extension/components/ui/input';
 import { renameRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
@@ -9,11 +9,13 @@ export function RecordingList({
   recordings,
   busy,
   onReplay,
+  onSchedule,
   onRemove,
 }: {
   recordings: StoredRecordingMeta[];
   busy?: boolean;
   onReplay: (recording: StoredRecordingMeta) => void;
+  onSchedule: (recording: StoredRecordingMeta) => void;
   onRemove: (recordingId: string) => void;
 }) {
   if (recordings.length === 0) {
@@ -39,6 +41,7 @@ export function RecordingList({
           recording={recording}
           busy={busy === true}
           onReplay={onReplay}
+          onSchedule={onSchedule}
           onRemove={onRemove}
         />
       ))}
@@ -50,11 +53,13 @@ function RecordingRow({
   recording,
   busy,
   onReplay,
+  onSchedule,
   onRemove,
 }: {
   recording: StoredRecordingMeta;
   busy: boolean;
   onReplay: (recording: StoredRecordingMeta) => void;
+  onSchedule: (recording: StoredRecordingMeta) => void;
   onRemove: (recordingId: string) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
@@ -128,14 +133,24 @@ function RecordingRow({
         </span>
 
         {ready && (
-          <button
-            type="button"
-            onClick={() => onReplay(recording)}
-            disabled={busy}
-            className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-brand/12 px-2 py-0.5 text-[11px] text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
-          >
-            <Play className="size-3" /> Do this again
-          </button>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <button
+              type="button"
+              onClick={() => onReplay(recording)}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full bg-brand/12 px-2 py-0.5 text-[11px] text-brand transition-colors hover:bg-brand/20 disabled:opacity-50"
+            >
+              <Play className="size-3" /> Do this again
+            </button>
+            <button
+              type="button"
+              onClick={() => onSchedule(recording)}
+              title="Replay it later, or on repeat, without the agent"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-ink-dim transition-colors hover:bg-surface hover:text-ink"
+            >
+              <CalendarClock className="size-3" /> Schedule
+            </button>
+          </div>
         )}
       </div>
 

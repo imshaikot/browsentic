@@ -13,6 +13,7 @@ import { openTab } from '@/lib/actions/page/open-tab';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import type { FileReport } from '@/lib/files/report';
+import { TASK_APPROVAL_WAIT_MS, TASK_RUN_MAX_MS } from '@/lib/schedules/task';
 import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
@@ -28,6 +29,7 @@ import {
   scopeFor,
   sealSecrets,
   summary as summarizeDecision,
+  unanswered,
   type Policy,
   type Scope,
 } from '../guardrails';
@@ -37,7 +39,7 @@ import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, withReports } from './prompt';
+import { buildSystemPrompt, scheduledBlock, withReports } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState } from './runners';
 import {
@@ -88,6 +90,8 @@ interface ActiveRun {
   liveTools: boolean;
   /** Actions the user allowed once in this run that stay allowed for the rest of it. */
   approved: Set<string>;
+  /** A schedule started it: an approval nobody answers is declined rather than awaited forever. */
+  scheduled: boolean;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
@@ -98,6 +102,7 @@ const HELD_FOR_RUN = new Set([CAPTCHA_ACTION]);
 interface Decision {
   allow: boolean;
   remember?: boolean;
+  unanswered?: boolean;
 }
 
 export class AgentSession {
@@ -228,6 +233,11 @@ export class AgentSession {
     if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site)) && !run.approved.has(action)) {
       emit({ kind: 'approval', toolId, action, input, site: run.site });
       const answer = await this.awaitDecision(run, toolId);
+      if (answer.unanswered) {
+        log(`agent run ${runId} got no answer on ${action}: ${describeDecision(decision)}`);
+        emit({ kind: 'toolResult', toolId, ok: false, summary: 'nobody answered in time' });
+        return unanswered();
+      }
       if (!answer.allow) {
         log(`agent run ${runId} declined ${action}: ${describeDecision(decision)}`);
         emit({ kind: 'toolResult', toolId, ok: false, summary: 'declined by the user' });
@@ -332,6 +342,7 @@ export class AgentSession {
       focusShot: context?.focus?.shot,
       liveTools: context?.liveTools === true,
       approved: new Set(),
+      scheduled: context?.task !== undefined,
     };
     this.runs.set(runId, run);
     if (run.liveTools && sessionId) this.codeListed.add(sessionId);
@@ -377,6 +388,7 @@ export class AgentSession {
           focus: focusBlock(context?.focus),
           attachments: handover.known,
           recordings: recordingsBlock(context?.recordings),
+          scheduled: scheduledBlock(context?.task),
         });
         instructionText = withReports(routed.text, handover.reports);
       }
@@ -405,7 +417,8 @@ export class AgentSession {
       emit({ kind: 'attachments', files: handover.handed });
     }
 
-    const budget = run.map ? setTimeout(() => run.abort.abort(), run.map.settings.timeoutMs) : undefined;
+    const allowance = run.map ? run.map.settings.timeoutMs : run.scheduled ? TASK_RUN_MAX_MS : undefined;
+    const budget = allowance ? setTimeout(() => run.abort.abort(), allowance) : undefined;
 
     try {
       const outcome = await runInstruction({
@@ -552,10 +565,13 @@ export class AgentSession {
   private awaitDecision(run: ActiveRun, toolId: string): Promise<Decision> {
     if (run.abort.signal.aborted) return Promise.resolve({ allow: false });
     return new Promise((resolve) => {
+      let expiry: ReturnType<typeof setTimeout> | undefined;
       const settle = (answer: Decision) => {
+        clearTimeout(expiry);
         run.pending.delete(toolId);
         resolve(answer);
       };
+      if (run.scheduled) expiry = setTimeout(() => settle({ allow: false, unanswered: true }), TASK_APPROVAL_WAIT_MS);
       run.pending.set(toolId, settle);
       run.abort.signal.addEventListener('abort', () => settle({ allow: false }), { once: true });
     });

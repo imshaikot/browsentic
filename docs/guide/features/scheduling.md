@@ -11,6 +11,70 @@ check the deploy queue every five minutes and tell me when something lands
 in ten minutes, reload this and tell me whether the build passed
 ```
 
+There are two kinds. A **scheduled task** is one you set up and leave running — every weekday, every
+Friday evening, once tomorrow morning. A **timer** is one the agent sets for itself in the middle of a
+conversation. Tasks come first on this page.
+
+---
+
+## Scheduled tasks
+
+Open the **Schedules** tab in the side panel and press **New task**. Or turn on the clock beside the
+message box and send: what you typed becomes the task, and you pick when. **Repeat this…** under a
+message you already sent, and **Schedule** on a recording, do the same.
+
+```
+every weekday at 09:00, open github.com/pulls and summarise what is waiting on my review
+```
+
+Each run opens its own background tab on the task's page, does the job and closes the tab. The result
+arrives as a notice on the page you are looking at, and every run lands in the task's history — when it
+ran, how it went, its one-line result and, for the last three runs, the whole transcript. Scheduled
+runs never fill up the History tab.
+
+| | |
+| --- | --- |
+| **What it does** | An instruction the agent follows, or a recording replayed step by step. A replay needs no agent and spends no tokens; when a step no longer fits the page, the agent takes over from there |
+| **When** | Once at a set time, on chosen days at chosen times, or every so often — optionally only between two times of day. Five minutes is the shortest interval |
+| **Afterwards** | Tell you every run, only when one fails, or never. Skip a missed run, or run it once when things are back. Stop after some runs, or on a date |
+
+The editor shows the next three runs before you save, and for an instruction how many agent runs a
+week the schedule adds up to — each one spends tokens.
+
+The daemon keeps the schedule, in `~/.browsentic/schedules.json`, so one list covers every browser
+paired with it. `browsentic tasks` lists the tasks from a terminal, and pauses, resumes or deletes one.
+
+### What has to be running
+
+A run needs the browser open and the daemon up. The daemon starts itself when the browser needs it:
+`browsentic setup` registers a small helper that Chrome, Edge, Brave and Firefox can launch, and
+`browsentic status` says which browsers have it.
+
+A run that falls due while the browser is closed or the computer is asleep is logged as **missed**. By
+default it then runs once when both are back; a task set to **Skip it** just waits for its next time.
+
+### Approvals with nobody watching
+
+A scheduled run follows the same [guardrails](../approvals.md) as one you start yourself. When an
+action needs your OK, a card appears on the page you are looking at, with **Allow**, **Deny** and
+**Always on ‹site›**. With no answer in ten minutes the action is declined and the run says so. The
+card only takes a real click, and none in its first moment on screen, so the page underneath cannot
+press **Allow** for you.
+
+A scheduled run never gets Live tools, and it is told to end on one line that stands alone, because
+that line is what the notice and the history show.
+
+### Task or timer?
+
+| | Scheduled task | Timer |
+| --- | --- | --- |
+| Set by | you, in the Schedules tab | the agent, during a conversation |
+| Runs in | a fresh background tab each time | the conversation that set it |
+| When | clock times, days of the week, intervals | "in ten minutes", "every two minutes" |
+| Lasts | until you delete it | until its conversation ends, a day at most |
+
+The rest of this page is about timers.
+
 ---
 
 ## What happens

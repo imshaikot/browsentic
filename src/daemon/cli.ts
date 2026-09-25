@@ -7,8 +7,11 @@ import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { formatWhen } from '@/lib/format-when';
 import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { agentSkills } from './agent/agent-skills';
 import { forgetGrants, listGrants } from './agent/approvals';
+import { describeMoment, describeRule } from '@/lib/schedules/rule';
+import { findTask, readSchedules, setEnabled, setPaused, updateSchedules } from './schedules/store';
 import { clearDownloads, downloadDir, storedDownloads } from './downloads';
 import { readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/config';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
@@ -17,6 +20,7 @@ import { install, InstallError, readStamp } from './install';
 import { logPath, readLockfile } from './lockfile';
 import { log } from './log';
 import { installKind } from './npx';
+import { installNativeHost, registeredBrowsers, removeNativeHost, serveNativeHost } from './native-host';
 import { extensionDir } from './paths';
 import { RELEASES_PAGE, signedAddonAttached, signedAddonUrl } from './firefox-addon';
 import { RemoteBridge } from './remote-bridge';
@@ -45,6 +49,9 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
   browsentic approvals clear [host]   forget them, all of them or one site's
+  browsentic tasks            list the scheduled tasks, when each runs next, and how it last went
+  browsentic tasks pause|resume [id]   pause or resume one task, or every task at once
+  browsentic tasks delete <id>         delete a task
   browsentic downloads        list the files captured from pages, and where they were saved
   browsentic downloads clear  delete all of them
   browsentic tools            print the bundled tool manifest (no browser needed)
@@ -54,7 +61,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic restart          stop the daemon and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
 
-  agent, skills, approvals and downloads take --json, which is what the macOS app reads.
+  agent, skills, approvals, tasks and downloads take --json, which is what the macOS app reads.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -92,6 +99,9 @@ switch (command) {
   case 'uninstall':
     await uninstall(process.argv.slice(3));
     break;
+  case 'native-host':
+    await serveNativeHost(ensureDaemon);
+    break;
   case 'pair':
     await pair();
     break;
@@ -127,6 +137,9 @@ switch (command) {
     break;
   case 'downloads':
     manageDownloads(positional[0]);
+    break;
+  case 'tasks':
+    manageTasks(positional[0], positional[1]);
     break;
   case 'logs':
     showLogs();
@@ -218,8 +231,11 @@ function printSkills(): void {
 
 async function showStatus(): Promise<void> {
   const lock = await probeExisting();
+  const waking = registeredBrowsers();
+  const wake = `wake-up:   ${waking.length ? `${waking.join(', ')} can start the daemon` : 'not registered — run "browsentic setup"'}`;
   if (!lock) {
     console.log('daemon:    not running');
+    console.log(wake);
     console.log('extension: unknown (start an MCP client, or run a tool, to launch the daemon)');
     return;
   }
@@ -229,6 +245,7 @@ async function showStatus(): Promise<void> {
   await bridge.close();
   const active = agents.runners.find((runner) => runner.kind === agents.active);
   console.log(`daemon:    running on 127.0.0.1:${status.port} (pid ${lock.pid}, v${status.daemonVersion})`);
+  console.log(wake);
 
   // "Updated the CLI, never reloaded the extension" is the failure this reports. Without it
   // the only symptom is a drifted manifest, which names no cause the user can act on.
@@ -309,6 +326,12 @@ async function pair(): Promise<void> {
  * A function declaration, not a const arrow: the switch at the top of this file invokes
  * commands before execution reaches the bottom, so anything they call has to be hoisted.
  */
+function wakeLine(browsers: string[]): string {
+  return browsers.length
+    ? `✓ Wake-up    ${browsers.join(', ')} can start the daemon when it is down`
+    : '· Wake-up    no supported browser found, so start the daemon yourself after a reboot';
+}
+
 function groupCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
@@ -364,6 +387,7 @@ async function setup(argv: string[]): Promise<void> {
   // Reading the lock before the restart would also report the pid that just went away.
   if (flag('restart')) await restart();
   const lock = await ensureDaemon();
+  const wake = installNativeHost(fileURLToPath(import.meta.url));
 
   // --no-pair means mint no code, not learn nothing: `update` still has to know whether this
   // browser is paired, because that decides whether what is left to do is "load unpacked" or
@@ -377,7 +401,14 @@ async function setup(argv: string[]): Promise<void> {
   if (json) {
     console.log(
       JSON.stringify(
-        { version: result.version, extensionDir: dir, daemon: { port: lock.port, pid: lock.pid }, alreadyPaired, pairingCode: code },
+        {
+          version: result.version,
+          extensionDir: dir,
+          daemon: { port: lock.port, pid: lock.pid },
+          nativeHost: wake,
+          alreadyPaired,
+          pairingCode: code,
+        },
         null,
         2,
       ),
@@ -389,7 +420,8 @@ async function setup(argv: string[]): Promise<void> {
   console.log(`\n  Browsentic ${result.version}\n`);
   console.log(`  ✓ Extension  ${dir}`);
   console.log(`               ${state}`);
-  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})\n`);
+  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})`);
+  console.log(`  ${wakeLine(wake.browsers)}\n`);
 
   if (alreadyPaired) {
     console.log(`  This browser is already paired. Press ↻ on the Browsentic card at`);
@@ -424,6 +456,7 @@ async function setup(argv: string[]): Promise<void> {
 async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; restart: boolean; pair: boolean }): Promise<void> {
   if (fresh) await restart();
   const lock = await ensureDaemon();
+  const wake = installNativeHost(fileURLToPath(import.meta.url));
   const bridge = await RemoteBridge.connect(lock.port, lock.token);
   const sessions = await bridge.sessions();
   const alreadyPaired = sessions.some((session) => session.origin.startsWith('moz-extension://'));
@@ -436,7 +469,15 @@ async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; res
   if (json) {
     console.log(
       JSON.stringify(
-        { version: pkg.version, firefoxAddon: addon, attached, daemon: { port: lock.port, pid: lock.pid }, alreadyPaired, pairingCode: code },
+        {
+          version: pkg.version,
+          firefoxAddon: addon,
+          attached,
+          daemon: { port: lock.port, pid: lock.pid },
+          nativeHost: wake,
+          alreadyPaired,
+          pairingCode: code,
+        },
         null,
         2,
       ),
@@ -445,7 +486,8 @@ async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; res
   }
 
   console.log(`\n  Browsentic ${pkg.version}\n`);
-  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})\n`);
+  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})`);
+  console.log(`  ${wakeLine(wake.browsers)}\n`);
 
   if (alreadyPaired) {
     console.log(`  This Firefox is already paired, and it picks up each new build on its own —`);
@@ -498,6 +540,8 @@ async function uninstall(argv: string[]): Promise<void> {
 
   console.log('  This removes:\n');
   for (const daemon of daemons) console.log(`    daemon      127.0.0.1:${daemon.port}, pid ${daemon.pid}`);
+  const waking = registeredBrowsers();
+  if (waking.length) console.log(`    wake-up     the native host registered with ${waking.join(', ')}`);
   for (const removal of plan.removals) {
     console.log(`    ${removal.label.padEnd(11)} ${removal.path}`);
     console.log(`                ${removal.holds}${removal.keep ? ' — keeping skills/' : ''}`);
@@ -559,6 +603,9 @@ async function uninstall(argv: string[]): Promise<void> {
   const { stopped, stubborn } = await stopDaemons();
   if (stopped.length) console.log(`  ✓ Daemon     stopped (pid ${stopped.map((daemon) => daemon.pid).join(', ')})`);
   for (const daemon of stubborn) console.log(`  ✗ Daemon     pid ${daemon.pid} would not exit — kill it by hand`);
+
+  const unregistered = removeNativeHost();
+  if (unregistered.length) console.log(`  ✓ Wake-up    unregistered from ${unregistered.length} place${unregistered.length === 1 ? '' : 's'}`);
 
   for (const outcome of removeAll(plan.removals)) {
     if (!outcome.removed) console.log(`  ✗ ${outcome.removal.path} — ${outcome.error}`);
@@ -704,6 +751,66 @@ function manageDownloads(sub?: string): void {
     console.log(`  ${download.name.padEnd(32)} ${download.notes.padEnd(34)} ${download.capturedAt.slice(0, 10)}`);
   }
   console.log('\nDelete them all with "browsentic downloads clear".');
+}
+
+function manageTasks(sub?: string, id?: string): void {
+  const now = Date.now();
+  if (sub === 'pause' || sub === 'resume') {
+    const enabled = sub === 'resume';
+    if (!id) {
+      updateSchedules((state) => setPaused(state, !enabled, now));
+      console.log(enabled ? 'Scheduled tasks resumed.' : 'Every scheduled task is paused. "browsentic tasks resume" starts them again.');
+      return;
+    }
+    const name = updateSchedules((state) => {
+      const task = findTask(state, id);
+      if (task) setEnabled(task, enabled, now);
+      return task?.name;
+    });
+    if (!name) return noSuchTask(id);
+    console.log(`${enabled ? 'Resumed' : 'Paused'} “${name}”.`);
+    return;
+  }
+  if (sub === 'delete') {
+    const name = id
+      ? updateSchedules((state) => {
+          const task = findTask(state, id);
+          state.tasks = state.tasks.filter((kept) => kept !== task);
+          return task?.name;
+        })
+      : undefined;
+    if (!name) return noSuchTask(id);
+    console.log(`Deleted “${name}”.`);
+    return;
+  }
+  if (sub) {
+    console.log(`Unknown command "tasks ${sub}". Use "tasks", "tasks pause|resume [id]" or "tasks delete <id>".`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const { paused, tasks } = readSchedules();
+  if (wantsJson) {
+    console.log(JSON.stringify({ paused, tasks }, null, 2));
+    return;
+  }
+  if (!tasks.length) {
+    console.log('No scheduled tasks. Create one from the Schedules tab in the side panel.');
+    return;
+  }
+  console.log(`${tasks.length} scheduled task${tasks.length === 1 ? '' : 's'}${paused ? ' — all paused' : ''}:\n`);
+  for (const task of tasks) {
+    const when = !task.enabled ? 'paused' : task.nextRunAt ? `next ${describeMoment(task.nextRunAt)}` : 'no more runs';
+    console.log(`  ${task.id.slice(0, 8)}  ${task.name.slice(0, 28).padEnd(28)} ${describeRule(task.rule).padEnd(30)} ${when}`);
+    const [last] = task.runs;
+    if (last) console.log(`            last: ${last.outcome}${last.headline || last.reason ? ` — ${last.headline ?? last.reason}` : ''}`);
+  }
+  console.log('\nPause one with "browsentic tasks pause <id>", or all of them with "tasks pause". An id prefix is enough.');
+}
+
+function noSuchTask(id?: string): void {
+  console.log(id ? `No task matches "${id}". "browsentic tasks" lists them with their ids.` : 'Say which task — "browsentic tasks" lists their ids.');
+  process.exitCode = 1;
 }
 
 function manageApprovals(sub?: string, host?: string): void {

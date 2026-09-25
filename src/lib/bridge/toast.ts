@@ -5,6 +5,7 @@ import {
   TOAST_DURATION_MS,
   isToastRequest,
   type ToastCommand,
+  type ToastApproval,
   type ToastTone,
   type ToastView,
 } from '@/lib/toast/events';
@@ -18,6 +19,15 @@ export interface ToastNotice {
   title: string;
   body: string;
   tabId?: number;
+  approval?: ToastApproval;
+}
+
+type AnswerListener = (toastId: string, allow: boolean, remember: boolean, fromTabId: number | undefined) => void;
+
+let answerListener: AnswerListener | null = null;
+
+export function onToastAnswer(listener: AnswerListener): void {
+  answerListener = listener;
 }
 
 /**
@@ -27,12 +37,21 @@ export interface ToastNotice {
  * the caller's cue to fall back to an OS notification.
  */
 export async function showToast(notice: ToastNotice, nearTabId?: number): Promise<boolean> {
+  return (await showToastOn(notice, nearTabId)) !== null;
+}
+
+/** Which tab took the card, so an answer can be checked against the page it was actually drawn on. */
+export async function showToastOn(notice: ToastNotice, nearTabId?: number): Promise<number | null> {
   const view: ToastView = { ...notice, theme: await readTheme(), durationMs: TOAST_DURATION_MS };
   const command: ToastCommand = { channel: TOAST_CHANNEL, op: 'show', view };
   for (const tabId of await candidates(nearTabId)) {
-    if (await post(tabId, command)) return true;
+    if (await post(tabId, command)) return tabId;
   }
-  return false;
+  return null;
+}
+
+export function hideToast(toastId: string, tabId: number): void {
+  void post(tabId, { channel: TOAST_CHANNEL, op: 'hide', toastId });
 }
 
 async function candidates(nearTabId?: number): Promise<number[]> {
@@ -66,14 +85,15 @@ async function post(tabId: number, command: ToastCommand): Promise<boolean> {
 }
 
 export function serveToast(): void {
-  browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
     if (!isToastRequest(message)) return;
-    void goToTab(message.tabId);
+    if (message.op === 'answer') answerListener?.(message.toastId, message.allow, message.remember === true, sender.tab?.id);
+    else void goToTab(message.tabId);
     sendResponse({ ok: true });
   });
 }
 
-async function goToTab(tabId: number): Promise<void> {
+export async function goToTab(tabId: number): Promise<void> {
   const tab = await browser.tabs.update(tabId, { active: true }).catch(() => null);
   if (tab?.windowId == null) return;
   await browser.windows.update(tab.windowId, { focused: true }).catch(() => undefined);

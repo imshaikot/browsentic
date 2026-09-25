@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind } from '@/lib/agents/catalog';
+import type { NotifyPolicy } from '@/lib/schedules/task';
 
 export const TAB_SESSIONS_KEY = 'browsentic/tabSessions';
 
@@ -11,6 +12,17 @@ export interface PendingApproval {
   action: string;
   input: unknown;
   site?: string;
+}
+
+export interface TaskTag {
+  id: string;
+  name: string;
+  keepTab: boolean;
+  notify: NotifyPolicy;
+  startedAt: number;
+  previous?: string;
+  /** Reported to the daemon, so closing the tab afterwards is not a cancellation. */
+  done?: boolean;
 }
 
 export interface TabSession {
@@ -35,6 +47,8 @@ export interface TabSession {
   pendingApproval?: PendingApproval;
   /** Files whose reports the running turn carries, marked handed over once it finishes. */
   handing?: string[];
+  /** Set when a schedule opened this conversation; it files to the task's runs, not History. */
+  task?: TaskTag;
 }
 
 export type TabSessionMap = Record<string, TabSession>;

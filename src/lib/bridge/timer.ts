@@ -37,7 +37,12 @@ interface ScheduledTimer {
   logs: TimerLogEntry[];
 }
 
-export type TimerHandoff = 'delivered' | 'busy' | 'gone';
+export type TimerHandoff = 'delivered' | 'busy' | 'offline' | 'gone';
+
+const SKIPPED: Record<Exclude<TimerHandoff, 'delivered' | 'gone'>, string> = {
+  busy: 'Skipped — the conversation was still working on the previous turn.',
+  offline: 'Skipped — no Browsentic daemon was connected to run it.',
+};
 
 type Deliverer = (sessionId: string, prompt: string, label: string) => Promise<TimerHandoff>;
 
@@ -184,9 +189,9 @@ async function fireTimer(timerId: string): Promise<void> {
     const timer = map[timerId];
     if (!timer) return null;
     const now = Date.now();
-    if (outcome === 'busy') {
+    if (outcome !== 'delivered') {
       timer.skipped += 1;
-      appendLog(timer, 'Skipped — the conversation was still working on the previous turn.');
+      appendLog(timer, SKIPPED[outcome]);
     } else {
       timer.runs += 1;
       timer.lastFiredAt = now;
@@ -202,7 +207,7 @@ async function fireTimer(timerId: string): Promise<void> {
     await finishTimer(
       timerId,
       'finished',
-      `Gave up after ${advanced.skipped} fires found the conversation still busy — the job takes longer than the interval it was given.`,
+      `Gave up after ${advanced.skipped} fires could not run — the conversation stayed busy, or no daemon was connected.`,
     );
     return;
   }

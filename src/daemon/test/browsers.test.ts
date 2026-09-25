@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
+import { WebSocket } from 'ws';
 import { clearAuth } from '../auth-store';
 import { startDaemon, type Daemon } from '../daemon';
 import { readLockfile, stateDir } from '../lockfile';
@@ -187,6 +188,37 @@ describe('a caller outside any browser', () => {
   test('with no browser connected, is told the extension is offline', async () => {
     const result = await (await control()).invoke('page.getPageInfo');
     expect(result.ok ? null : result.error.code).toBe('EXTENSION_OFFLINE');
+  });
+});
+
+describe('an action the browser takes a while over', () => {
+  test('a caller that asks hears the daemon is still working; one that does not hears only the result', async () => {
+    const browser = await pair(chrome);
+    await settled();
+    let release!: () => void;
+    browser.holdInvokes = new Promise((resolve) => (release = resolve));
+
+    const raw = new WebSocket(`ws://127.0.0.1:${daemon.port}/control`, { headers: { authorization: `Bearer ${readLockfile()!.token}` } });
+    opened.push(raw);
+    await new Promise((resolve) => raw.once('open', resolve));
+    const heard: string[] = [];
+    const working = new Promise<void>((resolve) =>
+      raw.on('message', (frame) => {
+        const { id, op } = JSON.parse(String(frame)) as { id: string; op: string };
+        heard.push(`${id} ${op}`);
+        if (op === 'working') resolve();
+      }),
+    );
+    raw.send(JSON.stringify({ id: 'patient', op: 'invoke', action: 'page.getPageInfo', keepAlive: true }));
+    raw.send(JSON.stringify({ id: 'plain', op: 'invoke', action: 'page.getPageInfo' }));
+
+    await working;
+    release();
+    await vi.waitFor(() => expect(heard.filter((line) => line.endsWith(' invoke'))).toHaveLength(2));
+    expect([heard.filter((line) => line.startsWith('patient')), heard.filter((line) => line.startsWith('plain'))]).toEqual([
+      ['patient working', 'patient invoke'],
+      ['plain invoke'],
+    ]);
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, PanelRightClose, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
@@ -23,6 +23,8 @@ import { SessionRail } from '@/extension/components/session-rail';
 import { SettingsPanel } from '@/extension/components/settings-panel';
 import { SiteMapReview } from '@/extension/components/site-map-review';
 import { SkillsPanel } from '@/extension/components/skills-panel';
+import { TaskPanel } from '@/extension/components/task-panel';
+import type { TaskSeed } from '@/extension/components/task-editor';
 import { StatusPill, describeStatus } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import { ScrollArea } from '@/extension/components/ui/scroll-area';
@@ -40,6 +42,7 @@ import { useStoredFiles } from '@/lib/bridge/use-stored-files';
 import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
 import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
 import { useStoredSkills } from '@/lib/bridge/use-stored-skills';
+import { useStoredTasks } from '@/lib/bridge/use-stored-tasks';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { useVoiceEnabled } from '@/lib/bridge/use-speech';
 
@@ -53,6 +56,10 @@ export default function App() {
   const sessions = useStoredSessions();
   const recordings = useStoredRecordings();
   const skills = useStoredSkills();
+  const tasks = useStoredTasks();
+  const [taskSeed, setTaskSeed] = useState<TaskSeed | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const takeSeed = useCallback(() => setTaskSeed(null), []);
   const tabUrl = useActiveTabUrl();
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
@@ -142,9 +149,21 @@ export default function App() {
   }
 
   function handleSend() {
-    if (run.running || !connected) return;
+    if (!connected) return;
+    if (scheduling) {
+      schedule({ text: voice.input.trim(), url: tabUrl });
+      voice.setInput('');
+      setScheduling(false);
+      return;
+    }
+    if (run.running) return;
     open('chat');
     voice.submitNow();
+  }
+
+  function schedule(seed: TaskSeed) {
+    setTaskSeed(seed);
+    open('tasks');
   }
 
   function openSession(sessionId: string) {
@@ -217,7 +236,12 @@ export default function App() {
   const runningCount = run.sessions.filter((session) => session.runId).length;
   const offChatRun = runningCount > 0 && tab !== 'chat';
   const hasBanners = offChatRun || !!run.recording || run.monitors.length > 0 || !!run.draft;
-  const counts = { history: sessions.length, skills: skills.length, recordings: recordings.length };
+  const counts = {
+    history: sessions.length,
+    skills: skills.length,
+    recordings: recordings.length,
+    tasks: tasks?.tasks.filter((task) => task.enabled).length ?? 0,
+  };
 
   return (
     <div className="relative flex h-screen flex-col">
@@ -302,7 +326,12 @@ export default function App() {
                 onUse={voice.setInput}
               />
             ) : (
-              <RunTimeline items={run.items} running={run.running} onDecide={run.decide} />
+              <RunTimeline
+                items={run.items}
+                running={run.running}
+                onDecide={run.decide}
+                onSchedule={(text) => schedule({ text, url: tabUrl })}
+              />
             )
           ) : tab === 'history' ? (
             <SessionList
@@ -316,6 +345,18 @@ export default function App() {
             <SkillsPanel tabUrl={tabUrl} connected={connected} onMapSite={mapSite} mapping={run.running} />
           ) : tab === 'settings' ? (
             <SettingsPanel />
+          ) : tab === 'tasks' ? (
+            <TaskPanel
+              tasks={tasks}
+              connected={connected}
+              paired={daemon?.paired ?? false}
+              tabUrl={tabUrl}
+              recordings={recordings}
+              sessions={run.sessions}
+              seed={taskSeed}
+              onSeedTaken={takeSeed}
+              onWatch={run.focusSession}
+            />
           ) : (
             <RecordingPanel
               tabUrl={tabUrl}
@@ -325,6 +366,7 @@ export default function App() {
               onStart={run.startRecording}
               onStop={run.stopRecording}
               onReplay={replayRecording}
+              onSchedule={(recording) => schedule({ recordingId: recording.id, name: recording.name, url: recording.startUrl })}
               onRemove={(id) => void removeRecording(id)}
             />
           )}
@@ -366,6 +408,8 @@ export default function App() {
             picking={picking}
             liveTools={liveTools}
             onToggleLiveTools={() => setLiveTools((on) => !on)}
+            scheduling={scheduling}
+            onToggleScheduling={() => setScheduling((on) => !on)}
             onAttachSkill={setAttachedSkill}
             onCommand={(command) => {
               if (isRemoveToolsCommand(command)) {

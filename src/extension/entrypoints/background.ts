@@ -15,6 +15,7 @@ import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/rec
 import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions, sweepFiles } from '@/lib/bridge/run-port';
 import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { serveTimers } from '@/lib/bridge/timer';
+import { serveTaskNotices } from '@/lib/bridge/task-notices';
 import { serveToast } from '@/lib/bridge/toast';
 import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
@@ -32,6 +33,7 @@ import {
   readSkillCatalog,
   setGuardrail,
   setUpAgent,
+  taskOp,
 } from '@/lib/bridge/socket';
 
 const OPEN_PANEL_MENU = 'open-side-panel';
@@ -135,6 +137,24 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
+    if (message.op === 'tasks' || message.op === 'pauseTasks') {
+      taskOp(message.op === 'tasks' ? { t: 'tasks' } : { t: 'pauseTasks', paused: message.paused === true })
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'saveTask') {
+      taskOp({ t: 'saveTask', task: message.task })
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if ((message.op === 'deleteTask' || message.op === 'runTaskNow') && typeof message.taskId === 'string') {
+      taskOp({ t: message.op, taskId: message.taskId })
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
         .then((result) =>
@@ -157,7 +177,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;
@@ -204,6 +224,7 @@ export default defineBackground(() => {
   serveRecorder();
   serveMonitor();
   serveTimers();
+  serveTaskNotices();
   serveRunPorts();
   serveTabSessions();
   serveRail();

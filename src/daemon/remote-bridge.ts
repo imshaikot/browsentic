@@ -39,7 +39,7 @@ export class RemoteBridge implements Bridge {
 
   async invoke(action: string, input?: unknown): Promise<ActionResult> {
     const reply = await this.request(
-      { id: randomUUID(), op: 'invoke', action, input, runId: this.runId },
+      { id: randomUUID(), op: 'invoke', action, input, runId: this.runId, keepAlive: true },
       invokeTimeoutFor(action, input),
     );
     if (reply && 'result' in reply) return reply.result;
@@ -87,14 +87,18 @@ export class RemoteBridge implements Bridge {
   private request(request: ControlRequest, timeoutMs = REQUEST_TIMEOUT_MS): Promise<ControlMessage | null> {
     if (this.socket.readyState !== WebSocket.OPEN) return Promise.resolve(null);
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(request.id);
-        resolve(null);
-      }, timeoutMs);
-      this.pending.set(request.id, (message) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (message: ControlMessage | null) => {
         clearTimeout(timer);
+        this.pending.delete(request.id);
         resolve(message);
-      });
+      };
+      const wait = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => finish(null), timeoutMs);
+      };
+      wait();
+      this.pending.set(request.id, (message) => ('op' in message && message.op === 'working' ? wait() : finish(message)));
       this.socket.send(JSON.stringify(request));
     });
   }
@@ -110,10 +114,7 @@ export class RemoteBridge implements Bridge {
       if (message.event === 'manifest-changed') for (const listener of this.manifestListeners) listener();
       return;
     }
-    const settle = this.pending.get(message.id);
-    if (!settle) return;
-    this.pending.delete(message.id);
-    settle(message);
+    this.pending.get(message.id)?.(message);
   }
 }
 

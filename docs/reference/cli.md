@@ -101,11 +101,14 @@ configurations written against the older name keep working.
 | `browsentic skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
 | `browsentic approvals` | The "always on this site" grants |
 | `browsentic approvals clear [host]` | Forget them, all or one site's |
+| `browsentic tasks` | Scheduled tasks, when each runs next and how it last went |
+| `browsentic tasks pause\|resume [id]` | Pause or resume one task, or every task at once. An id prefix is enough |
+| `browsentic tasks delete <id>` | Delete a task |
 | `browsentic downloads` | Files captured from pages, with notes and where they landed |
 | `browsentic downloads clear` | Delete all of them |
 | `browsentic token` | The control token, for MCP clients. Not for the browser |
 
-`agent`, `skills`, `approvals` and `downloads` take `--json`. It is what the [macOS app](../guide/mac-app.md)
+`agent`, `skills`, `approvals`, `tasks` and `downloads` take `--json`. It is what the [macOS app](../guide/mac-app.md)
 reads, so the app and a terminal can never disagree about what is on disk.
 
 ## Lifecycle
