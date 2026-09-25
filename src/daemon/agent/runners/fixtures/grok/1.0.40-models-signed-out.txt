@@ -1,0 +1,9 @@
+# `grok models` 1.0.40 with an empty HOME: exit 0, and a built-in list the account may not have, recorded 2026-09-25.
+# exit 0
+You are not authenticated.
+
+Default model: grok-4.6
+
+Available models:
+  * grok-4.6 (default)
+  - grok-4.5

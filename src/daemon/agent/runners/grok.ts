@@ -6,7 +6,7 @@ import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
 import { conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
-import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
+import type { JsonContext, Listing, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
 /** Grok takes every setting a run needs as a flag except its MCP server, which only a project config can add. */
 const CONFIG = '.grok/config.toml';
@@ -70,6 +70,8 @@ export const grokRunner: Runner = {
   efforts: ['low', 'medium', 'high', 'xhigh'],
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'grok', mode),
+
+  models: { args: ['models'], parse: listedModels },
 
   skillDirs: () => [join(grokHome(), 'skills'), join(homedir(), '.agents', 'skills'), join(homedir(), '.claude', 'skills')],
 
@@ -286,4 +288,16 @@ function lastLine<T>(stdout: string): T | null {
     if (parsed) return parsed;
   }
   return null;
+}
+
+/**
+ * `grok models` prints `  * id (default)` and `  - id` lines under a heading. Signed out it still
+ * exits 0, with a built-in list the account may not have, so that output is no list at all.
+ */
+function listedModels({ stdout, stderr, code }: Listing): string[] | null {
+  if (code !== 0 || /not authenticated/i.test(`${stdout}\n${stderr}`)) return null;
+  const lines = stdout.split('\n');
+  const heading = lines.findIndex((line) => /^available models:?$/i.test(line.trim()));
+  if (heading === -1) return null;
+  return lines.slice(heading + 1).flatMap((line) => /^\s+[*-]\s+(\S+)/.exec(line)?.slice(1, 2) ?? []);
 }

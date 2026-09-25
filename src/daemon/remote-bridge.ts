@@ -63,7 +63,7 @@ export class RemoteBridge implements Bridge {
     return reply && 'sessions' in reply ? reply.sessions : [];
   }
 
-  async agent(change?: { set?: AgentKind; grant?: AgentKind }): Promise<AgentState> {
+  async agent(change?: { set?: AgentKind; grant?: AgentKind; models?: AgentKind }): Promise<AgentState> {
     const reply = await this.request({ id: randomUUID(), op: 'agent', ...change });
     if (reply && 'state' in reply) return reply.state;
     throw new Error('The Browsentic daemon did not answer about its agent');

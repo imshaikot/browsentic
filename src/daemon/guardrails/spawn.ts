@@ -26,7 +26,7 @@
  * assumed away.
  */
 
-import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
+import { AGENTS, isModelId, type AgentKind } from '@/lib/agents/catalog';
 
 /** `run` drives the browser; `task` is a one-shot that must not reach it at all. */
 export type SpawnMode = 'run' | 'task';
@@ -430,6 +430,10 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     if (banned.some((pattern) => pattern.test(arg))) {
       problems.push(`${label} is spawned with ${arg}, which disables its own containment.`);
     }
+  }
+
+  for (const model of everyValueOf(plan.args, '--model')) {
+    if (!isModelId(model)) problems.push(`${label} is spawned with the model ${JSON.stringify(model)}, which it could read as a flag.`);
   }
 
   if (!within(plan.cwd, home)) problems.push(`${label} would run in ${plan.cwd}, which is outside ${home}.`);

@@ -3,6 +3,7 @@ import { Check, Loader2, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-re
 import { browser } from 'wxt/browser';
 
 import { AgentMark } from '@/extension/components/agent-marks';
+import { ModelFilter } from '@/extension/components/model-filter';
 import { StatusDot } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import {
@@ -13,8 +14,16 @@ import {
   SelectValue,
 } from '@/extension/components/ui/select';
 import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
-import { AGENTS, AGENT_LIST, type AgentKind, type AgentState, type RunnerStatus } from '@/lib/agents/catalog';
+import {
+  AGENTS,
+  AGENT_LIST,
+  type AgentKind,
+  type AgentState,
+  type ModelList,
+  type RunnerStatus,
+} from '@/lib/agents/catalog';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { formatWhen } from '@/lib/format-when';
 import { cn } from '@/lib/utils';
 
 type Request =
@@ -27,6 +36,9 @@ const busyKey = (request: Request): string =>
   request.op === 'agentState' ? 'refresh' : request.op === 'setAgentModel' ? `${request.agent}:model` : request.agent;
 
 const CLI_DEFAULT = '__default__';
+
+/** Past this many models, a dropdown is a scroll hunt, so the picker offers a filter instead. */
+const LONG_LIST = 20;
 
 export function AgentPicker() {
   const daemon = useDaemonState();
@@ -133,8 +145,8 @@ function AgentRow({
   onModel: (model: string | null) => void;
 }) {
   const agent = AGENTS[runner.kind];
-  const models =
-    runner.model && !agent.models.includes(runner.model) ? [runner.model, ...agent.models] : agent.models;
+  const list = offered(runner);
+  const pinned = runner.model && !list.ids.includes(runner.model) ? runner.model : null;
   return (
     <div
       className={cn(
@@ -167,32 +179,49 @@ function AgentRow({
         <span className="font-mono text-[10px] tracking-wider uppercase opacity-70">{describe(runner)}</span>
         {busy ? <Loader2 className="size-3 animate-spin" /> : active && <Check className="size-3" />}
       </button>
-      {runner.ready && models.length > 0 && (
+      {runner.ready && (
         <div
           className={cn(
-            'flex items-center gap-2 border-t px-2.5 py-1.5',
+            'flex flex-wrap items-center gap-x-2 gap-y-1 border-t px-2.5 py-1.5',
             active ? 'border-brand/25' : 'border-line',
           )}
         >
           <span className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Model</span>
-          <Select
-            value={runner.model ?? CLI_DEFAULT}
-            onValueChange={(value) => onModel(value === CLI_DEFAULT ? null : value)}
-            disabled={disabled}
-          >
-            <SelectTrigger className="h-6 min-w-0 flex-1 py-0 font-mono text-[10px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end" className="font-mono text-[10px]">
-              <SelectItem value={CLI_DEFAULT}>Default</SelectItem>
-              {models.map((model) => (
-                <SelectItem key={model} value={model}>
-                  {model}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {list.ids.length > LONG_LIST ? (
+            <ModelFilter
+              value={runner.model ?? null}
+              ids={list.ids}
+              suggested={agent.models.filter((id) => list.ids.includes(id))}
+              pinned={pinned}
+              disabled={disabled}
+              onModel={onModel}
+            />
+          ) : (
+            <Select
+              value={runner.model ?? CLI_DEFAULT}
+              onValueChange={(value) => onModel(value === CLI_DEFAULT ? null : value)}
+              disabled={disabled}
+            >
+              <SelectTrigger className="h-6 min-w-0 flex-1 py-0 font-mono text-[10px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" className="font-mono text-[10px]">
+                <SelectItem value={CLI_DEFAULT}>Default</SelectItem>
+                {pinned && <SelectItem value={pinned}>{pinned} · not listed</SelectItem>}
+                {list.ids.map((model) => (
+                  <SelectItem key={model} value={model}>
+                    {model}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {modelBusy && <Loader2 className="size-3 animate-spin text-ink-faint" />}
+          {active && (
+            <p className="basis-full truncate font-mono text-[9px] text-ink-faint" title={list.error}>
+              {describeList(runner.kind, list)}
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -214,3 +243,14 @@ function describe(runner: RunnerStatus): string {
 }
 
 const unknownRunner = (kind: AgentKind): RunnerStatus => ({ kind, bin: AGENTS[kind].bin, ready: false });
+
+/** The daemon's list when it sent a usable one, the catalog's otherwise. */
+function offered({ kind, models }: RunnerStatus): ModelList {
+  return models && Array.isArray(models.ids) && models.ids.length ? models : { ids: AGENTS[kind].models, from: 'catalog' };
+}
+
+function describeList(kind: AgentKind, { ids, from, at, error }: ModelList): string {
+  const source = from === 'cli' && at !== undefined ? `${ids.length} listed by ${AGENTS[kind].bin} · ${formatWhen(at)}` : 'built-in list';
+  if (!error) return source;
+  return from === 'cli' ? `${source} · last read failed` : `${source} · ${error}`;
+}

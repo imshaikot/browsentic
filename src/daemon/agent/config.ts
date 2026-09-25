@@ -1,9 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, type AgentKind } from '@/lib/agents/catalog';
+import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, isModelId, type AgentKind } from '@/lib/agents/catalog';
 import { FENCE_SETTING, UNATTENDED_SETTING, type GuardrailValue, type RuleEffect } from '@/lib/settings/guardrails';
 import type { GuardrailConfig } from '../guardrails';
 import { stateDir } from '../lockfile';
+import { log } from '../log';
 
 export interface AgentSettings {
   /** Binary name or absolute path. Defaults to the agent's own command name. */
@@ -80,7 +81,7 @@ function clamp(value: unknown, { fallback, max }: { fallback: number; max: numbe
 export const configPath = join(stateDir, 'config.json');
 
 const DEFAULT_MODEL: Partial<Record<AgentKind, string>> = {
-  claude: 'claude-sonnet-5',
+  claude: 'sonnet',
 };
 
 const DEFAULT_APPROVALS = ['page.submitForm'];
@@ -125,13 +126,21 @@ function settingsFor(stored: StoredConfig, kind: AgentKind): AgentSettings {
   const legacy = kind === 'claude' ? { bin: stored.claudeBin, model: stored.model, effort: stored.effort } : {};
   return {
     bin: text(scoped.bin) ?? text(legacy.bin) ?? AGENTS[kind].bin,
-    model: text(scoped.model) ?? text(legacy.model) ?? DEFAULT_MODEL[kind],
+    model: modelOf(kind, scoped.model) ?? modelOf(kind, legacy.model) ?? DEFAULT_MODEL[kind],
     effort: text(scoped.effort) ?? text(legacy.effort),
   };
 }
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+/** A hand-edited model a CLI could read as a flag is left out, so the run falls back rather than failing. */
+function modelOf(kind: AgentKind, value: unknown): string | undefined {
+  const model = text(value);
+  if (model === undefined || isModelId(model)) return model;
+  log(`ignoring ${kind} model ${JSON.stringify(model)} — a model id starts with a letter or digit and has no spaces`);
+  return undefined;
+}
 
 export interface ActiveAgent extends AgentSettings {
   kind: AgentKind;
@@ -150,12 +159,14 @@ export function writeActiveAgent(kind: AgentKind): void {
 /**
  * Sets or clears one agent's model, leaving every other key in config.json untouched. Claude's
  * pre-0.2 top-level `model` spelling is removed alongside, so a cleared pick cannot resurface it.
+ * False, and nothing written, when the model is not one `isModelId` accepts.
  */
-export function writeAgentModel(kind: AgentKind, model: string | null): void {
+export function writeAgentModel(kind: AgentKind, model: string | null): boolean {
+  const value = text(model);
+  if (value !== undefined && !isModelId(value)) return false;
   const stored = readStored();
   const agents = { ...(stored.agents ?? {}) };
   const scoped = { ...(agents[kind] ?? {}) };
-  const value = text(model);
   if (value) scoped.model = value;
   else delete scoped.model;
   if (Object.keys(scoped).length) agents[kind] = scoped;
@@ -166,6 +177,7 @@ export function writeAgentModel(kind: AgentKind, model: string | null): void {
   else delete next.agents;
   if (kind === 'claude') delete next.model;
   write(next);
+  return true;
 }
 
 /**

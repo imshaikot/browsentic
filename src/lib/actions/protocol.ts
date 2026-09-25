@@ -11,7 +11,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 18;
+export const SOCKET_PROTOCOL_VERSION = 19;
 
 export const EXTERNAL_RUN_ID = 'external';
 

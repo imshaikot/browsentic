@@ -15,3 +15,8 @@ What each agent CLI printed on stdout, one event per line, for the reader tests 
   produce or a CLI that was not installed. Its first line says so.
 
 Lines starting with `#` are comments, and the tests skip them.
+
+- `<cli version>-models.txt` and `-models-signed-out.txt` are what the CLI's model-listing command
+  printed, for `../models.test.ts`: stdout, then stderr after a `# stderr` line, with the exit code
+  in a `# exit` line. `codex/<version>-models_cache.json` is Codex's own cache, cut to the fields the
+  lister reads, with the account identity and etag replaced.
