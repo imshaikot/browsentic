@@ -81,7 +81,8 @@ it is the documented escape hatch.
 
 ## The panel's tabs
 
-`PanelNav` owns the tab strip: **Chat**, **History**, **Skills**, **Recordings**, **Settings**.
+`PanelNav` owns the tab strip: **Chat**, **History**, **Skills**, **Recordings**, **Schedules**,
+**Settings**.
 Adding one is a variant in `PanelTab`, an entry in `TABS`, and a branch in the side panel's body —
 there is no router.
 
@@ -93,8 +94,8 @@ learned, which is what keeps the strip from flapping between two fits at one pan
 practice five labels want ~485 px and one wants ~225 px, so a side panel at its usual size lands on
 the middle fit.
 
-**Settings** is two halves with nothing in common. **Guardrails** is the only panel state that
-lives on the daemon rather than in extension storage: it reads and writes `~/.browsentic/config.json`
+**Settings** is two halves with nothing in common. **Guardrails** lives on the daemon rather than in
+extension storage, like the Schedules tab's tasks: it reads and writes `~/.browsentic/config.json`
 through two bridge ops, `guardrails` and `setGuardrail`, which forward to the socket frames of the
 same name. The extension holds no copy — every write returns the daemon's fresh view, which is what
 the panel then renders, and the whole half is empty until the daemon is up. **Appearance** never
@@ -224,6 +225,27 @@ entry leaves the registry.
 
 Closing the side panel does **not** — the tab is the anchor. While a run is going, its tab carries a
 dot on the toolbar badge and on its favicon.
+
+## Scheduled runs
+
+The daemon owns the schedule and the clock (`src/daemon/schedules/`); the extension only runs what it
+is handed. A due task arrives as a `runTask` frame, answered like an `invoke`. `startTaskRun` in
+`run-port.ts` opens a background tab and tags its session with the task. An instruction then goes
+through `startTurn` like the Send button's; a recording replays through `invokeForHarness`, step by
+step, handing a failed step to the agent. When the run settles, `finishTask` reports `taskDone`, files
+the transcript under `browsentic:taskRuns` instead of History, shows the notice and closes the tab.
+
+The task list reaches the panel the same way the agent state does: the daemon pushes `taskList` on
+connect and after every change, and the extension caches it in `browsentic/tasks` so the tab still
+renders while the daemon is down.
+
+An approval raised by a scheduled run is drawn as a toast on the page in front, not only in the panel.
+Its buttons answer through `answerApproval`, the panel's own path. Only the tab the card was drawn
+on can answer, only with `isTrusted` clicks, and none in its first 800 ms.
+
+`nativeMessaging` is what lets a browser start a daemon that is down. When no port answers,
+`giveUp` calls `wakeDaemon`, which asks the browser to run the `com.browsentic.daemon` host that
+`browsentic setup` registered. That host runs `ensureDaemon` and exits.
 
 ---
 

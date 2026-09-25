@@ -30,7 +30,7 @@ first.
 | | |
 | --- | --- |
 | [Monitoring](monitoring.md) | Watching an upload, a build or a deploy in the background |
-| [Scheduling](scheduling.md) | Doing something in ten minutes, or every two, without an agent sitting there |
+| [Scheduling](scheduling.md) | Tasks that run on their own — every weekday at nine, or once tomorrow — plus the timers an agent sets for itself |
 | [Site maps](site-maps.md) | Teaching it a site once, so later sessions already know their way around |
 | [Recordings](recordings.md) | Doing a repetitive job once yourself, then "do it like last time" |
 
