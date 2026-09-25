@@ -370,6 +370,69 @@ describe('spawn containment', () => {
       expect(vetPlan('qwen', 'task', planOf('qwen', 'task', { reads: true }), stateDir)).toEqual([]);
     });
 
+    const opencodeRun = planOf('opencode', 'run');
+    const opencodeTask = planOf('opencode', 'task');
+    const reconfigured = (plan: Plan, edit: (config: Record<string, unknown>) => void): Plan => {
+      const config = JSON.parse(plan.env?.OPENCODE_CONFIG_CONTENT ?? '{}') as Record<string, unknown>;
+      edit(config);
+      return withEnv(plan, 'OPENCODE_CONFIG_CONTENT', JSON.stringify(config));
+    };
+    const rules = (config: Record<string, unknown>) =>
+      (config.agent as Record<string, { permission: Record<string, unknown> }>)['browsentic-contained'].permission;
+
+    test('an opencode run with web tools, or a task that reads a file, is still contained', () => {
+      expect(vetPlan('opencode', 'run', planOf('opencode', 'run', { research: true }), stateDir)).toEqual([]);
+      expect(vetPlan('opencode', 'task', planOf('opencode', 'task', { reads: true }), stateDir)).toEqual([]);
+    });
+
+    // Plugins run inside OpenCode, so one can add a tool or answer a permission prompt itself.
+    test('dropping --pure is caught on both opencode modes', () => {
+      expect(vetPlan('opencode', 'run', without(opencodeRun, '--pure'), stateDir)).toHaveLength(1);
+      expect(vetPlan('opencode', 'task', without(opencodeTask, '--pure'), stateDir)).toHaveLength(1);
+    });
+
+    test('running as another agent, the user’s own build agent among them, is caught', () => {
+      expect(vetPlan('opencode', 'run', plus(opencodeRun, '--agent', 'build'), stateDir)).toHaveLength(1);
+      expect(vetPlan('opencode', 'run', swapped(opencodeRun, 'browsentic-contained', 'browsentic'), stateDir)).toHaveLength(1);
+    });
+
+    test('a ruleset that no longer opens on a deny is caught', () => {
+      const open = reconfigured(opencodeRun, (config) => void (rules(config)['*'] = 'allow'));
+      expect(vetPlan('opencode', 'run', open, stateDir)).toHaveLength(1);
+    });
+
+    test('a config that lost its ruleset altogether is caught', () => {
+      expect(vetPlan('opencode', 'run', withEnv(opencodeRun, 'OPENCODE_CONFIG_CONTENT'), stateDir)).toHaveLength(1);
+    });
+
+    test('sharing turned back on, in the config or the environment, is caught', () => {
+      expect(vetPlan('opencode', 'run', reconfigured(opencodeRun, (config) => void (config.share = 'auto')), stateDir)).toHaveLength(1);
+      expect(vetPlan('opencode', 'run', withEnv(opencodeRun, 'OPENCODE_DISABLE_SHARE'), stateDir)).toHaveLength(1);
+    });
+
+    test('loading project config from above the workspace is caught', () => {
+      expect(vetPlan('opencode', 'run', withEnv(opencodeRun, 'OPENCODE_DISABLE_PROJECT_CONFIG', '0'), stateDir)).toHaveLength(1);
+    });
+
+    test('--auto, which approves whatever was not denied, is caught', () => {
+      expect(vetPlan('opencode', 'run', plus(opencodeRun, '--auto'), stateDir)).toHaveLength(1);
+    });
+
+    test('a turn sent to a running server, another folder, or a public share is caught', () => {
+      expect(vetPlan('opencode', 'run', plus(opencodeRun, '--attach', 'http://localhost:4096'), stateDir)).toHaveLength(1);
+      expect(vetPlan('opencode', 'run', plus(opencodeRun, '--dir=/'), stateDir)).toHaveLength(1);
+      expect(vetPlan('opencode', 'run', plus(opencodeRun, '--share'), stateDir)).toHaveLength(1);
+    });
+
+    test('an opencode task handed an MCP server is caught', () => {
+      const reaching = reconfigured(opencodeTask, (config) => void (config.mcp = { browsentic: { type: 'local' } }));
+      expect(vetPlan('opencode', 'task', reaching, stateDir)).toHaveLength(1);
+    });
+
+    test('losing the opencode instructions file is caught', () => {
+      expect(vetPlan('opencode', 'run', { ...opencodeRun, files: [] }, stateDir)).toHaveLength(1);
+    });
+
     test('running outside the state dir is caught', () => {
       expect(vetPlan('antigravity', 'run', { ...agyRun, cwd: '/tmp/anywhere' }, stateDir)).toHaveLength(1);
     });
@@ -505,6 +568,20 @@ describe('environment sealing', () => {
 
     test('claude loses those google credentials', () => {
       expect(sealedFor('claude')).not.toHaveProperty('GOOGLE_APPLICATION_CREDENTIALS');
+    });
+
+    test('opencode keeps its own zen key', () => {
+      expect(sealEnv('opencode', { ...DIRTY, OPENCODE_API_KEY: 'zen' }).OPENCODE_API_KEY).toBe('zen');
+    });
+
+    // OpenCode reads a dozen providers' keys; it keeps its own logins in a file, so none is handed over.
+    test('opencode loses every provider key in the environment', () => {
+      const sealed = sealedFor('opencode');
+      expect(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY', 'XAI_API_KEY'].filter((name) => name in sealed)).toEqual([]);
+    });
+
+    test('claude loses the opencode key', () => {
+      expect(sealEnv('claude', { ...DIRTY, OPENCODE_API_KEY: 'zen' })).not.toHaveProperty('OPENCODE_API_KEY');
     });
 
     test('sealing reports what it dropped', () => {

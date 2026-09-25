@@ -1,7 +1,7 @@
 # Choosing an agent
 
-The side panel runs on an agent CLI you already have logged in. Seven are supported — Mistral Vibe,
-Grok Build, Cursor CLI and Qwen Code in beta — and switching is a click.
+The side panel runs on an agent CLI you already have logged in. Eight are supported — Mistral Vibe,
+Grok Build, Cursor CLI, Qwen Code and OpenCode in beta — and switching is a click.
 
 This is only about the **side panel**. Driving Browsentic *from* another tool is
 [MCP clients](mcp-clients.md), and that direction is fully agent-agnostic.
@@ -32,18 +32,18 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 
 ---
 
-## The seven
+## The eight
 
-| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) | Qwen Code (beta) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba |
-| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` |
-| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) | Qwen Code (beta) | OpenCode (beta) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba | Anomaly |
+| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` | `opencode` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` |
+| Default model | `claude-sonnet-5` | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever | a variant the model defines, e.g. `high` or `max` |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
 
-All seven get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
+All eight get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
 the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
 for exactly what each flag buys.
@@ -174,6 +174,44 @@ Expect rough edges, and please report them.
 
 ---
 
+### OpenCode is in beta
+
+Browsentic's OpenCode runner was checked against `opencode` 1.18.32 with a stand-in for the model
+provider: every flag and setting it passes, the containment under a user config written to break
+it, the browser tools reaching a run, a follow-up turn resuming, and each error OpenCode reports.
+What has not been through it yet is a real model driving a real page, because OpenCode Zen's free
+models refuse a contained run and no paid provider was signed in where it was built. Expect rough
+edges, and please report them.
+
+- **Sign in to a provider first.** Run `opencode auth login`. Zen's free models answer only
+  requests that carry OpenCode's own built-in tools, and a Browsentic run carries the browser's
+  alone, so they refuse it with *free tier can only be used from within OpenCode*. Until OpenCode
+  has a login, or a provider in its config such as a local model, the popup shows *needs setup*.
+- **Models are `provider/model`**, spelled as `opencode models` lists them.
+- **A key in the environment does not reach a run.** Only `OPENCODE_*` does; `ANTHROPIC_API_KEY`
+  and the like are sealed away. `opencode auth login` keeps the key in OpenCode's own file instead,
+  which a run reads as usual.
+- **Your OpenCode settings are read, and cannot widen a run.** Your providers, models and
+  `~/.config/opencode/AGENTS.md` apply. The run is an agent of Browsentic's own whose rules deny
+  every tool not named for it, so your permission rules, custom tools and the MCP servers you set up
+  in OpenCode itself are hidden from the model — those servers still start. External plugins and
+  project config are off for the run.
+- **Sharing is off.** A `"share": "auto"` of your own would publish every browsing session to a
+  public link, so a run switches sharing off.
+- **Its sessions are kept apart from yours.** Runs and one-shots go into a session store under
+  `~/.browsentic`, not into `opencode session list`.
+- **Replies arrive a part at a time.** OpenCode's stream carries each finished part rather than
+  tokens, as Vibe's does.
+- **A tool result is cut at 100 KB** rather than OpenCode's own 50 KB, which a whole-page snapshot
+  can pass. Past that, the prompt asks for smaller reads, because the saved copy OpenCode points to
+  cannot be opened in a run.
+- **Effort is a variant.** `agents.opencode.effort` is passed as `--variant`, whose names each model
+  defines; one a model lacks is ignored.
+- **The run is stopped if a local tool ran.** OpenCode reports every tool call, and one that ran
+  outside the browser ends the run with `AGENT_UNSAFE`.
+
+---
+
 ## Per-agent settings
 
 In `~/.browsentic/config.json`:
@@ -188,7 +226,8 @@ In `~/.browsentic/config.json`:
     "vibe": { "bin": "vibe" },
     "grok": { "bin": "grok", "model": "grok-4.7" },
     "cursor": { "bin": "cursor-agent", "model": "composer-2.5" },
-    "qwen": { "bin": "qwen", "model": "qwen3-coder-plus" }
+    "qwen": { "bin": "qwen", "model": "qwen3-coder-plus" },
+    "opencode": { "bin": "opencode", "model": "anthropic/claude-sonnet-5" }
   }
 }
 ```
@@ -212,7 +251,7 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode is signed in to no provider: run `opencode auth login`. |
 | Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
@@ -225,6 +264,10 @@ Claude runner's settings.
 | Qwen Code: *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier has ended. Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL`. |
 | Qwen Code cannot find a key you have exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; `ANTHROPIC_*` and `GEMINI_*` are sealed away. Point Qwen at one of the first four. |
 | `AGENT_UNSAFE`: *Qwen Code registered …* or *loaded the MCP server …* | Qwen's own `init` line named a tool or a server Browsentic denied, so the run was stopped. Update Qwen Code and Browsentic, and report it if it persists. |
+| OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. Run `opencode auth login`, then pick that provider's model in the popup. |
+| OpenCode: *could not start this turn* | Usually a model OpenCode does not know. Pick one as `opencode models` lists it, `provider/model`. |
+| OpenCode cannot find a key you have exported | Only `OPENCODE_*` reaches a run. Run `opencode auth login` instead, which keeps the key in OpenCode's own file. |
+| `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped. Update OpenCode and Browsentic, and report it. |
 
 ---
 

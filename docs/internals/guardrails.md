@@ -347,6 +347,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Grok Build** | `allowlist` | A per-run built-in tool list, `--permission-mode dontAsk`, deny rules, and a kernel sandbox for writes. Reads are closed by the tool list and a `Read` deny rather than the sandbox, and MCP servers the user set up in Grok itself still load |
 | **Qwen Code** | `allowlist` | `--allowed-tools mcp__browsentic` is what a run may call without being asked, and a headless turn refuses everything it would otherwise have prompted for. `--safe-mode` is what makes the rest hold: it drops the user's hooks, extensions, bundled skills, `settings.json` MCP servers, `.mcp.json` and permission rules, while keeping `--mcp-config` — an explicit per-invocation argument rather than ambient state. Its cost is that it also **silently ignores `--core-tools`**, the fail-closed allowlist over Qwen's twenty-one core tools, so the built-ins are closed with `--exclude-tools` deny rules instead. A deny list cannot be fail-closed, so the `init` line is read back: it names every tool and MCP server that actually registered, and the reader ends the run with `AGENT_UNSAFE` on anything Browsentic did not ask for, before the model has spoken |
 | **Cursor CLI** | `allowlist` | Deny rules in a project `.cursor/cli.json`, where **a deny beats every allow** — including the user's own. Measured against 2026.09.18: a headless run asked to `echo` a marker got `permissionDenied`, twice, and gave up. `--sandbox enabled` is asked for as well but not depended on, and it has no Windows backend. This is the first runner whose containment lives in a file rather than in argv, which is why `vetPlan` checks file *content* and not only that the file was written. `--trust` is **required**, not forbidden: headless Cursor refuses to start in a folder nobody trusted, and the folder is one Browsentic created and wrote every file in — it grants no tool permission of its own |
+| **OpenCode** | `allowlist` | The run is an agent the config defines, whose permission ruleset opens on `"*": "deny"` and then allows each browser tool by name. OpenCode applies the last rule that matches and puts an agent's rules after the user's, so every other tool — built-in, custom, another MCP server's, or one a later release adds — is denied, and a tool denied outright is never offered to the model. `--pure` keeps plugins out, which run inside OpenCode and can answer its permission prompts. MCP servers the user set up in OpenCode itself still start, with their tools hidden |
 
 #### Grok Build, and why not always-approve
 
@@ -392,6 +393,35 @@ before the model sees it. The process is stopped, not left running.
 load. Their tools run only if the user approved them ahead of time — but Grok's approvals include
 rules merged from Claude Code's settings.
 
+#### OpenCode, and why its agent has a name nobody would pick
+
+OpenCode takes its whole config as JSON in `OPENCODE_CONFIG_CONTENT`, so the MCP server, the ruleset
+and the agent they belong to exist only for the one process. `vetPlan()` reads that variable back:
+`envContains` requires `"*":"deny"` and `"share":"disabled"` in it, and a task's `"mcp":{}` as well.
+Beside it, `OPENCODE_DISABLE_PROJECT_CONFIG` keeps an `opencode.json` or `.opencode` folder above the
+workspace from loading, and `OPENCODE_DISABLE_SHARE` means a user's `"share": "auto"` cannot publish
+a browsing session to a public link.
+
+Three things about OpenCode shaped the rest, each measured against 1.18.32:
+
+- **An agent of the same name is merged, in the user's key order.** Someone who made an agent called
+  `browsentic` for their own use, with `{"*": "allow", "bash": "allow"}`, would keep their `"*"` first
+  and their `bash` after Browsentic's deny — and a shell command ran. So the run's agent is
+  `browsentic-contained`, a name nobody picks by accident, and the reader stops a run in which a tool
+  outside the browser completed.
+- **OpenCode expands `{env:…}` and `{file:…}` anywhere in its config**, escaped or not. The system
+  prompt carries page text, and a page that wrote `{file:~/.ssh/id_rsa}` would have had the file read
+  into it. So the prompt is a file the config's `instructions` names; instruction files are read as
+  they are.
+- **A read is matched against its path relative to the project root**, which is `/` for a folder
+  outside git and the repository when the home directory is one. A task handed a file may read its
+  scratch folder as seen from every ancestor of the workspace — but not from the workspace itself,
+  where `tmp/*` under a root of `/` would be the machine's `/tmp`.
+
+**What remains:** MCP servers the user set up in OpenCode itself still start for every run, with their
+tools hidden from the model. And the user's own `~/.config/opencode/AGENTS.md` is read, as Claude
+Code reads the user's `CLAUDE.md`.
+
 `localTools` records which case each runner is in, and the note is logged once per run, so the weak
 one is **visible in the log rather than assumed away**.
 
@@ -400,7 +430,8 @@ one is **visible in the log rather than assumed away**.
 `run` drives the browser. `task` is a one-shot — the file analyst reading an attached file, the
 captcha analyst looking at one round of a challenge, turning a raw recording trace into steps — that
 must not reach the browser at all, which is asserted by
-requiring `{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv. `Read`
+requiring `{"mcpServers":{}}` (or `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv, or
+OpenCode's `"mcp":{}` and `"*":"deny"` in its config. `Read`
 is deliberately left out of `task`'s deny list, because some tasks are handed a file in the scratch
 workspace.
 
@@ -408,9 +439,10 @@ The file analyst adds three things to that. A file is screened before anything s
 archive, an executable or an oversized file never reaches an agent at all. The one-shot is stopped
 the moment its answer is in rather than left to exit, and its copy of the file is deleted. And the
 session is not kept where the CLI allows it: Claude Code runs a task with
-`--no-session-persistence` and Codex with `--ephemeral`. Antigravity, Mistral Vibe, Grok Build,
-Cursor CLI and Qwen Code have no such switch, so a task's session stays in that CLI's own history,
-inside the per-mode task workspace it was started in.
+`--no-session-persistence` and Codex with `--ephemeral`. OpenCode has no such switch, but its runs
+and tasks both go into a session store under `~/.browsentic` (`OPENCODE_DB`) rather than the user's.
+Antigravity, Mistral Vibe, Grok Build, Cursor CLI and Qwen Code have neither, so a task's session
+stays in that CLI's own history, inside the per-mode task workspace it was started in.
 
 ### Sealing the environment
 
@@ -432,6 +464,7 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Grok Build | `XAI_`, `GROK_` |
 | Cursor CLI | `CURSOR_` |
 | Qwen Code | `QWEN_`, `DASHSCOPE_`, `BAILIAN_`, `OPENAI_` |
+| OpenCode | `OPENCODE_` |
 
 Qwen Code is the awkward one: it authenticates through whichever provider it is pointed at, and the
 documented mainstream setup is `OPENAI_API_KEY` with `OPENAI_BASE_URL` at a DashScope endpoint, so
@@ -440,11 +473,16 @@ The `anthropic` and `gemini` auth types Qwen also accepts are **not** widened fo
 vendor's agent another vendor's key is what this exists to prevent, so `check()` reports a Qwen with
 only `ANTHROPIC_API_KEY` set as *needs setup* rather than promising a login that cannot happen.
 
+OpenCode reads a dozen providers' keys from the environment, and keeping all of them would undo
+sealing for it altogether. It keeps its own logins in a file instead — `opencode auth login` writes
+it — so only `OPENCODE_` survives, and `check()` counts that file, a Zen key, or a provider declared
+in its config as signed in.
+
 Sealing is also not absolute for Qwen, and it is worth saying so plainly: Qwen loads the first
 `.env` it finds walking up from its working directory, then `~/.qwen/.env` and `~/.env`, for
 variables not already present — so a key `sealEnv` stripped can come back from disk. It reaches the
 model provider rather than the model, because the shell and file tools are denied, but the guarantee
-is weaker there than for the other six.
+is weaker there than for the other seven.
 
 Plus **federated** cases, where a flag turns another prefix into the agent's own credentials: Claude
 Code on Bedrock authenticates with `AWS_*`, so sealing it would be sealing the agent out of its own

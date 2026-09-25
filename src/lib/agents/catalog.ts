@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor', 'qwen'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor', 'qwen', 'opencode'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -86,6 +86,18 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     // Which of these an account can reach depends on the provider it is pointed at, and no
     // subcommand lists them, so these are curated.
     models: ['qwen3-coder-plus', 'qwen3.7-plus', 'qwen3.6-plus', 'qwen3-max-2026-01-23'],
+    beta: true,
+  },
+  opencode: {
+    kind: 'opencode',
+    label: 'OpenCode',
+    vendor: 'Anomaly',
+    bin: 'opencode',
+    install: 'npm i -g opencode-ai',
+    docs: 'https://opencode.ai/docs/cli/',
+    // Spelled provider/model, and reachable only through a provider OpenCode is signed in to: Zen's
+    // free models refuse a run whose tools are narrowed to the browser.
+    models: ['anthropic/claude-opus-5-5', 'anthropic/claude-sonnet-5', 'openai/gpt-5.6', 'google/gemini-3.1-pro-preview'],
     beta: true,
   },
 };

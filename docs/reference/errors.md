@@ -66,9 +66,9 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | Code | Origin | Meaning and next move |
 | --- | --- | --- |
 | `AGENT_MISSING` | Runner | The chosen agent's binary is not on the *daemon's* `PATH`. Set `agents.<name>.bin` to an absolute path |
-| `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools (`browsentic agent fix antigravity`), Grok Build or Cursor CLI is not signed in (`grok login`, `cursor-agent login`), or Qwen Code has no model provider configured (`qwen`, then `/auth`) |
+| `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools (`browsentic agent fix antigravity`), Grok Build or Cursor CLI is not signed in (`grok login`, `cursor-agent login`), Qwen Code has no model provider configured (`qwen`, then `/auth`), or OpenCode is signed in to no provider (`opencode auth login`) |
 | `AGENT_UNUSABLE` | Runner | The CLI is present but cannot run — usually too old for the flags Browsentic passes |
-| `AGENT_UNSAFE` | Runner | The run was stopped before the agent could act on the machine: its plan had lost its containment, which is a bug in Browsentic, or the CLI itself said it had not applied it — Grok Build offering tools Browsentic never asks for, or Qwen Code reporting a denied tool or a second MCP server as registered. Update both, and report it |
+| `AGENT_UNSAFE` | Runner | The run was stopped before the agent could act on the machine: its plan had lost its containment, which is a bug in Browsentic, or the CLI itself said it had not applied it — Grok Build offering tools Browsentic never asks for, Qwen Code reporting a denied tool or a second MCP server as registered, or OpenCode reporting that a tool outside the browser ran. Update both, and report it |
 
 ## Guardrails
 

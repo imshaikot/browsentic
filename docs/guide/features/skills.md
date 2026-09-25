@@ -98,6 +98,7 @@ The `/` picker also lists the skills the active agent CLI keeps for itself:
 | Grok Build | `~/.grok/skills/`, `~/.agents/skills/`, and the Claude Code skills it also loads |
 | Cursor CLI | `~/.cursor/skills/`, `~/.agents/skills/` |
 | Qwen Code | `~/.qwen/skills/`, `~/.agents/skills/` |
+| OpenCode | `~/.config/opencode/skills/` (and `skill/`), `~/.opencode/skills/`, `~/.agents/skills/`, `~/.claude/skills/` |
 
 Picking one attaches it to that message: the daemon reads the file at spawn time and
 appends it to the system prompt, clearly marked, with a note that browser tools are all the run

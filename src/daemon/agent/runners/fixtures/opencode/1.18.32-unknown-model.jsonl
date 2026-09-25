@@ -1,0 +1,2 @@
+# opencode 1.18.32: a model id OpenCode does not know. Model replies scripted by a local stand-in for the provider.
+{"type":"error","timestamp":1790294608061,"sessionID":"ses_f2a2037fbffeL59ubvcJrlqa2T","error":{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_24e7408d"}}}

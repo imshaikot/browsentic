@@ -70,6 +70,8 @@ interface Requirements {
   readonly allows?: ToolAllowance;
   /** Variables the plan must set for a CLI that takes a switch only from its environment. */
   readonly env?: Readonly<Record<string, string>>;
+  /** Substrings a variable must contain, for a CLI that takes its whole config as one. */
+  readonly envContains?: Readonly<Record<string, readonly string[]>>;
   /** Workspace files the plan must write before the CLI starts. */
   readonly files: readonly string[];
   /**
@@ -139,6 +141,15 @@ const NEVER_QWEN = ['Bash', 'exec', 'Edit', 'agent', 'skill', 'monitor'];
  * a run's gate — and its memory would carry what a page said into the user's next session.
  */
 const GROK_SEALED = { GROK_MEMORY: '0', GROK_CLAUDE_MCPS_ENABLED: 'false', GROK_CURSOR_MCPS_ENABLED: 'false' };
+
+/**
+ * OpenCode takes these only from its environment. Project config would load agents and tools from
+ * the folders above the workspace, and a user's `share: auto` publishes every session it runs.
+ */
+const OPENCODE_SEALED = { OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_SHARE: '1' };
+
+/** The ruleset that denies every tool not named after it, and the switch that keeps a session off opncd.ai. */
+const OPENCODE_CONFIG = ['"*":"deny"', '"share":"disabled"'];
 
 export const CONTAINMENT: Record<AgentKind, Containment> = {
   claude: {
@@ -321,6 +332,41 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       files: [],
     },
   },
+
+  opencode: {
+    localTools: 'allowlist',
+    // A key in ANTHROPIC_* or OPENAI_* would be one of a dozen providers OpenCode reads; `opencode auth login` keeps them in a file.
+    keepsEnv: ['OPENCODE_'],
+    // `--auto` approves whatever is not denied, `--attach` runs the turn in a server started with someone
+    // else's config, `--dir` moves it out of the workspace, and `--share` publishes it.
+    forbidden: [/^--auto$/i, /^--attach/i, /^--dir/i, /^--share$/i],
+    note:
+      'a per-run permission ruleset opening on "*": "deny", which OpenCode applies after the user’s own rules, ' +
+      'so the model is offered no tool that was not named — built-in, custom, or another MCP server’s; ' +
+      'external plugins and project config stay off, but MCP servers the user gave OpenCode itself still start, with their tools hidden',
+    run: {
+      // Plugins run inside OpenCode and can add tools or answer its permission prompts.
+      required: ['--pure'],
+      pairs: [
+        ['--agent', 'browsentic-contained'],
+        ['--format', 'json'],
+      ],
+      env: OPENCODE_SEALED,
+      envContains: { OPENCODE_CONFIG_CONTENT: OPENCODE_CONFIG },
+      files: ['instructions.md'],
+    },
+    task: {
+      required: ['--pure'],
+      pairs: [
+        ['--agent', 'browsentic-contained'],
+        ['--format', 'json'],
+      ],
+      env: OPENCODE_SEALED,
+      // An empty map adds no server of ours, so a one-shot has no way to the browser.
+      envContains: { OPENCODE_CONFIG_CONTENT: [...OPENCODE_CONFIG, '"mcp":{}'] },
+      files: [],
+    },
+  },
 };
 
 /**
@@ -359,6 +405,11 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
 
   for (const [name, value] of Object.entries(rules.env ?? {})) {
     if (plan.env?.[name] !== value) problems.push(`${label} is spawned without ${name}=${value}.`);
+  }
+
+  for (const [name, needles] of Object.entries(rules.envContains ?? {})) {
+    const missing = needles.filter((needle) => !plan.env?.[name]?.includes(needle));
+    if (missing.length) problems.push(`${label} is spawned with a ${name} missing ${missing.join(', ')}.`);
   }
 
   for (const path of rules.files) {
@@ -405,7 +456,7 @@ const SECRET_PREFIX: readonly string[] = [
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
   'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'CURSOR_', 'HF_', 'HUGGINGFACE_',
-  'QWEN_', 'DASHSCOPE_', 'BAILIAN_',
+  'QWEN_', 'DASHSCOPE_', 'BAILIAN_', 'OPENCODE_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 
