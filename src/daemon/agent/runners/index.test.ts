@@ -43,6 +43,7 @@ const configWith = (agents: Partial<Record<AgentKind, AgentSettings>>, agent: Ag
     grok: { bin: join(bin, 'grok') },
     cursor: { bin: join(bin, 'cursor-agent') },
     qwen: { bin: join(bin, 'qwen') },
+    opencode: { bin: join(bin, 'opencode') },
     ...agents,
   },
   requireApproval: [],
@@ -75,7 +76,7 @@ describe('the registry', () => {
 describe('readiness probes', () => {
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
-    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok', 'cursor-agent', 'qwen']) stub(name);
+    for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok', 'cursor-agent', 'qwen', 'opencode']) stub(name);
     stub('codex-expired', { prints: 'licence expired', exit: 3 });
   });
 
@@ -141,7 +142,7 @@ describe('readiness probes', () => {
   test('probes are reused for half a minute, even when only the active agent changed', async () => {
     await agentState(configWith({}), { refresh: true });
     const again = await agentState(configWith({}, 'antigravity'));
-    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'qwen', 'vibe']], 'antigravity']);
+    expect([rounds(), again.active]).toEqual([[['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'opencode', 'qwen', 'vibe']], 'antigravity']);
   });
 
   test('asking for a refresh probes again', async () => {
@@ -154,8 +155,8 @@ describe('readiness probes', () => {
     await agentState(configWith({}), { refresh: true });
     await agentState(configWith({ claude: { bin: join(bin, 'claude-next') } }));
     expect(rounds()).toEqual([
-      ['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'qwen', 'vibe'],
-      ['agy', 'claude-next', 'codex', 'cursor-agent', 'grok', 'qwen', 'vibe'],
+      ['agy', 'claude', 'codex', 'cursor-agent', 'grok', 'opencode', 'qwen', 'vibe'],
+      ['agy', 'claude-next', 'codex', 'cursor-agent', 'grok', 'opencode', 'qwen', 'vibe'],
     ]);
   });
 

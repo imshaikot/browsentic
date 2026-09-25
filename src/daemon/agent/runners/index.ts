@@ -16,6 +16,7 @@ import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
 import { cursorRunner } from './cursor';
 import { grokRunner } from './grok';
+import { opencodeRunner } from './opencode';
 import { qwenRunner } from './qwen';
 import type { McpServer, Runner } from './types';
 import { vibeRunner } from './vibe';
@@ -28,6 +29,7 @@ export const RUNNERS: Record<AgentKind, Runner> = {
   grok: grokRunner,
   cursor: cursorRunner,
   qwen: qwenRunner,
+  opencode: opencodeRunner,
 };
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');

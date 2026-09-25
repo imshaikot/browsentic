@@ -34,6 +34,7 @@ const DEFAULTS: AgentConfig = {
     grok: { bin: 'grok' },
     cursor: { bin: 'cursor-agent' },
     qwen: { bin: 'qwen' },
+    opencode: { bin: 'opencode' },
   },
   requireApproval: ['page.submitForm'],
 };
