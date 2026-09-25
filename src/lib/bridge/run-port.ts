@@ -179,8 +179,8 @@ export function serveRunPorts(): void {
       if (!session) return 'gone';
       if (session.runId || busy.has(sessionId)) return 'busy';
       await append(sessionId, notice('info', `Timer “${label}” fired.`));
-      await startTurn(session, prompt, { fastPath: false });
-      return 'delivered';
+      const outcome = await startTurn(session, prompt, { fastPath: false });
+      return outcome === 'busy' || outcome === 'offline' ? outcome : 'delivered';
     }),
   );
 
