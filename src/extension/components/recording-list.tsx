@@ -3,6 +3,7 @@ import { Check, Clapperboard, Globe, KeyRound, Loader2, Pencil, Play, X } from '
 import { Badge } from '@/extension/components/ui/badge';
 import { Input } from '@/extension/components/ui/input';
 import { renameRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
+import { formatWhen } from '@/lib/format-when';
 
 export function RecordingList({
   recordings,
@@ -160,21 +161,8 @@ function RecordingRow({
   );
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
 function duration(ms: number): string {
   const total = Math.round(ms / 1000);
   if (total < 60) return `${total}s`;
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
-}
-
-function formatWhen(at: number): string {
-  const ago = Date.now() - at;
-  if (ago < MINUTE) return 'just now';
-  if (ago < HOUR) return `${Math.floor(ago / MINUTE)}m ago`;
-  if (ago < DAY) return `${Math.floor(ago / HOUR)}h ago`;
-  if (ago < 7 * DAY) return `${Math.floor(ago / DAY)}d ago`;
-  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }

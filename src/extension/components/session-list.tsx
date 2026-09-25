@@ -1,6 +1,7 @@
 import { Globe, Loader2, MessagesSquare, X } from 'lucide-react';
 import { Badge } from '@/extension/components/ui/badge';
 import { isNaming, type StoredSessionMeta } from '@/lib/bridge/session-store';
+import { formatWhen } from '@/lib/format-when';
 import { cn } from '@/lib/utils';
 
 export function SessionList({
@@ -112,17 +113,4 @@ function SessionRow({
       </button>
     </div>
   );
-}
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-function formatWhen(at: number): string {
-  const ago = Date.now() - at;
-  if (ago < MINUTE) return 'just now';
-  if (ago < HOUR) return `${Math.floor(ago / MINUTE)}m ago`;
-  if (ago < DAY) return `${Math.floor(ago / HOUR)}h ago`;
-  if (ago < 7 * DAY) return `${Math.floor(ago / DAY)}d ago`;
-  return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
