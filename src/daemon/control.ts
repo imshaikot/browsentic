@@ -26,10 +26,17 @@ export interface SessionSummary {
   connected: boolean;
 }
 
+/**
+ * An invoke can be held far longer than the caller's own timeout: an approval waits on the user.
+ * A caller that sends `keepAlive` hears `working` this often until the result, and restarts its
+ * timeout on each; one that doesn't — an older client — is never sent a frame it cannot read.
+ */
+export const INVOKE_KEEPALIVE_MS = 2_000;
+
 export type ControlRequest =
   | { id: string; op: 'describe'; runId?: string }
   | { id: string; op: 'status' }
-  | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string }
+  | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string; keepAlive?: boolean }
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
   | { id: string; op: 'revoke'; session?: string; origin?: string }
@@ -39,6 +46,7 @@ export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[] }
   | { id: string; op: 'status'; status: BridgeStatus }
   | { id: string; op: 'invoke'; result: ActionResult }
+  | { id: string; op: 'working' }
   | { id: string; op: 'pair'; code: string; expiresAt: number }
   | { id: string; op: 'sessions'; sessions: SessionSummary[] }
   | { id: string; op: 'revoke'; revoked: number }

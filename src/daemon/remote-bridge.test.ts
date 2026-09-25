@@ -72,7 +72,7 @@ describe('asking the daemon', () => {
     const result = await bridge.invoke('page.clickElement', { target: { text: 'Buy' } });
     expect([result, received[0]]).toEqual([
       { ok: true, data: { clicked: true } },
-      { id: expect.any(String), op: 'invoke', action: 'page.clickElement', input: { target: { text: 'Buy' } }, runId: 'run-9' },
+      { id: expect.any(String), op: 'invoke', action: 'page.clickElement', input: { target: { text: 'Buy' } }, runId: 'run-9', keepAlive: true },
     ]);
   });
 
@@ -168,6 +168,46 @@ describe('when the daemon does not answer', () => {
       [60_000, []],
       [60_000, 0],
     ]);
+  });
+
+  describe('while the daemon says it is still working on an action', () => {
+    const unreachable = { ok: false, error: { code: 'DAEMON_UNREACHABLE', message: 'The Browsentic daemon did not respond' } };
+
+    /** Frames on one socket arrive in order, so once the manifest event is heard, so was the frame before it. */
+    const deliver = async (message: ControlMessage) => {
+      const read = new Promise<void>((resolve) => bridge.onManifestChanged(resolve));
+      daemonSide.send(JSON.stringify(message));
+      daemonSide.send(JSON.stringify({ event: 'manifest-changed' }));
+      await read;
+    };
+
+    const held = async () => {
+      const asked = new Promise<string>((resolve) => (answer = ({ id }) => (resolve(id), null)));
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      const started = Date.now();
+      const call = bridge.invoke('page.submitForm');
+      return { id: await asked, call, took: () => Date.now() - started };
+    };
+
+    test('the action outlives the minute, for as long as it keeps hearing so', async () => {
+      const { id, call, took } = await held();
+      for (let minute = 0; minute < 3; minute++) {
+        await vi.advanceTimersByTimeAsync(50_000);
+        await deliver({ id, op: 'working' });
+      }
+      await deliver({ id, op: 'invoke', result: { ok: true, data: { submitted: true } } });
+      expect([await call, took()]).toEqual([{ ok: true, data: { submitted: true } }, 150_000]);
+    });
+
+    test('once the daemon falls silent, the action gives up a minute after the last word', async () => {
+      const { id, call, took } = await held();
+      await vi.advanceTimersByTimeAsync(50_000);
+      await deliver({ id, op: 'working' });
+      let outcome: unknown;
+      void call.then((result) => (outcome = result));
+      while (!outcome) await vi.advanceTimersToNextTimerAsync();
+      expect([outcome, took()]).toEqual([unreachable, 110_000]);
+    });
   });
 
   test('once closed, calls fail at once without being sent', async () => {

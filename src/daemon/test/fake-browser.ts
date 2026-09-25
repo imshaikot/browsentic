@@ -35,6 +35,8 @@ export class FakeBrowser {
   taskReply: ActionResult = { ok: true, data: { sessionId: 'fake-session' } };
   /** The task list the daemon last pushed or answered with. */
   tasks: TaskList | null = null;
+  /** While set, every invoke is answered only once it resolves. */
+  holdInvokes: Promise<void> | null = null;
   private readonly replies = new Map<string, (frame: SocketFrame) => void>();
   readonly closed: Promise<string>;
   /** Resolves once this browser has answered the daemon's request for its manifest — a drifted build is asked right behind the welcome. */
@@ -139,7 +141,10 @@ export class FakeBrowser {
     }
     if (frame?.t !== 'invoke') return;
     this.invoked.push(frame.action);
-    send(this.socket, { t: 'result', id: frame.id, result: { ok: true, data: { answeredBy: this.profile.installId } } });
+    const answer = () =>
+      send(this.socket, { t: 'result', id: frame.id, result: { ok: true, data: { answeredBy: this.profile.installId } } });
+    if (this.holdInvokes) void this.holdInvokes.then(answer);
+    else answer();
   }
 }
 

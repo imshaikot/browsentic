@@ -59,7 +59,15 @@ import { agentState, grantRunner, refreshModelLists } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
 import { loadSkills } from './agent/skills';
 import { commitStaging, discardStaging } from './agent/site-map-store';
-import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
+import {
+  INVOKE_KEEPALIVE_MS,
+  type Bridge,
+  type BridgeStatus,
+  type ControlMessage,
+  type ControlRequest,
+  type Described,
+  type SessionSummary,
+} from './control';
 import { ExtensionLink } from './extension-link';
 import { startScheduler } from './schedules/scheduler';
 import { refreshNativeHost } from './native-host';
@@ -702,16 +710,23 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         return send(ws, { id: request.id, op: 'status', status: statusNow(routeFor(binding)) });
       }
       if (request.op === 'invoke') {
+        const working = request.keepAlive
+          ? setInterval(() => send(ws, { id: request.id, op: 'working' }), INVOKE_KEEPALIVE_MS)
+          : undefined;
         let result: ActionResult;
-        if (request.runId) {
-          result =
-            (await sessionRunning(request.runId)?.invokeForRun(request.runId, request.action, request.input)) ??
-            failure('RUN_INACTIVE', 'This agent run is no longer active');
-          if (!result.ok && result.error.code === 'RUN_INACTIVE') {
-            log(`control ${client} invoked ${request.action} for inactive run ${request.runId}`);
+        try {
+          if (request.runId) {
+            result =
+              (await sessionRunning(request.runId)?.invokeForRun(request.runId, request.action, request.input)) ??
+              failure('RUN_INACTIVE', 'This agent run is no longer active');
+            if (!result.ok && result.error.code === 'RUN_INACTIVE') {
+              log(`control ${client} invoked ${request.action} for inactive run ${request.runId}`);
+            }
+          } else {
+            result = await invokeExternal(routeFor(binding), request.action, request.input, client);
           }
-        } else {
-          result = await invokeExternal(routeFor(binding), request.action, request.input, client);
+        } finally {
+          clearInterval(working);
         }
         return send(ws, { id: request.id, op: 'invoke', result });
       }
