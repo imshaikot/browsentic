@@ -49,8 +49,8 @@ other liability arising from the software or its use. In plain language, that me
   the action; deciding is yours. Actions taken in your browser — purchases, submissions,
   messages, deletions — are actions taken on your accounts, by you.
 - **The agent is not part of this project.** Browsentic spawns whichever agent CLI you chose —
-  Claude Code, Codex, Antigravity, Mistral Vibe, Grok Build, Cursor CLI or Qwen Code — and
-  contains each as well as its own flags allow, but their behaviour,
+  Claude Code, Codex, Antigravity, Mistral Vibe, Grok Build, Cursor CLI, Qwen Code or OpenCode —
+  and contains each as well as its own flags allow, but their behaviour,
   their terms, and what they do with your prompts are governed by their vendors, not by this
   repository.
 - **Automating a website may breach that website's terms of service.** Whether a site permits

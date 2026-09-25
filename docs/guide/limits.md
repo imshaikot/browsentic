@@ -70,14 +70,15 @@ contains it with whatever levers that CLI offers, and they are not equal:
 | Grok Build (beta) | A per-run tool list, approvals that refuse anything not granted up front, and a sandbox that keeps its writes in its own folder; MCP servers you set up in Grok itself still load |
 | Cursor CLI (beta) | Per-run deny rules, where a deny beats every allow including your own; a kernel sandbox is asked for too, but it has no Windows backend and is not depended on |
 | Qwen Code (beta) | `--safe-mode` drops every setting of your own — hooks, extensions, bundled skills, MCP servers, permission rules — and deny rules close the shell, the disk and the tools that reach either; because that mode also disables Qwen's own fail-closed tool allowlist, the run's startup line is read back and anything unexpected stops it |
+| OpenCode (beta) | A per-run agent whose rules open on a deny for every tool, applied after your own rules, so the model is offered only the browser; external plugins and project config are off, and MCP servers you set up in OpenCode itself still start, with their tools hidden |
 
 The environment is sealed for all of them — cloud keys, registry tokens and database URLs inherited
 from your shell are removed before the spawn, keeping only what that agent needs to authenticate.
 Details in [internals/guardrails.md](../internals/guardrails.md#spawn-containment).
 
-## Four of the agents are beta
+## Five of the agents are beta
 
-Mistral Vibe, Grok Build, Cursor CLI and Qwen Code were built by reading each CLI and checking its
+Mistral Vibe, Grok Build, Cursor CLI, Qwen Code and OpenCode were built by reading each CLI and checking its
 flags, its containment and its error texts — but none has carried a whole conversation end to end
 yet, so the popup, the docs and the release notes say *beta*. What that means in practice:
 
@@ -87,7 +88,9 @@ yet, so the popup, the docs and the release notes say *beta*. What that means in
 - Cursor is less fenced off on Windows, where its kernel sandbox has no backend;
 - Qwen was written against its source rather than a running binary — no provider was configured on
   the machine it was built on — and it needs one configured before it will answer at all;
-- the other three agents are untouched: the hooks the four share are covered by the spawn and
+- OpenCode needs a provider signed in, because Zen's free models refuse a run narrowed to the
+  browser, and its replies arrive a part at a time;
+- the other three agents are untouched: the hooks the five share are covered by the spawn and
   drive tests.
 
 [Choosing an agent](agents.md) has the per-agent detail. Please report what you find.

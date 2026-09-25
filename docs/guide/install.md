@@ -15,7 +15,7 @@ AI agent you already run locally.
 | **Node** | 20 or newer | `node --version` |
 | **Browser** | Chrome or another Chromium browser (Edge, Brave, Arc), or Firefox 140 or newer | — |
 | **System** | macOS, Windows or Linux. macOS also has an [app](mac-app.md) | — |
-| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install), [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta), [Grok Build](https://docs.x.ai/build/overview) (beta), [Cursor CLI](https://cursor.com/docs/cli/overview) (beta) or [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version`, `vibe --version`, `grok --version`, `cursor-agent --version`, `qwen --version` |
+| **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install), [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta), [Grok Build](https://docs.x.ai/build/overview) (beta), [Cursor CLI](https://cursor.com/docs/cli/overview) (beta), [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/) (beta) or [OpenCode](https://opencode.ai/docs/cli/) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version`, `vibe --version`, `grok --version`, `cursor-agent --version`, `qwen --version`, `opencode --version` |
 
 Two things worth knowing before you start:
 

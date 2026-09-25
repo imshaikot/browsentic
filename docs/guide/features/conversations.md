@@ -105,8 +105,8 @@ plus whether it can resume where it left off.
 
 The card also shows token counts, straight from the agent CLI's own reporting: roughly how many
 tokens the model's context window held after its last reply, and how many it generated on the last
-run. Claude Code, Codex, Grok Build, Cursor CLI and Qwen Code report these; Antigravity and Mistral Vibe
-do not, and the card says so.
+run. Claude Code, Codex, Grok Build, Cursor CLI, Qwen Code and OpenCode report these; Antigravity and
+Mistral Vibe do not, and the card says so.
 
 It is answered by the extension itself, without waking an agent, so it also works mid-run. The card
 describes what this browser holds; the agent's own working memory lives with the agent.

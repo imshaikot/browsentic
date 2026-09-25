@@ -49,7 +49,7 @@ Nothing here is required; this shows every key in one place.
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex`, `antigravity`, `vibe`, `grok`, `cursor` or `qwen` |
+| `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex`, `antigravity`, `vibe`, `grok`, `cursor`, `qwen` or `opencode` |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary |
 | `agents.<name>.model` | `claude-sonnet-5` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it |
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |

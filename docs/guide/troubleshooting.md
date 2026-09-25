@@ -68,6 +68,10 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | Qwen Code fails with *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier ended on 2026-04-15 | Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL` |
 | Qwen Code cannot see an API key you exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; the rest are sealed away | Point Qwen at one of those four providers |
 | `AGENT_UNSAFE`: *Qwen Code registered …* / *loaded the MCP server …* | Qwen's own startup line named a tool or a server Browsentic denied, so the run was stopped before the model saw it | Update Qwen Code and Browsentic; report it if it persists |
+| OpenCode fails with *free models refuse a run whose tools Browsentic has narrowed to the browser* | OpenCode Zen's free tier serves only requests carrying OpenCode's own built-in tools | `opencode auth login`, then pick that provider's model in the popup |
+| OpenCode fails with *could not start this turn* | Usually a model OpenCode does not know | Pick one as `opencode models` lists it, `provider/model` |
+| OpenCode cannot see an API key you exported | Only `OPENCODE_*` reaches a run; the rest are sealed away | `opencode auth login`, which keeps the key in OpenCode's own file |
+| `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped | Update OpenCode and Browsentic, and report it |
 
 ## Pages and tabs
 

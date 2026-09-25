@@ -46,7 +46,7 @@ The app opens on six checks and runs them on its own:
 | **Browsentic command** | `~/.browsentic/cli` holds the version this app carries | **Install** copies it there and writes the `browsentic` launcher to `~/.browsentic/bin` |
 | **Browser extension** | the same version is unpacked at `~/browsentic/extension/chrome-mv3` | **Install** unpacks it |
 | **A Chromium browser** | Chrome, Brave, Edge, Arc, Vivaldi, Opera or Chromium is installed | **Get Chrome** opens the download page. Advisory — it does not block you |
-| **An AI agent** | One of `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent` or `qwen` is on your `PATH` | **Install Claude Code** runs `npm i -g @anthropic-ai/claude-code`. Advisory |
+| **An AI agent** | One of `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent`, `qwen` or `opencode` is on your `PATH` | **Install Claude Code** runs `npm i -g @anthropic-ai/claude-code`. Advisory |
 
 **Set up everything** installs the first three in one click. A browser and an agent are yours to
 choose, so each has a button of its own. When everything required is in place the app moves on by
