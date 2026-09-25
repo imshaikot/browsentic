@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.imshaikot/browsentic",
+  "title": "Browsentic",
+  "description": "Hands your real, logged-in browser to your agent: an AI side panel extension, also over MCP.",
+  "websiteUrl": "https://browsentic.com",
+  "icons": [{ "src": "https://browsentic.com/icon/128.png", "mimeType": "image/png", "sizes": ["128x128"] }],
+  "repository": {
+    "url": "https://github.com/imshaikot/browsentic",
+    "source": "github",
+    "subfolder": "src/daemon"
+  },
+  "version": "0.7.4",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "browsentic",
+      "version": "0.7.4",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }]
+    }
+  ]
+}

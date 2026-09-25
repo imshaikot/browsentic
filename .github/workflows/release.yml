@@ -2,13 +2,15 @@
 #
 # The tag is both the trigger and the source of truth. CI bumps nothing and tags nothing:
 # it rebuilds the tagged commit from scratch, checks the build agrees with the tag, and
-# publishes the three store archives under a release of that name, then the Mac app and the
-# signed Firefox add-on in their own jobs. So the whole local half of a release is "bump
-# both package.json files, commit, tag vX.Y.Z, push the tag".
+# publishes the three store archives under a release of that name, then the Mac app, the
+# signed Firefox add-on and the MCP Registry entry in their own jobs. So the whole local half
+# of a release is "bump both package.json files and server.json, commit, tag vX.Y.Z, push
+# the tag".
 #
 # Two properties this leans on:
-#   - Both package.json files must already say X.Y.Z at the tagged commit. A mismatch fails
-#     the run rather than shipping a zip whose filename disagrees with its manifest.
+#   - Both package.json files and server.json must already say X.Y.Z at the tagged commit. A
+#     mismatch fails the run rather than shipping a zip whose filename disagrees with its
+#     manifest.
 #   - An annotated tag's own message, if it has one, becomes the release notes verbatim.
 #     Otherwise they are generated from the conventional-commit log since the previous tag.
 #     Either way scripts/release-notes.mjs decides, and it runs the same locally.
@@ -49,7 +51,7 @@ jobs:
           # would render an empty changelog rather than fail.
           fetch-depth: 0
 
-      - name: Resolve the version and check both manifests agree with the tag
+      - name: Resolve the version and check every manifest agrees with the tag
         # package.json is an output of `prepare`, not an input, so a mismatch means the tag
         # was cut by hand at the wrong commit. Catching it here beats shipping a zip whose
         # filename and manifest disagree with the release it hangs under.
@@ -60,8 +62,9 @@ jobs:
             echo "::error::'$tag' is not a vX.Y.Z tag"
             exit 1
           fi
-          for file in package.json src/daemon/package.json; do
-            found=$(node -p "require('./$file').version")
+          for file in package.json src/daemon/package.json server.json; do
+            # server.json repeats the version on the npm package it names.
+            found=$(node -p "const m = require('./$file'); [...new Set([m.version, ...(m.packages ?? []).map((p) => p.version)])].join(', ')")
             if [ "$found" != "$version" ]; then
               echo "::error::$file says $found but the tag is $tag"
               exit 1
@@ -363,3 +366,48 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" "$SIGNED" --clobber
           gh release upload "$GITHUB_REF_NAME" dist/updates.json --clobber
           echo "firefox: signed .xpi and updates.json attached" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------------------
+  # Lists the MCP server in the official MCP Registry, which the other MCP directories read
+  # from, under the name in server.json. The registry checks that name twice: this
+  # repository's OIDC token grants io.github.imshaikot/*, and the npm version server.json
+  # points at must carry the same name as its mcpName.
+  #
+  # After the release job, so that npm version exists. npm's public document can trail the
+  # publish by minutes, hence the wait. A failure here leaves the release and npm as they
+  # are: re-run the job, or publish by hand with `mcp-publisher login github`.
+  # ---------------------------------------------------------------------------------------
+  mcp-registry:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Skip a version the registry already lists
+        run: |
+          name=$(node -p "require('./server.json').name")
+          entry="https://registry.modelcontextprotocol.io/v0.1/servers/${name/\//%2F}/versions/${GITHUB_REF_NAME#v}"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+          echo "ENTRY=$entry" >> "$GITHUB_ENV"
+          if curl -sf -o /dev/null "$entry"; then
+            echo "SKIP=1" >> "$GITHUB_ENV"
+            echo "mcp registry: $entry already exists, skipping" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Wait for npm to serve the version with its mcpName
+        if: env.SKIP != '1'
+        run: |
+          for _ in $(seq 60); do
+            [ "$(npm view "browsentic@${GITHUB_REF_NAME#v}" mcpName 2>/dev/null)" = "$NAME" ] && exit 0
+            sleep 10
+          done
+          echo "::error::npm has not served browsentic@${GITHUB_REF_NAME#v} with mcpName $NAME for ten minutes"
+          exit 1
+
+      - name: Publish to the MCP Registry
+        if: env.SKIP != '1'
+        run: |
+          curl -sfL https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+          echo "mcp registry: $ENTRY" >> "$GITHUB_STEP_SUMMARY"
