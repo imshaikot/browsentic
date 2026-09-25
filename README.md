@@ -38,7 +38,8 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
   <a href="https://github.com/mistralai/mistral-vibe"><img src="https://browsentic.com/icons/mistral.svg" width="40" height="40" alt="Mistral Vibe (beta)" title="Mistral Vibe (beta)"></a>&emsp;
   <a href="https://docs.x.ai/build/overview"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/xai-dark.svg"><img src="https://browsentic.com/icons/xai.svg" width="40" height="40" alt="Grok Build (beta)" title="Grok Build (beta)"></picture></a>&emsp;
   <a href="https://cursor.com/docs/cli/overview"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/cursor-dark.svg"><img src="https://browsentic.com/icons/cursor.svg" width="40" height="40" alt="Cursor CLI (beta)" title="Cursor CLI (beta)"></picture></a>&emsp;
-  <a href="https://qwenlm.github.io/qwen-code-docs/en/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/qwen-dark.svg"><img src="https://browsentic.com/icons/qwen.svg" width="40" height="40" alt="Qwen Code (beta)" title="Qwen Code (beta)"></picture></a>
+  <a href="https://qwenlm.github.io/qwen-code-docs/en/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/qwen-dark.svg"><img src="https://browsentic.com/icons/qwen.svg" width="40" height="40" alt="Qwen Code (beta)" title="Qwen Code (beta)"></picture></a>&emsp;
+  <a href="https://opencode.ai/docs/"><picture><source media="(prefers-color-scheme: dark)" srcset="https://browsentic.com/icons/opencode-dark.svg"><img src="https://browsentic.com/icons/opencode.svg" width="40" height="40" alt="OpenCode (beta)" title="OpenCode (beta)"></picture></a>
 </p>
 
 </div>
