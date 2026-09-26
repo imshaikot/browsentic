@@ -44,6 +44,16 @@ describe('validateTask', () => {
     expect(validateTask(draft(patch), NOW)).toMatchObject({ ok: false, field });
   });
 
+  it('lets a task keep a time that has since passed, so it can still be renamed or switched off', () => {
+    const once = { kind: 'once', at: NOW - 60_000 } as const;
+    const until = NOW - 1;
+    const stored = { rule: once, until };
+
+    expect(validateTask(draft({ name: 'Renamed', rule: once, until }), NOW, stored)).toMatchObject({ ok: true });
+    expect(validateTask(draft({ rule: { kind: 'once', at: NOW - 1 }, until }), NOW, stored)).toMatchObject({ ok: false, field: 'rule' });
+    expect(validateTask(draft({ rule: once, until: NOW - 2 }), NOW, stored)).toMatchObject({ ok: false, field: 'until' });
+  });
+
   it('dedupes and orders the days and times of a weekly rule', () => {
     const checked = validateTask(draft({ rule: { kind: 'weekly', days: [5, 1, 5], times: ['17:30', '09:00', '09:00'] } }), NOW);
     expect(checked.ok && checked.draft.rule).toEqual({ kind: 'weekly', days: [1, 5], times: ['09:00', '17:30'] });
@@ -87,8 +97,9 @@ describe('orderFor', () => {
           { at: 1, outcome: 'ok', headline: 'Nothing waiting' },
         ],
       }),
+      'run-1',
     );
-    expect(order.previous).toBe('3 PRs need you');
+    expect(order).toMatchObject({ runId: 'run-1', previous: '3 PRs need you' });
   });
 });
 

@@ -16,6 +16,7 @@ export interface PendingApproval {
 
 export interface TaskTag {
   id: string;
+  runId: string;
   name: string;
   keepTab: boolean;
   notify: NotifyPolicy;

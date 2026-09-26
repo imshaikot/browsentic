@@ -18,6 +18,7 @@ import { logRun, readSchedules, setPaused, updateSchedules } from './store';
 
 export const CLOCK_MAX_WAIT_MS = 60_000;
 export const FIRST_WAKE_MS = 15_000;
+export const LINK_SETTLE_MS = 2_000;
 export const LATE_AFTER_MS = 2 * CLOCK_MAX_WAIT_MS;
 export const REPORT_GRACE_MS = 5 * 60_000;
 const MAX_MISSED_COUNTED = 1_000;
@@ -40,11 +41,13 @@ export interface Scheduler {
   pause(paused: boolean): ActionResult<TaskList>;
   runNow(taskId: string, link: TaskLink): ActionResult<TaskList>;
   finished(taskId: string, result: TaskResult): void;
+  linkOpened(): void;
   linkClosed(linkId: string): void;
   stop(): void;
 }
 
 interface InFlight {
+  runId: string;
   linkId: string;
   startedAt: number;
 }
@@ -80,11 +83,18 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     deps.publish(current);
   };
 
+  /** Rather than written off while no browser can take it, a run-once-when-back task stays due until one connects. */
+  const waitsForBrowser = (task: ScheduledTask) => task.missed === 'runOnce' && !deps.linkFor(task.browser);
+
+  const firesAt = (task: ScheduledTask, now: number): number | null =>
+    task.nextRunAt === null || (task.nextRunAt <= now && waitsForBrowser(task)) ? null : task.nextRunAt;
+
   function arm(wait?: number): void {
     clearTimeout(timer);
+    const now = Date.now();
     const { paused, tasks } = readSchedules();
-    const due = paused ? [] : tasks.flatMap((task) => (task.nextRunAt === null ? [] : [task.nextRunAt]));
-    const untilDue = due.length ? Math.max(Math.min(...due) - Date.now(), 0) : CLOCK_MAX_WAIT_MS;
+    const due = paused ? [] : tasks.flatMap((task) => firesAt(task, now) ?? []);
+    const untilDue = due.length ? Math.max(Math.min(...due) - now, 0) : CLOCK_MAX_WAIT_MS;
     timer = setTimeout(wake, wait ?? Math.min(untilDue, CLOCK_MAX_WAIT_MS));
     timer.unref();
   }
@@ -94,7 +104,10 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     expireSilent(now);
     const { paused, tasks } = readSchedules();
     if (!paused) {
-      for (const task of tasks) if (task.nextRunAt !== null && task.nextRunAt <= now) fire(task.id, now);
+      for (const task of tasks) {
+        const at = firesAt(task, now);
+        if (at !== null && at <= now) fire(task.id, now);
+      }
     }
     if (JSON.stringify(list()) !== published) publish();
     arm();
@@ -115,7 +128,7 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
         const run: TaskRun = {
           at: task.nextRunAt,
           outcome: 'missed',
-          reason: `Missed ${missed} while nothing could run it — the computer was asleep, or no daemon was running.`,
+          reason: `Missed ${missed} while nothing could run it — the browser was closed, the computer asleep, or no daemon was running.`,
         };
         if (task.missed === 'skip') return settle(run);
         logRun(task, run);
@@ -129,22 +142,29 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
       }
       task.runCount += 1;
       task.nextRunAt = nextRunFor(task, now);
-      inFlight.set(task.id, { linkId: link.id, startedAt: now });
-      return { order: orderFor(task), link };
+      const runId = randomUUID();
+      inFlight.set(task.id, { runId, linkId: link.id, startedAt: now });
+      return { order: orderFor(task, runId), link };
     });
     publish();
     if (plan) void dispatch(plan.order, plan.link);
+  }
+
+  function flightOf(taskId: string, runId: string | undefined): InFlight | undefined {
+    const flight = inFlight.get(taskId);
+    return flight?.runId === runId ? flight : undefined;
   }
 
   async function dispatch(order: TaskOrder, link: TaskLink): Promise<void> {
     log(`task “${order.name}” → ${link.label}`);
     const started = await link.runTask(order);
     if (started.ok) return;
-    const flight = inFlight.get(order.id);
-    inFlight.delete(order.id);
+    const flight = flightOf(order.id, order.runId);
+    if (flight) inFlight.delete(order.id);
     log(`task “${order.name}” did not start: ${started.error.code}`);
     record(order.id, {
       at: flight?.startedAt ?? Date.now(),
+      runId: order.runId,
       outcome: 'failed',
       reason: `${started.error.code}: ${started.error.message}`,
     });
@@ -162,13 +182,15 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     for (const [taskId, flight] of inFlight) {
       if (now - flight.startedAt < TASK_RUN_MAX_MS + REPORT_GRACE_MS) continue;
       inFlight.delete(taskId);
-      record(taskId, { at: flight.startedAt, outcome: 'failed', reason: 'The run never reported back.' });
+      record(taskId, { at: flight.startedAt, runId: flight.runId, outcome: 'failed', reason: 'The run never reported back.' });
     }
   }
 
   function save(input: unknown): ActionResult<TaskList> {
     const now = Date.now();
-    const checked = validateTask(input, now);
+    const editing = (input as { id?: unknown } | null)?.id;
+    const stored = typeof editing === 'string' ? readSchedules().tasks.find((task) => task.id === editing) : undefined;
+    const checked = validateTask(input, now, stored);
     if (!checked.ok) return failure('INVALID_INPUT', checked.message);
     const { id, ...draft } = checked.draft;
 
@@ -223,24 +245,38 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     if (inFlight.has(taskId)) {
       return failure('RUN_IN_PROGRESS', `“${task.name}” is already running — stop it, or wait for it to finish.`);
     }
-    inFlight.set(taskId, { linkId: link.id, startedAt: Date.now() });
+    const runId = randomUUID();
+    inFlight.set(taskId, { runId, linkId: link.id, startedAt: Date.now() });
     publish();
-    void dispatch(orderFor(task), link);
+    void dispatch(orderFor(task, runId), link);
     return success(list());
   }
 
+  /** A report for a run the daemon already gave up on replaces that entry instead of adding a second one. */
   function finished(taskId: string, result: TaskResult): void {
-    const flight = inFlight.get(taskId);
-    inFlight.delete(taskId);
+    const flight = flightOf(taskId, result.runId);
+    if (flight) inFlight.delete(taskId);
     log(`task ${taskId} finished: ${result.outcome}`);
-    record(taskId, { at: flight?.startedAt ?? Date.now() - (result.durationMs ?? 0), ...result });
+    updateSchedules((state) => {
+      const task = state.tasks.find((candidate) => candidate.id === taskId);
+      if (!task) return;
+      const given = result.runId ? task.runs.findIndex((run) => run.runId === result.runId) : -1;
+      if (given >= 0) task.runs[given] = { ...result, at: task.runs[given].at };
+      else logRun(task, { at: flight?.startedAt ?? Date.now() - (result.durationMs ?? 0), ...result });
+    });
+    publish();
   }
 
   function linkClosed(linkId: string): void {
     for (const [taskId, flight] of inFlight) {
       if (flight.linkId !== linkId) continue;
       inFlight.delete(taskId);
-      record(taskId, { at: flight.startedAt, outcome: 'failed', reason: 'The browser disconnected before the run finished.' });
+      record(taskId, {
+        at: flight.startedAt,
+        runId: flight.runId,
+        outcome: 'failed',
+        reason: 'The browser disconnected before the run finished.',
+      });
     }
   }
 
@@ -253,6 +289,7 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
     pause,
     runNow,
     finished,
+    linkOpened: () => arm(LINK_SETTLE_MS),
     linkClosed,
     stop: () => clearTimeout(timer),
   };

@@ -491,6 +491,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     watchModels();
     pushSkillCatalog(accepted);
     accepted.send({ t: 'taskList', id: '', result: success(scheduler.list()) });
+    scheduler.linkOpened();
     if (!known) await adoptExtensionManifest(accepted);
   }
 

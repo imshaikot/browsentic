@@ -808,7 +808,13 @@ function manageTasks(sub?: string, id?: string): void {
   }
   console.log(`${tasks.length} scheduled task${tasks.length === 1 ? '' : 's'}${paused ? ' — all paused' : ''}:\n`);
   for (const task of tasks) {
-    const when = !task.enabled ? 'paused' : task.nextRunAt ? `next ${describeMoment(task.nextRunAt)}` : 'no more runs';
+    const when = !task.enabled
+      ? 'paused'
+      : task.nextRunAt === null
+        ? 'no more runs'
+        : task.nextRunAt <= now && !paused
+          ? `due ${describeMoment(task.nextRunAt)}, waiting for a browser`
+          : `next ${describeMoment(task.nextRunAt)}`;
     console.log(`  ${task.id.slice(0, 8)}  ${task.name.slice(0, 28).padEnd(28)} ${describeRule(task.rule).padEnd(30)} ${when}`);
     const [last] = task.runs;
     if (last) console.log(`            last: ${last.outcome}${last.headline || last.reason ? ` — ${last.headline ?? last.reason}` : ''}`);

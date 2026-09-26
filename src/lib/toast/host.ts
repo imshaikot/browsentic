@@ -141,7 +141,9 @@ export function exposeToast(): void {
 
   /* The card sits inside a page that may want the answer to be yes. Only a real click counts —
      a page can dispatch clicks but cannot make them trusted — and none counts in the first
-     moment after the card appears, so a click aimed at the page cannot land on Allow. */
+     moment after the card appears, so a click aimed at the page cannot land on Allow. The page
+     can still restyle the host element and lure a click onto it, so the card only ever allows
+     once: "Always on this site" is answered from the side panel. */
   function approvalControls(view: ToastView): HTMLElement {
     const { approval } = view;
     const shownAt = performance.now();
@@ -151,10 +153,9 @@ export function exposeToast(): void {
     detail.className = 'detail';
     detail.textContent = [approval!.action, approval!.detail].filter(Boolean).join(' · ');
 
-    const choices: { label: string; allow: boolean; remember: boolean; kind: string }[] = [
-      ...(approval!.site ? [{ label: `Always on ${approval!.site}`, allow: true, remember: true, kind: 'answer quiet' }] : []),
-      { label: 'Deny', allow: false, remember: false, kind: 'answer' },
-      { label: 'Allow', allow: true, remember: false, kind: 'answer primary' },
+    const choices: { label: string; allow: boolean; kind: string }[] = [
+      { label: 'Deny', allow: false, kind: 'answer' },
+      { label: 'Allow', allow: true, kind: 'answer primary' },
     ];
     for (const choice of choices) {
       const button = document.createElement('button');
@@ -166,7 +167,7 @@ export function exposeToast(): void {
         event.stopPropagation();
         if (!event.isTrusted || performance.now() - shownAt < APPROVAL_ARMED_AFTER_MS) return;
         void browser.runtime
-          .sendMessage({ channel: TOAST_CHANNEL, op: 'answer', toastId: view.toastId, allow: choice.allow, remember: choice.remember })
+          .sendMessage({ channel: TOAST_CHANNEL, op: 'answer', toastId: view.toastId, allow: choice.allow })
           .catch(() => undefined);
         dismiss(view.toastId);
       });
@@ -271,8 +272,6 @@ const STYLES = `
   .answer:hover { background: var(--surface); }
   .answer.primary { border-color: transparent; background: var(--tone); color: var(--ground); }
   .answer.primary:hover { filter: brightness(1.08); background: var(--tone); }
-  .answer.quiet { margin-right: auto; border-color: transparent; padding-inline: 2px; color: var(--inkDim); font-weight: 500; }
-  .answer.quiet:hover { background: transparent; color: var(--ink); text-decoration: underline; }
   .close {
     position: absolute;
     top: 8px;

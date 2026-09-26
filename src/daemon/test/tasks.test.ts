@@ -64,7 +64,12 @@ describe('scheduled tasks between the daemon and a browser', () => {
     await vi.waitFor(() => expect(browser.orders).toHaveLength(1));
     expect(browser.orders[0]).toMatchObject({ id: task.id, url: draft.url, job: draft.job });
 
-    browser.tell({ t: 'taskDone', id: randomUUID(), taskId: task.id, result: { outcome: 'ok', headline: '3 PRs need you', durationMs: 900 } });
+    browser.tell({
+      t: 'taskDone',
+      id: randomUUID(),
+      taskId: task.id,
+      result: { runId: browser.orders[0].runId, outcome: 'ok', headline: '3 PRs need you', durationMs: 900 },
+    });
 
     await vi.waitFor(() => expect(browser.tasks?.tasks[0].runs[0]).toMatchObject({ outcome: 'ok', headline: '3 PRs need you' }));
     expect(browser.tasks?.running).toEqual({});

@@ -81,7 +81,6 @@ export async function askTaskApproval(request: {
       approval: {
         action,
         detail: approvalDetail(request.input),
-        site: request.site,
         expiresAt: Date.now() + TASK_APPROVAL_WAIT_MS,
       },
     },

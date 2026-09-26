@@ -22,7 +22,7 @@ export interface ToastNotice {
   approval?: ToastApproval;
 }
 
-type AnswerListener = (toastId: string, allow: boolean, remember: boolean, fromTabId: number | undefined) => void;
+type AnswerListener = (toastId: string, allow: boolean, fromTabId: number | undefined) => void;
 
 let answerListener: AnswerListener | null = null;
 
@@ -87,7 +87,7 @@ async function post(tabId: number, command: ToastCommand): Promise<boolean> {
 export function serveToast(): void {
   browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
     if (!isToastRequest(message)) return;
-    if (message.op === 'answer') answerListener?.(message.toastId, message.allow, message.remember === true, sender.tab?.id);
+    if (message.op === 'answer') answerListener?.(message.toastId, message.allow, sender.tab?.id);
     else void goToTab(message.tabId);
     sendResponse({ ok: true });
   });

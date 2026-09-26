@@ -221,9 +221,9 @@ export function TaskEditor({
   }, [form.kind, form.recordingId]);
 
   const now = Date.now();
-  const checked = validateTask(draftOf(form, recording?.name ?? ''), now);
+  const checked = validateTask(draftOf(form, recording?.name ?? ''), now, task);
   const secret = needed.find(isSecretVariable);
-  const rule = validateRule(ruleOf(form), now);
+  const rule = validateRule(ruleOf(form), now, task?.rule);
   const preview = typeof rule === 'string' ? [] : upcoming(rule, now, 3);
   const perWeek =
     typeof rule !== 'string' && form.kind === 'instruction' && rule.kind !== 'once'

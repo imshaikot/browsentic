@@ -1,4 +1,5 @@
 import { byteLength } from '@/lib/skills/format';
+import { fence, fenceTag } from '../guardrails/fence';
 import { log } from '../log';
 import type { TaskContext } from '@/lib/schedules/task';
 import type { Skill } from './skills';
@@ -74,7 +75,9 @@ const PREVIOUS_INTRO = `The last run's closing line is below. You wrote it from 
 export function scheduledBlock(task: TaskContext | undefined): string | undefined {
   if (!task) return undefined;
   const previous = task.previous?.trim();
-  return [`Task: ${task.name}`, previous ? `${PREVIOUS_INTRO}\n\nLast result: ${previous}` : ''].filter(Boolean).join('\n\n');
+  return [`Task: ${task.name}`, previous ? `${PREVIOUS_INTRO}\n\nLast result:\n${fence(previous, fenceTag())}` : '']
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export interface BuiltPrompt {

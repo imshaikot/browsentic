@@ -53,16 +53,18 @@ A run needs the browser open and the daemon up. The daemon starts itself when th
 After `browsentic stop` the browser leaves the daemon down until `browsentic start`, or an MCP
 client, brings it back.
 
-A run that falls due while the browser is closed or the computer is asleep is logged as **missed**. By
-default it then runs once when both are back; a task set to **Skip it** just waits for its next time.
+A run that falls due while the browser is closed or the computer is asleep is **missed**. By default
+it waits, and runs once as soon as a browser is back, logging how many runs it missed; a task set
+to **Skip it** logs the miss at once and waits for its next time.
 
 ### Approvals with nobody watching
 
 A scheduled run follows the same [guardrails](../approvals.md) as one you start yourself. When an
-action needs your OK, a card appears on the page you are looking at, with **Allow**, **Deny** and
-**Always on ‹site›**. With no answer in ten minutes the action is declined and the run says so. The
-card only takes a real click, and none in its first moment on screen, so the page underneath cannot
-press **Allow** for you.
+action needs your OK, a card appears on the page you are looking at, with **Allow** and **Deny**.
+To allow it on that site for good, answer from the task's conversation in the side panel instead.
+With no answer in ten minutes the action is declined and the run says so. The card only takes a
+real click, and none in its first moment on screen, so the page underneath cannot press **Allow**
+for you.
 
 A scheduled run never gets Live tools, and it is told to end on one line that stands alone, because
 that line is what the notice and the history show.

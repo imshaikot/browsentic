@@ -201,9 +201,9 @@ export function serveRunPorts(): void {
 
   onTaskOrder((order) => startTaskRun(order));
 
-  onToastAnswer((toastId, allow, remember, fromTabId) => {
+  onToastAnswer((toastId, allow, fromTabId) => {
     const answer = takeApprovalAnswer(toastId, fromTabId);
-    if (answer) void serialized(() => answerApproval(answer.sessionId, answer.toolId, allow, remember));
+    if (answer) void serialized(() => answerApproval(answer.sessionId, answer.toolId, allow));
   });
 
   onSiteMapDraft((runId, draft) => {
@@ -824,6 +824,7 @@ async function openTaskSession(order: TaskOrder): Promise<ActionResult<{ session
   }
   const task: TaskTag = {
     id: order.id,
+    runId: order.runId,
     name: order.name,
     keepTab: order.keepTab,
     notify: order.notify,
@@ -954,6 +955,7 @@ async function finishTask(session: TabSession, verdict: TaskVerdict): Promise<vo
   if (!task || task.done) return;
   const result: TaskResult = {
     ...verdict,
+    runId: task.runId,
     sessionId: session.sessionId,
     durationMs: Date.now() - task.startedAt,
     ...(session.usage ? { usage: session.usage } : {}),
@@ -974,6 +976,7 @@ async function abandonTask(session: TabSession): Promise<void> {
 function reportAbandoned(session: TabSession, reason: string): void {
   if (!session.task || session.task.done) return;
   reportTaskDone(session.task.id, {
+    runId: session.task.runId,
     outcome: 'cancelled',
     reason,
     sessionId: session.sessionId,

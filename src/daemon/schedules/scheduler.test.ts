@@ -4,7 +4,7 @@ import { rmSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import type { ScheduledTask, TaskList, TaskOrder } from '@/lib/schedules/task';
-import { CLOCK_MAX_WAIT_MS, startScheduler, type Scheduler, type TaskLink } from './scheduler';
+import { CLOCK_MAX_WAIT_MS, LINK_SETTLE_MS, startScheduler, type Scheduler, type TaskLink } from './scheduler';
 import { schedulesPath } from './store';
 
 const at = (d: number, h: number, m = 0) => new Date(2026, 8, d, h, m).getTime();
@@ -82,17 +82,35 @@ describe('the schedule clock', () => {
   it('files what the browser reports when the run ends', async () => {
     const task = saved();
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    const { runId } = link!.orders[0];
 
-    scheduler.finished(task.id, { outcome: 'ok', headline: '3 PRs need you', durationMs: 42_000 });
+    scheduler.finished(task.id, { runId, outcome: 'ok', headline: '3 PRs need you', durationMs: 42_000 });
 
-    expect(current(task.id).runs).toEqual([{ at: at(25, 9), outcome: 'ok', headline: '3 PRs need you', durationMs: 42_000 }]);
+    expect(current(task.id).runs).toEqual([{ at: at(25, 9), runId, outcome: 'ok', headline: '3 PRs need you', durationMs: 42_000 }]);
     expect(scheduler.list().running).toEqual({});
     expect(published.at(-1)?.tasks[0].runs).toHaveLength(1);
   });
 
-  it('logs a miss when no browser is connected, and keeps the schedule', async () => {
+  it('holds a run while no browser is connected, then runs it once when one comes back', async () => {
     link = null;
     const task = saved();
+    await vi.advanceTimersByTimeAsync(90 * MINUTE);
+    expect(current(task.id)).toMatchObject({ runs: [], runCount: 0, nextRunAt: at(25, 9) });
+
+    const back = fakeLink();
+    link = back;
+    scheduler.linkOpened();
+    await vi.advanceTimersByTimeAsync(LINK_SETTLE_MS);
+
+    expect(back.orders).toHaveLength(1);
+    expect(current(task.id).runs[0]).toMatchObject({ outcome: 'missed', at: at(25, 9) });
+    expect(current(task.id).runs[0].reason).toContain('Missed 1 run while nothing could run it — the browser was closed');
+    expect(current(task.id)).toMatchObject({ runCount: 1, nextRunAt: at(26, 9) });
+  });
+
+  it('writes a run off at once when no browser is connected and the task skips missed runs', async () => {
+    link = null;
+    const task = saved({ missed: 'skip' });
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
 
     expect(current(task.id).runs[0]).toMatchObject({ outcome: 'missed', reason: 'No browser was connected.' });
@@ -146,6 +164,26 @@ describe('the schedule clock', () => {
     expect(current(task.id).runs[0]).toMatchObject({ outcome: 'failed', reason: 'The browser disconnected before the run finished.' });
   });
 
+  it('replaces the failure it logged when the run reports back after all', async () => {
+    const task = saved();
+    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    const { runId } = link!.orders[0];
+    scheduler.linkClosed('chrome');
+
+    scheduler.finished(task.id, { runId, outcome: 'ok', headline: '3 PRs need you' });
+
+    expect(current(task.id).runs).toEqual([{ at: at(25, 9), runId, outcome: 'ok', headline: '3 PRs need you' }]);
+  });
+
+  it('leaves the current run going when an older one reports late', async () => {
+    const task = saved();
+    scheduler.runNow(task.id, fakeLink('edge'));
+
+    scheduler.finished(task.id, { runId: 'an-older-run', outcome: 'ok' });
+
+    expect(scheduler.list().running).toHaveProperty(task.id);
+  });
+
   it('holds every task while paused, and resumes from now rather than catching up', async () => {
     const task = saved();
     scheduler.pause(true);
@@ -180,7 +218,7 @@ describe('managing tasks', () => {
   it('keeps a task’s history through an edit and clears what the edit removed', async () => {
     const task = saved({ maxRuns: 5 });
     await vi.advanceTimersByTimeAsync(60 * MINUTE);
-    scheduler.finished(task.id, { outcome: 'ok', headline: 'done' });
+    scheduler.finished(task.id, { runId: link!.orders[0].runId, outcome: 'ok', headline: 'done' });
 
     const edited = scheduler.save({ ...draft({ name: 'Morning PRs' }), id: task.id });
 

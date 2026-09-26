@@ -241,7 +241,9 @@ renders while the daemon is down.
 
 An approval raised by a scheduled run is drawn as a toast on the page in front, not only in the panel.
 Its buttons answer through `answerApproval`, the panel's own path. Only the tab the card was drawn
-on can answer, only with `isTrusted` clicks, and none in its first 800 ms.
+on can answer, only with `isTrusted` clicks, and none in its first 800 ms. The page can still
+restyle the card's host element and lure a click onto it, so the card offers **Allow** and **Deny**
+only; **Always on ‹site›** stays in the panel.
 
 `nativeMessaging` is what lets a browser start a daemon that is down. When no port answers,
 `giveUp` calls `wakeDaemon`, which asks the browser to run the `com.browsentic.daemon` host that

@@ -27,6 +27,8 @@ export type RunOutcome = 'ok' | 'failed' | 'missed' | 'skipped' | 'cancelled';
 
 export interface TaskRun {
   at: number;
+  /** Which dispatch this was, so a report that arrives after the daemon gave up replaces that entry. */
+  runId?: string;
   outcome: RunOutcome;
   reason?: string;
   headline?: string;
@@ -66,6 +68,7 @@ export interface TaskList {
 
 export interface TaskOrder {
   id: string;
+  runId: string;
   name: string;
   job: TaskJob;
   url: string;
@@ -124,11 +127,13 @@ function checkJob(raw: unknown): TaskJob | string {
   return 'A task either follows an instruction or replays a recording.';
 }
 
-export function validateRule(raw: unknown, now: number): ScheduleRule | string {
+/** A time already in the past is refused only when it is new: a task that has had its day can still be renamed or switched off. */
+export function validateRule(raw: unknown, now: number, stored?: ScheduleRule): ScheduleRule | string {
   if (!isRecord(raw)) return 'Say when the task should run.';
   if (raw.kind === 'once') {
     if (typeof raw.at !== 'number' || !Number.isFinite(raw.at)) return 'Pick the date and time to run it.';
-    if (raw.at <= now) return 'That time has already passed.';
+    const kept = stored?.kind === 'once' && stored.at === raw.at;
+    if (raw.at <= now && !kept) return 'That time has already passed.';
     return { kind: 'once', at: raw.at };
   }
   if (raw.kind === 'every') {
@@ -155,7 +160,7 @@ export function validateRule(raw: unknown, now: number): ScheduleRule | string {
   return 'A task runs once, every so often, or on set days.';
 }
 
-export function validateTask(input: unknown, now: number): TaskValidation {
+export function validateTask(input: unknown, now: number, stored?: Pick<ScheduledTask, 'rule' | 'until'>): TaskValidation {
   if (!isRecord(input)) return invalid('task', 'Nothing to save.');
 
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -167,7 +172,7 @@ export function validateTask(input: unknown, now: number): TaskValidation {
 
   if (!isWebUrl(input.url)) return invalid('url', 'Start it on a web page — an http or https address.');
 
-  const rule = validateRule(input.rule, now);
+  const rule = validateRule(input.rule, now, stored?.rule);
   if (typeof rule === 'string') return invalid('rule', rule);
 
   const missed = MISSED.includes(input.missed as MissedPolicy) ? (input.missed as MissedPolicy) : 'runOnce';
@@ -178,7 +183,7 @@ export function validateTask(input: unknown, now: number): TaskValidation {
     return invalid('maxRuns', `Stop after between 1 and ${MAX_TASK_RUNS} runs.`);
   }
   const until = input.until;
-  if (until !== undefined && (typeof until !== 'number' || until <= now)) {
+  if (until !== undefined && (typeof until !== 'number' || (until <= now && until !== stored?.until))) {
     return invalid('until', 'The end date has already passed.');
   }
   if (input.browser !== undefined && typeof input.browser !== 'string') return invalid('browser', 'Pick a browser.');
@@ -213,8 +218,9 @@ export function nextRunFor(
   return task.until !== undefined && next > task.until ? null : next;
 }
 
-export const orderFor = (task: ScheduledTask): TaskOrder => ({
+export const orderFor = (task: ScheduledTask, runId: string): TaskOrder => ({
   id: task.id,
+  runId,
   name: task.name,
   job: task.job,
   url: task.url,

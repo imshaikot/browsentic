@@ -14,7 +14,6 @@ export interface ToastApproval {
   /** The page tool's short name, as the side panel's approval card shows it. */
   action: string;
   detail?: string;
-  site?: string;
   expiresAt: number;
 }
 
@@ -37,7 +36,7 @@ export type ToastCommand =
 
 export type ToastRequest =
   | { channel: typeof TOAST_CHANNEL; op: 'activate'; tabId: number }
-  | { channel: typeof TOAST_CHANNEL; op: 'answer'; toastId: string; allow: boolean; remember: boolean };
+  | { channel: typeof TOAST_CHANNEL; op: 'answer'; toastId: string; allow: boolean };
 
 export function isToastCommand(message: unknown): message is ToastCommand {
   if (typeof message !== 'object' || message === null) return false;
