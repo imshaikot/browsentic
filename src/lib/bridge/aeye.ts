@@ -40,6 +40,3 @@ export async function pickFocusIn(tab: { id: number; windowId?: number }): Promi
     },
   };
 }
-
-export const focusName = (focus: FocusedElement): string =>
-  focus.label?.trim() || focus.role || focus.tag;
