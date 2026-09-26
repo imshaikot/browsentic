@@ -82,6 +82,7 @@ export interface DaemonState {
 let socket: WebSocket | null = null;
 let welcomedSocket: WebSocket | null = null;
 let attempts = 0;
+let connecting: Promise<void> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let stableTimer: ReturnType<typeof setTimeout> | undefined;
 let runListener: ((runId: string, event: RunEvent) => void) | null = null;
@@ -323,7 +324,15 @@ function post(frame: SocketFrame): boolean {
   return true;
 }
 
-export async function connectDaemon(): Promise<void> {
+/**
+ * The worker's start, the reconnect alarm and a retry routinely ask in the same instant — a woken
+ * worker always does — and two dials from one browser make the daemon supersede each in turn.
+ */
+export function connectDaemon(): Promise<void> {
+  return (connecting ??= reconnect().finally(() => (connecting = null)));
+}
+
+async function reconnect(): Promise<void> {
   if (isLive()) return;
   const sessionKey = await storedSessionKey();
   if (!sessionKey) {
@@ -333,7 +342,7 @@ export async function connectDaemon(): Promise<void> {
   // A daemon that proved itself and still refused this key will refuse it again. Wait for the user
   // to pair rather than discarding a credential on the word of a peer that never proved anything.
   const state = await readState();
-  if (state && !state.paired && state.error) return;
+  if ((state && !state.paired && state.error) || isLive()) return;
   clearTimeout(reconnectTimer);
   dial({ kind: 'session', secret: sessionKey }, 0);
 }
@@ -446,8 +455,10 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
 
   ws.onclose = (event) => {
     clearTimeout(handshakeTimer);
+    // A socket a newer dial replaced speaks for nothing: its close must not mark the live link down.
+    if (socket !== ws) return;
+    socket = null;
     clearTimeout(stableTimer);
-    if (socket === ws) socket = null;
     // A daemon that refuses the handshake outright — a protocol mismatch above all — says why in
     // the close frame and never sends an `unauthorized`. Without this the walk ends on the generic
     // "no daemon is running", which sends the user hunting for a process that is running fine.
@@ -456,7 +467,7 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
     // walk continues instead of pinning the extension to whoever answered first.
     if (!welcomed) return dial(credential, portIndex + 1, refusal);
     void setState({ connected: false, paired: true, error: undefined, lastChangeAt: Date.now() });
-    if (credential.kind === 'session') scheduleRetry(credential);
+    if (credential.kind === 'session') scheduleRetry();
   };
 }
 
@@ -477,7 +488,7 @@ function giveUp(credential: Credential, refusal?: Refusal): void {
     return;
   }
   settlePairing({ ok: false, error: refusal?.reason ?? 'No Browsentic daemon is running.' });
-  if (credential.kind === 'session') scheduleRetry(credential);
+  if (credential.kind === 'session') scheduleRetry();
 }
 
 function transcriptOf(attempt: Attempt): Transcript {
@@ -525,6 +536,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       }
       const sessionKey = sealed ? await openSessionKey(secret, transcript, sealed) : null;
       if (!sessionKey && (sealed || attempt.credential.kind === 'pair')) return attempt.walk();
+      if (ws !== socket) return attempt.walk();
 
       attempt.done();
       welcomedSocket = ws;
@@ -621,11 +633,11 @@ function send(ws: WebSocket, frame: SocketFrame): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
 }
 
-function scheduleRetry(credential: Credential): void {
+function scheduleRetry(): void {
   const backoff = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** attempts++);
   const delay = backoff * (0.5 + Math.random() / 2);
   clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => dial(credential, 0), delay);
+  reconnectTimer = setTimeout(() => void connectDaemon(), delay);
 }
 
 async function readState(): Promise<DaemonState | undefined> {
@@ -633,9 +645,17 @@ async function readState(): Promise<DaemonState | undefined> {
   return stored[DAEMON_STATE_KEY] as DaemonState | undefined;
 }
 
-async function setState(patch: Partial<DaemonState> & { lastChangeAt: number }): Promise<void> {
-  const current = (await readState()) ?? { connected: false, paired: false, lastChangeAt: 0 };
-  await browser.storage.session.set({ [DAEMON_STATE_KEY]: { ...current, ...patch } });
+let stateQueue: Promise<unknown> = Promise.resolve();
+
+/** One writer at a time: the agent and skill pushes right behind a welcome must not write back the `connected` they read before it. */
+function setState(patch: Partial<DaemonState> & { lastChangeAt: number }): Promise<void> {
+  const write = async () => {
+    const current = (await readState()) ?? { connected: false, paired: false, lastChangeAt: 0 };
+    await browser.storage.session.set({ [DAEMON_STATE_KEY]: { ...current, ...patch } });
+  };
+  const run = stateQueue.then(write, write);
+  stateQueue = run.catch(() => undefined);
+  return run;
 }
 
 async function storedSessionKey(): Promise<string | null> {
