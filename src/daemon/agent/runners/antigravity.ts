@@ -6,7 +6,7 @@ import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { MCP_SERVER_NAME } from './claude';
-import { effortOf, parseJsonLine, sweepRunDirs } from './util';
+import { conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, Listing, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
 
 /** Antigravity reads MCP servers and instructions from the directory it runs in, not from flags. */
@@ -104,8 +104,11 @@ export const antigravityRunner: Runner = {
     const effort = effortOf(settings, this.efforts);
     const base = this.workspace('run');
     sweepRunDirs(base);
+    // A resumed conversation is re-read from the folder it began in, whatever folder agy is started
+    // in now (measured against 1.2.11) — so a conversation keeps one, and every turn rewrites it.
+    // Give a run its own and the second turn calls the browser with the first turn's run id.
     return {
-      cwd: join(base, context.runId),
+      cwd: conversationDir(base, context.conversation ?? context.runId),
       env: { BROWSENTIC_AGENT_RUN: context.runId },
       files: [
         { path: MCP_CONFIG, content: mcpConfig(context.mcp) },

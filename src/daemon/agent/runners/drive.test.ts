@@ -34,9 +34,12 @@ const printing = (...lines: unknown[]) =>
 
 const node = { bin: process.execPath };
 
-const run = async (runner: Runner, { runId = 'drive-run', signal = new AbortController().signal, bin = node.bin } = {}) => {
+const run = async (
+  runner: Runner,
+  { runId = 'drive-run', conversation = 'conversation-1', signal = new AbortController().signal, bin = node.bin } = {},
+) => {
   const events: RunEvent[] = [];
-  const outcome = await runStream(runner, streamContext({ bin }, { runId }), signal, (event) => events.push(event));
+  const outcome = await runStream(runner, streamContext({ bin }, { runId, conversation }), signal, (event) => events.push(event));
   return { outcome, events, said: events.flatMap((event) => (event.kind === 'text' ? [event.delta] : [])).join('') };
 };
 
@@ -96,10 +99,10 @@ describe('a streamed run', () => {
     expect([said.includes('AbCdEfGhIj'), said.includes('⟦api-key:'), said.endsWith(', as asked.')]).toEqual([false, true, true]);
   });
 
-  test("the plan's files are in the run's own directory before the agent starts, readable only by the user", async () => {
+  test("the plan's files are in the run's directory before the agent starts, readable only by the user", async () => {
     const script = `console.log(JSON.stringify(['text', require('node:fs').readFileSync('AGENTS.md', 'utf8')])); console.log('["done","end_turn"]');`;
-    const { said } = await run(standIn(script), { runId: 'files-run' });
-    const cwd = join(antigravityRunner.workspace('run'), 'files-run');
+    const { said } = await run(standIn(script), { conversation: 'files-conversation' });
+    const cwd = join(antigravityRunner.workspace('run'), 'files-conversation');
     expect({
       said,
       directory: statSync(cwd).mode & 0o777,
@@ -109,11 +112,11 @@ describe('a streamed run', () => {
   });
 
   test("a folder a conversation keeps is new again on every turn, so the sweep ages it from its last", async () => {
-    const cwd = join(antigravityRunner.workspace('run'), 'kept-run');
-    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-run' });
+    const cwd = join(antigravityRunner.workspace('run'), 'kept-conversation');
+    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-1', conversation: 'kept-conversation' });
     const nearlyADayAgo = new Date(Date.now() - 23 * 60 * 60_000);
     utimesSync(cwd, nearlyADayAgo, nearlyADayAgo);
-    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-run' });
+    await run(standIn(printing(['done', 'end_turn'])), { runId: 'kept-2', conversation: 'kept-conversation' });
     expect(statSync(cwd).mtimeMs).toBeGreaterThan(Date.now() - 60_000);
   });
 

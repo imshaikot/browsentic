@@ -281,6 +281,7 @@ Claude runner's settings.
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
+| Antigravity: a follow-up turn searches the web, or ends with no answer, instead of reading the page | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Antigravity keeps re-reading the first turn's, so every browser call in a later turn was refused as *no longer active*. A conversation begun before the update stays broken. |
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
 | Cursor CLI: *Authentication required* | The daemon inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
 | Cursor CLI on Windows | Cursor's sandbox has no Windows backend, so only the deny rules apply there. The browser still works; the machine is less fenced off than on macOS or Linux. |

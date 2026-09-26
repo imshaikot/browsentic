@@ -12,7 +12,7 @@ const read = (name: string) => readThrough(antigravityRunner, transcript('antigr
 const readLines = (...lines: object[]) => readThrough(antigravityRunner, lines.map((line) => JSON.stringify(line)));
 
 describe('a streamed run', () => {
-  test('a fresh run gets its own directory, with the browser server and the system prompt written into it', () => {
+  test("a run is written into its conversation's folder: the browser server and the system prompt", () => {
     expect(shown(stream())).toMatchInlineSnapshot(`
       {
         "args": [
@@ -23,7 +23,7 @@ describe('a streamed run', () => {
           "--print-timeout",
           "60m",
         ],
-        "cwd": "<state>/agents/antigravity/run/run-1",
+        "cwd": "<state>/agents/antigravity/run/conversation-1",
         "env": {
           "BROWSENTIC_AGENT_RUN": "run-1",
         },
@@ -59,6 +59,21 @@ describe('a streamed run', () => {
   test('a follow-up continues the conversation it is given', () => {
     const args = stream({ sessionId: 'conv-1' }).args;
     expect(args.slice(args.indexOf('--conversation'), args.indexOf('--conversation') + 2)).toEqual(['--conversation', 'conv-1']);
+  });
+
+  // agy re-reads a resumed conversation from the folder it began in, so a fresh folder per turn
+  // handed the second turn the first turn's run id.
+  test('every turn of a conversation rewrites the same folder, with its own run id', () => {
+    const [first, second] = [stream(), stream({ runId: 'run-2', sessionId: 'conv-1' })];
+    expect([second.cwd, second.env]).toEqual([first.cwd, { BROWSENTIC_AGENT_RUN: 'run-2' }]);
+  });
+
+  test('a run with no conversation keeps a folder of its own', () => {
+    expect(stream({ conversation: null }).cwd).toBe(`${stateDir}/agents/antigravity/run/run-1`);
+  });
+
+  test('a conversation id is spelled so it stays one path segment', () => {
+    expect(stream({ conversation: '../../escape me' }).cwd).toBe(`${stateDir}/agents/antigravity/run/______escape_me`);
   });
 
   // Antigravity takes no per-run tool list; its own settings decide whether it may search.
