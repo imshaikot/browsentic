@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isOverlay } from '@/lib/overlay';
 import { ActionError } from '../core';
 import { cssPath } from './dom';
 
@@ -56,8 +57,9 @@ export function approachPoint(to: Point): Point {
   };
 }
 
+/** What the page has at a point, looking through anything Browsentic drew over it. */
 export function elementAt(point: Point): Element | null {
-  return document.elementFromPoint(point.x, point.y);
+  return document.elementsFromPoint(point.x, point.y).find((element) => !isOverlay(element)) ?? null;
 }
 
 export function assertUncovered(el: HTMLElement, at: Point): void {
