@@ -6,13 +6,14 @@ How you talk to Browsentic, and how it keeps track of several things at once.
 
 ## Voice and text
 
-Three ways in:
+Four ways in:
 
 | | |
 | --- | --- |
 | **Type** | The composer at the bottom of the side panel |
 | **Dictate** | Hands-free in the side panel — press the mic and talk |
 | **Press to talk** | In the popup, for when the panel is not open |
+| **Hands-free** | The panel put away, and a mic on the page — see [Hands-free](hands-free.md) |
 
 Speech uses the browser's built-in recognition. Nothing is bundled or downloaded — which in Chrome
 means audio is streamed to Google for transcription. Type instead if that matters to you; see
@@ -65,6 +66,9 @@ and closes it instead.
 
 The rail belongs to the minimized state alone. Closing the panel with the browser's own close
 button removes any rail from every page — only the header's collapse button leaves one behind.
+
+The header's detach button, beside collapse, puts the panel away differently: instead of the rail,
+a microphone on the page you talk to directly. See [Hands-free](hands-free.md).
 
 ### Knowing something is running when you are elsewhere
 

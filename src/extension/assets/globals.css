@@ -417,7 +417,50 @@
   }
 }
 
+/* The panel folding down into the hands-free mic before it closes. */
+@keyframes browsentic-fold {
+  to {
+    opacity: 0;
+    transform: scale(0.9) translateY(4%);
+    filter: blur(6px);
+  }
+}
+
+/* Appears as the panel starts to collapse, holds alone on the empty ground, then drops away. */
+@keyframes browsentic-detach-orb {
+  0%,
+  22% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  56% {
+    transform: scale(1);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.7, 0, 0.84, 0);
+  }
+  100% {
+    opacity: 0.3;
+    transform: translateY(170%) scale(0.85);
+  }
+}
+
 @layer components {
+  .detaching > :not([data-detach-veil]) {
+    transform-origin: 50% 100%;
+    animation: browsentic-fold 0.34s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+  }
+
+  .detach-orb {
+    animation: browsentic-detach-orb 0.56s var(--ease-out-expo) both;
+  }
+
   [data-stream] .tok {
     animation: browsentic-token 0.42s var(--ease-out-expo) both;
   }

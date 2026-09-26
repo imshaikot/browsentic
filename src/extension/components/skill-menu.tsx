@@ -5,6 +5,9 @@ import { AGENTS } from '@/lib/agents/catalog';
 import {
   CONTEXT_COMMAND,
   CONTEXT_COMMAND_DESCRIPTION,
+  HANDS_FREE_ALIASES,
+  HANDS_FREE_COMMAND,
+  HANDS_FREE_DESCRIPTION,
   REMOVE_TOOLS_COMMAND,
   REMOVE_TOOLS_DESCRIPTION,
 } from '@/lib/bridge/commands';
@@ -28,6 +31,8 @@ export interface SkillMenuItem {
    * was saved.
    */
   savedToolId?: string;
+  /** Other spellings the filter matches, so a near miss still finds the command. */
+  aliases?: string[];
 }
 
 // Saved tools sort first: they are the only entries that do something on their own, and
@@ -46,6 +51,7 @@ export function skillMenuItems(
   tabUrl: string,
   query: string,
   tools: readonly SavedToolMeta[] = [],
+  { handsFree = false }: { handsFree?: boolean } = {},
 ): SkillMenuItem[] {
   const host = hostnameOf(tabUrl);
   const items: SkillMenuItem[] = [
@@ -57,6 +63,16 @@ export function skillMenuItems(
       command: CONTEXT_COMMAND,
     },
   ];
+  if (handsFree) {
+    items.push({
+      key: 'command:hands-free',
+      group: 'command',
+      name: 'hands-free',
+      description: HANDS_FREE_DESCRIPTION,
+      command: HANDS_FREE_COMMAND,
+      aliases: HANDS_FREE_ALIASES,
+    });
+  }
   if (tools.length) {
     items.push({
       key: 'command:remove-tools',
@@ -93,7 +109,10 @@ export function skillMenuItems(
   const needle = query.trim().toLowerCase();
   const matched = needle
     ? items.filter(
-        (item) => item.name.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle),
+        (item) =>
+          item.name.toLowerCase().includes(needle) ||
+          item.description.toLowerCase().includes(needle) ||
+          item.aliases?.some((alias) => alias.includes(needle)),
       )
     : items;
   return matched.sort((a, b) => GROUP_ORDER[a.group] - GROUP_ORDER[b.group] || a.name.localeCompare(b.name));

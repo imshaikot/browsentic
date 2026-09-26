@@ -125,6 +125,7 @@ export type RunMessage =
 const ports = new Set<Browser.runtime.Port>();
 const panelPorts = new Set<Browser.runtime.Port>();
 const panelWatchers = new Set<(open: boolean) => void>();
+const settleWatchers = new Set<(sessionId: string, items: RunItem[]) => void>();
 const buffers = new Map<string, RunItem[]>();
 const busy = new Set<string>();
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -254,6 +255,16 @@ export function onPanelPresence(watch: (open: boolean) => void): void {
 /** Chromium has no menu-side close, so each panel is told to shut itself. */
 export function closePanels(): void {
   for (const panel of panelPorts) post(panel, { op: 'close' });
+}
+
+/** Fires once a turn is over — finished, failed or stopped — with the conversation as it now stands. */
+export function onTurnSettled(watch: (sessionId: string, items: RunItem[]) => void): void {
+  settleWatchers.add(watch);
+}
+
+/** The panel's commands, for a surface in the background's own reach that has no port — the hands-free orb. */
+export function runCommand(command: RunCommand): void {
+  handle(command);
 }
 
 function handle(command: RunCommand): void {
@@ -445,6 +456,8 @@ async function settle(sessionId: string): Promise<void> {
   await dropDiagnosticsForSession(sessionId);
   await patchSession(sessionId, { runId: null, pendingApproval: undefined, handing: undefined });
   await syncRunIndicator();
+  const settledItems = buffers.get(sessionId) ?? [];
+  for (const watch of settleWatchers) watch(sessionId, settledItems);
 
   const session = (await readTabSessions())[sessionId];
   if (session) {
