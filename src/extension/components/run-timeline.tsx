@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Braces,
+  CalendarClock,
   Camera,
   Check,
   Clapperboard,
@@ -42,9 +43,10 @@ interface RunTimelineProps {
   items: RunItem[];
   running: boolean;
   onDecide: (toolId: string, allow: boolean, remember?: boolean) => void;
+  onSchedule?: (text: string) => void;
 }
 
-export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
+export function RunTimeline({ items, running, onDecide, onSchedule }: RunTimelineProps) {
   const last = items.at(-1);
   const streaming = running && last?.kind === 'assistant';
   const awaiting = running && !streaming;
@@ -59,7 +61,12 @@ export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
         ) : item.kind === 'context' ? (
           <ContextCard key={item.id} breakdown={item.breakdown} />
         ) : item.kind === 'user' ? (
-          <UserBubble key={item.id} text={item.text} focus={item.focus} />
+          <UserBubble
+            key={item.id}
+            text={item.text}
+            focus={item.focus}
+            onSchedule={onSchedule && !running ? () => onSchedule(item.text) : undefined}
+          />
         ) : (
           <Reply key={item.id} text={item.text} streaming={streaming && index === items.length - 1} />
         ),
@@ -69,9 +76,9 @@ export function RunTimeline({ items, running, onDecide }: RunTimelineProps) {
   );
 }
 
-function UserBubble({ text, focus }: { text: string; focus?: string }) {
+function UserBubble({ text, focus, onSchedule }: { text: string; focus?: string; onSchedule?: () => void }) {
   return (
-    <div className="enters flex min-w-0 flex-col items-end gap-1">
+    <div className="enters group flex min-w-0 flex-col items-end gap-1">
       <div className="min-w-0 max-w-[88%] rounded-2xl rounded-br-md border border-brand/30 bg-brand/10 px-3 py-2 text-sm whitespace-pre-wrap wrap-anywhere text-ink">
         {text}
       </div>
@@ -80,6 +87,15 @@ function UserBubble({ text, focus }: { text: string; focus?: string }) {
           <ScanEye className="size-2.5 shrink-0" />
           <span className="truncate">{focus}</span>
         </span>
+      )}
+      {onSchedule && (
+        <button
+          type="button"
+          onClick={onSchedule}
+          className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-brand focus-visible:opacity-100"
+        >
+          <CalendarClock className="size-2.5" /> Repeat this…
+        </button>
       )}
     </div>
   );

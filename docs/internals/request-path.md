@@ -54,6 +54,13 @@ well as agent runs.
 link allows 120 s for a screenshot, the computed typing duration plus 30 s for `page.typeText`, any
 declared `timeoutMs` plus 5 s, and 30 s otherwise.
 
+**A held call is kept alive.** An approval can hold an invoke for as long as the user takes, and a
+scheduled run's for ten minutes. So `RemoteBridge` sends `keepAlive` with every invoke. The daemon
+answers with a `working` frame every 2 s until the result, and the bridge restarts its timeout on
+each one. Only a daemon that goes quiet is reported as `DAEMON_UNREACHABLE`. Without this, the agent
+heard "unreachable" a minute into every approval and asked again. A client that doesn't send
+`keepAlive` is never sent `working`.
+
 **Screenshots are persisted by the daemon**, not the browser, and only on request.
 `persistScreenshot()` writes nothing unless the call passed `save: true` or a mapping run supplied a
 `saveTo` — so the captures an agent takes to look at a page leave no files behind. It reads `save`

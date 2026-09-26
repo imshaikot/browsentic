@@ -14,6 +14,7 @@ export function RecordingPanel({
   onStart,
   onStop,
   onReplay,
+  onSchedule,
   onRemove,
 }: {
   tabUrl: string;
@@ -23,6 +24,7 @@ export function RecordingPanel({
   onStart: (captureValues: boolean) => void;
   onStop: () => void;
   onReplay: (recording: StoredRecordingMeta) => void;
+  onSchedule: (recording: StoredRecordingMeta) => void;
   onRemove: (recordingId: string) => void;
 }) {
   const [captureValues, setCaptureValues] = useState(false);
@@ -67,7 +69,7 @@ export function RecordingPanel({
         </label>
       )}
 
-      <RecordingList recordings={recordings} busy={busy} onReplay={onReplay} onRemove={onRemove} />
+      <RecordingList recordings={recordings} busy={busy} onReplay={onReplay} onSchedule={onSchedule} onRemove={onRemove} />
     </div>
   );
 }

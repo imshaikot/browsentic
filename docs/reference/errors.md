@@ -59,7 +59,16 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `SESSION_TAB_CLOSED` | Extension | Every tab this conversation was working in has been closed |
 | `TAB_IN_USE` | Extension | That tab belongs to another Browsentic conversation |
 | `RUN_INACTIVE` | AgentSession | The run was cancelled while a tool call was in flight |
+| `APPROVAL_TIMEOUT` | AgentSession | A scheduled run asked for approval and nobody answered within ten minutes, so the action was declined. The agent is told to stop and say what it was about to do |
 | `SKILL_UNKNOWN` | AgentSession | The attached agent skill's id no longer resolves — the file moved, changed agents, or outgrew the size cap. Reopen the `/` picker and choose again |
+
+## Scheduled tasks
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `TASK_NOT_FOUND` | Daemon | No task with that id — deleted from another browser or from `browsentic tasks` |
+| `TASK_LIMIT` | Daemon | 25 tasks are already scheduled. Delete one first |
+| `REPLAY_UNAVAILABLE` | Extension | The task's recording is gone, was never turned into steps, or needs a value the task does not hold |
 
 ## Agents
 

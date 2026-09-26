@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stateDir } from './paths.js';
 
@@ -34,6 +34,24 @@ export function writeLockfile(lock: Lockfile): void {
 export function clearLockfile(): void {
   rmSync(lockfilePath, { force: true });
 }
+
+/**
+ * Left by a stop and cleared by the next daemon to start. While it is there the browser's
+ * wake-up leaves the daemon down, so `browsentic stop` is not undone a second later by a
+ * paired browser reconnecting.
+ */
+export const stoppedPath = join(stateDir, 'stopped');
+
+export function holdWake(): void {
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+  writeFileSync(stoppedPath, `${new Date().toISOString()}\n`, { mode: 0o600 });
+}
+
+export function releaseWake(): void {
+  rmSync(stoppedPath, { force: true });
+}
+
+export const wakeHeld = (): boolean => existsSync(stoppedPath);
 
 export function isRunning(pid: number): boolean {
   try {

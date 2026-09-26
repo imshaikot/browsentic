@@ -70,7 +70,7 @@ export async function putSession(fields: SessionFields, items: RunItem[]): Promi
   await writeIndex(kept.slice(0, MAX_SESSIONS));
 }
 
-function withoutPreview(item: RunItem): RunItem {
+export function withoutPreview(item: RunItem): RunItem {
   if (item.kind !== 'tool' || !item.preview) return item;
   const { preview: _preview, ...rest } = item;
   return rest;
