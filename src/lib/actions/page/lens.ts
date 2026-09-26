@@ -1,3 +1,5 @@
+import { isOverlay } from '@/lib/overlay';
+
 export type LensOutcome = { picked: Element } | { cancelled: true } | { timedOut: true };
 
 const HOST_ID = 'browsentic-a-eye';
@@ -71,7 +73,9 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
 
     const onClick = (event: MouseEvent) => {
       swallow(event);
-      const target = hovered ?? document.elementFromPoint(event.clientX, event.clientY);
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      if (under && isOverlay(under)) return;
+      const target = hovered ?? under;
       if (target && target !== document.documentElement) settle({ picked: target });
     };
 
@@ -106,6 +110,11 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
     for (const [type, listener, options] of listeners) window.addEventListener(type, listener, options);
 
     function aim(target: Element | null): void {
+      if (target && isOverlay(target)) {
+        hovered = null;
+        box.hidden = true;
+        return;
+      }
       if (!target || target === host || target === document.documentElement) return;
       hovered = target;
       draw(target);
