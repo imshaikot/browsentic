@@ -58,7 +58,11 @@ leaves history. The daemon holds a copy only while the analyst reads it, in the 
 workspace at `0600`, and deletes it when the report is in.
 
 **Tab sessions** live in `browser.storage.session` under `browsentic/tabSessions`, so they are gone
-when the browser closes. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
+when the browser closes. So does **hands-free mode** (`browsentic/handsFree`, and the listening
+state under `browsentic/dictation`) — a restarted browser never comes back with a microphone on.
+Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
+(`browsentic/pushToTalk`) and whether this browser's speech service has ever worked
+(`browsentic/speechService`) are kept in `storage.local`. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
 timers — none of what a page reported about itself outlives the browser that reported it.
 
 ## Relocating
