@@ -12,7 +12,7 @@ const read = (name: string) => readThrough(antigravityRunner, transcript('antigr
 const readLines = (...lines: object[]) => readThrough(antigravityRunner, lines.map((line) => JSON.stringify(line)));
 
 describe('a streamed run', () => {
-  test("a run is written into its conversation's folder: the browser server and the system prompt", () => {
+  test("a run is written into its conversation's folder: the browser server, the system prompt, and where the page is", () => {
     expect(shown(stream())).toMatchInlineSnapshot(`
       {
         "args": [
@@ -48,6 +48,12 @@ describe('a streamed run', () => {
           },
           {
             "content": "You are Browsentic.
+
+      # Where the page is
+
+      The user is looking at a page in their own browser, and a question is about that page unless they say otherwise: "this repo" is the repository page they have open, not a folder on disk. This folder is Browsentic's scratch space and holds no project.
+
+      Reach that page only through the browsentic MCP server — call_mcp_tool with ServerName "browsentic", starting with page_getPageInfo. Never run a command, read or write a file, or open a browser of your own to answer, and never search the web or fetch a URL: none of them sees the user's page. If the browsentic tools cannot be reached at all, say so instead of answering another way.
       ",
             "path": "AGENTS.md",
           },
@@ -76,9 +82,11 @@ describe('a streamed run', () => {
     expect(stream({ conversation: '../../escape me' }).cwd).toBe(`${stateDir}/agents/antigravity/run/______escape_me`);
   });
 
-  // Antigravity takes no per-run tool list; its own settings decide whether it may search.
-  test('research changes nothing about the plan', () => {
-    expect(stream({ research: true })).toEqual(stream());
+  // Antigravity takes no per-run tool list, so only the prompt keeps it off the web.
+  test('research changes only whether the prompt allows a web search', () => {
+    const prompt = (research: boolean) => stream({ research }).files?.find((file) => file.path === 'AGENTS.md')?.content;
+    expect([prompt(false), prompt(true)].map((text) => text?.includes('never search the web'))).toEqual([true, false]);
+    expect({ ...stream({ research: true }), files: [] }).toEqual({ ...stream(), files: [] });
   });
 
   test('the chosen model and effort are passed through', () => {

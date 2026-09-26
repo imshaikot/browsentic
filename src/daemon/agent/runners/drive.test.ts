@@ -108,7 +108,7 @@ describe('a streamed run', () => {
       directory: statSync(cwd).mode & 0o777,
       instructions: statSync(join(cwd, 'AGENTS.md')).mode & 0o777,
       mcpConfig: statSync(join(cwd, '.agents', 'mcp_config.json')).mode & 0o777,
-    }).toEqual({ said: 'You are Browsentic.\n', directory: 0o700, instructions: 0o600, mcpConfig: 0o600 });
+    }).toEqual({ said: expect.stringMatching(/^You are Browsentic\.\n/), directory: 0o700, instructions: 0o600, mcpConfig: 0o600 });
   });
 
   test("a folder a conversation keeps is new again on every turn, so the sweep ages it from its last", async () => {

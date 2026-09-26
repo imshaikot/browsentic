@@ -33,6 +33,17 @@ interface Settings {
   [key: string]: unknown;
 }
 
+/**
+ * Antigravity offers the model its whole built-in toolset — a shell, files, a browser of its own,
+ * web search — and reads AGENTS.md as project notes rather than its instructions. Left unsaid,
+ * "this repo" became `git status` in the scratch folder, and a refused page read became a web search.
+ */
+const wherePageIs = (research: boolean) => `# Where the page is
+
+The user is looking at a page in their own browser, and a question is about that page unless they say otherwise: "this repo" is the repository page they have open, not a folder on disk. This folder is Browsentic's scratch space and holds no project.
+
+Reach that page only through the ${MCP_SERVER_NAME} MCP server — call_mcp_tool with ServerName "${MCP_SERVER_NAME}", starting with page_getPageInfo. Never run a command, read or write a file, or open a browser of your own to answer${research ? '' : ', and never search the web or fetch a URL'}: none of them sees the user's page.${research ? ' Keep web searches to background the page cannot give you.' : ''} If the ${MCP_SERVER_NAME} tools cannot be reached at all, say so instead of answering another way.`;
+
 /** Every MCP call, whichever server it reaches; the server and tool are in its parameters. */
 const MCP_CALL = 'call_mcp_tool';
 
@@ -100,7 +111,7 @@ export const antigravityRunner: Runner = {
   },
 
   stream(context: StreamContext): Plan {
-    const { settings } = context;
+    const { settings, research } = context;
     const effort = effortOf(settings, this.efforts);
     const base = this.workspace('run');
     sweepRunDirs(base);
@@ -112,7 +123,7 @@ export const antigravityRunner: Runner = {
       env: { BROWSENTIC_AGENT_RUN: context.runId },
       files: [
         { path: MCP_CONFIG, content: mcpConfig(context.mcp) },
-        { path: INSTRUCTIONS, content: `${context.systemPrompt.trim()}\n` },
+        { path: INSTRUCTIONS, content: `${context.systemPrompt.trim()}\n\n${wherePageIs(research)}\n` },
       ],
       args: [
         '-p',
