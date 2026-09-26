@@ -128,15 +128,54 @@ describe('a one-shot task', () => {
 });
 
 describe('reading the stream', () => {
-  test('a run establishes the conversation, announces its own tool once, streams the answer and finishes', () => {
-    expect(read('run.hand-written.jsonl')).toEqual([
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
-      ['tool', expect.any(String), 'search_web'],
-      ['text', 'It costs '],
-      ['text', '$12 a month.'],
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
+  const step = (index: number, state: string, name: string, parameters: object = {}) => ({
+    event: 'step_update',
+    step_update: { step_index: index, state, step_type: 'tool', tool_name: name, tool_info: { name, parameters } },
+  });
+  const withoutSessions = (calls: ReturnType<typeof read>) => calls.filter(([signal]) => signal !== 'session');
+
+  test('a Browsentic call and the schema read before it stay off the timeline, which the daemon draws itself', () => {
+    expect(withoutSessions(read('1.2.11-mcp-call.jsonl'))).toEqual([
+      ['usage', { contextTokens: 14_733, outputTokens: 509 }],
+      ['usage', { contextTokens: 15_127, outputTokens: 760 }],
+      ['text', 'echo: hello'],
+      ['usage', { contextTokens: 15_253, outputTokens: 851 }],
+      ['text', '\n'],
       ['done', 'end_turn'],
+    ]);
+  });
+
+  test('every line carries the conversation', () => {
+    expect(new Set(read('1.2.11-mcp-call.jsonl').filter(([signal]) => signal === 'session').map(([, id]) => id))).toEqual(
+      new Set(['cc91cfe3-dda5-41df-96e3-88d226320b41']),
+    );
+  });
+
+  test('a large result Antigravity spilled to a file is read back without a row', () => {
+    const spilled = '/Users/you/.gemini/antigravity-cli/brain/47835b7b/.system_generated/steps/10/output.txt';
+    expect(readLines(step(12, 'ACTIVE', 'view_file', { AbsolutePath: spilled }), step(12, 'DONE', 'view_file', { AbsolutePath: spilled }))).toEqual([]);
+  });
+
+  test('its own tool gets one row, closed once when it is done', () => {
+    const calls = readLines(step(3, 'ACTIVE', 'search_web'), step(3, 'DONE', 'search_web'), step(3, 'DONE', 'search_web'));
+    expect(calls).toEqual([
+      ['tool', expect.any(String), 'search_web'],
+      ['toolResult', calls[0][1], true],
+    ]);
+  });
+
+  test('a file it reads for the task is shown, and a step that errors closes as failed', () => {
+    const notes = { AbsolutePath: '/Users/you/notes.txt' };
+    expect(readLines(step(4, 'ACTIVE', 'view_file', notes), step(4, 'ERROR', 'view_file', notes))).toEqual([
+      ['tool', expect.any(String), 'view_file'],
+      ['toolResult', expect.any(String), false],
+    ]);
+  });
+
+  test("another server's call is shown under that server's name", () => {
+    expect(readLines(step(6, 'DONE', 'call_mcp_tool', { ServerName: 'github', ToolName: 'list_issues' }))).toEqual([
+      ['tool', expect.any(String), 'github:list_issues'],
+      ['toolResult', expect.any(String), true],
     ]);
   });
 
