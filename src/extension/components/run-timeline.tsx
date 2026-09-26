@@ -50,12 +50,13 @@ export function RunTimeline({ items, running, onDecide, onSchedule }: RunTimelin
   const last = items.at(-1);
   const streaming = running && last?.kind === 'assistant';
   const awaiting = running && !streaming;
+  const turnStart = items.findLastIndex((item) => item.kind === 'user');
 
   return (
     <div className="flex min-w-0 flex-col gap-2.5 p-3">
       {items.map((item, index) =>
         item.kind === 'tool' ? (
-          <ToolRow key={item.id} item={item} onDecide={onDecide} />
+          <ToolRow key={item.id} item={item} live={running && index > turnStart} onDecide={onDecide} />
         ) : item.kind === 'notice' ? (
           <Notice key={item.id} item={item} />
         ) : item.kind === 'context' ? (
@@ -128,14 +129,17 @@ function Thinking() {
 
 function ToolRow({
   item,
+  live,
   onDecide,
 }: {
   item: Extract<RunItem, { kind: 'tool' }>;
+  /** In the turn still running. A row a CLI never closed stops sweeping when its turn ends. */
+  live: boolean;
   onDecide: (toolId: string, allow: boolean, remember?: boolean) => void;
 }) {
   const name = item.action.replace(/^page\./, '');
   const Icon = ICONS[name] ?? Wrench;
-  const pending = item.ok === undefined && !item.awaiting;
+  const pending = live && item.ok === undefined && !item.awaiting;
   const source = item.action === injectCode.name ? sourceOf(item.input) : null;
   const [reviewing, setReviewing] = useState(false);
 
