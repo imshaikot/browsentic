@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import {
   RAIL_CHANNEL,
   RAIL_PALETTES,
@@ -57,6 +58,7 @@ export function exposeRail(): void {
       host = document.createElement('div');
       host.id = HOST_ID;
       host.setAttribute('aria-hidden', 'false');
+      host.setAttribute(OVERLAY_ATTRIBUTE, '');
       host.style.cssText = 'all: initial; position: static;';
       root = host.attachShadow({ mode: 'closed' });
       document.documentElement.append(host);

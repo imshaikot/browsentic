@@ -140,6 +140,7 @@ export type RunMessage =
 const ports = new Set<Browser.runtime.Port>();
 const panelPorts = new Set<Browser.runtime.Port>();
 const panelWatchers = new Set<(open: boolean) => void>();
+const settleWatchers = new Set<(tabId: number, items: readonly RunItem[]) => void>();
 const buffers = new Map<string, RunItem[]>();
 const busy = new Set<string>();
 const persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -278,6 +279,28 @@ export function closePanels(): void {
   for (const panel of panelPorts) post(panel, { op: 'close' });
 }
 
+/**
+ * Fires once a turn is over — finished, failed, stopped, answered in the browser, or refused
+ * before it began — with the tab it belongs to and what its conversation now says.
+ */
+export function onTurnSettled(watch: (tabId: number, items: readonly RunItem[]) => void): void {
+  settleWatchers.add(watch);
+}
+
+function turnOver(tabId: number, items: readonly RunItem[]): void {
+  for (const watch of settleWatchers) watch(tabId, items);
+}
+
+/** The orb's attach, answered once the file belongs to a conversation, or with why it cannot. */
+export function attachFile(file: NewFile, anchor: TabAnchor): Promise<Attached> {
+  return serialized(() => attach(file, anchor));
+}
+
+/** The panel's commands, for a surface in the background's own reach that has no port — the hands-free orb. */
+export function runCommand(command: RunCommand): void {
+  handle(command);
+}
+
 function handle(command: RunCommand): void {
   switch (command.op) {
     case 'instruct':
@@ -390,16 +413,19 @@ async function answerApproval(sessionId: string, toolId: string, allow: boolean,
   dropTaskApproval(toolId);
 }
 
+type Attached = { ok: true } | { ok: false; error: string };
+
 /** A file belongs to the conversation of the tab it was dropped on, which is started here if need be. */
-async function attach(file: NewFile, anchor: TabAnchor): Promise<void> {
+async function attach(file: NewFile, anchor: TabAnchor): Promise<Attached> {
   const ensured = await ensureSessionForTab(anchor);
   if (!ensured.ok) {
     await removeFile(file.id);
     broadcast({ op: 'event', runId: LOCAL_RUN, event: { kind: 'error', code: 'SESSION_LIMIT', message: ensured.message } });
-    return;
+    return { ok: false, error: ensured.message };
   }
   await indexFile(file, ensured.session.sessionId);
   await requestAnalysis(file.id);
+  return { ok: true };
 }
 
 /** Clears out files whose conversation has left both the open tabs and history. */
@@ -485,6 +511,7 @@ async function settle(sessionId: string): Promise<void> {
 
   const session = (await readTabSessions())[sessionId];
   if (session) {
+    turnOver(session.currentTabId, buffers.get(sessionId) ?? []);
     const tab = await browser.tabs.get(session.currentTabId).catch(() => null);
     if (tab?.url) await patchSession(sessionId, { url: tab.url, host: hostOf(tab.url) });
   }
@@ -512,11 +539,12 @@ async function instruct(
       runId: LOCAL_RUN,
       event: { kind: 'error', code: 'SESSION_LIMIT', message: ensured.message },
     });
+    turnOver(anchor.tabId, [notice('error', `SESSION_LIMIT: ${ensured.message}`)]);
     return;
   }
 
+  const { sessionId } = ensured.session;
   if (isContextCommand(text)) {
-    const { sessionId } = ensured.session;
     const breakdown = await contextBreakdown(ensured.session, await bufferFor(sessionId));
     await append(sessionId, { kind: 'user', id: nextId(), text: CONTEXT_COMMAND });
     await append(sessionId, { kind: 'context', id: nextId(), breakdown });
@@ -524,11 +552,13 @@ async function instruct(
   }
 
   const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, liveTools, fastPath: true });
-  if (outcome !== 'busy') return;
-  await append(
-    ensured.session.sessionId,
-    notice('error', 'RUN_IN_PROGRESS: This conversation is still running — stop it before sending another instruction.'),
-  );
+  if (outcome === 'busy') {
+    await append(
+      sessionId,
+      notice('error', 'RUN_IN_PROGRESS: This conversation is still running — stop it before sending another instruction.'),
+    );
+  }
+  if (outcome !== 'started') turnOver(anchor.tabId, await bufferFor(sessionId));
 }
 
 type TurnOutcome = 'started' | 'local' | 'busy' | 'offline';

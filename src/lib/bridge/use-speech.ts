@@ -1,50 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { micPermission, openMicPermissionPage, watchMicPermission } from './mic-permission';
-
-interface SpeechAlternativeLike {
-  readonly transcript: string;
-}
-interface SpeechResultLike {
-  readonly isFinal: boolean;
-  readonly length: number;
-  readonly [index: number]: SpeechAlternativeLike;
-}
-interface SpeechResultListLike {
-  readonly length: number;
-  readonly [index: number]: SpeechResultLike;
-}
-interface SpeechResultEventLike {
-  readonly resultIndex: number;
-  readonly results: SpeechResultListLike;
-}
-interface SpeechErrorEventLike {
-  readonly error: string;
-  readonly message?: string;
-}
-interface SpeechRecognitionLike {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  onstart: (() => void) | null;
-  onresult: ((event: SpeechResultEventLike) => void) | null;
-  onerror: ((event: SpeechErrorEventLike) => void) | null;
-  onend: (() => void) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-function recognitionCtor(): SpeechRecognitionConstructor | null {
-  if (typeof window === 'undefined') return null;
-  const scope = window as unknown as {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  };
-  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null;
-}
+import { createRecognition, recognitionCtor, transcriptOf, type SpeechRecognitionLike } from './recognition';
+import { SPEECH_SERVICE_KEY, handsFreeAllowed, noteSpeechService, readSpeechService, type SpeechService } from './speech-support';
 
 const RESTART_DELAY_MS = 400;
 
@@ -82,6 +40,28 @@ export function useVoiceEnabled(): [boolean, (on: boolean) => void] {
   return [enabled, set];
 }
 
+/** Hidden until known, so a browser without speech never sees the detach button flash on and off. */
+export function useHandsFreeSupported(): boolean {
+  const [supported, setSupported] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void readSpeechService().then((service) => {
+      if (live) setSupported(handsFreeAllowed(service));
+    });
+    const listener = (changes: Record<string, { newValue?: unknown }>) => {
+      if (SPEECH_SERVICE_KEY in changes) setSupported(handsFreeAllowed(changes[SPEECH_SERVICE_KEY].newValue as SpeechService));
+    };
+    browser.storage.local.onChanged.addListener(listener);
+    return () => {
+      live = false;
+      browser.storage.local.onChanged.removeListener(listener);
+    };
+  }, []);
+
+  return supported;
+}
+
 export interface UseSpeechOptions {
   onFinal: (text: string) => void;
   onInterim?: (text: string) => void;
@@ -111,6 +91,7 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
   const blocked = useRef(false);
   const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const micGrant = useRef<Promise<void> | null>(null);
+  const heardOnce = useRef(false);
   const beginRef = useRef<() => void>(() => {});
 
   const ensureMic = useCallback(() => {
@@ -132,8 +113,7 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
   }, []);
 
   const begin = useCallback(async () => {
-    const Ctor = recognitionCtor();
-    if (!Ctor || recognition.current) return;
+    if (!recognitionCtor() || recognition.current) return;
     if ((await micPermission()) === 'prompt') {
       setListening(false);
       setNeedsGrant(true);
@@ -153,27 +133,21 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
     }
     if (!wanted.current) return;
 
-    const speech = new Ctor();
-    speech.continuous = true;
-    speech.interimResults = true;
-    speech.lang = navigator.language || 'en-US';
-    speech.maxAlternatives = 1;
+    const speech = createRecognition();
+    if (!speech) return;
 
     speech.onstart = () => {
       setListening(true);
       setError(null);
     };
     speech.onresult = (event) => {
-      let interim = '';
-      let final = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const text = result[0]?.transcript ?? '';
-        if (result.isFinal) final += text;
-        else interim += text;
+      const { interim, final } = transcriptOf(event);
+      if ((interim || final) && !heardOnce.current) {
+        heardOnce.current = true;
+        void noteSpeechService('works');
       }
-      if (interim.trim()) handlers.current.onInterim?.(interim.trim());
-      if (final.trim()) handlers.current.onFinal(final.trim());
+      if (interim) handlers.current.onInterim?.(interim);
+      if (final) handlers.current.onFinal(final);
     };
     speech.onerror = (event) => {
       if (event.error === 'aborted' || event.error === 'no-speech') return;
@@ -192,6 +166,7 @@ export function useSpeech({ onFinal, onInterim }: UseSpeechOptions): Speech {
       }
       if (event.error === 'network') {
         wanted.current = false;
+        void noteSpeechService('missing');
         setError(NO_SPEECH_SERVICE);
         return;
       }

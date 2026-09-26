@@ -17,6 +17,8 @@ import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib
 import { serveTimers } from '@/lib/bridge/timer';
 import { serveTaskNotices } from '@/lib/bridge/task-notices';
 import { serveToast } from '@/lib/bridge/toast';
+import { serveHandsFree } from '@/lib/bridge/hands-free';
+import { endHandsFree } from '@/lib/bridge/panel-view';
 import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
 import { isAgentKind } from '@/lib/agents/catalog';
 import {
@@ -165,6 +167,7 @@ export default defineBackground(() => {
     }
     if (message.op === 'panelOpened') {
       void setPanelCollapsed(false);
+      void endHandsFree();
       sendResponse(success(true));
       return;
     }
@@ -229,6 +232,7 @@ export default defineBackground(() => {
   serveTabSessions();
   serveRail();
   serveToast();
+  serveHandsFree();
   void syncRail();
 
   onWelcome(() => {

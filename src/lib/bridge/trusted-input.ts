@@ -1,8 +1,10 @@
+import { browser } from 'wxt/browser';
 import { invokeInTab } from '@/lib/actions/client';
 import { dragElement } from '@/lib/actions/page/drag-element';
 import { APPROACH_STEPS, pathBetween, type Point } from '@/lib/actions/page/pointer';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { send, settle, withDebugger, type DebuggerSession } from './cdp';
 import { FRAME_GONE_HINT, frameOffset } from './frame-focus';
 
@@ -44,7 +46,9 @@ export function trustedClickInTab(tabId: number, input: unknown): Promise<Action
     const offset = await frameOffset(tabId);
     if (!offset) return failure('TAB_UNREACHABLE', `The click could not be placed — ${FRAME_GONE_HINT}`);
     const plan = planned.data as ClickPlan;
-    await dispatchClick(session, { ...plan, point: shifted(plan.point, offset), from: shifted(plan.from, offset) });
+    await throughOverlays(tabId, () =>
+      dispatchClick(session, { ...plan, point: shifted(plan.point, offset), from: shifted(plan.from, offset) }),
+    );
     return success({ ...(planned.data as object), trusted: true });
   });
 }
@@ -56,17 +60,45 @@ export function dragInTab(tabId: number, input: unknown): Promise<ActionResult> 
     const offset = await frameOffset(tabId);
     if (!offset) return failure('TAB_UNREACHABLE', `The drag could not be placed — ${FRAME_GONE_HINT}`);
     const plan = planned.data as DragPlan;
-    await dispatchDrag(session, {
-      ...plan,
-      approach: shifted(plan.approach, offset),
-      grip: shifted(plan.grip, offset),
-      drop: shifted(plan.drop, offset),
-    });
+    await throughOverlays(tabId, () =>
+      dispatchDrag(session, {
+        ...plan,
+        approach: shifted(plan.approach, offset),
+        grip: shifted(plan.grip, offset),
+        drop: shifted(plan.drop, offset),
+      }),
+    );
     return success({ ...(planned.data as object), trusted: true });
   });
 }
 
 const shifted = (at: Point, by: Point): Point => ({ x: at.x + by.x, y: at.y + by.y });
+
+/**
+ * A real pointer lands on whatever is on top, and the hands-free mic, the rail or a toast may be
+ * over the target. Inert for the length of the gesture, they let it through to the page, and an
+ * agent's click can never press the mic's own stop.
+ */
+async function throughOverlays(tabId: number, gesture: () => Promise<void>): Promise<void> {
+  await markOverlaysInert(tabId, true);
+  try {
+    await gesture();
+  } finally {
+    await markOverlaysInert(tabId, false);
+  }
+}
+
+async function markOverlaysInert(tabId: number, inert: boolean): Promise<void> {
+  await browser.scripting
+    .executeScript({
+      target: { tabId },
+      func: (attribute: string, on: boolean) => {
+        for (const host of document.querySelectorAll(`[${attribute}]`)) host.toggleAttribute('inert', on);
+      },
+      args: [OVERLAY_ATTRIBUTE, inert],
+    })
+    .catch(() => undefined);
+}
 
 export async function dispatchClick(session: DebuggerSession, plan: ClickPlan): Promise<void> {
   const { point, from, button, clickCount, modifiers, moveSteps, hoverMs, holdMs } = plan;

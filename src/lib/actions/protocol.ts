@@ -114,6 +114,8 @@ export interface FocusedElement {
   shot?: string;
 }
 
+export const focusName = (focus: FocusedElement): string => focus.label?.trim() || focus.role || focus.tag;
+
 export interface SavedRecording {
   id: string;
   name: string;

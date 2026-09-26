@@ -11,6 +11,17 @@ export const REMOVE_TOOLS_DESCRIPTION = 'Review the tools you saved, and delete 
 export const isRemoveToolsCommand = (text: string): boolean =>
   text.trim().toLowerCase() === REMOVE_TOOLS_COMMAND;
 
+export const HANDS_FREE_COMMAND = '/hands-free';
+
+export const HANDS_FREE_ALIASES = ['hand-free', 'handsfree'];
+
+export const HANDS_FREE_DESCRIPTION = 'Put the panel away and talk to the page — a floating mic you can drag anywhere.';
+
+export const isHandsFreeCommand = (text: string): boolean => {
+  const typed = text.trim().toLowerCase();
+  return typed === HANDS_FREE_COMMAND || HANDS_FREE_ALIASES.some((alias) => typed === `/${alias}`);
+};
+
 export const CONTEXT_COMMAND_DESCRIPTION =
   'See what this conversation carries — messages, files, recordings, tabs.';
 

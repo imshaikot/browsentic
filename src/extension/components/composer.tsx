@@ -5,8 +5,7 @@ import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/compo
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
 import { Button } from '@/extension/components/ui/button';
 import { Textarea } from '@/extension/components/ui/textarea';
-import type { FocusedElement, SkillCatalog } from '@/lib/actions/protocol';
-import { focusName } from '@/lib/bridge/aeye';
+import { focusName, type FocusedElement, type SkillCatalog } from '@/lib/actions/protocol';
 import type { StoredFileMeta } from '@/lib/bridge/file-store';
 import type { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { cn } from '@/lib/utils';
@@ -31,6 +30,7 @@ export function Composer({
   focus,
   picking,
   liveTools,
+  handsFree,
   onToggleLiveTools,
   scheduling,
   onToggleScheduling,
@@ -60,6 +60,8 @@ export function Composer({
   focus: FocusedElement | null;
   picking: boolean;
   liveTools: boolean;
+  /** Whether `/hands-free` is offered — never where the browser cannot transcribe speech. */
+  handsFree: boolean;
   onToggleLiveTools: () => void;
   scheduling: boolean;
   onToggleScheduling: () => void;
@@ -84,8 +86,8 @@ export function Composer({
   const menuOpen = slash !== null && connected;
   const [highlight, setHighlight] = useState(0);
   const menuItems = useMemo(
-    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools) : []),
-    [menuOpen, catalog, tabUrl, slash, tools],
+    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools, { handsFree }) : []),
+    [menuOpen, catalog, tabUrl, slash, tools, handsFree],
   );
 
   useEffect(() => setHighlight(0), [slash]);
