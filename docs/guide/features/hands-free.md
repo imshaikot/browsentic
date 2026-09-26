@@ -42,7 +42,8 @@ When a run finishes, its answer streams in above the mic the same way, and fades
 
 The mic listens for **the tab in front of you**, and only while the browser window is focused. Switch
 tabs and it follows; switch to another app and it stops until you come back. It also stops while the
-agent is working, and while a side panel is open anywhere.
+agent is working. The browser lets only one thing listen at a time, so going hands-free closes the
+side panel in every window, and opening the panel anywhere ends hands-free.
 
 ## The menu
 
@@ -84,14 +85,20 @@ buttons out in that turned order; captions and permission requests move to which
 
 The mic turns orange and says what the agent is asking to do. Press it for the request — the same
 **Allow**, **Deny** and **Always on ‹host›** the panel offers, or the code itself when the agent
-wrote some. If the request comes from a tab you are not looking at, a card appears on the page you
-are on, or a system notification when the browser is in the background; clicking it takes you there.
+wrote some — all of it, scrolling if it is long, since **Allow** runs every line. If the request
+comes from a tab you are not looking at, a card appears on the page you are on, or a system
+notification when the browser is in the background; clicking it takes you there. Each request is
+announced once.
 
 ## A-Eye never lands on the mic
 
 The mic, like the rail and Browsentic's cards, is marked as Browsentic's own. A-Eye — yours or the
 agent's — never outlines it and never picks it; a click on the mic while A-Eye is up does nothing.
 When you start A-Eye from the mic's menu, the mic steps aside until you have picked.
+
+The agent's pointer passes through it too. A button under the mic — a cookie banner's **Accept**, a
+sticky footer — is still one the agent can click or drag to, and an agent's click there never lands
+on the mic's own stop.
 
 ## Which browsers
 

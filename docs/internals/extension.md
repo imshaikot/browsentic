@@ -210,11 +210,16 @@ content script would run on the page's origin — a prompt per site, and none at
 tab already granted. The document exists exactly while the orb should listen: creating it starts the
 mic, closing it stops it, so it needs no command channel of its own. It reports a `DictationPhase`
 and each interim and final transcript; the background keeps the phase in `browsentic/dictation` and
-relays transcripts to the one tab listening.
+relays transcripts to the one tab listening. The phase is only ever what the page itself reported —
+the background writes none ahead of it, so the orb never shows a microphone the page has not opened —
+except `failed` for a document that could not be created, which then waits for a press on the orb
+rather than being retried on every repaint. Only `network` is `no-service`; any other recognizer
+error is `failed`, a retry and no verdict on the browser.
 
 **Chrome runs one recognizer at a time**, and a second one aborts the first. That is why the panel
-and hands-free never overlap — the panel's `panelOpened` ends hands-free, and the orb does not listen
-while any panel's run port is connected — and why an `aborted` the document did not ask for is read
+and hands-free never overlap — the panel's `panelOpened` ends hands-free, starting hands-free sends
+every connected panel `close`, and the orb does not listen while any panel's run port is connected —
+and why an `aborted` the document did not ask for is read
 as another page taking the mic. The document then stops as `yielded` rather than restarting into a
 tug-of-war; a press on the orb takes the mic back.
 
@@ -234,23 +239,35 @@ itself is the pure `capableOf()` so it can be tested at all.
 **The microphone listens for one tab**: the one in front of a focused window, whose conversation has
 no run and no approval waiting, while the link is up and the user has not muted it. Every other orb
 is painted `paused`. `paint()` computes each tab's `OrbView`, sends only the ones that changed since
-that tab was last told, and records which tabs answered — a tab with no orb is never aimed at. Like
-the rail it is a cache the worker can lose: a revived worker repaints everything.
+that tab was last told, and records which tabs answered — a tab with no orb is never aimed at. The
+tab in front is told afresh until it answers, and gets the content script injected if it has none,
+as every open tab does after the extension reloads. The tab the mic is aimed at is asked again once
+it finishes loading, so a navigation to a page the content script cannot run in lets go of the mic.
+Like the rail it is a cache the worker can lose: a revived worker repaints everything. Only the parts
+of `browsentic/tabSessions` an orb shows — which tabs, the run, the approval — and the daemon link's
+state trigger a repaint; a run rewrites the rest on every step.
 
 **The orb owns only what dies with the page**: what has been said since the last send, the countdown
 ring (`AUTO_SEND_MS`, the composer's 1.6 s), the A-Eye focus, the live-code toggle and the files
 attached since the last send. An instruction goes through the same `instruct` the panel's run port
 takes, via `runCommand()`, so it lands in the tab's own conversation and takes the fast path as a
 typed one would. A finished turn's last reply or error comes back as a `say` caption, through
-`onTurnSettled()`.
+`onTurnSettled()`, which also fires for a turn that never reached the agent — answered on the fast
+path, refused as `SESSION_LIMIT` or `RUN_IN_PROGRESS`, or with no daemon attached — since no panel is
+there to show those. An attach answers only once the file belongs to the conversation, via
+`attachFile()`.
 
 **Hold to talk swaps the dictation page's mode, not the orb's.** `browsentic/pushToTalk` in
 `storage.local` is a preference, so it is remembered. With it on, the background opens
-`dictation.html?hold`, which holds no microphone until a `talk` command arrives — relayed from the
-orb only for the tab being listened for — and on `talk: false` calls `stop()` rather than `abort()`,
+`dictation.html?hold`, which holds no microphone until a `talk` command arrives — `talk: true`
+relayed only from the tab being listened for, `talk: false` from any, since the key can come up after
+the mic moved on — and on `talk: false` calls `stop()` rather than `abort()`,
 so Chrome finishes the words already spoken; anything still interim is reported as final, then the
 page says `held`. The orb sends on that `held`, or after 2.5 s, whichever comes first. A page left
-in the other mode is closed and opened afresh, which is how the toggle takes effect.
+in the other mode is closed and opened afresh, which is how the toggle takes effect, and so is a hold
+page whenever the mic moves to another tab, so words held down in one never land in another. The
+page checks it is still wanted after the permission query, so a release during that query cannot
+leave a recognizer running, and an orb removed mid-hold releases the key on its way out.
 
 The key is `event.code === 'ControlLeft'` (`HOLD_KEY_CODE`) — a physical position, so layout-proof,
 present on every platform, and inert on its own everywhere. Because Control is a modifier, a hold
@@ -262,16 +279,24 @@ removed tears its listeners down on the next event instead of answering beside i
 
 **Approvals are the orb's to show.** The view carries the waiting approval, the orb turns ember, and
 a press opens the same Allow / Deny / Always choice as the timeline, placed on whichever side of the
-orb it fits and pointing at it. An approval in a tab nobody is looking at raises a toast on the page
-that is, or an OS notification when the browser is in the background.
+orb it fits and pointing at it. It carries the agent's code whole, scrollable, never cut short,
+since Allow runs all of it. An approval in a tab nobody is looking at raises a toast on the page that
+is, or an OS notification when the browser is in the background — once, with the announced ids kept
+in `browsentic/approvalsAnnounced` so a revived worker does not raise them again.
 
 **A-Eye skips every overlay.** The rail, the toast and the orb carry `data-browsentic-overlay`
 (`src/lib/overlay.ts`). A closed shadow root retargets a hit to its host, so the lens sees the host
 element under the pointer; it draws no box there and a click there picks nothing, whether the pick
 is the user's or the agent's. An orb that starts a pick also hides until the pick is over.
 
+**So does the agent's pointer.** `elementAt()` in `pointer.ts` reads `elementsFromPoint()` past any
+overlay, so `assertUncovered` never blames the mic for covering a target and a drag never drops onto
+it. A real pointer still lands on whatever is on top, so `trusted-input.ts` marks every overlay host
+`inert` for the length of a trusted click or drag — `inert` reaches through the closed shadow root —
+and the gesture reaches the page beneath instead of pressing the mic's own stop.
+
 State: `browsentic/handsFree` in `storage.session` (on while present, with `muted` and `since`),
-`browsentic/dictation` in `storage.session`, and in `storage.local` `browsentic/speechService`,
+`browsentic/dictation` and `browsentic/approvalsAnnounced` in `storage.session`, and in `storage.local` `browsentic/speechService`,
 `browsentic/pushToTalk` and `browsentic/orbPosition` — the orb's centre as viewport fractions, so one drag places it on every tab. Hands-free is session state
 on purpose: a restarted browser comes back with the panel, not a live microphone.
 
