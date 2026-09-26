@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { RAIL_PALETTES, RAIL_TONES } from '@/lib/rail/events';
 import { MAX_TOASTS, TOAST_CHANNEL, isToastCommand, type ToastView } from './events';
 
@@ -66,6 +67,7 @@ export function exposeToast(): void {
       clear();
       host = document.createElement('div');
       host.id = HOST_ID;
+      host.setAttribute(OVERLAY_ATTRIBUTE, '');
       host.style.cssText = 'all: initial; position: static;';
       root = host.attachShadow({ mode: 'closed' });
       root.innerHTML = `<style>${STYLES}</style><div class="stack" role="region" aria-label="Browsentic"></div>`;

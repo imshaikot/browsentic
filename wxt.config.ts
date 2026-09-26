@@ -26,8 +26,9 @@ export default defineConfig({
     permissions: [
       'storage', 'unlimitedStorage', 'activeTab', 'contextMenus', 'alarms', 'scripting',
       'notifications', 'downloads',
-      // Firefox has no sidePanel or debugger permission, and addons.mozilla.org flags each name it does not know.
-      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger']),
+      // Firefox has no sidePanel, debugger or offscreen permission, and addons.mozilla.org flags each name it does not know.
+      // offscreen is the hidden page hands-free mode listens through once the side panel is closed.
+      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen']),
     ],
     host_permissions: ['<all_urls>'],
     // Release Firefox installs only what addons.mozilla.org has signed, and signing needs a

@@ -35,8 +35,8 @@ microphone to an extension. `use-speech.ts` therefore reads `navigator.permissio
 `prompt` it never calls `getUserMedia` — repeated silent refusals would earn the origin a temporary
 block — and offers **Allow microphone** instead. That opens the unlisted `mic-permission.html`
 entrypoint in a tab, where the prompt can appear. The grant belongs to the extension's origin, so the
-panel and the popup both see the `PermissionStatus` change and start listening without a reload.
-Firefox prompts from its sidebar on its own and skips the check.
+panel, the popup and hands-free mode's offscreen page all see the `PermissionStatus` change and start
+listening without a reload. Firefox prompts from its sidebar on its own and skips the check.
 
 ## The Firefox build is signed, and says who it is
 
@@ -54,8 +54,8 @@ a `browser_specific_settings.gecko` block the Chrome build has no use for:
   behind whichever agent CLI the user runs.
 - **`strict_min_version: 140.0`** — the first Firefox that understands the data-collection key.
 
-Two permissions are filtered out of that build, `sidePanel` and `debugger`: Firefox has neither, and
-AMO's validator flags each name it does not know. The Firefox sidebar is `sidebar_action`, which WXT
+Three permissions are filtered out of that build, `sidePanel`, `debugger` and `offscreen`: Firefox has
+none of them, and AMO's validator flags each name it does not know. The Firefox sidebar is `sidebar_action`, which WXT
 derives from the same entrypoint, and the nine tools that need the debugger are left off the list a
 Firefox build offers (see [Background vs content script](#background-vs-content-script)).
 
@@ -186,6 +186,119 @@ the sidebar inside the gesture, Chromium panels are told over the run port to cl
 Pages that refuse content scripts — `chrome://`, the Web Store, the new-tab page — get no rail.
 That is the same `TAB_UNREACHABLE` set as everywhere else, and it is why the toolbar icon and the
 **Open/Close Browsentic** context-menu item stay the guaranteed way back in.
+
+## Hands-free: the orb lives in the page
+
+Detaching is the rail's sibling: the panel closes, and a microphone orb is drawn into the page
+instead, which the user talks to. The panel cannot be shrunk, so the fold the user sees — the panel
+collapsing into a mic that drops away — is `DetachVeil` playing for 560 ms before `closeSidePanel()`,
+and the page's orb rising once the page has widened. Firefox closes its sidebar only inside the
+click's gesture, so it skips the fold.
+
+| | |
+| --- | --- |
+| `src/lib/handsfree/events.ts` | The channel, `OrbView`, the orb's requests, the dictation reports, and the Lucide paths |
+| `src/lib/handsfree/host.ts` + `styles.ts` | `exposeHandsFree()` — the orb, its arc menu, caption, countdown ring and approval card, in a closed shadow root |
+| `src/lib/handsfree/geometry.ts` | Pure layout: which way the arc opens from the edges the orb is against, and which side a caption or card fits on |
+| `src/lib/bridge/hands-free.ts` | `serveHandsFree()` — when the microphone listens and for which tab, what every orb shows, and the orb's requests |
+| `src/extension/entrypoints/dictation/` | The offscreen page speech recognition runs in, Chromium only |
+
+**Speech needs a document, and the panel is gone.** The background has no DOM, and recognition in a
+content script would run on the page's origin — a prompt per site, and none at all where the page's
+`Permissions-Policy` forbids the microphone. So recognition runs in an **offscreen document**
+(`dictation.html`, reason `USER_MEDIA`) on the extension's own origin, which the `mic-permission`
+tab already granted. The document exists exactly while the orb should listen: creating it starts the
+mic, closing it stops it, so it needs no command channel of its own. It reports a `DictationPhase`
+and each interim and final transcript; the background keeps the phase in `browsentic/dictation` and
+relays transcripts to the one tab listening. The phase is only ever what the page itself reported —
+the background writes none ahead of it, so the orb never shows a microphone the page has not opened —
+except `failed` for a document that could not be created, which then waits for a press on the orb
+rather than being retried on every repaint. Only `network` is `no-service`; any other recognizer
+error is `failed`, a retry and no verdict on the browser.
+
+**Chrome runs one recognizer at a time**, and a second one aborts the first. That is why the panel
+and hands-free never overlap — the panel's `panelOpened` ends hands-free, starting hands-free sends
+every connected panel `close`, and the orb does not listen while any panel's run port is connected —
+and why an `aborted` the document did not ask for is read
+as another page taking the mic. The document then stops as `yielded` rather than restarting into a
+tug-of-war; a press on the orb takes the mic back.
+
+**Hands-free only exists where speech does.** `speech-support.ts` decides it in two layers.
+`speechCapable()` is what is knowable without listening: a Firefox build (no offscreen documents, no
+recognizer), no `offscreen` API, no recognizer constructor, or a brand known to ship the recognizer
+without a service behind it (`Brave`, which fails every attempt with `network`). What that lets
+through is settled by the service itself: the panel's dictation and the offscreen page record
+`browsentic/speechService` in `storage.local` — `works` on the first transcript, `missing` on a
+`network` failure, and `works` always wins, since a service that answered once is only out of reach.
+The panel hides the detach button and `/hands-free` behind `useHandsFreeSupported()`, which starts
+hidden so nothing flashes; `paint()` ends hands-free on the spot if it finds itself on anywhere
+unsupported, and a `missing` found mid-session raises a toast saying why the mic left. Note that
+Vitest serves `import.meta.env.FIREFOX` as the string `"false"`, which is truthy — the decision
+itself is the pure `capableOf()` so it can be tested at all.
+
+**The microphone listens for one tab**: the one in front of a focused window, whose conversation has
+no run and no approval waiting, while the link is up and the user has not muted it. Every other orb
+is painted `paused`. `paint()` computes each tab's `OrbView`, sends only the ones that changed since
+that tab was last told, and records which tabs answered — a tab with no orb is never aimed at. The
+tab in front is told afresh until it answers, and gets the content script injected if it has none,
+as every open tab does after the extension reloads. The tab the mic is aimed at is asked again once
+it finishes loading, so a navigation to a page the content script cannot run in lets go of the mic.
+Like the rail it is a cache the worker can lose: a revived worker repaints everything. Only the parts
+of `browsentic/tabSessions` an orb shows — which tabs, the run, the approval — and the daemon link's
+state trigger a repaint; a run rewrites the rest on every step.
+
+**The orb owns only what dies with the page**: what has been said since the last send, the countdown
+ring (`AUTO_SEND_MS`, the composer's 1.6 s), the A-Eye focus, the live-code toggle and the files
+attached since the last send. An instruction goes through the same `instruct` the panel's run port
+takes, via `runCommand()`, so it lands in the tab's own conversation and takes the fast path as a
+typed one would. A finished turn's last reply or error comes back as a `say` caption, through
+`onTurnSettled()`, which also fires for a turn that never reached the agent — answered on the fast
+path, refused as `SESSION_LIMIT` or `RUN_IN_PROGRESS`, or with no daemon attached — since no panel is
+there to show those. An attach answers only once the file belongs to the conversation, via
+`attachFile()`.
+
+**Hold to talk swaps the dictation page's mode, not the orb's.** `browsentic/pushToTalk` in
+`storage.local` is a preference, so it is remembered. With it on, the background opens
+`dictation.html?hold`, which holds no microphone until a `talk` command arrives — `talk: true`
+relayed only from the tab being listened for, `talk: false` from any, since the key can come up after
+the mic moved on — and on `talk: false` calls `stop()` rather than `abort()`,
+so Chrome finishes the words already spoken; anything still interim is reported as final, then the
+page says `held`. The orb sends on that `held`, or after 2.5 s, whichever comes first. A page left
+in the other mode is closed and opened afresh, which is how the toggle takes effect, and so is a hold
+page whenever the mic moves to another tab, so words held down in one never land in another. The
+page checks it is still wanted after the permission query, so a release during that query cannot
+leave a recognizer running, and an orb removed mid-hold releases the key on its way out.
+
+The key is `event.code === 'ControlLeft'` (`HOLD_KEY_CODE`) — a physical position, so layout-proof,
+present on every platform, and inert on its own everywhere. Because Control is a modifier, a hold
+engages only after 250 ms with nothing else pressed, and any other key, a pointer press, a wheel, a
+window blur or the tab hiding cancels it and discards what was heard. Only trusted events count: a
+page that synthesizes a keydown would otherwise be opening the user's microphone. The listeners are
+on the top page's window, since the content script runs in no other frame; an orb whose host the page
+removed tears its listeners down on the next event instead of answering beside its replacement.
+
+**Approvals are the orb's to show.** The view carries the waiting approval, the orb turns ember, and
+a press opens the same Allow / Deny / Always choice as the timeline, placed on whichever side of the
+orb it fits and pointing at it. It carries the agent's code whole, scrollable, never cut short,
+since Allow runs all of it. An approval in a tab nobody is looking at raises a toast on the page that
+is, or an OS notification when the browser is in the background — once, with the announced ids kept
+in `browsentic/approvalsAnnounced` so a revived worker does not raise them again.
+
+**A-Eye skips every overlay.** The rail, the toast and the orb carry `data-browsentic-overlay`
+(`src/lib/overlay.ts`). A closed shadow root retargets a hit to its host, so the lens sees the host
+element under the pointer; it draws no box there and a click there picks nothing, whether the pick
+is the user's or the agent's. An orb that starts a pick also hides until the pick is over.
+
+**So does the agent's pointer.** `elementAt()` in `pointer.ts` reads `elementsFromPoint()` past any
+overlay, so `assertUncovered` never blames the mic for covering a target and a drag never drops onto
+it. A real pointer still lands on whatever is on top, so `trusted-input.ts` marks every overlay host
+`inert` for the length of a trusted click or drag — `inert` reaches through the closed shadow root —
+and the gesture reaches the page beneath instead of pressing the mic's own stop.
+
+State: `browsentic/handsFree` in `storage.session` (on while present, with `muted` and `since`),
+`browsentic/dictation` and `browsentic/approvalsAnnounced` in `storage.session`, and in `storage.local` `browsentic/speechService`,
+`browsentic/pushToTalk` and `browsentic/orbPosition` — the orb's centre as viewport fractions, so one drag places it on every tab. Hands-free is session state
+on purpose: a restarted browser comes back with the panel, not a live microphone.
 
 ## Tab scoping
 

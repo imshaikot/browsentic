@@ -1,5 +1,6 @@
 import { exposeActions } from '@/lib/actions/host';
 import { exposeFrameProbe } from '@/lib/frames/host';
+import { exposeHandsFree } from '@/lib/handsfree/host';
 import { exposeIndicator } from '@/lib/indicator/host';
 import { exposeMonitor } from '@/lib/monitor/watch';
 import { exposeRail } from '@/lib/rail/host';
@@ -20,5 +21,6 @@ export default defineContentScript({
     exposeIndicator();
     exposeRail();
     exposeToast();
+    exposeHandsFree();
   },
 });

@@ -50,6 +50,9 @@ agent is told to ask in words instead, not to ask you to point again.
 - **One lens at a time.** Starting a new pick — from the button, or the agent asking — dismisses a
   lens already waiting, and whoever opened that one is told it was cancelled.
 - **Top frame only.** An element inside an iframe picks the iframe, not what is in it.
+- **Never Browsentic's own.** The [hands-free](hands-free.md) mic, the minimized rail and
+  Browsentic's cards are skipped: the lens draws nothing over them, and a click on one picks
+  nothing. A pick started from the hands-free mic's menu has the mic step aside until it is done.
 - **The element, not the page.** The photograph covers what you picked, with a sliver of margin.
   For the page around it, ask for a [screenshot](screenshots.md) as well.
 - **Long elements are cut.** Picking a whole article sends the first couple of thousand characters;

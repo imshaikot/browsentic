@@ -108,6 +108,10 @@ Voice input uses Chrome's built-in Web Speech API, which streams audio to Google
 No model is bundled and nothing is downloaded. If that is not acceptable, type instead — it is one
 file to replace the speech engine.
 
+[Hands-free](features/hands-free.md) listens the same way, and for as long as it is on and the
+browser is in front — not only while you are talking to it. Switch its **Hold to talk** on and it
+listens only while you hold the key.
+
 ## Recording and mapping limits
 
 **Recordings** run for at most 15 minutes, follow one tab, live in extension storage rather than on
