@@ -31,8 +31,8 @@ export function captionOf(markdown: string, max = MAX_SPOKEN_CHARS): string {
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/`([^`]*)`/g, '$1')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, '')
-    .replace(/(\*\*|__|\*|_|~~)(\S(?:.*?\S)?)\1/g, '$2')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d{1,2}[.)])\s+/gm, '')
+    .replace(/(?<![\w*~])(\*\*|__|\*|_|~~)(\S(?:.*?\S)?)\1(?![\w*~])/g, '$2')
     .replace(/\s+/g, ' ')
     .trim();
   if (plain.length <= max) return plain;
@@ -40,6 +40,13 @@ export function captionOf(markdown: string, max = MAX_SPOKEN_CHARS): string {
   const lastSpace = cut.lastIndexOf(' ');
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.–—-]+$/, '')}…`;
 }
+
+/** `page.clickElement` as a person would say it, mid-sentence: “click element”. */
+export const spoken = (action: string): string =>
+  action
+    .replace(/^page\./, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase();
 
 /** Long enough to read at an unhurried pace, never so long it lingers after the page moved on. */
 export const readingMs = (text: string): number => Math.min(16_000, Math.max(4_000, 2_500 + wordsOf(text).length * 300));
