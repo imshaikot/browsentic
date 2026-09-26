@@ -158,18 +158,12 @@ export default function App() {
   /**
    * A side panel cannot be shrunk, only closed, so detaching is a close dressed as a fold: the
    * panel collapses into a mic at its foot and drops away, and the page’s own mic rises from
-   * the bottom once the panel is gone. Firefox closes its sidebar only inside the click’s
-   * gesture, so it skips the fold and goes at once.
+   * the bottom once the panel is gone.
    */
   function detach() {
     if (detaching || !handsFree) return;
     setConnectionOpen(false);
     voice.setInput('');
-    if (import.meta.env.FIREFOX) {
-      void startHandsFree();
-      void closeSidePanel(windowId.current);
-      return;
-    }
     setDetaching(true);
     window.setTimeout(() => {
       void startHandsFree();
