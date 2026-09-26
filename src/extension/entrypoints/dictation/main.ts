@@ -48,8 +48,10 @@ async function granted(): Promise<boolean> {
   return false;
 }
 
+const due = (): boolean => wanted && !speech;
+
 async function listen(): Promise<void> {
-  if (speech || !wanted || !(await granted())) return;
+  if (!due() || !(await granted()) || !due()) return;
   const next = createRecognition();
   if (!next) {
     report({ op: 'phase', phase: 'no-service' });
@@ -68,7 +70,7 @@ async function listen(): Promise<void> {
   next.onerror = (event) => {
     if (event.error === 'no-speech') return;
     halted = true;
-    report({ op: 'phase', phase: PHASE_OF_ERROR[event.error] ?? 'no-service' });
+    report({ op: 'phase', phase: PHASE_OF_ERROR[event.error] ?? 'failed' });
   };
   next.onend = () => {
     speech = null;
@@ -85,7 +87,7 @@ async function listen(): Promise<void> {
     next.start();
   } catch {
     speech = null;
-    report({ op: 'phase', phase: 'no-service' });
+    report({ op: 'phase', phase: 'failed' });
   }
 }
 

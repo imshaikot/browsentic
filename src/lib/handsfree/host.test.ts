@@ -165,6 +165,15 @@ describe('the hands-free orb', () => {
     expect(requests('openPanel')).toHaveLength(1);
   });
 
+  it('says so when recognition stops, and a press tries again', async () => {
+    await show();
+    await show({ voice: 'failed' });
+    expect($('.wrap').dataset.tone).toBe('trouble');
+    expect(shown()).toBe('Speech recognition stopped — tap the mic to try again.');
+    press();
+    expect(requests('listen').at(-1)).toMatchObject({ on: true });
+  });
+
   it('turns ember for an approval and opens the request on a press, which a forged click cannot answer', async () => {
     await show();
     await show({
@@ -338,6 +347,15 @@ describe('the hands-free orb', () => {
       key('keydown', 'ControlLeft', {}, false);
       vi.advanceTimersByTime(500);
       expect(requests('talk')).toHaveLength(0);
+    });
+
+    it('lets go of the mic when the page takes the orb away mid-hold', async () => {
+      await show(held);
+      key('keydown', 'ControlLeft');
+      vi.advanceTimersByTime(250);
+      document.getElementById('browsentic-hands-free')?.remove();
+      key('keydown', 'ControlLeft', { repeat: true });
+      expect(requests('talk').at(-1)).toMatchObject({ on: false });
     });
 
     it('stays quiet where it is not the tab being listened for', async () => {

@@ -1,6 +1,7 @@
 import { browser, type Browser } from 'wxt/browser';
+import { injectContentScript } from '@/lib/actions/client';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
-import { replyOf } from '@/lib/handsfree/caption';
+import { replyOf, spoken } from '@/lib/handsfree/caption';
 import {
   DICTATION_CHANNEL,
   HANDS_FREE_CHANNEL,
@@ -20,28 +21,28 @@ import { pickFocusIn } from './aeye';
 import { putBytes } from './file-store';
 import { openMicPermissionPage } from './mic-permission';
 import { HANDS_FREE_KEY, endHandsFree, readHandsFree, writeHandsFree, type HandsFreeState } from './panel-view';
-import { onPanelPresence, onTurnSettled, runCommand } from './run-port';
+import { attachFile, closePanels, onPanelPresence, onTurnSettled, runCommand } from './run-port';
 import { openSidePanel } from './side-panel';
 import { TAB_SESSIONS_KEY, readTabSessions, type PendingApproval, type TabAnchor, type TabSession } from './tab-sessions';
 import { THEME_KEY, readTheme, type ThemeId } from './theme';
 import { SPEECH_SERVICE_KEY, handsFreeSupported, noteSpeechService } from './speech-support';
 import { showToast } from './toast';
-import type { DaemonState } from './socket';
+import { DAEMON_STATE_KEY, type DaemonState } from './socket';
 
 export const ORB_POSITION_KEY = 'browsentic/orbPosition';
 export const PUSH_TO_TALK_KEY = 'browsentic/pushToTalk';
 const DICTATION_KEY = 'browsentic/dictation';
-const DAEMON_KEY = 'browsentic/daemon';
+/** Approvals already announced elsewhere, kept where a revived worker still finds them. */
+const ANNOUNCED_KEY = 'browsentic/approvalsAnnounced';
 const DICTATION_PAGE = 'dictation.html';
 const HOLD_DICTATION_PAGE = `${DICTATION_PAGE}?hold`;
 const NOTIFICATION_PREFIX = 'browsentic-approval:';
+const NO_CONTENT_SCRIPT = 'Receiving end does not exist';
 const MAX_DETAIL_CHARS = 180;
-const MAX_CODE_CHARS = 4_000;
 
 /** What every tab was last told. A cache: a revived worker starts it empty and repaints. */
 const sent = new Map<number, string>();
 const orbTabs = new Set<number>();
-const announced = new Set<string>();
 let showing: boolean | null = null;
 let listeningTab: number | null = null;
 let panelOpen = false;
@@ -96,7 +97,7 @@ export function approvalOf(pending: PendingApproval): OrbApproval {
     return {
       ...base,
       purpose: typeof input.purpose === 'string' ? input.purpose : undefined,
-      code: input.code.slice(0, MAX_CODE_CHARS),
+      code: input.code,
     };
   }
   return { ...base, detail: flatten(pending.input) };
@@ -115,8 +116,19 @@ function flatten(input: unknown): string | undefined {
   return text.length > MAX_DETAIL_CHARS ? `${text.slice(0, MAX_DETAIL_CHARS - 1)}…` : text;
 }
 
-const linkOf = (daemon: DaemonState | null): OrbLink =>
+const linkOf = (daemon: DaemonState | null | undefined): OrbLink =>
   !daemon?.paired ? 'off' : daemon.connected ? 'live' : 'pending';
+
+/** The part of the tab sessions an orb shows. A run rewrites the rest — usage, title, transcript state — on every step. */
+const orbFacts = (sessions: unknown): string =>
+  JSON.stringify(
+    Object.values((sessions ?? {}) as Record<string, TabSession>).map((session) => [
+      session.tabIds,
+      session.currentTabId,
+      session.runId,
+      session.pendingApproval?.toolId,
+    ]),
+  );
 
 const sessionOn = (sessions: Record<string, TabSession>, tabId: number): TabSession | null =>
   Object.values(sessions).find((session) => session.tabIds.includes(tabId)) ?? null;
@@ -157,6 +169,8 @@ async function paint(): Promise<void> {
     !state.muted && link === 'live' && !panelOpen && !frontSession?.runId && !frontSession?.pendingApproval
       ? frontId
       : null;
+  /* The tab in front is told afresh until it shows an orb, and healed if the extension was reloaded under it. */
+  if (frontId != null && !orbTabs.has(frontId)) sent.delete(frontId);
 
   const world: OrbWorld = { theme, position, link, state, phase, pushToTalk, listeningTab: target };
   await Promise.all(
@@ -166,24 +180,33 @@ async function paint(): Promise<void> {
       const painted = JSON.stringify(view);
       if (sent.get(tab.id) === painted) return;
       sent.set(tab.id, painted);
-      if (await post(tab.id, { channel: HANDS_FREE_CHANNEL, op: 'show', view })) orbTabs.add(tab.id);
+      if (await post(tab.id, { channel: HANDS_FREE_CHANNEL, op: 'show', view }, tab.id === frontId)) orbTabs.add(tab.id);
       else orbTabs.delete(tab.id);
     }),
   );
 
   await aimMic(target != null && orbTabs.has(target) ? target : null, pushToTalk);
-  for (const session of Object.values(sessions)) {
-    const pending = session.pendingApproval;
-    if (!pending || announced.has(pending.toolId)) continue;
-    announced.add(pending.toolId);
-    if (session.currentTabId !== frontId) void askElsewhere(session, pending, frontId != null);
+  await announce(Object.values(sessions), frontId);
+}
+
+/** Each approval once: raised in a tab nobody is looking at, it is said where they are. */
+async function announce(sessions: TabSession[], frontId: number | null): Promise<void> {
+  const pending = sessions.flatMap((session) => (session.pendingApproval ? [{ session, ask: session.pendingApproval }] : []));
+  const stored = (await browser.storage.session.get(ANNOUNCED_KEY))[ANNOUNCED_KEY];
+  const told = new Set(Array.isArray(stored) ? (stored as string[]) : []);
+  const ids = pending.map(({ ask }) => ask.toolId);
+  if (ids.length !== told.size || ids.some((id) => !told.has(id))) {
+    await browser.storage.session.set({ [ANNOUNCED_KEY]: ids });
+  }
+  for (const { session, ask } of pending) {
+    if (!told.has(ask.toolId) && session.currentTabId !== frontId) void askElsewhere(session, ask, frontId != null);
   }
 }
 
 async function clearOrbs(): Promise<void> {
   await aimMic(null, false);
-  announced.clear();
   if (showing === false) return;
+  await browser.storage.session.remove(ANNOUNCED_KEY);
   const tabs = await browser.tabs.query({});
   await Promise.all(tabs.map((tab) => tab.id != null && !tab.discarded && post(tab.id, { channel: HANDS_FREE_CHANNEL, op: 'hide' })));
   sent.clear();
@@ -192,9 +215,11 @@ async function clearOrbs(): Promise<void> {
 }
 
 async function aimMic(tabId: number | null, hold: boolean): Promise<void> {
+  const moved = listeningTab !== tabId;
   listeningTab = tabId;
-  if (tabId == null) await closeDictation();
-  else await openDictation(hold);
+  /* A hold-to-talk page starts afresh for each tab, so words held down in one never land in another. */
+  if (tabId == null || (moved && hold)) await closeDictation();
+  if (tabId != null) await openDictation(hold);
 }
 
 async function dictationUrl(): Promise<URL | null> {
@@ -209,25 +234,30 @@ async function hasDictation(): Promise<boolean> {
   return (await dictationUrl()) !== null;
 }
 
-/** One page, in the mode asked for: a page left in the other mode is closed and opened afresh. */
+/**
+ * One page, in the mode asked for: a page left in the other mode is closed and opened afresh.
+ * Its phase is whatever the page itself last reported, so the orb never claims a microphone
+ * the page has not opened. A page that could not be created waits for a tap on the mic.
+ */
 async function openDictation(hold: boolean): Promise<void> {
-  if (import.meta.env.FIREFOX) return;
   const open = await dictationUrl();
-  if (open && open.searchParams.has('hold') === hold) return;
-  if (open) await closeDictation();
-  await browser.storage.session.set({ [DICTATION_KEY]: (hold ? 'held' : 'starting') satisfies DictationPhase });
+  if (open?.searchParams.has('hold') === hold) return;
+  if (!open && (await readPhase()) === 'failed') return;
+  await closeDictation();
   await browser.offscreen
     .createDocument({
       url: hold ? HOLD_DICTATION_PAGE : DICTATION_PAGE,
       reasons: [browser.offscreen.Reason.USER_MEDIA],
       justification: 'Hands-free mode listens for spoken instructions while the side panel is closed.',
     })
-    .catch((error) => console.warn('[browsentic] could not start dictation:', error));
+    .catch(async (error) => {
+      console.warn('[browsentic] could not start dictation:', error);
+      await browser.storage.session.set({ [DICTATION_KEY]: 'failed' satisfies DictationPhase });
+    });
 }
 
 async function closeDictation(): Promise<void> {
-  if (!(await hasDictation())) return;
-  await browser.offscreen.closeDocument().catch(() => undefined);
+  if (await hasDictation()) await browser.offscreen.closeDocument().catch(() => undefined);
   await browser.storage.session.remove(DICTATION_KEY);
 }
 
@@ -265,7 +295,7 @@ async function sayNoService(): Promise<void> {
 /** An approval raised in a tab nobody is looking at: a card on the page they are on, or the OS when the browser is behind. */
 async function askElsewhere(session: TabSession, pending: PendingApproval, browserInFront: boolean): Promise<void> {
   const title = 'Browsentic needs your OK';
-  const body = `${spoken(pending.action)}${pending.site ? ` on ${pending.site}` : ''} — open the tab and tap the mic.`;
+  const body = `The agent wants to ${spoken(pending.action)}${pending.site ? ` on ${pending.site}` : ''} — open the tab and tap the mic.`;
   const shown =
     browserInFront &&
     (await showToast({ toastId: `approval-${pending.toolId}`, tone: 'warn', title, body, tabId: session.currentTabId }));
@@ -279,14 +309,6 @@ async function askElsewhere(session: TabSession, pending: PendingApproval, brows
     })
     .catch(() => undefined);
 }
-
-/** `page.clickElement` as a person would say it: “Click element”. */
-export const spoken = (action: string): string =>
-  action
-    .replace(/^page\./, '')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .replace(/^./, (first) => first.toUpperCase());
 
 function largestIcon(): string {
   const icons = browser.runtime.getManifest().icons ?? {};
@@ -304,8 +326,8 @@ async function frontTab(): Promise<Browser.tabs.Tab | null> {
 }
 
 async function readDaemon(): Promise<DaemonState | null> {
-  const stored = await browser.storage.session.get(DAEMON_KEY);
-  return (stored[DAEMON_KEY] as DaemonState | undefined) ?? null;
+  const stored = await browser.storage.session.get(DAEMON_STATE_KEY);
+  return (stored[DAEMON_STATE_KEY] as DaemonState | undefined) ?? null;
 }
 
 async function readPhase(): Promise<DictationPhase | null> {
@@ -330,11 +352,14 @@ function asPosition(value: unknown): OrbPosition | null {
 
 /* Answered through sendResponse by the orb, for the reason the toast gives: on Chrome a
    returned promise is dropped, and the verdict is what says whether a tab has an orb. */
-async function post(tabId: number, command: OrbCommand): Promise<boolean> {
+async function post(tabId: number, command: OrbCommand, heal = false): Promise<boolean> {
+  const send = async () =>
+    ((await browser.tabs.sendMessage(tabId, command)) as { ok?: boolean } | undefined)?.ok === true;
   try {
-    return ((await browser.tabs.sendMessage(tabId, command)) as { ok?: boolean } | undefined)?.ok === true;
-  } catch {
-    return false;
+    return await send();
+  } catch (error) {
+    if (!heal || !String(error).includes(NO_CONTENT_SCRIPT) || !(await injectContentScript(tabId))) return false;
+    return send().catch(() => false);
   }
 }
 
@@ -366,8 +391,8 @@ async function attach(request: Extract<OrbRequest, { op: 'attach' }>, tab: TabAn
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
-  runCommand({ op: 'attach', file: { id, name, mime, size }, tab });
-  return { ok: true, fileId: id };
+  const attached = await attachFile({ id, name, mime, size }, tab);
+  return attached.ok ? { ok: true, fileId: id } : attached;
 }
 
 function answer(request: OrbRequest, tab: Browser.tabs.Tab & { id: number }, respond: (reply: unknown) => void): boolean {
@@ -418,7 +443,8 @@ function answer(request: OrbRequest, tab: Browser.tabs.Tab & { id: number }, res
       respond({ ok: true });
       return false;
     case 'talk':
-      if (tab.id === listeningTab) {
+      /* Letting go always reaches the page: the key can come up in a tab the mic has already left. */
+      if (!request.on || tab.id === listeningTab) {
         const command: DictationCommand = { channel: DICTATION_CHANNEL, op: 'talk', on: request.on === true };
         void browser.runtime.sendMessage(command).catch(() => undefined);
       }
@@ -460,14 +486,10 @@ export function serveHandsFree(): void {
     void syncHandsFree();
   });
 
-  onTurnSettled((sessionId, items) => {
+  onTurnSettled((tabId, items) => {
     const reply = replyOf(items);
     if (!reply) return;
-    void (async () => {
-      if (!(await readHandsFree())) return;
-      const session = (await readTabSessions())[sessionId];
-      if (session) await post(session.currentTabId, { channel: HANDS_FREE_CHANNEL, op: 'say', ...reply });
-    })();
+    void readHandsFree().then((state) => state && post(tabId, { channel: HANDS_FREE_CHANNEL, op: 'say', ...reply }));
   });
 
   browser.notifications?.onClicked.addListener((notificationId) => {
@@ -485,13 +507,26 @@ export function serveHandsFree(): void {
     sent.delete(tabId);
     orbTabs.delete(tabId);
   });
+  /* A page the content script cannot run in never asks for its orb, so the tab the mic is aimed
+     at is asked again once it has loaded, and the mic lets go of it if nothing answers. */
   browser.tabs.onUpdated.addListener((tabId, changed) => {
-    if (changed.status !== 'loading') return;
+    const leaving = changed.status === 'loading';
+    const landed = changed.status === 'complete' && tabId === listeningTab;
+    if (!leaving && !landed) return;
     sent.delete(tabId);
     orbTabs.delete(tabId);
+    if (landed) void syncHandsFree();
   });
   browser.storage.session.onChanged.addListener((changes) => {
-    if (HANDS_FREE_KEY in changes || DICTATION_KEY in changes || TAB_SESSIONS_KEY in changes || DAEMON_KEY in changes) {
+    const { [HANDS_FREE_KEY]: handsFree, [TAB_SESSIONS_KEY]: sessions, [DAEMON_STATE_KEY]: daemon } = changes;
+    /* The panel and the orb never share the microphone: opening a panel ends hands-free, and starting it closes every panel. */
+    if (handsFree?.newValue && !handsFree.oldValue) closePanels();
+    if (
+      handsFree ||
+      DICTATION_KEY in changes ||
+      (sessions && orbFacts(sessions.oldValue) !== orbFacts(sessions.newValue)) ||
+      (daemon && linkOf(daemon.oldValue as DaemonState | undefined) !== linkOf(daemon.newValue as DaemonState | undefined))
+    ) {
       void syncHandsFree();
     }
   });

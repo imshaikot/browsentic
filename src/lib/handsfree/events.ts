@@ -6,7 +6,11 @@ export const DICTATION_CHANNEL = 'browsentic/dictation';
 
 export const AUTO_SEND_MS = 1600;
 
-/** What the offscreen recognizer reports about itself. `held`: in hold-to-talk, ready and waiting for the key. */
+/**
+ * What the offscreen recognizer reports about itself. `held`: in hold-to-talk, ready and waiting
+ * for the key. `no-service` is only ever `network`, the one error that says the browser has no
+ * speech service; any other stop is `failed`, worth a retry and no verdict on the browser.
+ */
 export type DictationPhase =
   | 'starting'
   | 'listening'
@@ -15,6 +19,7 @@ export type DictationPhase =
   | 'blocked'
   | 'no-mic'
   | 'no-service'
+  | 'failed'
   | 'yielded';
 
 /**
@@ -107,6 +112,8 @@ const ORB_REQUESTS = new Set([
   'sync', 'submit', 'cancel', 'decide', 'openPanel', 'listen', 'grantMic', 'pick', 'attach', 'detach', 'move',
   'pushToTalk', 'talk',
 ]);
+const DICTATION_REPORTS = new Set(['phase', 'heard']);
+const DICTATION_COMMANDS = new Set(['talk']);
 
 function onChannel(message: unknown, channel: string, ops: Set<string>): boolean {
   if (typeof message !== 'object' || message === null) return false;
@@ -121,10 +128,10 @@ export const isOrbRequest = (message: unknown): message is OrbRequest =>
   onChannel(message, HANDS_FREE_CHANNEL, ORB_REQUESTS);
 
 export const isDictationReport = (message: unknown): message is DictationReport =>
-  onChannel(message, DICTATION_CHANNEL, new Set(['phase', 'heard']));
+  onChannel(message, DICTATION_CHANNEL, DICTATION_REPORTS);
 
 export const isDictationCommand = (message: unknown): message is DictationCommand =>
-  onChannel(message, DICTATION_CHANNEL, new Set(['talk']));
+  onChannel(message, DICTATION_CHANNEL, DICTATION_COMMANDS);
 
 /** Lucide paths, copied for the same reason as the rail's: the content script carries no icon package. */
 export const ORB_ICONS = {

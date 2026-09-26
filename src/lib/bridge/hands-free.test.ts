@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approvalOf, describeOrb, spoken, type OrbWorld } from './hands-free';
+import { approvalOf, describeOrb, type OrbWorld } from './hands-free';
 import type { TabSession } from './tab-sessions';
 
 const world: OrbWorld = {
@@ -62,15 +62,14 @@ describe('approvalOf', () => {
     expect(ask).toEqual({ toolId: 't', action: 'injectCode', site: undefined, purpose: 'Sum the column', code: 'let a = 1;' });
   });
 
+  it('never cuts the code short, since Allow runs every line of it', () => {
+    const code = `${'let a = 1;\n'.repeat(3_000)}exfiltrate();`;
+    expect(approvalOf({ toolId: 't', action: 'page.runCode', input: { code } }).code).toBe(code);
+  });
+
   it('flattens any other input to one short line', () => {
     const ask = approvalOf({ toolId: 't', action: 'page.fillInput', input: { selector: '#q', value: 'x'.repeat(400) } });
     expect(ask.detail?.length).toBeLessThanOrEqual(180);
     expect(ask.detail?.startsWith('selector: #q · value: xxx')).toBe(true);
-  });
-});
-
-describe('spoken', () => {
-  it('reads an action name the way a person would say it', () => {
-    expect(spoken('page.clickElement')).toBe('Click element');
   });
 });

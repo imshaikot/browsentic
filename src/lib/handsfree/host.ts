@@ -1,9 +1,9 @@
 import { browser } from 'wxt/browser';
-import type { FocusedElement } from '@/lib/actions/protocol';
+import { focusName, type FocusedElement } from '@/lib/actions/protocol';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { RAIL_PALETTES, RAIL_TONES } from '@/lib/rail/events';
-import { readingMs, sharedWords, wordsOf } from './caption';
+import { readingMs, sharedWords, spoken, wordsOf } from './caption';
 import {
   AUTO_SEND_MS,
   HANDS_FREE_CHANNEL,
@@ -84,6 +84,7 @@ const VOICE_HINTS: Partial<Record<OrbView['voice'], string>> = {
   blocked: 'The microphone is blocked for Browsentic — tap the mic to fix it.',
   'no-mic': 'No microphone was found — tap the mic to try again.',
   'no-service': 'No speech service answered — tap the mic to try again.',
+  failed: 'Speech recognition stopped — tap the mic to try again.',
   yielded: 'Another page took the microphone — tap the mic to listen here.',
 };
 
@@ -94,11 +95,6 @@ function icon(name: OrbIcon): string {
 function escape(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-
-const spoken = (action: string): string =>
-  action.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
-
-const focusName = (focus: FocusedElement): string => focus.label?.trim() || focus.role || focus.tag;
 
 const request = <T = unknown>(message: Unsent<OrbRequest>): Promise<T | undefined> =>
   browser.runtime.sendMessage({ channel: HANDS_FREE_CHANNEL, ...message }).catch(() => undefined) as Promise<T | undefined>;
@@ -966,6 +962,7 @@ function mountOrb(first: OrbView): Orb | null {
   }
 
   function remove(): void {
+    holdCancel();
     alive = false;
     for (const name of Object.keys(timers) as (keyof typeof timers)[]) stop(name);
     window.removeEventListener('resize', onResize);
