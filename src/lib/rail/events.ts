@@ -2,7 +2,7 @@ import type { ThemeId } from '@/lib/bridge/theme';
 
 export const RAIL_CHANNEL = 'browsentic/rail';
 
-export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings' | 'settings';
+export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings' | 'tasks' | 'settings';
 
 export type RailTone = 'off' | 'pending' | 'live' | 'busy' | 'listening' | 'warn';
 
@@ -77,6 +77,18 @@ export const RAIL_TABS: { id: PanelTab; label: string; paths: string[] }[] = [
       'M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z',
       'M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
       'm6.18 5.276 3.1 3.899',
+    ],
+  },
+  {
+    id: 'tasks',
+    label: 'Schedules',
+    paths: [
+      'M16 14v2.2l1.6 1',
+      'M16 2v4',
+      'M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5',
+      'M3 10h5',
+      'M8 2v4',
+      'M22 16a6 6 0 1 1-12 0 6 6 0 0 1 12 0',
     ],
   },
   {

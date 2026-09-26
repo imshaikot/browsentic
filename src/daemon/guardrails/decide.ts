@@ -71,3 +71,10 @@ export function blocked(decision: Decision): ActionResult {
 export function declined(): ActionResult {
   return failure('DECLINED', DECLINED_MESSAGE);
 }
+
+export function unanswered(): ActionResult {
+  return failure(
+    'APPROVAL_TIMEOUT',
+    'Nobody answered the approval in time, so it was not done. Do not retry it and do not try another way. Say what you were about to do and that it is waiting on the user, then stop.',
+  );
+}

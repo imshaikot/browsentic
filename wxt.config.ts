@@ -25,7 +25,7 @@ export default defineConfig({
     description: 'Reimagine browsing as agentic — driven by the AI agent you already run, in your own logged-in browser.',
     permissions: [
       'storage', 'unlimitedStorage', 'activeTab', 'contextMenus', 'alarms', 'scripting',
-      'notifications', 'downloads',
+      'notifications', 'downloads', 'nativeMessaging',
       // Firefox has no sidePanel, debugger or offscreen permission, and addons.mozilla.org flags each name it does not know.
       // offscreen is the hidden page hands-free mode listens through once the side panel is closed.
       ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen']),

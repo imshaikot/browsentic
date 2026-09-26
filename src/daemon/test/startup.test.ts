@@ -3,11 +3,12 @@ import { homedir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { DAEMON_PORTS } from '@/lib/actions/protocol';
 import { startDaemon, type Daemon } from '../daemon';
-import { readLockfile, stateDir } from '../lockfile';
+import { holdWake, readLockfile, stateDir, wakeHeld } from '../lockfile';
 
 describe('a daemon started in the sandbox', () => {
   let daemon: Daemon;
   beforeAll(async () => {
+    holdWake();
     daemon = await startDaemon({ version: '0.0.0-test', idleExit: false });
   });
   afterAll(async () => {
@@ -21,6 +22,10 @@ describe('a daemon started in the sandbox', () => {
   test('writes its lockfile inside the sandboxed home', () => {
     expect(stateDir.startsWith(homedir())).toBe(true);
     expect(readLockfile()).toMatchObject({ pid: process.pid, port: daemon.port, daemonVersion: '0.0.0-test' });
+  });
+
+  test('clears the mark a stop left, so the browser can wake a daemon again', () => {
+    expect(wakeHeld()).toBe(false);
   });
 
   test('answers /health on the port it recorded', async () => {
