@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   NATIVE_HOST_NAME,
+  STOPPED_REPLY,
+  answerNativeMessage,
   decodeNativeMessage,
   encodeNativeMessage,
   hostManifest,
@@ -82,6 +84,27 @@ describe('the message frame', () => {
     expect(frame.readUInt32LE(0)).toBe(frame.length - 4);
     expect(decodeNativeMessage(frame)).toEqual({ op: 'ensure' });
     expect(decodeNativeMessage(frame.subarray(0, frame.length - 1))).toBeUndefined();
+  });
+});
+
+describe('answering the browser', () => {
+  const ensure = vi.fn(async () => ({ port: 8765 }));
+
+  beforeEach(() => ensure.mockClear());
+
+  it('starts the daemon when asked', async () => {
+    expect(await answerNativeMessage({ op: 'ensure' }, ensure, () => false)).toEqual({ ok: true, port: 8765 });
+    expect(ensure).toHaveBeenCalledOnce();
+  });
+
+  it('leaves a daemon stopped on purpose down', async () => {
+    expect(await answerNativeMessage({ op: 'ensure' }, ensure, () => true)).toBe(STOPPED_REPLY);
+    expect(ensure).not.toHaveBeenCalled();
+  });
+
+  it('refuses anything but ensure', async () => {
+    expect(await answerNativeMessage({ op: 'spawn' }, ensure, () => false)).toMatchObject({ ok: false });
+    expect(ensure).not.toHaveBeenCalled();
   });
 });
 

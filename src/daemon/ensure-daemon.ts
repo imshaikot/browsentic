@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { clearLockfile, isRunning, readLockfile, type Lockfile } from './lockfile';
+import { clearLockfile, holdWake, isRunning, readLockfile, type Lockfile } from './lockfile';
 import { log } from './log';
 import { daemonPorts } from './ports';
 
@@ -81,6 +81,7 @@ export interface StopResult {
 
 /** SIGTERM every daemon, then SIGKILL whatever is still standing, and drop the lockfile. */
 export async function stopDaemons(graceMs = 5_000): Promise<StopResult> {
+  holdWake();
   const daemons = await runningDaemons();
   for (const { pid } of daemons) kill(pid, 'SIGTERM');
 

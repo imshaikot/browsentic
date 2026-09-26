@@ -262,15 +262,26 @@ function readNativeMessage(input: NodeJS.ReadableStream): Promise<unknown> {
   });
 }
 
-export async function serveNativeHost(ensure: () => Promise<{ port: number }>): Promise<void> {
+export const STOPPED_REPLY = { ok: false, error: 'Stopped with "browsentic stop"; "browsentic start" lets the browser start it again.' };
+
+export async function serveNativeHost(ensure: () => Promise<{ port: number }>, held: () => boolean): Promise<void> {
   const message = (await readNativeMessage(process.stdin)) as { op?: unknown } | null;
-  const reply =
-    message?.op === 'ensure'
-      ? await ensure()
-          .then((lock) => ({ ok: true, port: lock.port }))
-          .catch((error) => ({ ok: false, error: String(error) }))
-      : { ok: false, error: 'Expected {"op":"ensure"}.' };
-  log(`native host: ${reply.ok ? 'daemon ready' : `could not start the daemon — ${'error' in reply ? reply.error : ''}`}`);
+  const reply = await answerNativeMessage(message, ensure, held);
+  if (reply !== STOPPED_REPLY) {
+    log(`native host: ${reply.ok ? 'daemon ready' : `could not start the daemon — ${'error' in reply ? reply.error : ''}`}`);
+  }
   await new Promise<void>((resolve) => process.stdout.write(encodeNativeMessage(reply), () => resolve()));
+}
+
+export async function answerNativeMessage(
+  message: { op?: unknown } | null,
+  ensure: () => Promise<{ port: number }>,
+  held: () => boolean,
+): Promise<{ ok: boolean; port?: number; error?: string }> {
+  if (message?.op !== 'ensure') return { ok: false, error: 'Expected {"op":"ensure"}.' };
+  if (held()) return STOPPED_REPLY;
+  return ensure()
+    .then((lock) => ({ ok: true, port: lock.port }))
+    .catch((error) => ({ ok: false, error: String(error) }));
 }
 

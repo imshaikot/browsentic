@@ -245,7 +245,9 @@ on can answer, only with `isTrusted` clicks, and none in its first 800 ms.
 
 `nativeMessaging` is what lets a browser start a daemon that is down. When no port answers,
 `giveUp` calls `wakeDaemon`, which asks the browser to run the `com.browsentic.daemon` host that
-`browsentic setup` registered. That host runs `ensureDaemon` and exits.
+`browsentic setup` registered. That host runs `ensureDaemon` and exits. `browsentic stop` leaves
+`~/.browsentic/stopped` behind, and while it is there the host starts nothing; the next daemon to
+start, by any other path, removes it.
 
 ---
 

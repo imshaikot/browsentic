@@ -17,7 +17,7 @@ import { readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting, runningDaemons, stopDaemons } from './ensure-daemon';
 import { install, InstallError, readStamp } from './install';
-import { logPath, readLockfile } from './lockfile';
+import { logPath, readLockfile, wakeHeld } from './lockfile';
 import { log } from './log';
 import { installKind } from './npx';
 import { installNativeHost, registeredBrowsers, removeNativeHost, serveNativeHost } from './native-host';
@@ -100,7 +100,7 @@ switch (command) {
     await uninstall(process.argv.slice(3));
     break;
   case 'native-host':
-    await serveNativeHost(ensureDaemon);
+    await serveNativeHost(ensureDaemon, wakeHeld);
     break;
   case 'pair':
     await pair();
@@ -232,7 +232,13 @@ function printSkills(): void {
 async function showStatus(): Promise<void> {
   const lock = await probeExisting();
   const waking = registeredBrowsers();
-  const wake = `wake-up:   ${waking.length ? `${waking.join(', ')} can start the daemon` : 'not registered — run "browsentic setup"'}`;
+  const wake = `wake-up:   ${
+    !waking.length
+      ? 'not registered — run "browsentic setup"'
+      : wakeHeld()
+        ? `held since "browsentic stop" — "browsentic start" lets ${waking.join(', ')} start it again`
+        : `${waking.join(', ')} can start the daemon`
+  }`;
   if (!lock) {
     console.log('daemon:    not running');
     console.log(wake);
@@ -278,6 +284,7 @@ async function stop(): Promise<void> {
     console.error(`Daemon (pid ${daemon.pid}) on 127.0.0.1:${daemon.port} would not exit — kill it by hand.`);
   }
   if (!stopped.length && !stubborn.length) console.log('No daemon is answering; nothing to stop.');
+  console.log('A paired browser leaves it stopped until "browsentic start", or an MCP client, starts it again.');
   if (stubborn.length) process.exitCode = 1;
 }
 
@@ -326,14 +333,14 @@ async function pair(): Promise<void> {
  * A function declaration, not a const arrow: the switch at the top of this file invokes
  * commands before execution reaches the bottom, so anything they call has to be hoisted.
  */
+function groupCode(code: string): string {
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
 function wakeLine(browsers: string[]): string {
   return browsers.length
     ? `✓ Wake-up    ${browsers.join(', ')} can start the daemon when it is down`
     : '· Wake-up    no supported browser found, so start the daemon yourself after a reboot';
-}
-
-function groupCode(code: string): string {
-  return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
 /**
@@ -600,12 +607,13 @@ async function uninstall(argv: string[]): Promise<void> {
     }
   }
 
+  // Before the daemon goes, or a browser that sees it go could have the host start another.
+  const unregistered = removeNativeHost();
+  if (unregistered.length) console.log(`  ✓ Wake-up    unregistered from ${unregistered.length} place${unregistered.length === 1 ? '' : 's'}`);
+
   const { stopped, stubborn } = await stopDaemons();
   if (stopped.length) console.log(`  ✓ Daemon     stopped (pid ${stopped.map((daemon) => daemon.pid).join(', ')})`);
   for (const daemon of stubborn) console.log(`  ✗ Daemon     pid ${daemon.pid} would not exit — kill it by hand`);
-
-  const unregistered = removeNativeHost();
-  if (unregistered.length) console.log(`  ✓ Wake-up    unregistered from ${unregistered.length} place${unregistered.length === 1 ? '' : 's'}`);
 
   for (const outcome of removeAll(plan.removals)) {
     if (!outcome.removed) console.log(`  ✗ ${outcome.removal.path} — ${outcome.error}`);

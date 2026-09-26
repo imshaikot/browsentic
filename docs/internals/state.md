@@ -13,6 +13,7 @@ Nothing lives in the repository.
 ├── models.json    0600        each agent CLI's own model list, as last read
 ├── schedules.json 0600        scheduled tasks and the last twenty runs of each
 ├── native-host/               the helper a browser launches to start the daemon
+├── stopped                    only after `browsentic stop`: the helper leaves the daemon down
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
 ├── skills/                    hand-written skill overrides
 ├── cli/                       macOS app only: the command, the daemon, bundled skills, the extension payload
@@ -36,6 +37,7 @@ Nothing lives in the repository.
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
 | `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw. Each browser gets a manifest in its own `NativeMessagingHosts` folder (a registry key on Windows) naming the extension origins allowed to use it; pairing adds the new one. `browsentic uninstall` removes both |
+| `stopped` | `browsentic stop` and `restart` | While it exists the helper starts no daemon, so a paired browser cannot undo a stop. The next daemon to start removes it |
 | `cli/`, `bin/`, `runtime/` | [Browsentic.app](../guide/mac-app.md) | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 

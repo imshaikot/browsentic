@@ -116,7 +116,7 @@ reads, so the app and a terminal can never disagree about what is on disk.
 | Command | Does |
 | --- | --- |
 | `browsentic start` | Bring the background daemon up, if it is not already |
-| `browsentic stop` | Stop the background daemon, whichever of 8765–8767 is answering |
+| `browsentic stop` | Stop the background daemon, whichever of 8765–8767 is answering. A paired browser leaves it stopped until `browsentic start`, or an MCP client, starts it |
 | `browsentic restart` | Stop the daemon and bring up a fresh one |
 | `browsentic --version` / `-v` | Print the version |
 | `browsentic help` / `--help` / `-h` | Usage |

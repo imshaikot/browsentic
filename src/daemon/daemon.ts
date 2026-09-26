@@ -85,7 +85,7 @@ import {
   summary as summarizeDecision,
 } from './guardrails';
 import { log } from './log';
-import { readLockfile, writeLockfile, clearLockfile, type Lockfile } from './lockfile';
+import { readLockfile, writeLockfile, clearLockfile, releaseWake, type Lockfile } from './lockfile';
 import { daemonPorts } from './ports';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
@@ -227,6 +227,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const port = await listen(http);
   lock.port = port;
   writeLockfile(lock);
+  releaseWake();
   log(`daemon ${version} listening on 127.0.0.1:${port} (pid ${process.pid})`);
   scheduleIdleExit();
 

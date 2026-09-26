@@ -50,6 +50,9 @@ A run needs the browser open and the daemon up. The daemon starts itself when th
 `browsentic setup` registers a small helper that Chrome, Edge, Brave and Firefox can launch, and
 `browsentic status` says which browsers have it.
 
+After `browsentic stop` the browser leaves the daemon down until `browsentic start`, or an MCP
+client, brings it back.
+
 A run that falls due while the browser is closed or the computer is asleep is logged as **missed**. By
 default it then runs once when both are back; a task set to **Skip it** just waits for its next time.
 
