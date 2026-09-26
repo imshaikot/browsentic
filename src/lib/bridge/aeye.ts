@@ -17,8 +17,11 @@ interface PickedElement {
 export async function pickFocus(): Promise<PickOutcome> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (tab?.id == null) return { error: 'No active tab to point at' };
+  return pickFocusIn({ id: tab.id, windowId: tab.windowId });
+}
 
-  const result = await pickInTab({ id: tab.id, windowId: tab.windowId });
+export async function pickFocusIn(tab: { id: number; windowId?: number }): Promise<PickOutcome> {
+  const result = await pickInTab(tab);
   if (!result.ok) {
     return result.error.code === 'PICK_CANCELLED' ? { cancelled: true } : { error: result.error.message };
   }

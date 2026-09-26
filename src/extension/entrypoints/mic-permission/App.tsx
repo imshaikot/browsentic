@@ -11,7 +11,7 @@ const CLOSE_AFTER_MS = 1500;
 const COPY: Record<Phase, { title: string; body: string }> = {
   asking: {
     title: 'Allow the microphone',
-    body: 'Your browser is asking above. Choose Allow, and dictation works in the side panel and the popup from then on.',
+    body: 'Your browser is asking above. Choose Allow, and dictation works in the side panel, the popup and hands-free mode from then on.',
   },
   granted: {
     title: 'The microphone is on',
