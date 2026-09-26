@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, PanelRightClose, SquarePen } from 'lucide-react';
+import { ArrowDown, PanelRightClose, PictureInPicture2, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
-import { isRemoveToolsCommand } from '@/lib/bridge/commands';
+import { isHandsFreeCommand, isRemoveToolsCommand } from '@/lib/bridge/commands';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { Wordmark } from '@/extension/components/brand';
 import { Composer, type AttachedSkill } from '@/extension/components/composer';
 import { ConnectionSheet } from '@/extension/components/connection-sheet';
+import { DetachVeil } from '@/extension/components/detach-veil';
 import { DropMask } from '@/extension/components/drop-mask';
 import { Greeting } from '@/extension/components/greeting';
 import { MonitorBar } from '@/extension/components/monitor-bar';
@@ -34,6 +35,7 @@ import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
+import { startHandsFree } from '@/lib/bridge/panel-view';
 import { usePanelCollapsed, usePanelTab } from '@/lib/bridge/use-panel-view';
 import { useRun } from '@/lib/bridge/use-run';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
@@ -41,14 +43,21 @@ import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
 import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
 import { useStoredSkills } from '@/lib/bridge/use-stored-skills';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
-import { useVoiceEnabled } from '@/lib/bridge/use-speech';
+import { useHandsFreeSupported, useVoiceEnabled } from '@/lib/bridge/use-speech';
+import { cn } from '@/lib/utils';
 
 const PINNED_SLACK_PX = 56;
+
+/** Long enough to watch the panel fold into the mic; the panel then closes and the page’s own mic rises. */
+const DETACH_MS = 560;
+
+const DETACH_STUCK_MS = 1_500;
 
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
+  const handsFree = useHandsFreeSupported();
   const storedFiles = useStoredFiles();
   const sessions = useStoredSessions();
   const recordings = useStoredRecordings();
@@ -66,6 +75,7 @@ export default function App() {
   const viewport = useRef<HTMLDivElement>(null);
   const windowId = useRef<number | null>(null);
   const [pinned, setPinned] = useState(true);
+  const [detaching, setDetaching] = useState(false);
 
   const connected = daemon?.connected ?? false;
   const files = useMemo(
@@ -84,6 +94,10 @@ export default function App() {
   const voice = useVoiceComposer({
     active: voiceEnabled && connected && !run.running,
     onSubmit: (text) => {
+      if (handsFree && isHandsFreeCommand(text)) {
+        detach();
+        return;
+      }
       run.send(text, { agentSkillId: attachedSkill?.id, focus: focus ?? undefined, liveTools });
       setAttachedSkill(null);
       setFocus(null);
@@ -141,7 +155,34 @@ export default function App() {
     void closeSidePanel(windowId.current);
   }
 
+  /**
+   * A side panel cannot be shrunk, only closed, so detaching is a close dressed as a fold: the
+   * panel collapses into a mic at its foot and drops away, and the page’s own mic rises from
+   * the bottom once the panel is gone. Firefox closes its sidebar only inside the click’s
+   * gesture, so it skips the fold and goes at once.
+   */
+  function detach() {
+    if (detaching || !handsFree) return;
+    setConnectionOpen(false);
+    voice.setInput('');
+    if (import.meta.env.FIREFOX) {
+      void startHandsFree();
+      void closeSidePanel(windowId.current);
+      return;
+    }
+    setDetaching(true);
+    window.setTimeout(() => {
+      void startHandsFree();
+      void closeSidePanel(windowId.current);
+    }, DETACH_MS);
+    window.setTimeout(() => setDetaching(false), DETACH_MS + DETACH_STUCK_MS);
+  }
+
   function handleSend() {
+    if (handsFree && isHandsFreeCommand(voice.input)) {
+      detach();
+      return;
+    }
     if (run.running || !connected) return;
     open('chat');
     voice.submitNow();
@@ -220,7 +261,7 @@ export default function App() {
   const counts = { history: sessions.length, skills: skills.length, recordings: recordings.length };
 
   return (
-    <div className="relative flex h-screen flex-col">
+    <div className={cn('relative flex h-screen flex-col', detaching && 'detaching')}>
       <header className="flex shrink-0 items-center gap-2 px-3 py-2.5">
         <Wordmark className="flex-1" />
         <StatusPill
@@ -242,6 +283,17 @@ export default function App() {
         >
           <SquarePen className="size-3.5" />
         </Button>
+        {handsFree && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="Detach — go hands-free with a mic on the page"
+            aria-label="Detach into a hands-free mic on the page"
+            onClick={detach}
+          >
+            <PictureInPicture2 className="size-3.5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -367,7 +419,12 @@ export default function App() {
             liveTools={liveTools}
             onToggleLiveTools={() => setLiveTools((on) => !on)}
             onAttachSkill={setAttachedSkill}
+            handsFree={handsFree}
             onCommand={(command) => {
+              if (handsFree && isHandsFreeCommand(command)) {
+                detach();
+                return;
+              }
               if (isRemoveToolsCommand(command)) {
                 setShowTools(true);
                 return;
@@ -394,6 +451,7 @@ export default function App() {
       )}
 
       {dragging && <DropMask connected={connected} maxBytes={MAX_STORED_FILE_BYTES} />}
+      {detaching && <DetachVeil />}
     </div>
   );
 }

@@ -31,6 +31,7 @@ export function Composer({
   focus,
   picking,
   liveTools,
+  handsFree,
   onToggleLiveTools,
   onAttachSkill,
   onCommand,
@@ -58,6 +59,8 @@ export function Composer({
   focus: FocusedElement | null;
   picking: boolean;
   liveTools: boolean;
+  /** Whether `/hands-free` is offered — never where the browser cannot transcribe speech. */
+  handsFree: boolean;
   onToggleLiveTools: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onCommand: (command: string) => void;
@@ -80,8 +83,8 @@ export function Composer({
   const menuOpen = slash !== null && connected;
   const [highlight, setHighlight] = useState(0);
   const menuItems = useMemo(
-    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools) : []),
-    [menuOpen, catalog, tabUrl, slash, tools],
+    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools, { handsFree }) : []),
+    [menuOpen, catalog, tabUrl, slash, tools, handsFree],
   );
 
   useEffect(() => setHighlight(0), [slash]);
