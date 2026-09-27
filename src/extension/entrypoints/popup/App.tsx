@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mic, MicOff, PanelRightOpen, Send } from 'lucide-react';
+import { Mic, MicOff, PanelRightOpen, Send, SlidersHorizontal } from 'lucide-react';
 
 import { AgentPicker } from '@/extension/components/agent-picker';
 import { Wordmark } from '@/extension/components/brand';
@@ -83,6 +83,15 @@ export default function App() {
       <header className="flex items-center gap-2 px-4 py-3">
         <Wordmark className="flex-1" />
         <StatusPill tone={status.tone}>{status.label}</StatusPill>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="Settings"
+          aria-label="Open Browsentic settings in a tab"
+          onClick={() => void browser.runtime.openOptionsPage()}
+        >
+          <SlidersHorizontal className="size-3.5" />
+        </Button>
       </header>
 
       {paired && (

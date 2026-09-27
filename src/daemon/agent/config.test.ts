@@ -11,6 +11,7 @@ import {
   writeActiveAgent,
   writeAgentModel,
   writeGuardrailSetting,
+  writeTheme,
   type AgentConfig,
 } from './config';
 
@@ -170,6 +171,14 @@ describe('writing config.json', () => {
       writeGuardrailSetting('file-upload', null);
       expect([both, stored()]).toEqual([{ guardrails: { rules: { 'form-submission': 'allow', 'file-upload': 'deny' } } }, {}]);
     });
+  });
+
+  test('a theme is written as one key beside the rest, and read back only when it is one the extension has', () => {
+    store({ agent: 'codex' });
+    writeTheme('midnight');
+    const written = [stored(), readAgentConfig().theme];
+    store({ theme: 'solarized' });
+    expect([...written, readAgentConfig().theme]).toEqual([{ agent: 'codex', theme: 'midnight' }, 'midnight', undefined]);
   });
 
   test('where setup --dir put the extension is remembered, and forgotten when it goes back to the default', () => {

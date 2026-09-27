@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, PanelRightClose, PictureInPicture2, SquarePen } from 'lucide-react';
+import { ArrowDown, PanelRightClose, PictureInPicture2, SlidersHorizontal, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { invokeInActiveTab } from '@/lib/actions/client';
@@ -21,7 +21,6 @@ import { RunTimeline } from '@/extension/components/run-timeline';
 import { KeepToolPrompt, SavedToolList } from '@/extension/components/saved-tools';
 import { SessionList } from '@/extension/components/session-list';
 import { SessionRail } from '@/extension/components/session-rail';
-import { SettingsPanel } from '@/extension/components/settings-panel';
 import { SiteMapReview } from '@/extension/components/site-map-review';
 import { SkillsPanel } from '@/extension/components/skills-panel';
 import { TaskPanel } from '@/extension/components/task-panel';
@@ -315,6 +314,15 @@ export default function App() {
         <Button
           variant="ghost"
           size="icon-sm"
+          title="Settings"
+          aria-label="Open Browsentic settings in a tab"
+          onClick={() => void browser.runtime.openOptionsPage()}
+        >
+          <SlidersHorizontal className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           title="Minimize to a rail on the page"
           aria-label="Minimize to a rail on the page"
           onClick={minimize}
@@ -389,8 +397,6 @@ export default function App() {
             />
           ) : tab === 'skills' ? (
             <SkillsPanel tabUrl={tabUrl} connected={connected} onMapSite={mapSite} mapping={run.running} />
-          ) : tab === 'settings' ? (
-            <SettingsPanel />
           ) : tab === 'tasks' ? (
             <TaskPanel
               tasks={tasks}

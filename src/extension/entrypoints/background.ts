@@ -20,7 +20,9 @@ import { serveToast } from '@/lib/bridge/toast';
 import { serveHandsFree } from '@/lib/bridge/hands-free';
 import { endHandsFree } from '@/lib/bridge/panel-view';
 import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
+import { servePreferences } from '@/lib/bridge/preferences';
 import { isAgentKind } from '@/lib/agents/catalog';
+import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
   RECONNECT_ALARM,
   chooseAgent,
@@ -30,10 +32,10 @@ import {
   onWelcome,
   pairDaemon,
   readAgentState,
-  readGuardrails,
+  readPreferences,
   reportFocus,
   readSkillCatalog,
-  setGuardrail,
+  setPreference,
   setUpAgent,
   taskOp,
 } from '@/lib/bridge/socket';
@@ -127,14 +129,14 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
-    if (message.op === 'guardrails') {
-      readGuardrails()
+    if (message.op === 'preferences') {
+      readPreferences()
         .then(sendResponse)
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
-    if (message.op === 'setGuardrail' && typeof message.setting === 'string') {
-      setGuardrail(message.setting, message.value)
+    if (message.op === 'setPreference' && isPreferenceChange(message.change)) {
+      setPreference(message.change)
         .then(sendResponse)
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
@@ -180,7 +182,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"guardrails"|"setGuardrail"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"preferences"|"setPreference"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"}',
       ),
     );
     return;
@@ -233,6 +235,7 @@ export default defineBackground(() => {
   serveRail();
   serveToast();
   serveHandsFree();
+  servePreferences();
   void syncRail();
 
   onWelcome(() => {

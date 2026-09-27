@@ -1,4 +1,5 @@
-import { X } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
+import { browser } from 'wxt/browser';
 
 import { AgentPicker } from '@/extension/components/agent-picker';
 import { DaemonLink } from '@/extension/components/daemon-link';
@@ -17,6 +18,13 @@ export function ConnectionSheet({ onClose }: { onClose: () => void }) {
         <DaemonLink />
         <AgentPicker />
       </div>
+      <button
+        type="button"
+        onClick={() => void browser.runtime.openOptionsPage()}
+        className="mt-3 inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase transition-colors hover:text-brand"
+      >
+        <SlidersHorizontal className="size-3" /> All settings
+      </button>
     </div>
   );
 }

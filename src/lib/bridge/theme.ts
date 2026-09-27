@@ -1,15 +1,8 @@
 import { browser } from 'wxt/browser';
+import { asTheme, isThemeId, type ThemeId } from '@/lib/settings/theme';
 
-export type ThemeId = 'ember' | 'midnight' | 'phosphor' | 'daylight';
+export { THEMES, DEFAULT_THEME, asTheme, type ThemeId } from '@/lib/settings/theme';
 
-export const THEMES: { id: ThemeId; name: string; note: string }[] = [
-  { id: 'ember', name: 'Ember', note: 'Warm near-black, cyan brand.' },
-  { id: 'midnight', name: 'Midnight', note: 'Cool blue-black, violet brand.' },
-  { id: 'phosphor', name: 'Phosphor', note: 'A green CRT, grain turned up.' },
-  { id: 'daylight', name: 'Daylight', note: 'Ink on paper, for a bright room.' },
-];
-
-export const DEFAULT_THEME: ThemeId = 'ember';
 export const THEME_KEY = 'browsentic/theme';
 
 /* storage.local answers a tick after the page has already painted, which on a
@@ -18,12 +11,14 @@ export const THEME_KEY = 'browsentic/theme';
    and storage.local stays the truth that corrects it. */
 const PAINT_HINT = 'browsentic/theme.paint';
 
-export function asTheme(value: unknown): ThemeId {
-  return THEMES.some((theme) => theme.id === value) ? (value as ThemeId) : DEFAULT_THEME;
+export async function readTheme(): Promise<ThemeId> {
+  return asTheme(await readChosenTheme());
 }
 
-export async function readTheme(): Promise<ThemeId> {
-  return asTheme((await browser.storage.local.get(THEME_KEY))[THEME_KEY]);
+/** Null until someone picks one, so a first pairing can tell a choice from the default. */
+export async function readChosenTheme(): Promise<ThemeId | null> {
+  const stored = (await browser.storage.local.get(THEME_KEY))[THEME_KEY];
+  return isThemeId(stored) ? stored : null;
 }
 
 /* Clearing the inline colour hands the ground back to the stylesheet: index.html

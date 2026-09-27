@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, isModelId, type AgentKind } from '@/lib/agents/catalog';
 import { FENCE_SETTING, UNATTENDED_SETTING, type GuardrailValue, type RuleEffect } from '@/lib/settings/guardrails';
+import { isThemeId, type ThemeId } from '@/lib/settings/theme';
 import type { GuardrailConfig } from '../guardrails';
 import { stateDir } from '../lockfile';
 import { log } from '../log';
@@ -22,6 +23,8 @@ export interface AgentConfig {
   maxConcurrentRuns?: number;
   /** Overrides for the declared guardrail policy. See guardrails/policy.ts. */
   guardrails?: GuardrailConfig;
+  /** The look every paired browser takes. Absent until someone picks one. */
+  theme?: ThemeId;
   screenshotDir?: string;
   downloadDir?: string;
   /** Days a captured download is kept before the daemon sweeps it. Fractions allowed. Defaults to 14. */
@@ -118,6 +121,7 @@ export function readAgentConfig(): AgentConfig {
     requireApproval: Array.isArray(stored.requireApproval)
       ? (stored.requireApproval as string[])
       : DEFAULT_APPROVALS,
+    theme: isThemeId(stored.theme) ? stored.theme : undefined,
   };
 }
 
@@ -208,6 +212,11 @@ export function writeGuardrailSetting(setting: string, value: GuardrailValue): v
   if (Object.keys(guardrails).length) next.guardrails = guardrails;
   else delete next.guardrails;
   write(next);
+}
+
+/** Sets the look every paired browser takes, leaving every other key in config.json untouched. */
+export function writeTheme(theme: ThemeId): void {
+  write({ ...readStored(), theme });
 }
 
 function write(config: StoredConfig): void {

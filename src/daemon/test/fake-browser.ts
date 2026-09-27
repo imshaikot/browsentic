@@ -9,7 +9,9 @@ import {
   type ExtensionRequest,
   type SocketFrame,
 } from '@/lib/actions/protocol';
+import type { AgentState } from '@/lib/agents/catalog';
 import type { TaskList, TaskOrder } from '@/lib/schedules/task';
+import type { Preferences } from '@/lib/settings/preferences';
 import { describeActions, type BrowserTarget } from '@/lib/actions/registry';
 
 export interface Profile {
@@ -35,6 +37,10 @@ export class FakeBrowser {
   taskReply: ActionResult = { ok: true, data: { sessionId: 'fake-session' } };
   /** The task list the daemon last pushed or answered with. */
   tasks: TaskList | null = null;
+  /** The settings the daemon last pushed or answered with. */
+  preferences: Preferences | null = null;
+  /** The agent state the daemon last pushed or answered with. */
+  agent: AgentState | null = null;
   /** While set, every invoke is answered only once it resolves. */
   holdInvokes: Promise<void> | null = null;
   private readonly replies = new Map<string, (frame: SocketFrame) => void>();
@@ -122,6 +128,8 @@ export class FakeBrowser {
 
   private receive(frame: SocketFrame | null): void {
     if (frame?.t === 'taskList' && frame.result.ok) this.tasks = frame.result.data;
+    if (frame?.t === 'preferencesInfo' && frame.result.ok) this.preferences = frame.result.data;
+    if (frame?.t === 'agentInfo' && frame.result.ok) this.agent = frame.result.data;
     const waiting = frame && 'id' in frame ? this.replies.get(frame.id) : undefined;
     if (waiting && frame && 'id' in frame) {
       this.replies.delete(frame.id);
