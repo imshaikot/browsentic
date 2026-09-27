@@ -1,10 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { stateDir } from '../../lockfile';
 import { cursorRunner } from './cursor';
-import { jsonContext, readThrough, shown, streamContext, transcript, valueOf } from './fixtures/support';
+import { jsonContext, readThrough, shown, streamContext, stubCli, transcript, valueOf } from './fixtures/support';
 
 const settings = { bin: 'cursor-agent' };
 const stream = (overrides: Parameters<typeof streamContext>[1] = {}) => cursorRunner.stream(streamContext(settings, overrides));
@@ -338,12 +338,7 @@ describe('what a failed start is explained as', () => {
 });
 
 describe('whether it is signed in', () => {
-  const stubbed = (says: string) => {
-    const path = join(home, 'cursor-agent-stub');
-    writeFileSync(path, `#!/bin/sh\necho "${says}"\nexit 0\n`);
-    chmodSync(path, 0o755);
-    return path;
-  };
+  const stubbed = (says: string) => stubCli(join(home, 'cursor-agent-stub'), `console.log(${JSON.stringify(says)});`);
 
   test('a signed-out CLI needs setup, though it exits 0 saying so', async () => {
     expect(await cursorRunner.check?.({ bin: stubbed('Not logged in') })).toEqual({

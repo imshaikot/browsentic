@@ -1,10 +1,9 @@
-import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
-import { listing } from './fixtures/support';
+import { listing, stubCli } from './fixtures/support';
 import { RUNNERS } from './index';
 import { modelsFor, refreshModels } from './models';
 import type { Listing, Runner } from './types';
@@ -63,12 +62,12 @@ describe("each CLI's own list, as recorded", () => {
 });
 
 describe('reading and keeping a list', () => {
-  const stub = (name: string, body: string) => {
-    const path = join(bin, name);
-    writeFileSync(path, `#!/bin/sh\necho "${name} $*" >> "${calls}"\n${body}\n`);
-    chmodSync(path, 0o755);
-    return path;
-  };
+  const stub = (name: string, body: string) =>
+    stubCli(
+      join(bin, name),
+      `require('node:fs').appendFileSync(${JSON.stringify(calls)}, [${JSON.stringify(name)}, ...process.argv.slice(2)].join(' ') + '\\n');\n${body}`,
+    );
+  const out = (text: string) => `process.stdout.write(${JSON.stringify(text)});`;
   const spawned = () => (existsSync(calls) ? readFileSync(calls, 'utf8').split('\n').filter(Boolean) : []);
   const agy = RUNNERS.antigravity;
   const settings = (path: string) => ({ bin: path });
@@ -79,8 +78,11 @@ describe('reading and keeping a list', () => {
 
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
-    listed = stub('agy', `printf 'gemini-3.8-flash-high\\tFlash\\ngemini-3.1-pro-high\\tPro\\nother-model\\tOther\\n'`);
-    signedOut = stub('agy-signed-out', `echo 'Fetching available models...' >&2\necho 'Error: Please sign in to view available models.' >&2\nexit 1`);
+    listed = stub('agy', out('gemini-3.8-flash-high\tFlash\ngemini-3.1-pro-high\tPro\nother-model\tOther\n'));
+    signedOut = stub(
+      'agy-signed-out',
+      `console.error('Fetching available models...'); console.error('Error: Please sign in to view available models.'); process.exit(1);`,
+    );
   });
 
   beforeEach(() => {
@@ -148,8 +150,8 @@ describe('reading and keeping a list', () => {
   });
 
   test('an id a CLI could read as a flag, or one with spaces, is dropped; a list of nothing else is a failure', async () => {
-    const hostile = stub('agy-hostile', `printf -- '--yolo\\tYolo\\nrm -rf\\tRm\\n'`);
-    const mixed = stub('agy-mixed', `printf -- '--yolo\\tYolo\\ngemini-3.1-pro-high\\tPro\\n'`);
+    const hostile = stub('agy-hostile', out('--yolo\tYolo\nrm -rf\tRm\n'));
+    const mixed = stub('agy-mixed', out('--yolo\tYolo\ngemini-3.1-pro-high\tPro\n'));
     await refreshModels(agy, settings(hostile), '1');
     const hostileList = modelsFor('antigravity');
     await refreshModels(agy, settings(mixed), '2');
@@ -168,20 +170,28 @@ describe('reading and keeping a list', () => {
   });
 
   test('a CLI that floods its output is stopped at 512 KB', async () => {
-    const flood = stub('agy-flood', `yes 'gemini-3.8-flash-high\tFlash' | head -c 2000000`);
+    const flood = stub('agy-flood', out('gemini-3.8-flash-high\tFlash\n'.repeat(80_000)));
     await refreshModels(agy, settings(flood), '1.2.11');
     expect(modelsFor('antigravity')).toMatchObject({ from: 'catalog', error: '"agy-flood models" printed more than 512 KB.' });
   });
 
   test('a CLI that hangs is killed at ten seconds, with whatever it started', async () => {
-    const hung = stub('agy-hung', 'sleep 37.25 &\nwait');
+    const started = join(bin, 'agy-hung.child');
+    rmSync(started, { force: true });
+    const hung = stub(
+      'agy-hung',
+      `const child = require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 37_250)'], { stdio: 'ignore' });
+require('node:fs').writeFileSync(${JSON.stringify(started)}, String(child.pid));
+setTimeout(() => {}, 37_250);`,
+    );
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const reading = refreshModels(agy, settings(hung), '1.2.11');
-    await vi.waitUntil(() => spawned().length === 1, { interval: 10, timeout: 5_000 });
+    await vi.waitUntil(() => existsSync(started) && readFileSync(started, 'utf8') !== '', { interval: 10, timeout: 5_000 });
     vi.advanceTimersByTime(10_000);
     await reading;
     vi.useRealTimers();
-    await vi.waitUntil(() => !running('sleep 37.25'), { interval: 20, timeout: 2_000 });
+    const child = Number(readFileSync(started, 'utf8'));
+    await vi.waitUntil(() => !alive(child), { interval: 20, timeout: 2_000 });
     expect(modelsFor('antigravity').error).toBe('"agy-hung models" did not answer within 10 s.');
   });
 
@@ -219,9 +229,9 @@ describe('reading and keeping a list', () => {
   });
 });
 
-function running(pattern: string): boolean {
+function alive(pid: number): boolean {
   try {
-    execFileSync('pgrep', ['-f', pattern]);
+    process.kill(pid, 0);
     return true;
   } catch {
     return false;

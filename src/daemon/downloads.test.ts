@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, truncateSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, truncateSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { ActionResult } from '@/lib/actions/protocol';
@@ -14,6 +14,7 @@ import {
   type DownloadRecord,
 } from './downloads';
 import { stateDir } from './lockfile';
+import { bits, modeOf } from './test/modes';
 
 // The store's refusals are only worth anything if the refused file is gone afterwards, so these
 // run against the real filesystem inside the sandboxed home.
@@ -76,7 +77,7 @@ describe('what the store keeps', () => {
   });
 
   test('and written where only the user can read it', () => {
-    expect(statSync(kept.savedTo).mode & 0o777).toBe(0o600);
+    expect(modeOf(kept.savedTo)).toBe(bits(0o600));
   });
 
   test('with notes about its shape, not its contents', () => {

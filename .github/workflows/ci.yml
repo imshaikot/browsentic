@@ -46,6 +46,42 @@ jobs:
           node "$YARN" build
           node "$YARN" daemon:build
 
+  # The daemon on Windows, where an npm-installed agent is a .cmd shim, a path has backslashes, a
+  # kill takes nothing with it and a file has no POSIX mode. The extension's tests do not reach
+  # the platform, so only the daemon project runs here.
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Recorded CLI output is read line by line, and a checkout that turned LF into CRLF would
+      # hand every parser a stray carriage return.
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          test -f "$yarn_bin" || { echo "::error::no vendored Yarn at '$yarn_bin'"; exit 1; }
+          echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
+          node "$yarn_bin" install --immutable
+          node "$yarn_bin" --cwd src/daemon install --immutable
+
+      - name: Type-check and bundle the daemon
+        run: |
+          node "$YARN" daemon:compile
+          node "$YARN" daemon:build
+
+      - name: Test the daemon
+        run: node "$YARN" vitest run --project daemon
+
   mac:
     runs-on: macos-15
     steps:

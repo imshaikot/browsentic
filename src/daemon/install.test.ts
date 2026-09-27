@@ -1,9 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { install, InstallError, readStamp } from './install';
 import { stateDir } from './lockfile';
 import { extensionDir, installStampPath } from './paths';
+import { bits, modeOf } from './test/modes';
 
 // Only a built package or a source checkout carries the extension; the test builds a small one of its own.
 const packaged = vi.hoisted(() => ({ current: null as { dir: string; source: 'package' | 'repo' } | null }));
@@ -51,7 +52,7 @@ describe('installing the extension', () => {
 
   test('the files are readable by the browser', () => {
     install(target);
-    expect(statSync(join(target, 'background.js')).mode & 0o777).toBe(0o644);
+    expect(modeOf(join(target, 'background.js'))).toBe(bits(0o644));
   });
 
   test('the same version again copies nothing', () => {

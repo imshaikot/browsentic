@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { clearLockfile, isRunning, lockfilePath, readLockfile, stateDir, writeLockfile, type Lockfile } from './lockfile';
 import { extensionDir, installStampPath, userDir } from './paths';
+import { bits, modeOf } from './test/modes';
 
 const lock: Lockfile = { pid: process.pid, port: 49_152, token: 'secret-token', protocolVersion: 9, daemonVersion: '0.6.2' };
 
@@ -55,7 +56,7 @@ describe('the lockfile', () => {
 
   test('it holds the control token, so only the user can read it', () => {
     writeLockfile(lock);
-    expect(statSync(lockfilePath).mode & 0o777).toBe(0o600);
+    expect(modeOf(lockfilePath)).toBe(bits(0o600));
   });
 
   test('no lockfile means no daemon', () => {

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
@@ -13,6 +13,7 @@ import {
   writeGuardrailSetting,
   type AgentConfig,
 } from './config';
+import { bits, modeOf } from '../test/modes';
 
 const store = (value: unknown) => {
   mkdirSync(dirname(configPath), { recursive: true });
@@ -117,7 +118,7 @@ describe('writing config.json', () => {
 
   test('the file is written readable only by the user', () => {
     writeActiveAgent('codex');
-    expect(statSync(configPath).mode & 0o777).toBe(0o600);
+    expect(modeOf(configPath)).toBe(bits(0o600));
   });
 
   test("setting a model writes only that agent's model", () => {

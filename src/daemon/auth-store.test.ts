@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -16,6 +16,7 @@ import {
   type Install,
 } from './auth-store';
 import { stateDir } from './lockfile';
+import { bits, modeOf } from './test/modes';
 
 const authPath = join(stateDir, 'auth.json');
 const extension = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
@@ -126,7 +127,7 @@ describe('sessions', () => {
 describe('the file', () => {
   test('is readable only by the user', () => {
     createSession(chrome);
-    expect(statSync(authPath).mode & 0o777).toBe(0o600);
+    expect(modeOf(authPath)).toBe(bits(0o600));
   });
 
   test('a damaged file pairs nothing, and the next write replaces it', () => {

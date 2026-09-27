@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { skillNameForHost } from '@/lib/skills/format';
@@ -18,6 +18,7 @@ import {
 } from './site-map-store';
 import { loadSkills, uploadedSkillsDir } from './skills';
 import type { SiteIndex } from './sitemap';
+import { bits, modeOf } from '../test/modes';
 
 const skills = () => uploadedSkillsDir();
 const target = (url = 'https://www.example.com/pricing'): MapTarget => {
@@ -111,7 +112,7 @@ describe('what can be mapped', () => {
 describe('staging a map', () => {
   test('a staging area is made for the run, readable only by the user', () => {
     const staging = prepareStaging();
-    expect([staging.dir, staging.screenshots, staging.evidence, staging.pages].map((dir) => statSync(dir).mode & 0o777)).toEqual([0o700, 0o700, 0o700, 0o700]);
+    expect([staging.dir, staging.screenshots, staging.evidence, staging.pages].map(modeOf)).toEqual([0o700, 0o700, 0o700, 0o700].map(bits));
   });
 
   test('evidence with nothing in it is not written', () => {

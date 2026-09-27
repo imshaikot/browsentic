@@ -1,10 +1,11 @@
-import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { SocketFrame } from '@/lib/actions/protocol';
 import { readAgentConfig } from './config';
 import { FileAnalyses, analyzeFile, promptFor } from './file-analyst';
 import { RunError, runAgentJson, taskDir } from './runner';
+import { bits, modeOf } from '../test/modes';
 
 vi.mock('./runner', async (importOriginal) => ({ ...(await importOriginal<typeof import('./runner')>()), runAgentJson: vi.fn() }));
 
@@ -36,7 +37,7 @@ const REPORT = `=== REPORT ===\n${JSON.stringify({
 })}`;
 
 /** The path the agent was told to read, and what was in it at that moment. */
-let handed: { path: string; content: string; mode: number } | null;
+let handed: { path: string; content: string; mode: number | null } | null;
 
 beforeEach(() => {
   rmSync(taskDir(config), { recursive: true, force: true });
@@ -44,7 +45,7 @@ beforeEach(() => {
   agent.mockReset();
   agent.mockImplementation(async (prompt) => {
     const path = /The file is at (\S+)\. /.exec(prompt)?.[1] ?? '';
-    handed = { path, content: readFileSync(path, 'utf8'), mode: statSync(path).mode & 0o777 };
+    handed = { path, content: readFileSync(path, 'utf8'), mode: modeOf(path) };
     return REPORT;
   });
 });
@@ -63,7 +64,7 @@ describe('reading an attached file', () => {
 
   test("the file is put in the agent's own workspace for it to read, readable only by the user, and the agent may read", async () => {
     await analyze(csv);
-    expect([dirname(handed?.path ?? ''), handed?.content, handed?.mode, agent.mock.calls[0][3].reads]).toEqual([taskDir(config), csv, 0o600, true]);
+    expect([dirname(handed?.path ?? ''), handed?.content, handed?.mode, agent.mock.calls[0][3].reads]).toEqual([taskDir(config), csv, bits(0o600), true]);
   });
 
   test('the copy is deleted afterwards, whether or not the analyst managed', async () => {
