@@ -121,7 +121,8 @@ describe('purging npx caches', () => {
     expect([purged.removed, existsSync(dir)]).toEqual([true, false]);
   });
 
-  test('a cache that cannot be deleted is reported rather than stopping the uninstall', () => {
+  // A read-only folder stands in for a cache that cannot be deleted; Windows folders have no such mode.
+  test.skipIf(process.platform === 'win32')('a cache that cannot be deleted is reported rather than stopping the uninstall', () => {
     const root = join(homedir(), '.npm', '_npx');
     const dir = npxEntry(root, 'h8', '0.6.0');
     chmodSync(root, 0o555);

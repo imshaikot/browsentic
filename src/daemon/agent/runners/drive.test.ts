@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -10,7 +10,7 @@ import { configPath } from '../config';
 import { antigravityRunner } from './antigravity';
 import { codexRunner } from './codex';
 import { launch, runJson, runStream } from './drive';
-import { jsonContext, streamContext } from './fixtures/support';
+import { jsonContext, streamContext, stubCli } from './fixtures/support';
 import { RunError, type Plan, type Runner, type StreamReader, type StreamSink } from './types';
 import { bits, modeOf } from '../../test/modes';
 
@@ -153,12 +153,13 @@ describe('a streamed run', () => {
   });
 
   test('a failure the reader reports stops the agent, rather than leaving it running unwatched', async () => {
-    const stopped = join(stateDir, 'stopped-after-fail');
+    const pidFile = join(stateDir, 'stopped-after-fail');
+    rmSync(pidFile, { force: true });
     const script =
-      `process.on('SIGTERM', () => { require('node:fs').writeFileSync(${JSON.stringify(stopped)}, 'stopped'); process.exit(0); });` +
+      `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));` +
       `${printing(['fail', 'AGENT_UNSAFE', 'offered the shell'])} setInterval(() => {}, 1000);`;
     const refused = await failure(run(standIn(script)));
-    await vi.waitFor(() => expect(existsSync(stopped)).toBe(true));
+    await vi.waitFor(() => expect(alive(Number(readFileSync(pidFile, 'utf8')))).toBe(false));
     expect(refused).toEqual({ code: 'AGENT_UNSAFE', message: 'offered the shell' });
   });
 
@@ -201,13 +202,11 @@ describe('a streamed run', () => {
  * It notes each subcommand it was started with, then plays the part `behaviour` gives it.
  */
 function codexStandIn(name: string, behaviour: string): { bin: string; started: () => string[] } {
-  const bin = join(stateDir, `${name}.js`);
   const log = join(stateDir, `${name}.log`);
   rmSync(log, { force: true });
-  writeFileSync(
-    bin,
-    `#!${process.execPath}\nconst fs = require('node:fs');\nfs.appendFileSync(${JSON.stringify(log)}, process.argv[2] + '\\n');\n${behaviour}\n`,
-    { mode: 0o755 },
+  const bin = stubCli(
+    join(stateDir, name),
+    `const fs = require('node:fs');\nfs.appendFileSync(${JSON.stringify(log)}, process.argv[2] + '\\n');\n${behaviour}\n`,
   );
   return { bin, started: () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : []) };
 }
@@ -302,7 +301,8 @@ describe('what reaches the process', () => {
     expect(JSON.parse(answer)).toEqual({ present: ['GEMINI_API_KEY'], run: null });
   });
 
-  test('aborting asks the agent to stop, and only kills it once the grace period is over', async () => {
+  // Windows has no signal to ask with: a stop there ends the agent and what it started at once.
+  test.skipIf(process.platform === 'win32')('aborting asks the agent to stop, and only kills it once the grace period is over', async () => {
     const controller = new AbortController();
     const script = `process.on('SIGTERM', () => console.log('asked to stop')); console.log('ready'); setInterval(() => {}, 1000);`;
     const plan = { ...antigravityRunner.stream(streamContext(node, { runId: 'stubborn-run' })), args: ['-e', script] };
@@ -328,8 +328,8 @@ describe('what reaches the process', () => {
   test('a run whose signal already fired is stopped the moment it starts', async () => {
     const plan = { ...antigravityRunner.stream(streamContext(node, { runId: 'late-run' })), args: ['-e', 'setInterval(() => {}, 1000);'] };
     const { child } = launch('antigravity', 'run', node, plan, AbortSignal.abort());
-    const [, signal] = await once(child, 'exit');
-    expect(signal).toBe('SIGTERM');
+    const [code, signal] = await once(child, 'exit');
+    expect(signal ?? code).toBe(process.platform === 'win32' ? 1 : 'SIGTERM');
   });
 });
 
@@ -369,10 +369,10 @@ describe('a one-shot task', () => {
   });
 
   test('an answer the caller accepts ends the task there, and the agent is stopped rather than waited out', async () => {
-    const marker = join(stateDir, 'stopped-after-answering');
-    rmSync(marker, { force: true });
+    const pidFile = join(stateDir, 'stopped-after-answering');
+    rmSync(pidFile, { force: true });
     const lingering = standIn(
-      `process.on('SIGTERM', () => { require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'stopped'); process.exit(0); });` +
+      `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));` +
         `${printing({ result: { status: 'success', response: 'A pricing page.' } })} setInterval(() => {}, 1000);`,
     );
     const answer = await runJson(lingering, jsonContext(node), new AbortController().signal, {
@@ -380,7 +380,7 @@ describe('a one-shot task', () => {
       empty: 'The agent said nothing.',
       accept: (text) => text.endsWith('.'),
     });
-    await vi.waitFor(() => expect(existsSync(marker)).toBe(true));
+    await vi.waitFor(() => expect(alive(Number(readFileSync(pidFile, 'utf8')))).toBe(false));
     expect(answer).toBe('A pricing page.');
   });
 
@@ -403,4 +403,13 @@ function printed(stream: Readable, word: string): Promise<void> {
     };
     stream.on('data', listen);
   });
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }

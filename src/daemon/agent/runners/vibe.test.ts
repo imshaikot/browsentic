@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { stateDir } from '../../lockfile';
 import { jsonContext, shown, streamContext } from './fixtures/support';
@@ -85,11 +86,11 @@ describe('a streamed run', () => {
   });
 
   test('a run with no conversation keeps a folder of its own', () => {
-    expect(stream({ conversation: null }).cwd).toBe(`${stateDir}/agents/vibe/run/run-1`);
+    expect(stream({ conversation: null }).cwd).toBe(join(stateDir, 'agents', 'vibe', 'run', 'run-1'));
   });
 
   test('a conversation id is spelled so it stays one path segment', () => {
-    expect(stream({ conversation: '../../escape me' }).cwd).toBe(`${stateDir}/agents/vibe/run/______escape_me`);
+    expect(stream({ conversation: '../../escape me' }).cwd).toBe(join(stateDir, 'agents', 'vibe', 'run', '______escape_me'));
   });
 
   test('research adds the web tools to the allowlist, and nothing else is switched on', () => {
@@ -102,7 +103,7 @@ describe('a streamed run', () => {
 describe('a one-shot task', () => {
   test('a task reaches no browser and switches no tool on', () => {
     const plan = vibeRunner.json(jsonContext(settings));
-    expect(plan.cwd).toBe(`${stateDir}/agents/vibe/task`);
+    expect(plan.cwd).toBe(join(stateDir, 'agents', 'vibe', 'task'));
     expect(plan.args).toContain('re:^$');
     expect(fileIn(plan, '.vibe/config.toml')).not.toContain('mcp_servers');
   });

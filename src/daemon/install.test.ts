@@ -1,5 +1,5 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { install, InstallError, readStamp } from './install';
 import { stateDir } from './lockfile';
@@ -28,7 +28,7 @@ const release = (version: string, files: Record<string, string> = {}) => {
 const installed = () =>
   readdirSync(target, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => join(entry.parentPath, entry.name).slice(target.length + 1))
+    .map((entry) => join(entry.parentPath, entry.name).slice(target.length + 1).replaceAll(sep, '/'))
     .sort();
 
 beforeEach(() => {
@@ -82,7 +82,8 @@ describe('installing the extension', () => {
     expect(installed()).not.toContain('background.js.tmp-4242');
   });
 
-  test('a file the browser will not let go of is explained, with what to do', () => {
+  // A read-only folder stands in for a file the browser holds open; Windows folders have no such mode.
+  test.skipIf(process.platform === 'win32')('a file the browser will not let go of is explained, with what to do', () => {
     install(target);
     release('1.3.0', { 'background.js': 'bg v2' });
     chmodSync(target, 0o555);

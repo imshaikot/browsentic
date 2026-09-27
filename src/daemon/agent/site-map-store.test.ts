@@ -131,7 +131,7 @@ describe('staging a map', () => {
   test('the staged map is a machine-generated site skill that records what was seen', () => {
     vi.useFakeTimers({ now: new Date('2026-09-21T10:00:00Z'), toFake: ['Date'] });
     const { draft } = stage({ background: 'Founded in 2019.' });
-    expect(draft.markdown.replaceAll(skills(), '<skills>')).toMatchInlineSnapshot(`
+    expect(draft.markdown.replaceAll(join(skills(), 'example-com', 'screenshots'), '<skills>/example-com/screenshots')).toMatchInlineSnapshot(`
       "---
       name: example-com
       description: Machine-generated map of example.com — 2 pages, 2026-09-21.

@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { stateDir } from '../../lockfile';
+import { within } from '../../guardrails/spawn';
 import { grokRunner } from './grok';
 import { jsonContext, readThrough, shown, streamContext, transcript, valueOf } from './fixtures/support';
 
@@ -327,5 +328,5 @@ test("the user's own skills are listed from Grok's home, the shared agents folde
 });
 
 test('every directory a run or task uses is inside the state directory', () => {
-  expect([stream().cwd, task().cwd].every((cwd) => cwd.startsWith(`${stateDir}/`))).toBe(true);
+  expect([stream().cwd, task().cwd].every((cwd) => cwd !== stateDir && within(cwd, stateDir))).toBe(true);
 });

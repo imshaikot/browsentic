@@ -75,11 +75,11 @@ describe('a streamed run', () => {
   });
 
   test('a run with no conversation keeps a folder of its own', () => {
-    expect(stream({ conversation: null }).cwd).toBe(`${stateDir}/agents/antigravity/run/run-1`);
+    expect(stream({ conversation: null }).cwd).toBe(join(stateDir, 'agents', 'antigravity', 'run', 'run-1'));
   });
 
   test('a conversation id is spelled so it stays one path segment', () => {
-    expect(stream({ conversation: '../../escape me' }).cwd).toBe(`${stateDir}/agents/antigravity/run/______escape_me`);
+    expect(stream({ conversation: '../../escape me' }).cwd).toBe(join(stateDir, 'agents', 'antigravity', 'run', '______escape_me'));
   });
 
   // Antigravity takes no per-run tool list, so only the prompt keeps it off the web.
@@ -340,7 +340,7 @@ describe("the user's own skills", () => {
   test('are listed from each root in its skills index', () => {
     mkdirSync(dirname(index), { recursive: true });
     writeFileSync(index, '/work/team-skills\n\n  /Users/me/antigravity  \n');
-    expect(antigravityRunner.skillDirs?.()).toEqual(['/work/team-skills/skills', '/Users/me/antigravity/skills']);
+    expect(antigravityRunner.skillDirs?.()).toEqual([join('/work/team-skills', 'skills'), join('/Users/me/antigravity', 'skills')]);
   });
 
   test('are none when there is no index', () => {
