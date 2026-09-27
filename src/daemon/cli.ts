@@ -168,12 +168,17 @@ async function serve(): Promise<void> {
   await server.connect(new StdioServerTransport());
   log(`stdio MCP server attached to daemon on port ${lock.port}`);
 
-  const shutdown = async () => {
-    await bridge.close();
-    await server.close();
-    process.exit(0);
-  };
+  let stopping: Promise<void> | undefined;
+  const shutdown = () =>
+    (stopping ??= (async () => {
+      await bridge.close();
+      await server.close();
+      process.exit(0);
+    })());
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => void shutdown());
+  // A client that is gone closes stdin. On Windows that is often all it does, since a CLI ended there
+  // takes nothing with it, and a server that waited on would hold its socket to the daemon for good.
+  for (const event of ['end', 'close'] as const) process.stdin.once(event, () => void shutdown());
 }
 
 function printTools(): void {

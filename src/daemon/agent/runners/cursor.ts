@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +5,7 @@ import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import type { AgentSettings } from '../config';
 import { MCP_SERVER_NAME } from './claude';
+import { spawnCli, stopTree, type CliProcess } from './command';
 import { conversationDir, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, Listing, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
@@ -219,6 +219,12 @@ export const cursorRunner: Runner = {
  * the opposite case.
  */
 function signedIn(bin: string): Promise<boolean> {
+  let child: CliProcess;
+  try {
+    child = spawnCli(bin, ['status']);
+  } catch {
+    return Promise.resolve(true);
+  }
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
@@ -229,9 +235,8 @@ function signedIn(bin: string): Promise<boolean> {
       resolve(value);
     };
 
-    const child = spawn(bin, ['status'], { stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      stopTree(child, 'SIGKILL');
       done(true);
     }, STATUS_TIMEOUT_MS);
     timer.unref();

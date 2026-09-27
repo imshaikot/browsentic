@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { basename } from 'node:path';
 import type { AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../../lockfile';
 import type { AgentSettings } from '../../config';
@@ -7,6 +8,23 @@ import type { JsonContext, Listing, McpServer, Plan, Runner, StreamContext, Stre
 
 export type Signal = keyof StreamSink;
 export type Call = [Signal, ...unknown[]];
+
+/**
+ * A stand-in CLI at `path` that runs the Node `script` with whatever arguments it is started with.
+ * On Windows it is a batch shim of the shape npm writes, so a stub there is started the way an
+ * npm-installed CLI is; elsewhere it is a shell script that hands over to Node.
+ */
+export function stubCli(path: string, script: string): string {
+  const js = `${path}.js`;
+  writeFileSync(js, script);
+  if (process.platform === 'win32') {
+    writeFileSync(`${path}.cmd`, `@ECHO off\r\n"${process.execPath}"  "%~dp0\\${basename(js)}" %*\r\n`);
+  } else {
+    writeFileSync(path, `#!/bin/sh\nexec '${process.execPath}' '${js}' "$@"\n`);
+    chmodSync(path, 0o755);
+  }
+  return path;
+}
 
 export function transcript(agent: AgentKind, name: string): string[] {
   return readFileSync(new URL(`./${agent}/${name}`, import.meta.url), 'utf8')
@@ -83,8 +101,18 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
 /** A plan as a snapshot shows it: the sandbox's paths and any freshly minted id replaced by names. */
 export function shown(plan: Plan): Plan {
-  const text = JSON.stringify(plan).replaceAll(stateDir, '<state>').replaceAll(homedir(), '<home>').replace(UUID, '<uuid>');
+  // Each string is rewritten before it is escaped as JSON, where a Windows path's backslashes are doubled.
+  const text = JSON.stringify(plan, (key, value: unknown) =>
+    typeof value === 'string' ? portable(key, value.replaceAll(stateDir, '<state>').replaceAll(homedir(), '<home>')) : value,
+  ).replace(UUID, '<uuid>');
   return JSON.parse(text) as Plan;
+}
+
+/** A workspace file's path, and any path under a placeholder, read the same on every platform. */
+function portable(key: string, value: string): string {
+  if (process.platform !== 'win32') return value;
+  if (key === 'path') return value.replaceAll('\\', '/');
+  return value.replace(/<(state|home)>[^"\s]*/g, (path) => path.replaceAll('\\', '/'));
 }
 
 /** The value a flag takes, or undefined when the flag is absent. */

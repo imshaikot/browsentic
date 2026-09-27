@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
-import { browserToolsDidNotStart, effortOf, parseJsonLine } from './util';
+import { browserToolsDidNotStart, conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, Plan, Runner, StreamContext, StreamReader, StreamSink } from './types';
 
 export const MCP_SERVER_NAME = 'browsentic';
@@ -99,15 +99,22 @@ export const claudeRunner: Runner = {
 
   skillDirs: () => [join(homedir(), '.claude', 'skills')],
 
+  // The message goes in on stdin and the system prompt from a file of its own: argv is capped on
+  // Windows at a length a follow-up with site notes and file reports can pass, and anyone can read it.
   stream(context: StreamContext): Plan {
     const { settings, research } = context;
     const effort = effortOf(settings, this.efforts);
+    const cwd = this.workspace('run');
+    const prompts = join(stateDir, 'agents', 'claude', 'prompts');
+    sweepRunDirs(prompts);
+    const prompt = `${conversationDir(prompts, context.runId)}.md`;
     return {
-      cwd: this.workspace('run'),
+      cwd,
       env: { BROWSENTIC_AGENT_RUN: context.runId },
+      input: context.instruction,
+      files: [{ path: relative(cwd, prompt), content: context.systemPrompt }],
       args: [
         '-p',
-        context.instruction,
         '--output-format',
         'stream-json',
         '--include-partial-messages',
@@ -123,8 +130,8 @@ export const claudeRunner: Runner = {
         '--disallowedTools',
         ...BUILTIN_DENIED,
         ...(research ? [] : WEB_TOOLS),
-        '--append-system-prompt',
-        context.systemPrompt,
+        '--append-system-prompt-file',
+        prompt,
         ...(context.sessionId ? ['--resume', context.sessionId] : ['--session-id', randomUUID()]),
         ...(settings.model ? ['--model', settings.model] : []),
         ...(effort ? ['--effort', effort] : []),

@@ -1,10 +1,11 @@
-import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { configPath } from './agent/config';
 import { uploadedSkillsDir } from './agent/skills';
 import { saveScreenshot, screenshotDir } from './screenshots';
+import { bits, modeOf } from './test/modes';
 
 const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const png = `data:image/png;base64,${PNG_BYTES.toString('base64')}`;
@@ -32,8 +33,8 @@ describe('saving a screenshot', () => {
       dir: dirname(path),
       name: /^screenshot-20260921-140509-[0-9a-f]{6}\.png$/.test(basename(path)),
       bytes: readFileSync(path).equals(PNG_BYTES),
-      mode: statSync(path).mode & 0o777,
-    }).toEqual({ dir: defaultDir, name: true, bytes: true, mode: 0o600 });
+      mode: modeOf(path),
+    }).toEqual({ dir: defaultDir, name: true, bytes: true, mode: bits(0o600) });
   });
 
   test('the extension follows the image type', () => {

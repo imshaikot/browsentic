@@ -1,8 +1,9 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest';
+import { stubCli } from './agent/runners/fixtures/support';
 import { stateDir } from './lockfile';
 import type { InstallKind, NpxEntry } from './npx';
 
@@ -35,8 +36,11 @@ beforeAll(async () => {
 
   mkdirSync(bin, { recursive: true });
   for (const name of ['npm', 'npx', 'browsentic']) {
-    writeFileSync(join(bin, name), `#!/bin/sh\necho "${name} $*" >> "${ran}"\nexit "\${FAKE_${name.toUpperCase()}_EXIT:-0}"\n`);
-    chmodSync(join(bin, name), 0o755);
+    stubCli(
+      join(bin, name),
+      `require('node:fs').appendFileSync(${JSON.stringify(ran)}, [${JSON.stringify(name)}, ...process.argv.slice(2)].join(' ') + '\\n');
+process.exit(Number(process.env.FAKE_${name.toUpperCase()}_EXIT || 0));`,
+    );
   }
 });
 
@@ -168,7 +172,8 @@ describe('updating the command itself', () => {
     ]);
   });
 
-  test('a command that is not there at all is a failure with its name', async () => {
+  // Windows runs npm through cmd.exe, which answers a missing command with an exit code, not a spawn error.
+  test.skipIf(process.platform === 'win32')('a command that is not there at all is a failure with its name', async () => {
     vi.stubEnv('PATH', join(stateDir, 'empty-bin'));
     expect([await selfUpdate.upgradeCli('0.6.2', ['update']), stderr().includes('Could not run `npm`')]).toEqual([1, true]);
   });

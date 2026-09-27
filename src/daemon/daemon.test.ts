@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
@@ -6,6 +6,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { configPath } from './agent/config';
 import { uploadedSkillsDir } from './agent/skills';
 import { persistScreenshot } from './daemon';
+import { bits, modeOf } from './test/modes';
 
 // Everything else in daemon.ts needs a running daemon with a browser attached, which is the integration suite's job.
 
@@ -28,7 +29,7 @@ describe('keeping a screenshot', () => {
 
   test('save: true writes it, at mode 0600, and says where', () => {
     const kept = data(persistScreenshot('page.screenshot', { save: true, filename: 'pricing' }, capture));
-    expect([kept.savedTo, statSync(String(kept.savedTo)).mode & 0o777, kept.width]).toEqual([join(screenshotDir, 'pricing.png'), 0o600, 1280]);
+    expect([kept.savedTo, modeOf(String(kept.savedTo)), kept.width]).toEqual([join(screenshotDir, 'pricing.png'), bits(0o600), 1280]);
   });
 
   test('only a real true asks for a save, since the content script applies the default and the daemon never sees it', () => {

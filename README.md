@@ -46,7 +46,7 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
 
 ## Quick Start
 
-**Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
+**Any platform** — with [Node.js](https://nodejs.org) 20 or newer (Windows is [experimental](docs/guide/limits.md#windows-is-experimental)):
 
 ```sh
 npx browsentic setup

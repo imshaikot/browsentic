@@ -24,6 +24,8 @@ export interface Plan {
   cwd: string;
   env?: Record<string, string>;
   files?: WorkspaceFile[];
+  /** Written to the CLI's stdin, which is then closed: what is too long, or too page-made, for argv. */
+  input?: string;
 }
 
 export interface StreamContext {

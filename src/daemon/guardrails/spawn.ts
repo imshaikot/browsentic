@@ -26,6 +26,7 @@
  * assumed away.
  */
 
+import { posix, win32 } from 'node:path';
 import { AGENTS, isModelId, type AgentKind } from '@/lib/agents/catalog';
 
 /**
@@ -561,7 +562,11 @@ function variadic(args: readonly string[], flag: string): string[] {
   return values;
 }
 
-function within(child: string, parent: string): boolean {
-  const base = parent.endsWith('/') ? parent : `${parent}/`;
-  return child === parent || child.startsWith(base);
+/**
+ * Whether `child` is `parent` or lies under it, by the platform's own path rules: Windows spells a
+ * path with backslashes and compares it case-blind, and a `..` climbs out whatever the prefix says.
+ */
+export function within(child: string, parent: string, path: typeof posix = process.platform === 'win32' ? win32 : posix): boolean {
+  const rel = path.relative(parent, child);
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
 }

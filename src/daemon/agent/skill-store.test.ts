@@ -1,10 +1,11 @@
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { SkillDraft } from '@/lib/skills/format';
 import { stateDir } from '../lockfile';
 import { deleteSiteMap, deleteSkill, saveSkill } from './skill-store';
 import { loadSkills, uploadedSkillsDir } from './skills';
+import { bits, modeOf } from '../test/modes';
 
 const draft = (overrides: Partial<SkillDraft> = {}): SkillDraft => ({
   name: 'expense-reports',
@@ -30,9 +31,9 @@ describe('saving a skill from the panel', () => {
     const path = join(uploaded(), 'expense-reports.md');
     expect({
       saved,
-      mode: statSync(path).mode & 0o777,
+      mode: modeOf(path),
       loaded: loadSkills().find((skill) => skill.name === 'expense-reports')?.source,
-    }).toEqual({ saved: { ok: true, data: { name: 'expense-reports', path, replaced: false } }, mode: 0o600, loaded: 'uploaded' });
+    }).toEqual({ saved: { ok: true, data: { name: 'expense-reports', path, replaced: false } }, mode: bits(0o600), loaded: 'uploaded' });
   });
 
   test('it is written as front matter and the body', () => {

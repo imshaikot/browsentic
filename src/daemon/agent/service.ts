@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { basename } from 'node:path';
 import {
   failure,
   success,
@@ -707,7 +708,7 @@ function summarize(input: unknown, result: ActionResult): string {
 
   const shot = result.data as { dataUrl?: unknown; width?: unknown; height?: unknown; savedTo?: unknown } | null;
   if (shot && typeof shot.dataUrl === 'string') {
-    const saved = typeof shot.savedTo === 'string' ? ` → ${shot.savedTo.split('/').pop()}` : '';
+    const saved = typeof shot.savedTo === 'string' ? ` → ${basename(shot.savedTo)}` : '';
     return clip(`image ${shot.width ?? '?'}×${shot.height ?? '?'}${saved}`);
   }
 

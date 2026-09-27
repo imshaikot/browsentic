@@ -1,8 +1,9 @@
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { stateDir } from '../lockfile';
 import { forgetGrants, isGranted, listGrants, rememberGrant } from './approvals';
+import { bits, modeOf } from '../test/modes';
 
 const approvalsPath = join(stateDir, 'approvals.json');
 const at = '2026-09-21T10:00:00.000Z';
@@ -43,7 +44,7 @@ describe('standing approvals', () => {
 
   test('the file is readable only by the user', () => {
     rememberGrant('page.submitForm', 'example.com', at);
-    expect(statSync(approvalsPath).mode & 0o777).toBe(0o600);
+    expect(modeOf(approvalsPath)).toBe(bits(0o600));
   });
 });
 

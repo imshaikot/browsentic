@@ -10,7 +10,7 @@ import { NATIVE_HOST_NAME } from '@/lib/actions/protocol';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { listSessions } from './auth-store';
 import { readAgentConfig } from './agent/config';
 import { stateDir } from './lockfile';
@@ -63,12 +63,12 @@ const WINDOWS_BROWSERS: [string, Family, string][] = [
 
 export function hostTargets(platform: NodeJS.Platform = process.platform, home = homedir()): HostTarget[] {
   if (platform === 'darwin') {
-    const support = join(home, 'Library', 'Application Support');
+    const support = posix.join(home, 'Library', 'Application Support');
     return MAC_BROWSERS.map(([browser, family, dir]) => ({
       browser,
       family,
-      home: join(support, dir),
-      manifestDir: join(support, dir, 'NativeMessagingHosts'),
+      home: posix.join(support, dir),
+      manifestDir: posix.join(support, dir, 'NativeMessagingHosts'),
     }));
   }
   if (platform === 'win32') {
@@ -82,8 +82,8 @@ export function hostTargets(platform: NodeJS.Platform = process.platform, home =
   return LINUX_BROWSERS.map(([browser, family, dir, manifests]) => ({
     browser,
     family,
-    home: join(home, dir),
-    manifestDir: join(home, manifests),
+    home: posix.join(home, dir),
+    manifestDir: posix.join(home, manifests),
   }));
 }
 

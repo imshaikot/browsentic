@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -9,17 +8,19 @@ import {
   type AgentState,
   type RunnerStatus,
 } from '@/lib/agents/catalog';
-import { activeAgent, type AgentConfig, type AgentSettings } from '../config';
+import { activeAgent, configPath, type AgentConfig, type AgentSettings } from '../config';
 import { log } from '../../log';
 import { antigravityRunner } from './antigravity';
 import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
+import { spawnCli, stopTree, type CliProcess } from './command';
 import { cursorRunner } from './cursor';
 import { grokRunner } from './grok';
 import { modelsFor, refreshModels } from './models';
 import { opencodeRunner } from './opencode';
 import { qwenRunner } from './qwen';
 import type { McpServer, Runner } from './types';
+import { installHint } from './util';
 import { vibeRunner } from './vibe';
 
 export const RUNNERS: Record<AgentKind, Runner> = {
@@ -117,7 +118,20 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
       problem: {
         code: 'AGENT_MISSING',
         message: `${agent.label} is not installed, or "${settings.bin}" is not on the daemon's PATH.`,
-        fix: agent.install,
+        fix: installHint(runner.kind),
+      },
+    };
+  }
+  if (found.code === 'AGENT_UNUSABLE') {
+    return {
+      kind: runner.kind,
+      bin: settings.bin,
+      model: settings.model,
+      ready: false,
+      problem: {
+        code: 'AGENT_UNUSABLE',
+        message: found.detail ?? `"${settings.bin}" could not be started.`,
+        fix: `{"agents":{"${runner.kind}":{"bin":"<the program itself>"}}} in ${configPath}`,
       },
     };
   }
@@ -130,7 +144,7 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
       problem: {
         code: 'AGENT_UNUSABLE',
         message: `"${settings.bin} ${runner.versionArgs.join(' ')}" failed${found.detail ? `: ${found.detail}` : ''}.`,
-        fix: agent.install,
+        fix: installHint(runner.kind),
       },
     };
   }
@@ -147,20 +161,32 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
   };
 }
 
-function version(bin: string, args: string[]): Promise<{ ok: boolean; code?: string; detail?: string }> {
+interface Found {
+  ok: boolean;
+  code?: string;
+  detail?: string;
+}
+
+function version(bin: string, args: string[]): Promise<Found> {
+  let child: CliProcess;
+  try {
+    child = spawnCli(bin, args);
+  } catch (error) {
+    // One agent that cannot be started must not take the others' answers down with it.
+    return Promise.resolve({ ok: false, code: (error as { code?: string }).code, detail: (error as Error).message });
+  }
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
-    const done = (result: { ok: boolean; code?: string; detail?: string }) => {
+    const done = (result: Found) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       resolve(result);
     };
 
-    const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => {
-      child.kill('SIGKILL');
+      stopTree(child, 'SIGKILL');
       done({ ok: false, detail: 'timed out' });
     }, PROBE_TIMEOUT_MS);
     timer.unref();

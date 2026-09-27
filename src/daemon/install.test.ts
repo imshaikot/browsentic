@@ -1,9 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { install, InstallError, readStamp } from './install';
 import { stateDir } from './lockfile';
 import { extensionDir, installStampPath } from './paths';
+import { bits, modeOf } from './test/modes';
 
 // Only a built package or a source checkout carries the extension; the test builds a small one of its own.
 const packaged = vi.hoisted(() => ({ current: null as { dir: string; source: 'package' | 'repo' } | null }));
@@ -27,7 +28,7 @@ const release = (version: string, files: Record<string, string> = {}) => {
 const installed = () =>
   readdirSync(target, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => join(entry.parentPath, entry.name).slice(target.length + 1))
+    .map((entry) => join(entry.parentPath, entry.name).slice(target.length + 1).replaceAll(sep, '/'))
     .sort();
 
 beforeEach(() => {
@@ -51,7 +52,7 @@ describe('installing the extension', () => {
 
   test('the files are readable by the browser', () => {
     install(target);
-    expect(statSync(join(target, 'background.js')).mode & 0o777).toBe(0o644);
+    expect(modeOf(join(target, 'background.js'))).toBe(bits(0o644));
   });
 
   test('the same version again copies nothing', () => {
@@ -81,7 +82,8 @@ describe('installing the extension', () => {
     expect(installed()).not.toContain('background.js.tmp-4242');
   });
 
-  test('a file the browser will not let go of is explained, with what to do', () => {
+  // A read-only folder stands in for a file the browser holds open; Windows folders have no such mode.
+  test.skipIf(process.platform === 'win32')('a file the browser will not let go of is explained, with what to do', () => {
     install(target);
     release('1.3.0', { 'background.js': 'bg v2' });
     chmodSync(target, 0o555);

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,6 +18,7 @@ import {
   unpackedExtensionOrigin,
 } from './native-host';
 import { extensionDir } from './paths';
+import { bits, modeOf } from './test/modes';
 
 describe('unpackedExtensionOrigin', () => {
   it('names the folder the way Chrome does', () => {
@@ -122,7 +123,7 @@ describe('registering the host', () => {
     const installed = installNativeHost('/opt/browsentic/dist/cli.js', 'linux');
 
     expect(installed.browsers).toEqual(['Chrome']);
-    expect(statSync(installed.launcher).mode & 0o777).toBe(0o755);
+    expect(modeOf(installed.launcher)).toBe(bits(0o755));
     expect(JSON.parse(readFileSync(manifest, 'utf8'))).toMatchObject({
       path: installed.launcher,
       allowed_origins: [unpackedExtensionOrigin(extensionDir())],

@@ -333,7 +333,9 @@ and no argument matching `FORBIDDEN` — `--dangerously*`, `--yolo`, `--always-a
 `sandbox_mode=` or `approval_policy=` override that is not `"read-only"` / `"never"`,
 `--permission-mode=bypassPermissions`, and friends. Every pattern is
 checked against every runner, not just the one that owns the flag: the cost is nothing and it covers
-the runner nobody has written yet.
+the runner nobody has written yet. Last, the working directory has to lie inside `~/.browsentic`, by
+the platform's own path rules — Windows spells a path with backslashes and compares it case-blind,
+and a `..` climbs out whatever the prefix says.
 
 `NEVER = ['Bash', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep', 'Task']` — local tools no run may
 have, whatever else it is allowed.
@@ -354,6 +356,12 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Qwen Code** | `allowlist` | `--allowed-tools mcp__browsentic` is what a run may call without being asked, and a headless turn refuses everything it would otherwise have prompted for. `--safe-mode` is what makes the rest hold: it drops the user's hooks, extensions, bundled skills, `settings.json` MCP servers, `.mcp.json` and permission rules, while keeping `--mcp-config` — an explicit per-invocation argument rather than ambient state. Its cost is that it also **silently ignores `--core-tools`**, the fail-closed allowlist over Qwen's twenty-one core tools, so the built-ins are closed with `--exclude-tools` deny rules instead. A deny list cannot be fail-closed, so the `init` line is read back: it names every tool and MCP server that actually registered, and the reader ends the run with `AGENT_UNSAFE` on anything Browsentic did not ask for, before the model has spoken |
 | **Cursor CLI** | `allowlist` | Deny rules in a project `.cursor/cli.json`, where **a deny beats every allow** — including the user's own. Measured against 2026.09.18: a headless run asked to `echo` a marker got `permissionDenied`, twice, and gave up. `--sandbox enabled` is asked for as well but not depended on, and it has no Windows backend. This is the first runner whose containment lives in a file rather than in argv, which is why `vetPlan` checks file *content* and not only that the file was written. `--trust` is **required**, not forbidden: headless Cursor refuses to start in a folder nobody trusted, and the folder is one Browsentic created and wrote every file in — it grants no tool permission of its own |
 | **OpenCode** | `allowlist` | The run is an agent the config defines, whose permission ruleset opens on `"*": "deny"` and then allows each browser tool by name. OpenCode applies the last rule that matches and puts an agent's rules after the user's, so every other tool — built-in, custom, another MCP server's, or one a later release adds — is denied, and a tool denied outright is never offered to the model. `--pure` keeps plugins out, which run inside OpenCode and can answer its permission prompts. MCP servers the user set up in OpenCode itself still start, with their tools hidden |
+
+**Windows is less measured.** Cursor's kernel sandbox has no Windows backend, so only its deny rules
+apply there. Codex's `sandbox_mode="read-only"` and Grok's `--sandbox workspace` are asked for as on
+macOS and Linux, but neither has been measured on Windows; treat a Windows run of either as
+`host`-class until it has. The spawn itself is covered in
+[Agent runs § Windows](agent-runs.md#windows).
 
 #### Grok Build, and why not always-approve
 

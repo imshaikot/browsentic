@@ -1,5 +1,6 @@
 import { readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { log } from '../../log';
 import type { AgentSettings } from '../config';
 
@@ -16,6 +17,12 @@ export const MCP_CALL_TIMEOUT_MS = 30 * 60_000;
 export const browserToolsDidNotStart = (label: string): string =>
   `${label} could not start Browsentic's browser tools, so this run could not reach the page. ` +
   'Run "browsentic restart", then send the message again.';
+
+/** How to install an agent here. A line piped into a POSIX shell means nothing on Windows, so there it is the docs. */
+export function installHint(kind: AgentKind, platform: NodeJS.Platform = process.platform): string {
+  const { install, docs } = AGENTS[kind];
+  return platform === 'win32' && /\|\s*(ba)?sh\b/.test(install) ? docs : install;
+}
 
 /** Concurrent runs each get their own workspace; yesterday's are nobody's. */
 export function sweepRunDirs(base: string, ttlMs = RUN_DIR_TTL_MS): void {

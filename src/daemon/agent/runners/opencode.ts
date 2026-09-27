@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
@@ -243,7 +243,10 @@ function scratchReads(workspace: string): Record<string, string> {
   const scratch = join(workspace, 'tmp');
   const rules: Record<string, string> = { '*': 'deny' };
   for (let root = dirname(workspace); ; root = dirname(root)) {
-    rules[`${relative(root, scratch)}/*`] = 'allow';
+    const seen = relative(root, scratch);
+    rules[`${seen.replaceAll(sep, '/')}/*`] = 'allow';
+    // Windows spells it with backslashes. Which spelling OpenCode matches there is unmeasured, and each names only the scratch folder.
+    if (sep !== '/') rules[`${seen}${sep}*`] = 'allow';
     if (root === dirname(root)) return rules;
   }
 }
