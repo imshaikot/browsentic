@@ -679,7 +679,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     const running = runId ? [...agents].find(([, agent]) => agent.owns(runId)) : undefined;
     const offer = running && runId ? running[1].offerFor(runId) : null;
     if (offer && running) {
-      return { tools: running[0].tools.filter(({ name }) => !offer.withheld.includes(name)), reserved: offer.reserved };
+      const withheld = (name: string) => offer.withheld.includes(name);
+      return {
+        tools: running[0].tools.filter(({ name }) => !withheld(name)),
+        reserved: offer.reserved,
+        withheld: running[0].tools.filter(({ name }) => withheld(name)),
+      };
     }
 
     const tools = routeFor(binding)?.tools ?? bundled;
