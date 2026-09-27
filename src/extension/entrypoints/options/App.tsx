@@ -19,19 +19,19 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string 
     id: 'appearance',
     label: 'Appearance',
     icon: Palette,
-    blurb: 'How the side panel, the popup and this page look. Every paired browser follows the same choice, and the Mac app can change it too.',
+    blurb: 'How the side panel, the popup and this page look. Every paired browser follows the same choice, and the desktop app can change it too.',
   },
   {
     id: 'guardrails',
     label: 'Guardrails',
     icon: ShieldCheck,
-    blurb: 'What the agent may do without asking you first. A run takes its policy when it starts, so a change applies to the next one. The Mac app’s Settings tab edits the same rows.',
+    blurb: 'What the agent may do without asking you first. A run takes its policy when it starts, so a change applies to the next one. The desktop app’s Settings tab edits the same rows.',
   },
   {
     id: 'agent',
     label: 'Agent',
     icon: Sparkles,
-    blurb: 'Which agent CLI the side panel drives, and on which model. A switch here or in the Mac app reaches every paired browser.',
+    blurb: 'Which agent CLI the side panel drives, and on which model. A switch here or in the desktop app reaches every paired browser.',
   },
   {
     id: 'connection',
@@ -140,7 +140,7 @@ function Appearance() {
       <ThemePicker theme={theme} onSelect={setTheme} />
       <p className="text-xs leading-relaxed text-ink-faint">
         {daemon?.connected
-          ? 'Kept in the daemon’s config, so every paired browser and the Mac app see the change at once.'
+          ? 'Kept in the daemon’s config, so every paired browser and the desktop app see the change at once.'
           : 'Kept in this browser for now, and handed to the daemon the next time it connects.'}
       </p>
     </div>

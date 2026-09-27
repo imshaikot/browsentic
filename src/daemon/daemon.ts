@@ -790,7 +790,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           return send(ws, {
             id: request.id,
             op: 'preferences',
-            result: failure('BLOCKED', 'An agent run cannot change the settings it runs under. Change them from the settings page or the Mac app.'),
+            result: failure('BLOCKED', 'An agent run cannot change the settings it runs under. Change them from the settings page or the desktop app.'),
           });
         }
         send(ws, { id: request.id, op: 'preferences', result: applyPreference(request.change) });

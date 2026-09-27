@@ -8,7 +8,7 @@ export const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'
 
 export type InstallKind = 'npx' | 'global' | 'repo' | 'app';
 
-/** Written beside the payload by Browsentic.app when it lays the CLI down in ~/.browsentic/cli. */
+/** Written beside the payload by the desktop app when it lays the CLI down in ~/.browsentic/cli. */
 export const APP_MARKER = '.browsentic-app.json';
 
 const inNpxCache = (path: string) => path.split(sep).includes('_npx');
