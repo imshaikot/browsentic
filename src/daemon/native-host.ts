@@ -87,9 +87,15 @@ export function hostTargets(platform: NodeJS.Platform = process.platform, home =
   }));
 }
 
-/** Chrome names an unpacked extension after its folder: the SHA-256 of the path, spelled in a–p. */
-export function unpackedExtensionOrigin(dir: string): string {
-  const hex = createHash('sha256').update(dir).digest('hex').slice(0, 32);
+/**
+ * Chrome names an unpacked extension after its folder: the SHA-256 of the path, spelled in a–p.
+ * On Windows it hashes the path as UTF-16, with a lower-case drive letter raised first
+ * (`crx_file::id_util::MaybeNormalizePath`).
+ */
+export function unpackedExtensionOrigin(dir: string, platform: NodeJS.Platform = process.platform): string {
+  const path =
+    platform === 'win32' ? Buffer.from(dir.replace(/^[a-z](?=:)/, (drive) => drive.toUpperCase()), 'utf16le') : dir;
+  const hex = createHash('sha256').update(path).digest('hex').slice(0, 32);
   const id = [...hex].map((digit) => String.fromCharCode(97 + parseInt(digit, 16))).join('');
   return `chrome-extension://${id}/`;
 }
@@ -100,8 +106,8 @@ export function allowedOrigins(platform: NodeJS.Platform = process.platform): st
   const paired = listSessions()
     .map((session) => session.origin)
     .filter((origin) => origin.startsWith('chrome-extension://'));
-  const unpacked = platform === 'win32' ? [] : [unpackedExtensionOrigin(extensionDir(readAgentConfig().extensionDir))];
-  return [...new Set([...unpacked, ...paired].map(asOrigin))].sort();
+  const unpacked = unpackedExtensionOrigin(extensionDir(readAgentConfig().extensionDir), platform);
+  return [...new Set([unpacked, ...paired].map(asOrigin))].sort();
 }
 
 export function hostManifest(family: Family, launcher: string, origins: readonly string[]): Record<string, unknown> {

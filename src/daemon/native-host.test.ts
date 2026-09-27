@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   NATIVE_HOST_NAME,
   STOPPED_REPLY,
+  allowedOrigins,
   answerNativeMessage,
   decodeNativeMessage,
   encodeNativeMessage,
@@ -22,9 +23,25 @@ import { bits, modeOf } from './test/modes';
 
 describe('unpackedExtensionOrigin', () => {
   it('names the folder the way Chrome does', () => {
-    expect(unpackedExtensionOrigin('/Users/shahriar/browsentic/extension/chrome-mv3')).toBe(
+    expect(unpackedExtensionOrigin('/Users/shahriar/browsentic/extension/chrome-mv3', 'darwin')).toBe(
       'chrome-extension://pplbfkdfiimmogofmehpibbmldcefgpc/',
     );
+  });
+
+  it('hashes a Windows path as UTF-16, whichever case the drive letter was typed in', () => {
+    const upper = unpackedExtensionOrigin('C:\\Users\\me\\browsentic\\extension\\chrome-mv3', 'win32');
+
+    expect(unpackedExtensionOrigin('c:\\Users\\me\\browsentic\\extension\\chrome-mv3', 'win32')).toBe(upper);
+    expect(unpackedExtensionOrigin('C:\\Users\\me\\browsentic\\extension\\chrome-mv3', 'linux')).not.toBe(upper);
+    expect(unpackedExtensionOrigin('C:\\Users\\Me\\browsentic\\extension\\chrome-mv3', 'win32')).not.toBe(upper);
+  });
+});
+
+describe('allowedOrigins', () => {
+  it('lets the unpacked extension start the daemon before it has ever paired, on Windows too', () => {
+    for (const platform of ['darwin', 'linux', 'win32'] as const) {
+      expect(allowedOrigins(platform)).toContain(unpackedExtensionOrigin(extensionDir(), platform));
+    }
   });
 });
 
@@ -126,7 +143,7 @@ describe('registering the host', () => {
     expect(modeOf(installed.launcher)).toBe(bits(0o755));
     expect(JSON.parse(readFileSync(manifest, 'utf8'))).toMatchObject({
       path: installed.launcher,
-      allowed_origins: [unpackedExtensionOrigin(extensionDir())],
+      allowed_origins: [unpackedExtensionOrigin(extensionDir(), 'linux')],
     });
     expect(registeredBrowsers('linux')).toEqual(['Chrome']);
   });
