@@ -35,6 +35,14 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: [{ find: /^@\//, replacement: `${at('./src')}/` }] },
+        test: {
+          name: 'windows',
+          environment: 'happy-dom',
+          include: ['src/windows/ui/**/*.test.ts'],
+        },
+      },
+      {
         resolve: daemonResolve,
         test: {
           name: 'daemon',

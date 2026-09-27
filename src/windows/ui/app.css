@@ -1,0 +1,113 @@
+@import "../../extension/assets/globals.css";
+
+@source "../../extension/components";
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  user-select: none;
+}
+
+.select-text {
+  user-select: text;
+}
+
+.backdrop-wash {
+  position: absolute;
+  border-radius: 9999px;
+  animation: drift 11s ease-in-out infinite alternate;
+}
+
+.backdrop-wash-brand {
+  width: 900px;
+  height: 900px;
+  left: calc(50% - 450px - 300px);
+  top: calc(50% - 450px - 270px);
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--brand) 20%, transparent), transparent);
+  --drift-x: 80px;
+  --drift-y: -60px;
+}
+
+.backdrop-wash-ember {
+  width: 860px;
+  height: 860px;
+  left: calc(50% - 430px + 340px);
+  top: calc(50% - 430px + 295px);
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--ember) 16%, transparent), transparent);
+  --drift-x: -80px;
+  --drift-y: 70px;
+}
+
+[data-theme="daylight"] .backdrop-wash-brand {
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--brand) 12%, transparent), transparent);
+}
+
+[data-theme="daylight"] .backdrop-wash-ember {
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--ember) 9%, transparent), transparent);
+}
+
+@keyframes drift {
+  to {
+    transform: translate(var(--drift-x), var(--drift-y));
+  }
+}
+
+/* A ring drawn with a conic gradient and cut out by a radial mask: the orb's and the beacon's arcs. */
+.ring {
+  position: absolute;
+  border-radius: 9999px;
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-width, 3px)), #000 calc(100% - var(--ring-width, 3px)));
+}
+
+.spin {
+  animation: turn var(--spin, 6s) linear infinite;
+}
+
+.spin-reverse {
+  animation: turn var(--spin, 6s) linear infinite reverse;
+}
+
+.breathe {
+  animation: breathe 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes breathe {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+.enter {
+  animation: enter 0.28s ease-out both;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop-wash,
+  .spin,
+  .spin-reverse,
+  .breathe,
+  .enter {
+    animation: none;
+  }
+}

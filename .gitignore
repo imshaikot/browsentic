@@ -24,6 +24,13 @@ coverage/
 # `dist/` rule above already covers.
 src/mac/.build/
 
+# The Windows app's Cargo build tree, the payload it carries (staged from the extension and daemon
+# builds by scripts/windows-payload.ts), and the schemas Tauri generates. Its UI builds to
+# src/windows/dist/, which the `dist/` rule covers.
+src/windows/target/
+src/windows/src-tauri/resources/
+src/windows/src-tauri/gen/
+
 # WXT generated types + bundle stats
 .wxt/
 stats.html
