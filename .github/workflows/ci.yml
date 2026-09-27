@@ -92,3 +92,37 @@ jobs:
         run: |
           swift build
           swift test
+
+  # The Windows app's Rust half, built and tested where it runs: the registry, the PATH, the job
+  # object and the tray only compile on Windows. Its UI is type-checked and tested by `check`.
+  windows-app:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/windows
+
+      - name: Install dependencies
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
+          node "$yarn_bin" install --immutable
+
+      - name: Build the window the app embeds
+        run: node "$YARN" win:ui
+
+      - name: Build and test the app and its launcher
+        working-directory: src/windows
+        run: cargo test --workspace --locked
