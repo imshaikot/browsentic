@@ -1,5 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, parse, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { stateDir } from '../../lockfile';
 import { opencodeRunner } from './opencode';
@@ -156,7 +156,8 @@ describe('a one-shot', () => {
     const read = rulesOf(task({ reads: true })).read as Record<string, string>;
     const scratch = join(opencodeRunner.workspace('task'), 'tmp');
     expect(read['*']).toBe('deny');
-    expect(read[`${scratch.slice(1)}/*`]).toBe('allow');
+    const fromTop = relative(parse(scratch).root, scratch);
+    expect([read[`${fromTop.replaceAll(sep, '/')}/*`], read[`${fromTop}${sep}*`]]).toEqual(['allow', 'allow']);
     expect(read['task/tmp/*']).toBe('allow');
   });
 
