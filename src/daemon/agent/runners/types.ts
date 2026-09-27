@@ -53,6 +53,8 @@ export interface StreamSink {
   text(delta: string): void;
   /** A tool the daemon cannot see itself — web search and the like. MCP calls report themselves. */
   tool(toolId: string, name: string): void;
+  /** That tool finished. A CLI that never says so leaves the row open until the turn ends. */
+  toolResult(toolId: string, ok: boolean): void;
   session(id: string): void;
   /** Token counts this CLI reported, normalized to the shared shape. Optional — not every CLI reports them. */
   usage(usage: TokenUsage): void;

@@ -6,7 +6,7 @@ import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import { MCP_SERVER_NAME } from './claude';
-import { effortOf, parseJsonLine, sweepRunDirs } from './util';
+import { conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, Listing, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader } from './types';
 
 /** Antigravity reads MCP servers and instructions from the directory it runs in, not from flags. */
@@ -33,6 +33,33 @@ interface Settings {
   [key: string]: unknown;
 }
 
+/**
+ * Antigravity offers the model its whole built-in toolset — a shell, files, a browser of its own,
+ * web search — and reads AGENTS.md as project notes rather than its instructions. Left unsaid,
+ * "this repo" became `git status` in the scratch folder, and a refused page read became a web search.
+ */
+const wherePageIs = (research: boolean) => `# Where the page is
+
+The user is looking at a page in their own browser, and a question is about that page unless they say otherwise: "this repo" is the repository page they have open, not a folder on disk. This folder is Browsentic's scratch space and holds no project.
+
+Reach that page only through the ${MCP_SERVER_NAME} MCP server — call_mcp_tool with ServerName "${MCP_SERVER_NAME}", starting with page_getPageInfo. Never run a command, read or write a file, or open a browser of your own to answer${research ? '' : ', and never search the web or fetch a URL'}: none of them sees the user's page.${research ? ' Keep web searches to background the page cannot give you.' : ''} If the ${MCP_SERVER_NAME} tools cannot be reached at all, say so instead of answering another way.`;
+
+/** Every MCP call, whichever server it reaches; the server and tool are in its parameters. */
+const MCP_CALL = 'call_mcp_tool';
+
+/**
+ * Files Antigravity reads as part of an MCP call rather than for the task: the schema it saved for
+ * each tool, which the model opens before calling it, and a large result it spilled to disk.
+ */
+const CALL_PLUMBING = /\/antigravity-cli\/(mcp\/[^/]+\/[^/]+\.json|brain\/[^/]+\/\.system_generated\/)/;
+
+interface Usage {
+  input_tokens?: number;
+  cache_read_tokens?: number;
+  output_tokens?: number;
+  thinking_tokens?: number;
+}
+
 interface StepUpdate {
   conversation_id?: string;
   step_index?: number;
@@ -40,7 +67,8 @@ interface StepUpdate {
   state?: string;
   text_delta?: string;
   tool_name?: string;
-  tool_info?: { name?: string };
+  tool_info?: { name?: string; parameters?: { ServerName?: string; ToolName?: string; AbsolutePath?: string } };
+  usage?: Usage;
 }
 
 interface Result {
@@ -83,16 +111,19 @@ export const antigravityRunner: Runner = {
   },
 
   stream(context: StreamContext): Plan {
-    const { settings } = context;
+    const { settings, research } = context;
     const effort = effortOf(settings, this.efforts);
     const base = this.workspace('run');
     sweepRunDirs(base);
+    // A resumed conversation is re-read from the folder it began in, whatever folder agy is started
+    // in now (measured against 1.2.11) — so a conversation keeps one, and every turn rewrites it.
+    // Give a run its own and the second turn calls the browser with the first turn's run id.
     return {
-      cwd: join(base, context.runId),
+      cwd: conversationDir(base, context.conversation ?? context.runId),
       env: { BROWSENTIC_AGENT_RUN: context.runId },
       files: [
         { path: MCP_CONFIG, content: mcpConfig(context.mcp) },
-        { path: INSTRUCTIONS, content: `${context.systemPrompt.trim()}\n` },
+        { path: INSTRUCTIONS, content: `${context.systemPrompt.trim()}\n\n${wherePageIs(research)}\n` },
       ],
       args: [
         '-p',
@@ -110,7 +141,10 @@ export const antigravityRunner: Runner = {
 
   reader(): StreamReader {
     let streamed = 0;
-    const reported = new Set<string>();
+    let generated = 0;
+    // A step is reported while it runs and again when it finishes: one row, closed once.
+    const rows = new Map<string, string>();
+    const closed = new Set<string>();
 
     return (line, sink) => {
       const frame = parseJsonLine<Frame>(line);
@@ -126,18 +160,29 @@ export const antigravityRunner: Runner = {
           const step = frame.step_update;
           if (!step) return;
           if (step.conversation_id) sink.session(step.conversation_id);
+          if (step.usage) {
+            const { input_tokens = 0, cache_read_tokens = 0, output_tokens = 0, thinking_tokens = 0 } = step.usage;
+            generated += output_tokens + thinking_tokens;
+            sink.usage({ contextTokens: input_tokens + cache_read_tokens + output_tokens, outputTokens: generated });
+          }
           if (step.text_delta) {
             streamed += step.text_delta.length;
             return sink.text(step.text_delta);
           }
-          const tool = step.tool_name ?? step.tool_info?.name;
-          if (step.step_type !== 'tool' || !tool || ownTool(tool)) return;
-          // A step is reported while it runs and again when it finishes; announce it once.
-          const seen = `${step.step_index ?? tool}:${tool}`;
-          if (reported.has(seen)) return;
-          reported.add(seen);
-          sink.tool(randomUUID(), tool);
-          return;
+          if (step.step_type !== 'tool') return;
+          const name = shownAs(step);
+          if (!name) return;
+          const key = String(step.step_index ?? name);
+          let id = rows.get(key);
+          if (!id) {
+            id = randomUUID();
+            rows.set(key, id);
+            sink.tool(id, name);
+          }
+          const outcome = outcomeOf(step.state);
+          if (outcome === 'running' || closed.has(key)) return;
+          closed.add(key);
+          return sink.toolResult(id, outcome === 'ok');
         }
 
         case 'result': {
@@ -148,7 +193,7 @@ export const antigravityRunner: Runner = {
             return sink.fail('AGENT_FAILED', `Antigravity ended the run: ${result.status}`);
           }
           if (!streamed && result.response) sink.text(result.response);
-          return sink.done(result.status && result.status !== 'success' ? result.status : 'end_turn');
+          return sink.done(result.status && !/^success$/i.test(result.status) ? result.status : 'end_turn');
         }
 
         default:
@@ -275,7 +320,25 @@ function lastFrame(stdout: string): Frame | null {
   return null;
 }
 
-const ownTool = (name: string) => /browsentic|^mcp/i.test(name);
+/**
+ * How a tool step appears on the timeline, or null for one the timeline already shows: a call to
+ * Browsentic's own server, which the daemon draws itself, and the files Antigravity opens to make one.
+ */
+function shownAs(step: StepUpdate): string | null {
+  const name = step.tool_name ?? step.tool_info?.name;
+  const parameters = step.tool_info?.parameters;
+  if (!name) return null;
+  if (name === MCP_CALL) {
+    const server = parameters?.ServerName;
+    if (server === MCP_SERVER_NAME) return null;
+    return server ? `${server}:${parameters?.ToolName ?? name}` : name;
+  }
+  if (parameters?.AbsolutePath && CALL_PLUMBING.test(parameters.AbsolutePath)) return null;
+  return name;
+}
+
+const outcomeOf = (state: string | undefined): 'running' | 'ok' | 'failed' =>
+  /^done$/i.test(state ?? '') ? 'ok' : /error|fail|cancel/i.test(state ?? '') ? 'failed' : 'running';
 
 /** `agy models` prints one `id<TAB>label` line per model, and exits 1 when signed out. */
 function listedModels({ stdout, code }: Listing): string[] | null {

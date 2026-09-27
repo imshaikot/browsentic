@@ -12,7 +12,7 @@ const read = (name: string) => readThrough(antigravityRunner, transcript('antigr
 const readLines = (...lines: object[]) => readThrough(antigravityRunner, lines.map((line) => JSON.stringify(line)));
 
 describe('a streamed run', () => {
-  test('a fresh run gets its own directory, with the browser server and the system prompt written into it', () => {
+  test("a run is written into its conversation's folder: the browser server, the system prompt, and where the page is", () => {
     expect(shown(stream())).toMatchInlineSnapshot(`
       {
         "args": [
@@ -23,7 +23,7 @@ describe('a streamed run', () => {
           "--print-timeout",
           "60m",
         ],
-        "cwd": "<state>/agents/antigravity/run/run-1",
+        "cwd": "<state>/agents/antigravity/run/conversation-1",
         "env": {
           "BROWSENTIC_AGENT_RUN": "run-1",
         },
@@ -48,6 +48,12 @@ describe('a streamed run', () => {
           },
           {
             "content": "You are Browsentic.
+
+      # Where the page is
+
+      The user is looking at a page in their own browser, and a question is about that page unless they say otherwise: "this repo" is the repository page they have open, not a folder on disk. This folder is Browsentic's scratch space and holds no project.
+
+      Reach that page only through the browsentic MCP server — call_mcp_tool with ServerName "browsentic", starting with page_getPageInfo. Never run a command, read or write a file, or open a browser of your own to answer, and never search the web or fetch a URL: none of them sees the user's page. If the browsentic tools cannot be reached at all, say so instead of answering another way.
       ",
             "path": "AGENTS.md",
           },
@@ -61,9 +67,26 @@ describe('a streamed run', () => {
     expect(args.slice(args.indexOf('--conversation'), args.indexOf('--conversation') + 2)).toEqual(['--conversation', 'conv-1']);
   });
 
-  // Antigravity takes no per-run tool list; its own settings decide whether it may search.
-  test('research changes nothing about the plan', () => {
-    expect(stream({ research: true })).toEqual(stream());
+  // agy re-reads a resumed conversation from the folder it began in, so a fresh folder per turn
+  // handed the second turn the first turn's run id.
+  test('every turn of a conversation rewrites the same folder, with its own run id', () => {
+    const [first, second] = [stream(), stream({ runId: 'run-2', sessionId: 'conv-1' })];
+    expect([second.cwd, second.env]).toEqual([first.cwd, { BROWSENTIC_AGENT_RUN: 'run-2' }]);
+  });
+
+  test('a run with no conversation keeps a folder of its own', () => {
+    expect(stream({ conversation: null }).cwd).toBe(`${stateDir}/agents/antigravity/run/run-1`);
+  });
+
+  test('a conversation id is spelled so it stays one path segment', () => {
+    expect(stream({ conversation: '../../escape me' }).cwd).toBe(`${stateDir}/agents/antigravity/run/______escape_me`);
+  });
+
+  // Antigravity takes no per-run tool list, so only the prompt keeps it off the web.
+  test('research changes only whether the prompt allows a web search', () => {
+    const prompt = (research: boolean) => stream({ research }).files?.find((file) => file.path === 'AGENTS.md')?.content;
+    expect([prompt(false), prompt(true)].map((text) => text?.includes('never search the web'))).toEqual([true, false]);
+    expect({ ...stream({ research: true }), files: [] }).toEqual({ ...stream(), files: [] });
   });
 
   test('the chosen model and effort are passed through', () => {
@@ -128,15 +151,54 @@ describe('a one-shot task', () => {
 });
 
 describe('reading the stream', () => {
-  test('a run establishes the conversation, announces its own tool once, streams the answer and finishes', () => {
-    expect(read('run.hand-written.jsonl')).toEqual([
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
-      ['tool', expect.any(String), 'search_web'],
-      ['text', 'It costs '],
-      ['text', '$12 a month.'],
-      ['session', '9a1b2c3d-4e5f-4061-8a7b-8c9d0e1f2a3b'],
+  const step = (index: number, state: string, name: string, parameters: object = {}) => ({
+    event: 'step_update',
+    step_update: { step_index: index, state, step_type: 'tool', tool_name: name, tool_info: { name, parameters } },
+  });
+  const withoutSessions = (calls: ReturnType<typeof read>) => calls.filter(([signal]) => signal !== 'session');
+
+  test('a Browsentic call and the schema read before it stay off the timeline, which the daemon draws itself', () => {
+    expect(withoutSessions(read('1.2.11-mcp-call.jsonl'))).toEqual([
+      ['usage', { contextTokens: 14_733, outputTokens: 509 }],
+      ['usage', { contextTokens: 15_127, outputTokens: 760 }],
+      ['text', 'echo: hello'],
+      ['usage', { contextTokens: 15_253, outputTokens: 851 }],
+      ['text', '\n'],
       ['done', 'end_turn'],
+    ]);
+  });
+
+  test('every line carries the conversation', () => {
+    expect(new Set(read('1.2.11-mcp-call.jsonl').filter(([signal]) => signal === 'session').map(([, id]) => id))).toEqual(
+      new Set(['cc91cfe3-dda5-41df-96e3-88d226320b41']),
+    );
+  });
+
+  test('a large result Antigravity spilled to a file is read back without a row', () => {
+    const spilled = '/Users/you/.gemini/antigravity-cli/brain/47835b7b/.system_generated/steps/10/output.txt';
+    expect(readLines(step(12, 'ACTIVE', 'view_file', { AbsolutePath: spilled }), step(12, 'DONE', 'view_file', { AbsolutePath: spilled }))).toEqual([]);
+  });
+
+  test('its own tool gets one row, closed once when it is done', () => {
+    const calls = readLines(step(3, 'ACTIVE', 'search_web'), step(3, 'DONE', 'search_web'), step(3, 'DONE', 'search_web'));
+    expect(calls).toEqual([
+      ['tool', expect.any(String), 'search_web'],
+      ['toolResult', calls[0][1], true],
+    ]);
+  });
+
+  test('a file it reads for the task is shown, and a step that errors closes as failed', () => {
+    const notes = { AbsolutePath: '/Users/you/notes.txt' };
+    expect(readLines(step(4, 'ACTIVE', 'view_file', notes), step(4, 'ERROR', 'view_file', notes))).toEqual([
+      ['tool', expect.any(String), 'view_file'],
+      ['toolResult', expect.any(String), false],
+    ]);
+  });
+
+  test("another server's call is shown under that server's name", () => {
+    expect(readLines(step(6, 'DONE', 'call_mcp_tool', { ServerName: 'github', ToolName: 'list_issues' }))).toEqual([
+      ['tool', expect.any(String), 'github:list_issues'],
+      ['toolResult', expect.any(String), true],
     ]);
   });
 

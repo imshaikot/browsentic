@@ -38,6 +38,7 @@ export function readThrough(runner: Runner, lines: string[], only?: Signal): Cal
   const sink: StreamSink = {
     text: record('text'),
     tool: record('tool'),
+    toolResult: record('toolResult'),
     session: record('session'),
     usage: record('usage'),
     done: record('done'),

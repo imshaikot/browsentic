@@ -130,6 +130,7 @@ export function runStream(
     const sink: StreamSink = {
       text: (delta) => delta && say(outbound.push(delta)),
       tool: (toolId, name) => emit({ kind: 'tool', toolId, action: name, input: {} }),
+      toolResult: (toolId, ok) => emit({ kind: 'toolResult', toolId, ok, summary: ok ? 'done' : 'failed' }),
       session: (id) => {
         if (id) sessionId = id;
       },
