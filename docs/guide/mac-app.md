@@ -69,7 +69,7 @@ The tabs float at the top; ⌘1–⌘7 switch between them.
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `~/.browsentic/daemon.log`, followed live |
-| **Settings** | Light, dark or system appearance; whether the daemon starts with the app; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
+| **Settings** | Light, dark or system appearance for this window; whether the daemon starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
 
 There is also a menu bar item with the daemon’s state and the same on, off and restart.
 
