@@ -2,6 +2,7 @@ import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind, AgentProblem } from '@/lib/agents/catalog';
 import type { FileKind } from '@/lib/files/report';
 import type { AgentSettings } from '../config';
+import type { ToolHost } from '../../tool-host';
 
 /** `run` drives the browser and resumes conversations; `task` is a one-shot with no browser. */
 export type RunMode = 'run' | 'task';
@@ -39,6 +40,8 @@ export interface StreamContext {
   mcp: McpServer;
   /** Every tool that server will offer, for a CLI that grants MCP tools one name at a time. */
   mcpTools: string[];
+  /** The run's browser tools served in this process, for a CLI that takes tools other than over MCP. */
+  tools: () => Promise<ToolHost>;
 }
 
 export interface JsonContext {
@@ -66,6 +69,27 @@ export interface StreamSink {
 
 export type StreamReader = (line: string, sink: StreamSink) => void;
 
+export interface ConversationIO {
+  write(message: unknown): void;
+}
+
+/**
+ * A CLI spoken to over stdin for the length of a turn rather than handed it on argv: it is sent
+ * `open`'s messages as it starts, and each line it prints may be answered.
+ */
+export interface Conversation {
+  plan: Plan;
+  open(io: ConversationIO): void;
+  read(line: string, sink: StreamSink, io: ConversationIO): void;
+  /** Whether it got as far as holding a session. One that ends before is refused, not failed. */
+  readonly holding: boolean;
+  /** It was refused — told so, or it ended before holding a session — so later turns need not ask again. */
+  declined(reason: string): void;
+}
+
+/** A conversation the CLI would not hold; the turn is run through `stream()` instead. */
+export const CONVERSATION_REFUSED = 'CONVERSATION_REFUSED';
+
 export interface Listing {
   stdout: string;
   stderr: string;
@@ -92,6 +116,8 @@ export interface Runner {
   /** Absent: the picker offers the catalog's curated models. */
   models?: ModelLister;
   stream(context: StreamContext): Plan;
+  /** A conversation to hold for this turn instead, where the CLI offers one; null to use `stream`. */
+  converse?(context: StreamContext): Conversation | null;
   /** Fresh per run — readers carry state across lines. */
   reader(): StreamReader;
   /** This CLI's stream has no closing event, so exiting cleanly is how it says the turn is over. */

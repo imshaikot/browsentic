@@ -1,27 +1,34 @@
 import { describe, expect, test } from 'vitest';
 import { AGENT_KINDS, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { mcpServerFor, RUNNERS } from '../agent/runners';
-import type { Plan } from '../agent/runners/types';
+import type { Plan, StreamContext } from '../agent/runners/types';
 import { stateDir } from '../lockfile';
-import { CONTAINMENT, sealEnv, sealedAway, vetPlan } from './spawn';
+import { CONTAINMENT, sealEnv, sealedAway, vetPlan, type SpawnMode } from './spawn';
 
 const settingsFor = (kind: AgentKind) => ({ bin: AGENTS[kind].bin });
 
-const planOf = (kind: AgentKind, mode: 'run' | 'task', { research = false, reads = false } = {}): Plan =>
-  mode === 'run'
-    ? RUNNERS[kind].stream({
-        runId: 'run-1',
-        conversation: 'conversation-1',
-        instruction: 'what does this page cost',
-        systemPrompt: 'You are Browsentic.',
-        research,
-        settings: settingsFor(kind),
-        sessionId: null,
-        workspace: stateDir,
-        mcp: mcpServerFor('run-1'),
-        mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
-      })
-    : RUNNERS[kind].json({ prompt: 'summarize this', settings: settingsFor(kind), workspace: stateDir, reads });
+const contextFor = (kind: AgentKind, research: boolean): StreamContext => ({
+  runId: 'run-1',
+  conversation: 'conversation-1',
+  instruction: 'what does this page cost',
+  systemPrompt: 'You are Browsentic.',
+  research,
+  settings: settingsFor(kind),
+  sessionId: null,
+  workspace: stateDir,
+  mcp: mcpServerFor('run-1'),
+  mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
+  tools: () => Promise.reject(new Error('no browser tools in a containment test')),
+});
+
+const planOf = (kind: AgentKind, mode: SpawnMode, { research = false, reads = false } = {}): Plan => {
+  if (mode === 'task') return RUNNERS[kind].json({ prompt: 'summarize this', settings: settingsFor(kind), workspace: stateDir, reads });
+  const context = contextFor(kind, research);
+  if (mode === 'run') return RUNNERS[kind].stream(context);
+  const conversation = RUNNERS[kind].converse?.(context);
+  if (!conversation) throw new Error(`${kind} holds no conversation`);
+  return conversation.plan;
+};
 
 const without = (plan: Plan, arg: string): Plan => ({ ...plan, args: plan.args.filter((value) => value !== arg) });
 const plus = (plan: Plan, ...args: string[]): Plan => ({ ...plan, args: [...plan.args, ...args] });
@@ -177,6 +184,18 @@ describe('spawn containment', () => {
     test("a codex run that reads the user's config.toml is caught, and so is a profile layering one back on", () => {
       const reading: Plan = { ...codexRun, args: codexRun.args.filter((arg) => arg !== '--ignore-user-config') };
       expect([vetPlan('codex', 'run', reading, stateDir), vetPlan('codex', 'run', plus(codexRun, '--profile', 'work'), stateDir)].map((problems) => problems.length)).toEqual([1, 1]);
+    });
+
+    // Held over stdin, Codex takes its tools in-process; the argv is what can still be vetted.
+    test('a codex conversation is contained, and one without its switches, or from any other agent, is refused', () => {
+      const held = planOf('codex', 'conversation');
+      const shell = { ...held, args: held.args.filter((arg) => arg !== 'features.shell_tool=false') };
+      expect({
+        held: vetPlan('codex', 'conversation', held, stateDir),
+        shell: vetPlan('codex', 'conversation', shell, stateDir).length,
+        enabled: vetPlan('codex', 'conversation', plus(held, '--enable', 'shell_tool'), stateDir).length,
+        claude: vetPlan('claude', 'conversation', planOf('claude', 'run'), stateDir),
+      }).toEqual({ held: [], shell: 1, enabled: 1, claude: ['Claude Code (conversation) has no containment written for it.'] });
     });
 
     test('the codex shell or image viewer switched back on is caught, however it is spelled', () => {

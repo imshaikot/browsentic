@@ -12,6 +12,8 @@ export interface AgentSettings {
   bin: string;
   model?: string;
   effort?: string;
+  /** How a runner that can reach its CLI two ways should; Codex takes `exec` to keep off its app-server. */
+  transport?: string;
 }
 
 export interface AgentConfig {
@@ -91,7 +93,7 @@ const DEFAULT_APPROVALS = ['page.submitForm'];
 
 interface StoredConfig extends Record<string, unknown> {
   agent?: unknown;
-  agents?: Record<string, { bin?: unknown; model?: unknown; effort?: unknown } | undefined>;
+  agents?: Record<string, { bin?: unknown; model?: unknown; effort?: unknown; transport?: unknown } | undefined>;
   requireApproval?: unknown;
   guardrails?: unknown;
   /** Pre-0.2 layout: one Claude Code runner, configured at the top level. */
@@ -132,6 +134,7 @@ function settingsFor(stored: StoredConfig, kind: AgentKind): AgentSettings {
     bin: text(scoped.bin) ?? text(legacy.bin) ?? AGENTS[kind].bin,
     model: modelOf(kind, scoped.model) ?? modelOf(kind, legacy.model) ?? DEFAULT_MODEL[kind],
     effort: text(scoped.effort) ?? text(legacy.effort),
+    transport: text(scoped.transport),
   };
 }
 

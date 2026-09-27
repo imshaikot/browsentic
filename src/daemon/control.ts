@@ -47,7 +47,7 @@ export type ControlRequest =
   | { id: string; op: 'setPreference'; change: unknown };
 
 export type ControlMessage =
-  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[] }
+  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
   | { id: string; op: 'status'; status: BridgeStatus }
   | { id: string; op: 'invoke'; result: ActionResult }
   | { id: string; op: 'working' }
@@ -64,6 +64,12 @@ export interface Described {
   tools: ToolDescriptor[];
   /** Reserved actions this caller may be offered. Absent when the daemon predates the field. */
   reserved?: string[];
+  /**
+   * Tools a run is not offered right now but may be later in its conversation — the page-code tools,
+   * until the user turns Live tool on. A CLI whose tool list is fixed when its session begins lists
+   * them out of sight up front; a call to one while it is withheld is refused.
+   */
+  withheld?: ToolDescriptor[];
 }
 
 export interface Bridge {

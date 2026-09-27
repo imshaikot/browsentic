@@ -55,6 +55,7 @@ Nothing here is required; this shows every key in one place.
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary |
 | `agents.<name>.model` | `sonnet` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it. One starting with a dash or holding a space is ignored |
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |
+| `agents.codex.transport` | unset — the app-server | `"exec"` runs Codex through `codex exec` instead of its app-server; see [agents.md § Codex](agents.md#codex-gets-the-browser-tools-as-its-own) |
 
 Which models the select offers is not configured: Codex, Antigravity, Grok Build and Cursor CLI are
 asked for their own list, the rest offer a short one Browsentic ships.

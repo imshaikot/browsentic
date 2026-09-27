@@ -67,6 +67,7 @@ export const streamContext = (settings: AgentSettings, overrides: Partial<Stream
   workspace: stateDir,
   mcp,
   mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
+  tools: () => Promise.reject(new Error('no browser tools in a runner test')),
   ...overrides,
 });
 

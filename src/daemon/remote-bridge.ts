@@ -34,7 +34,7 @@ export class RemoteBridge implements Bridge {
 
   async describe(): Promise<Described> {
     const reply = await this.request({ id: randomUUID(), op: 'describe', runId: this.runId });
-    return reply && 'tools' in reply ? { tools: reply.tools, reserved: reply.reserved } : { tools: [] };
+    return reply && 'tools' in reply ? { tools: reply.tools, reserved: reply.reserved, withheld: reply.withheld } : { tools: [] };
   }
 
   async invoke(action: string, input?: unknown): Promise<ActionResult> {

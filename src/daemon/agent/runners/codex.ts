@@ -3,11 +3,13 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
+import { log } from '../../log';
 import { isModelId } from '@/lib/agents/catalog';
 import type { AgentSettings } from '../config';
 import { MCP_SERVER_NAME } from './claude';
 import { browserToolsDidNotStart, effortOf, MCP_CALL_TIMEOUT_MS, parseJsonLine } from './util';
-import type { JsonContext, Plan, Runner, StreamContext, StreamReader, StreamSink } from './types';
+import { appServerTurn } from './codex-app-server';
+import type { Conversation, JsonContext, Plan, Runner, StreamContext, StreamReader, StreamSink } from './types';
 
 /**
  * Codex has no per-run tool allowlist; the read-only sandbox is what keeps a run inside the browser.
@@ -23,6 +25,12 @@ const SANDBOX = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never
  * the only way to one server. Sign-in is still read from CODEX_HOME.
  */
 const WITHOUT_USER_CONFIG = '--ignore-user-config';
+
+/** The same, for the app-server, which takes no `exec` flag. */
+const SANDBOX_CONFIG = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy="never"'];
+
+/** A Codex whose app-server turned a conversation down, so later turns go straight to `exec`. */
+const noConversation = new Set<string>();
 
 /**
  * The shell and the image viewer read the machine, and a run has the page for that. A code-mode
@@ -81,6 +89,11 @@ const RESULT_TOKENS = 25_000;
 /** Codex gives a server ten seconds to start, which a cold start of the browser tools' own process can pass. */
 const STARTUP_SECONDS = 30;
 
+/** What every Codex run is told, however its tools reach it. */
+const keepToThePage = (research: boolean) => `The page the user means is the one open in their browser. Read it with these tools. Never answer from memory${research ? '' : ', from a web search,'} or by fetching the page from the shell${research ? ', and keep a web search to background the page cannot give you' : ''}. Do the job yourself rather than spawning sub-agents: what they say never reaches the user.
+
+When you reach the tools through \`exec\`, start every script that reads the page with the line \`// @exec: {"max_output_tokens": ${RESULT_TOKENS}}\`, or its output is cut at 10,000 tokens. Even then a tool result over ${RESULT_TOKENS} tokens comes back cut, so ask for less at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back — rather than one large read whose middle goes missing.`;
+
 /**
  * Codex keeps an MCP server's tools out of the model's tool list: they are deferred behind
  * `tool_search`, and a code-mode model reaches them only from inside `exec`. A run that does not
@@ -90,9 +103,17 @@ const reachingTheBrowser = (research: boolean) => `# Reaching the browser from C
 
 Your browsentic tools are not in your tool list yet, because Codex defers them. Before you plan anything, call \`tool_search\` for what this job needs — query "browsentic page", limit 20 — and search again for a tool you have not loaded. If the only way you can call a tool is \`exec\`, the same tools are there as \`tools.mcp__browsentic__<name>({ ... })\`: find them by filtering \`ALL_TOOLS\`, and pass a screenshot on with \`image(result.content[0])\`, because \`text()\` alone drops the picture.
 
-The page the user means is the one open in their browser. Read it with these tools. Never answer from memory${research ? '' : ', from a web search,'} or by fetching the page from the shell${research ? ', and keep a web search to background the page cannot give you' : ''}. Do the job yourself rather than spawning sub-agents: what they say never reaches the user.
+${keepToThePage(research)}`;
 
-When you reach the tools through \`exec\`, start every script that reads the page with the line \`// @exec: {"max_output_tokens": ${RESULT_TOKENS}}\`, or its output is cut at 10,000 tokens. Even then a tool result over ${RESULT_TOKENS} tokens comes back cut, so ask for less at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back — rather than one large read whose middle goes missing.`;
+/**
+ * Held through the app-server, the browser tools are the model's own. A code-mode model calls them
+ * inside `exec`, where a result comes back as one string, a picture's data URL on its first line.
+ */
+const holdingTheBrowser = (research: boolean) => `# Your browser tools in Codex
+
+Your browsentic tools — \`page_getPageInfo\`, \`page_clickElement\` and the rest — are in your tool list. If the only way you can call a tool is \`exec\`, they are there as \`tools.page_getPageInfo({ ... })\` and the like; a result that holds a picture comes back as text whose first line is a \`data:image/\` URL, and passing that line to \`image()\` is how you see it.
+
+${keepToThePage(research)}`;
 
 interface Item {
   id?: string;
@@ -161,6 +182,40 @@ export const codexRunner: Runner = {
   models: {
     file: () => join(codexHome(), 'models_cache.json'),
     parse: listedModels,
+  },
+
+  /**
+   * Codex's app-server, unless the config says `exec` or this Codex already turned it down. It takes
+   * the browser tools as its own, streams its words, and counts tokens per request; `exec` is the
+   * fallback, and a thread either one began, the other resumes.
+   */
+  converse(context: StreamContext): Conversation | null {
+    const { settings, research } = context;
+    if (settings.transport === 'exec' || noConversation.has(settings.bin)) return null;
+    return appServerTurn(context, {
+      plan: {
+        cwd: this.workspace('run'),
+        args: [
+          'app-server',
+          ...SANDBOX_CONFIG,
+          ...NO_SHELL,
+          ...NO_IMAGE_VIEWER,
+          ...QUIETED,
+          ...searching(research),
+          '-c',
+          `tool_output_token_limit=${RESULT_TOKENS}`,
+        ],
+      },
+      settings,
+      effort: effortOf(settings, this.efforts),
+      developerInstructions: `${context.systemPrompt.trim()}\n\n${holdingTheBrowser(research)}`,
+      declined: (reason) => {
+        noConversation.add(settings.bin);
+        log(`codex at ${settings.bin} holds no conversation from now on: ${reason}`);
+      },
+      explain,
+      stoppedFor,
+    });
   },
 
   stream(context: StreamContext): Plan {
