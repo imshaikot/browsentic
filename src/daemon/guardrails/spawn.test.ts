@@ -73,8 +73,9 @@ describe('spawn containment', () => {
       expect(planOf('claude', 'task').args).toContain('{"mcpServers":{}}');
     });
 
-    test('codex task carries no mcp server', () => {
-      expect(planOf('codex', 'task').args).toContain('mcp_servers={}');
+    // Measured against 0.155.1: `mcp_servers={}` merges into config.toml and clears nothing.
+    test('codex task leaves the user config, and every mcp server in it, out', () => {
+      expect(planOf('codex', 'task').args).toContain('--ignore-user-config');
     });
 
     test('grok task refuses every MCP call, whichever server the user configured', () => {
@@ -171,6 +172,22 @@ describe('spawn containment', () => {
 
     test('a later override of the codex sandbox is caught', () => {
       expect(vetPlan('codex', 'run', plus(codexRun, '-c', 'sandbox_mode="workspace-write"'), stateDir)).toHaveLength(1);
+    });
+
+    test("a codex run that reads the user's config.toml is caught, and so is a profile layering one back on", () => {
+      const reading: Plan = { ...codexRun, args: codexRun.args.filter((arg) => arg !== '--ignore-user-config') };
+      expect([vetPlan('codex', 'run', reading, stateDir), vetPlan('codex', 'run', plus(codexRun, '--profile', 'work'), stateDir)].map((problems) => problems.length)).toEqual([1, 1]);
+    });
+
+    test('the codex shell or image viewer switched back on is caught, however it is spelled', () => {
+      expect(
+        [
+          plus(codexRun, '-c', 'features.shell_tool=true'),
+          plus(codexRun, '--enable', 'shell_tool'),
+          plus(codexRun, '-c', 'features.view_image=true'),
+          { ...codexRun, args: codexRun.args.filter((arg) => arg !== 'features.shell_tool=false') },
+        ].map((plan) => vetPlan('codex', 'run', plan, stateDir).length),
+      ).toEqual([1, 1, 1, 1]);
     });
 
     const vibeRun = planOf('vibe', 'run');

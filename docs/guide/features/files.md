@@ -21,7 +21,7 @@ What it reads:
 | --- | --- | --- |
 | Text — CSV, JSON, Markdown, logs, code, anything in UTF-8 | 5 MB | every agent |
 | PDF | 10 MB | Claude Code |
-| Images — PNG, JPEG, GIF, WebP | 5 MB | Claude Code |
+| Images — PNG, JPEG, GIF, WebP | 5 MB | Claude Code, Codex |
 
 The bytes decide the kind, not the name: a PNG called `notes.txt` is read as an image. Anything else
 — a ZIP archive, which Word, Excel and PowerPoint files are too, a program, audio or video — is

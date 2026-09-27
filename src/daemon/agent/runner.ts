@@ -50,10 +50,10 @@ export function runAgentJson(
   prompt: string,
   config: AgentConfig,
   signal: AbortSignal,
-  { reads = false, ...options }: JsonOptions & { reads?: boolean },
+  { reads = false, image, ...options }: JsonOptions & { reads?: boolean; image?: string },
 ): Promise<string> {
   const { runner, settings } = runnerFor(config);
-  return runJson(runner, { prompt, settings, reads, workspace: runner.workspace('task') }, signal, options);
+  return runJson(runner, { prompt, settings, reads, image, workspace: runner.workspace('task') }, signal, options);
 }
 
 /** Where a one-shot's scratch files go — inside the agent's own workspace, so it is allowed to read them. */

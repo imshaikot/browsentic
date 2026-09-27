@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
-import { effortOf, parseJsonLine } from './util';
+import { browserToolsDidNotStart, effortOf, parseJsonLine } from './util';
 import type { JsonContext, Plan, Runner, StreamContext, StreamReader, StreamSink } from './types';
 
 export const MCP_SERVER_NAME = 'browsentic';
@@ -50,8 +50,22 @@ interface UsageLine {
   output_tokens?: number;
 }
 
+/** A server still `pending` may yet connect; anything else but `connected` never will this run. */
+const STARTING = ['connected', 'pending'];
+
 type StreamLine =
-  | { type: 'system'; subtype?: string; session_id?: string; tools?: string[] }
+  | {
+      type: 'system';
+      subtype?: string;
+      session_id?: string;
+      tools?: string[];
+      mcp_servers?: { name?: string; status?: string }[];
+    }
+  | {
+      type: 'user';
+      parent_tool_use_id?: string | null;
+      message?: { content?: string | { type?: string; tool_use_id?: string; is_error?: boolean }[] };
+    }
   | {
       type: 'stream_event';
       parent_tool_use_id?: string | null;
@@ -77,6 +91,9 @@ export const claudeRunner: Runner = {
   versionArgs: ['--version'],
   efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
   opens: ['text', 'pdf', 'image'],
+  // Claude Code records the system prompt on a session's first request and resends that record on every
+  // resume, whatever --append-system-prompt says (`--system-prompt-snapshot`, on by default in 2.1.283).
+  keepsFirstPrompt: true,
 
   workspace: () => stateDir,
 
@@ -122,6 +139,9 @@ export const claudeRunner: Runner = {
     let generated = 0;
     let counted = false;
 
+    // Its own web tools are the only rows this reader opens, so only their results close one.
+    const opened = new Set<string>();
+
     const promptOf = (usage: UsageLine) =>
       (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0);
 
@@ -141,8 +161,24 @@ export const claudeRunner: Runner = {
             if (message.session_id) sink.session(message.session_id);
             const builtins = (message.tools ?? []).filter((tool) => !tool.startsWith('mcp__'));
             log(`claude session ${message.session_id} up, built-ins: ${builtins.join(', ') || 'none'}`);
+            const browser = message.mcp_servers?.find((server) => server.name === MCP_SERVER_NAME);
+            // Claude Code carries on without a server that failed, and the model answers without the page.
+            if (browser?.status && !STARTING.includes(browser.status)) {
+              log(`claude session ${message.session_id}: the ${MCP_SERVER_NAME} server is ${browser.status}`);
+              return sink.fail('AGENT_FAILED', browserToolsDidNotStart('Claude Code'));
+            }
           }
           return;
+
+        case 'user': {
+          if (message.parent_tool_use_id || !Array.isArray(message.message?.content)) return;
+          for (const block of message.message.content) {
+            if (block.type !== 'tool_result' || !block.tool_use_id || !opened.has(block.tool_use_id)) continue;
+            opened.delete(block.tool_use_id);
+            sink.toolResult(block.tool_use_id, block.is_error !== true);
+          }
+          return;
+        }
 
         case 'stream_event': {
           if (message.parent_tool_use_id) return;
@@ -152,7 +188,10 @@ export const claudeRunner: Runner = {
           }
           if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
             const name = event.content_block.name ?? 'tool';
-            if (WEB_TOOLS.includes(name)) sink.tool(event.content_block.id ?? randomUUID(), name);
+            if (!WEB_TOOLS.includes(name)) return;
+            const id = event.content_block.id ?? randomUUID();
+            opened.add(id);
+            sink.tool(id, name);
           }
           if (event?.type === 'message_start') prompt = promptOf(event.message?.usage ?? {});
           if (event?.type === 'message_delta' && event.usage) report(event.usage, sink);

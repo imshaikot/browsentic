@@ -77,7 +77,7 @@ Two kinds are answered:
 - **Pictures to tap** — hCaptcha's canvas challenges ("click the animal icon that is
   different"). The answer is a set of points on the photograph.
 
-The analyst needs an agent that can look at images; today that is Claude Code. With another
+The analyst needs an agent that can look at images; today that is Claude Code or Codex. With another
 agent, or when the analyst gives up (ten rounds, or the time budget), the result comes back as
 `state: "challenge"` with the picture attached, and the agent driving the run answers it itself
 by calling `page_solveCaptcha` again with `tiles`, `points` or `reload`.

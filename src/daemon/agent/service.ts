@@ -39,9 +39,9 @@ import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, scheduledBlock, withReports } from './prompt';
+import { buildSystemPrompt, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
-import { agentState } from './runners';
+import { agentState, RUNNERS } from './runners';
 import {
   discardStaging,
   mapTargetFor,
@@ -106,8 +106,11 @@ interface Decision {
 }
 
 export class AgentSession {
-  /** Per session, the conversation its agent is holding open. Switching agents drops them all. */
-  private held = new Map<string, { agent: AgentKind; sessionId: string }>();
+  /**
+   * Per session, the conversation its agent is holding open, and the prompt that conversation was last
+   * brought up to date with. Switching agents drops them all.
+   */
+  private held = new Map<string, { agent: AgentKind; sessionId: string; sections: PromptSection[] }>();
   private runs = new Map<string, ActiveRun>();
   /**
    * Conversations that have been shown the page-code tools. The tool list leads the
@@ -365,7 +368,7 @@ export class AgentSession {
     const supplied = mapping ? null : sessionFrom(context, config.agent);
     const resuming = mapping ? null : (supplied ?? held);
 
-    let built: { prompt: string; dropped: string[] };
+    let built: BuiltPrompt;
     let instructionText = routed.text;
     let handover: Handover = { handed: [] };
     try {
@@ -390,7 +393,13 @@ export class AgentSession {
           recordings: recordingsBlock(context?.recordings),
           scheduled: scheduledBlock(context?.task),
         });
-        instructionText = withReports(routed.text, handover.reports);
+        // The CLI sends the prompt its session began with, so what has changed since goes in the message.
+        const update =
+          resuming && RUNNERS[config.agent].keepsFirstPrompt
+            ? promptUpdate(holding?.agent === config.agent && holding.sessionId === resuming ? holding.sections : undefined, built)
+            : undefined;
+        if (update) log(`agent run ${runId} brings its session's prompt up to date: ${update.changed.join(', ')}`);
+        instructionText = turnMessage(routed.text, { update: update?.text, reports: handover.reports });
       }
     } catch (error) {
       this.release(run);
@@ -435,8 +444,11 @@ export class AgentSession {
       });
       if (!mapping) {
         if (sessionId) {
-          if (outcome.sessionId) this.held.set(sessionId, { agent: config.agent, sessionId: outcome.sessionId });
-          else this.held.delete(sessionId);
+          if (outcome.sessionId) {
+            this.held.set(sessionId, { agent: config.agent, sessionId: outcome.sessionId, sections: built.sections });
+          } else {
+            this.held.delete(sessionId);
+          }
         }
         if (outcome.sessionId !== resuming) {
           emit({ kind: 'session', agent: config.agent, agentSessionId: outcome.sessionId });
@@ -464,7 +476,7 @@ export class AgentSession {
     skill: Skill,
     context: RunContext | undefined,
     emit: (event: RunEvent) => void,
-  ): Promise<{ built: { prompt: string; dropped: string[] }; instruction: string } | null> {
+  ): Promise<{ built: BuiltPrompt; instruction: string } | null> {
     if (!context?.url) {
       this.release(run);
       emit({ kind: 'error', code: 'INVALID_INPUT', message: 'Open the site you want mapped in this tab first.' });

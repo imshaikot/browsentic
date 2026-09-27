@@ -6,6 +6,5 @@
 {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Looking it up."}}
 {"type":"item.started","item":{"id":"item_1","type":"web_search","query":"acme pricing"}}
 {"type":"item.completed","item":{"id":"item_1","type":"web_search","query":"acme pricing"}}
-{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"ls"}}
 {"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"It costs $12 a month."}}
 {"type":"turn.completed","usage":{"input_tokens":20000,"cached_input_tokens":18000,"output_tokens":45}}

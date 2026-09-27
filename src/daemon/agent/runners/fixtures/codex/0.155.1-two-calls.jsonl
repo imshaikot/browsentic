@@ -1,0 +1,9 @@
+# Recorded from codex 0.155.1 through the runner's own plan, with a local stand-in for the model that reported 1,000, 2,000, 3,000 and 4,000 input tokens for the turn's four requests: turn.completed adds them up.
+{"type":"thread.started","thread_id":"01a0e29b-5586-7523-9532-06cafa6ff5e1"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"mcp_tool_call","server":"browsentic","tool":"page_shot","arguments":{},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"mcp_tool_call","server":"browsentic","tool":"page_shot","arguments":{},"result":{"content":[{"type":"image","data":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==","mimeType":"image/png"},{"type":"text","text":"SHOT_NOTE"}],"structured_content":null},"error":null,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_1","type":"mcp_tool_call","server":"browsentic","tool":"page_echo","arguments":{},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"mcp_tool_call","server":"browsentic","tool":"page_echo","arguments":{},"result":{"content":[{"type":"text","text":"MARKER=A"}],"structured_content":null},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"done"}}
+{"type":"turn.completed","usage":{"input_tokens":10000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":100,"reasoning_output_tokens":0}}

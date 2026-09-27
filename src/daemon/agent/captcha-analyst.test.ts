@@ -113,7 +113,7 @@ describe('one round', () => {
     let handed = '';
     agent.mockImplementation(async (prompt, _config, _signal, options) => {
       handed = /The picture is at (\S+\.jpg)/.exec(prompt)?.[1] ?? '';
-      expect([existsSync(handed), readFileSync(handed, 'utf8'), options.reads]).toEqual([true, 'not really a jpeg', true]);
+      expect([existsSync(handed), readFileSync(handed, 'utf8'), options.reads, options.image]).toEqual([true, 'not really a jpeg', true, handed]);
       return answered('{ "tiles": [3] }');
     });
     expect(await answerChallenge(grid(), config(), new AbortController().signal)).toEqual({ tiles: [3] });
@@ -129,7 +129,7 @@ describe('one round', () => {
   });
 
   test('no answer when the agent cannot open pictures, and nothing is spawned', async () => {
-    const configured = { ...config(), agent: 'codex' as const };
+    const configured = { ...config(), agent: 'vibe' as const };
     expect(await answerChallenge(grid(), configured, new AbortController().signal)).toBeNull();
     expect(agent).not.toHaveBeenCalled();
   });

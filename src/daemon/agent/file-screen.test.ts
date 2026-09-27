@@ -8,7 +8,7 @@ const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj');
 const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
 const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0]);
 
-const textOnly: Reader = { label: 'Codex', opens: ['text'], openers: () => ['Claude Code'] };
+const textOnly: Reader = { label: 'Mistral Vibe', opens: ['text'], openers: () => ['Claude Code'] };
 const everything: Reader = { label: 'Claude Code', opens: ['text', 'pdf', 'image'], openers: () => [] };
 
 const file = (name: string, size: number, mime = '') => ({ name, mime, size });
@@ -96,7 +96,7 @@ describe('what is rejected before any agent is started', () => {
       ok: false,
       code: 'UNSUPPORTED_TYPE',
       kind: 'pdf',
-      message: 'Codex cannot open PDFs here. Switch to Claude Code to have it read.',
+      message: 'Mistral Vibe cannot open PDFs here. Switch to Claude Code to have it read.',
     });
   });
 

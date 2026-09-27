@@ -181,15 +181,28 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
   codex: {
     localTools: 'sandbox',
     keepsEnv: ['OPENAI_', 'CODEX_', 'AZURE_OPENAI_'],
-    note: 'no per-run tool list; the read-only sandbox is the whole containment, so the agent can still read any file the user can',
+    // A `-c` merges into the user's config.toml, so turning a switch back on takes one later flag; a
+    // profile layers a second config file back on, with whatever MCP servers it names.
+    forbidden: [/^features\.(shell_tool|view_image)=(?!false$)/i, /^--enable(=|$)/i, /^--profile(=|$)/i],
+    note:
+      'no per-run tool list: the user’s config.toml is left out, so the browser is the only MCP server; the shell and the image viewer are switched off, ' +
+      'and the read-only sandbox refuses the writes its patch tool still offers. A one-shot that reads a text file keeps the shell, read-only, so it can read any file the user can',
     run: {
       // Sub-agents are spawned outside the run's gate and report nothing to the panel.
-      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'features.multi_agent=false'],
+      required: [
+        '--ignore-user-config',
+        'sandbox_mode="read-only"',
+        'approval_policy="never"',
+        'features.multi_agent=false',
+        'features.shell_tool=false',
+        'features.view_image=false',
+      ],
       pairs: [],
       files: [],
     },
     task: {
-      required: ['sandbox_mode="read-only"', 'approval_policy="never"', 'mcp_servers={}', 'features.multi_agent=false'],
+      // Left out, config.toml takes its MCP servers with it; `mcp_servers={}` alone clears none of them.
+      required: ['--ignore-user-config', 'sandbox_mode="read-only"', 'approval_policy="never"', 'features.multi_agent=false'],
       pairs: [],
       files: [],
     },

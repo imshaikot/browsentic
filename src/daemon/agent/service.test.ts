@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { FOCUS_SHOT_ACTION } from '@/lib/actions/reserved';
@@ -84,5 +84,53 @@ describe('answering a captcha', () => {
       prompts: 1,
       invoked: ['page.solveCaptcha', 'page.solveCaptcha'],
     });
+  });
+});
+
+// Claude Code and Codex go on sending the system prompt a session began with, so a turn that changes it
+// has to say what changed in its own message — and a turn that changes nothing says nothing more.
+describe('a follow-up in a conversation whose agent keeps its first prompt', () => {
+  test('carries what changed since the session began, once, and then nothing it already has', async () => {
+    const dir = `${dirname(configPath)}/prompt-turns`;
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const agent = `${dir}/claude.sh`;
+    writeFileSync(
+      agent,
+      [
+        '#!/bin/sh',
+        'if [ "$1" = "--version" ]; then echo "2.1.283 (Claude Code)"; exit 0; fi',
+        `n=$(ls "${dir}" | grep -c '^turn-'); printf '%s' "$2" > "${dir}/turn-$n"`,
+        'echo \'{"type":"system","subtype":"init","session_id":"sess-1","mcp_servers":[{"name":"browsentic","status":"connected"}]}\'',
+        'echo \'{"type":"result","subtype":"success","is_error":false,"stop_reason":"end_turn","result":"ok"}\'',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    const done: string[] = [];
+    const turns = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void ((event.kind === 'done' || event.kind === 'error') && done.push(runId)),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    const focus = { tag: 'button', selector: '#buy', content: 'Buy now', truncated: false, url: 'https://shop.example/', title: 'Shop' };
+    const turn = async (id: string, context: object) => {
+      turns.handle({ t: 'instruct', id, text: 'what does this cost?', context: { sessionId: 's1', ...context } });
+      await vi.waitFor(() => expect(done).toContain(id), { timeout: 5_000 });
+    };
+
+    await turn('r1', {});
+    await turn('r2', { focus });
+    await turn('r3', { focus });
+    const said = [0, 1, 2].map((n) => readFileSync(`${dir}/turn-${n}`, 'utf8'));
+    turns.dispose();
+
+    expect(said.map((message) => [message.includes("# Browsentic's instructions for this message"), message.includes('`#buy`')])).toEqual([
+      [false, false],
+      [true, true],
+      [false, false],
+    ]);
+    expect(said.every((message) => message.endsWith('what does this cost?'))).toBe(true);
   });
 });
