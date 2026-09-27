@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 
-import { THEMES, type ThemeId } from '@/lib/bridge/theme';
+import { THEMES, type ThemeId } from '@/lib/settings/theme';
 import { cn } from '@/lib/utils';
 
 const ACCENTS = ['bg-brand', 'bg-ember', 'bg-lime', 'bg-amber'];
