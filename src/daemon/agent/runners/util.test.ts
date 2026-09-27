@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { logPath, stateDir } from '../../lockfile';
-import { effortOf, parseJsonBlob, parseJsonLine, sweepRunDirs } from './util';
+import { AGENTS } from '@/lib/agents/catalog';
+import { effortOf, installHint, parseJsonBlob, parseJsonLine, sweepRunDirs } from './util';
 
 describe('sweeping run directories', () => {
   const base = join(stateDir, 'sweep-test');
@@ -61,5 +62,16 @@ describe('reading JSON a CLI printed', () => {
 
   test('text with no object in it is null', () => {
     expect([parseJsonBlob('no braces here'), parseJsonBlob('} backwards {'), parseJsonBlob('{"broken": }')]).toEqual([null, null, null]);
+  });
+});
+
+describe('how to install an agent', () => {
+  test('an npm or uv install is the same command everywhere', () => {
+    expect([installHint('codex', 'win32'), installHint('vibe', 'win32')]).toEqual([AGENTS.codex.install, AGENTS.vibe.install]);
+  });
+
+  test('a line piped into a POSIX shell is the docs on Windows, and the line itself elsewhere', () => {
+    expect([installHint('grok', 'win32'), installHint('cursor', 'win32')]).toEqual([AGENTS.grok.docs, AGENTS.cursor.docs]);
+    expect([installHint('grok', 'darwin'), installHint('cursor', 'linux')]).toEqual([AGENTS.grok.install, AGENTS.cursor.install]);
   });
 });

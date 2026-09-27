@@ -17,7 +17,6 @@ describe('a streamed run', () => {
       {
         "args": [
           "-p",
-          "what does this page cost",
           "--output-format",
           "stream-json",
           "--include-partial-messages",
@@ -58,8 +57,8 @@ describe('a streamed run', () => {
           "ExitWorktree",
           "WebSearch",
           "WebFetch",
-          "--append-system-prompt",
-          "You are Browsentic.",
+          "--append-system-prompt-file",
+          "<state>/agents/claude/prompts/run-1.md",
           "--session-id",
           "<uuid>",
         ],
@@ -67,6 +66,13 @@ describe('a streamed run', () => {
         "env": {
           "BROWSENTIC_AGENT_RUN": "run-1",
         },
+        "files": [
+          {
+            "content": "You are Browsentic.",
+            "path": "agents/claude/prompts/run-1.md",
+          },
+        ],
+        "input": "what does this page cost",
       }
     `);
   });

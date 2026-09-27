@@ -1,10 +1,11 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { FOCUS_SHOT_ACTION } from '@/lib/actions/reserved';
 import type { RunEvent } from '@/lib/actions/protocol';
 import { failure } from '@/lib/actions/protocol';
 import { configPath } from './config';
+import { stubCli } from './runners/fixtures/support';
 import { AgentSession } from './service';
 
 const CODE_TOOLS = ['page.injectCode', 'page.runCode'];
@@ -55,8 +56,7 @@ describe("what a run's tool list holds", () => {
 
 describe('answering a captcha', () => {
   test('asks once, then lets the rest of that run’s rounds through without asking again', async () => {
-    const agent = `${dirname(configPath)}/agent-that-waits.sh`;
-    writeFileSync(agent, '#!/bin/sh\nsleep 30\n', { mode: 0o755 });
+    const agent = stubCli(join(dirname(configPath), 'agent-that-waits'), 'setTimeout(() => {}, 30_000);');
     writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
     const events: RunEvent[] = [];
     const invoked: string[] = [];
@@ -94,17 +94,20 @@ describe('a follow-up in a conversation whose agent keeps its first prompt', () 
     const dir = `${dirname(configPath)}/prompt-turns`;
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    const agent = `${dir}/claude.sh`;
-    writeFileSync(
-      agent,
-      [
-        '#!/bin/sh',
-        'if [ "$1" = "--version" ]; then echo "2.1.283 (Claude Code)"; exit 0; fi',
-        `n=$(ls "${dir}" | grep -c '^turn-'); printf '%s' "$2" > "${dir}/turn-$n"`,
-        'echo \'{"type":"system","subtype":"init","session_id":"sess-1","mcp_servers":[{"name":"browsentic","status":"connected"}]}\'',
-        'echo \'{"type":"result","subtype":"success","is_error":false,"stop_reason":"end_turn","result":"ok"}\'',
-      ].join('\n'),
-      { mode: 0o755 },
+    const agent = stubCli(
+      join(dir, 'claude'),
+      `const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log('2.1.283 (Claude Code)');
+  process.exit(0);
+}
+const turn = ${JSON.stringify(dir)} + '/turn-' + fs.readdirSync(${JSON.stringify(dir)}).filter((name) => name.startsWith('turn-')).length;
+let heard = '';
+process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
+  fs.writeFileSync(turn, heard);
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1', mcp_servers: [{ name: 'browsentic', status: 'connected' }] }));
+  console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
+});`,
     );
     writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
     const done: string[] = [];

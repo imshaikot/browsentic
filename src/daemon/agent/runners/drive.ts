@@ -1,14 +1,14 @@
-import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { mkdirSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
-import type { Readable, Writable } from 'node:stream';
 import type { RunEvent } from '@/lib/actions/protocol';
 import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { describeContainment, sealEnv, sealedAway, sealingStream, vetPlan, type SpawnMode } from '../../guardrails';
 import { configPath, type AgentSettings } from '../config';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
+import { spawnCli, stopTree, type CliProcess } from './command';
+import { installHint } from './util';
 import {
   CONVERSATION_REFUSED,
   RunError,
@@ -26,8 +26,6 @@ const KILL_GRACE_MS = 5_000;
 
 const STRIPPED = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'BROWSENTIC_AGENT_RUN'];
 
-type Child = ChildProcessByStdio<Writable | null, Readable, Readable>;
-
 /** What a plan is spawned with: stdin stays closed unless the CLI is held in a conversation over it. */
 type Stdin = 'ignore' | 'pipe';
 
@@ -43,7 +41,7 @@ export function launch(
   plan: Plan,
   signal: AbortSignal,
   stdin: Stdin = 'ignore',
-): { child: Child; release: () => void; stop: () => void } {
+): { child: CliProcess; release: () => void; stop: () => void } {
   const problems = vetPlan(kind, mode, plan, stateDir);
   if (problems.length) {
     throw new RunError(
@@ -68,15 +66,14 @@ export function launch(
   if (dropped.length) log(`sealed ${dropped.length} credential-shaped variables out of the ${kind} environment`);
   const env = { ...childEnv(kind), ...plan.env };
 
-  const child = spawn(settings.bin, plan.args, {
-    cwd: plan.cwd,
-    env,
-    stdio: [stdin, 'pipe', 'pipe'],
-  }) as Child;
+  const child = spawnCli(settings.bin, plan.args, { cwd: plan.cwd, env, stdin: plan.input === undefined ? stdin : 'pipe' });
+  // A CLI that is gone before it has read its stdin fails the write, and that must not take the daemon with it.
+  child.stdin?.on('error', (error) => log(`${kind} stopped reading its stdin: ${error.message}`));
+  if (plan.input !== undefined) child.stdin?.end(plan.input);
 
   const kill = () => {
-    child.kill('SIGTERM');
-    const hardKill = setTimeout(() => child.kill('SIGKILL'), KILL_GRACE_MS);
+    stopTree(child, 'SIGTERM');
+    const hardKill = setTimeout(() => stopTree(child, 'SIGKILL'), KILL_GRACE_MS);
     hardKill.unref();
   };
   if (signal.aborted) kill();
@@ -96,7 +93,7 @@ function notInstalled(runner: Runner, settings: AgentSettings): RunError {
   return new RunError(
     'AGENT_MISSING',
     `Could not run "${settings.bin}" — ${agent.label} is not installed, or not on the daemon's PATH. ` +
-      `Install it (${agent.install}), or set {"agents":{"${runner.kind}":{"bin":"/absolute/path/to/${agent.bin}"}}} ` +
+      `Install it (${installHint(runner.kind)}), or set {"agents":{"${runner.kind}":{"bin":"/absolute/path/to/${agent.bin}"}}} ` +
       `in ${configPath}.`,
   );
 }
@@ -154,7 +151,7 @@ function drive(
 
     // A conversation ends when its stdin does; the CLI is asked to go, and stopped if it lingers.
     const hangUp = () => {
-      if (!child.stdin) return;
+      if (!conversation || !child.stdin) return;
       child.stdin.end();
       const lingering = setTimeout(stop, KILL_GRACE_MS);
       lingering.unref();

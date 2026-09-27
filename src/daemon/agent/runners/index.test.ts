@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -6,6 +6,7 @@ import { AGENT_KINDS, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import type { AgentConfig, AgentSettings } from '../config';
 import { MCP_RULE, settingsPath } from './antigravity';
+import { stubCli } from './fixtures/support';
 import { agentState, grantRunner, mcpServerFor, refreshModelLists, RUNNERS, runnerFor } from './index';
 
 const bin = join(stateDir, 'stub-bin');
@@ -16,15 +17,13 @@ const probes = join(stateDir, 'probes.log');
  * version probe is recorded: a runner's `check()` may call the binary again — Cursor asks it
  * whether it is signed in — and those are not what `rounds()` is counting.
  */
-const stub = (name: string, { prints = `${name} 1.0.0`, exit = 0 } = {}) => {
-  const path = join(bin, name);
-  writeFileSync(
-    path,
-    `#!/bin/sh\ncase "$1" in --version) echo ${name} >> "${probes}" ;; esac\necho "${prints}" >&2\nexit ${exit}\n`,
+const stub = (name: string, { prints = `${name} 1.0.0`, exit = 0 } = {}) =>
+  stubCli(
+    join(bin, name),
+    `if (process.argv[2] === '--version') require('node:fs').appendFileSync(${JSON.stringify(probes)}, ${JSON.stringify(`${name}\n`)});
+console.error(${JSON.stringify(prints)});
+process.exit(${exit});`,
   );
-  chmodSync(path, 0o755);
-  return path;
-};
 
 /** The stubs probed so far, a round at a time. Every agent is probed at once, so each round is sorted. */
 const rounds = () => {
@@ -111,6 +110,15 @@ describe('readiness probes', () => {
       message: `"${expired} --version" failed: licence expired.`,
       fix: AGENTS.codex.install,
     });
+  });
+
+  test('an agent that cannot be started at all is unusable on its own, and the rest still answer', async () => {
+    const state = await agentState(configWith({ codex: { bin: `${join(bin, 'codex')}\0` } }), { refresh: true });
+    expect(state.runners.find((status) => status.kind === 'codex')).toMatchObject({
+      ready: false,
+      problem: { code: 'AGENT_UNUSABLE', fix: expect.stringContaining('"codex":{"bin"') },
+    });
+    expect(state.runners.find((status) => status.kind === 'claude')).toMatchObject({ ready: true });
   });
 
   test('an installed agent that still needs setting up is not ready, and says why', async () => {

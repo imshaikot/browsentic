@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { clearLockfile, holdWake, isRunning, readLockfile, type Lockfile } from './lockfile';
@@ -23,6 +23,7 @@ export async function ensureDaemon(): Promise<Lockfile> {
     detached: true,
     stdio: 'ignore',
     env,
+    windowsHide: true,
   });
   child.unref();
 
@@ -79,7 +80,11 @@ export interface StopResult {
   stubborn: RunningDaemon[];
 }
 
-/** SIGTERM every daemon, then SIGKILL whatever is still standing, and drop the lockfile. */
+/**
+ * SIGTERM every daemon, then SIGKILL whatever is still standing, and drop the lockfile. Windows has no
+ * SIGTERM to catch — a kill there ends the daemon alone, and the agent CLIs it started run on — so each
+ * one is ended there with everything it started.
+ */
 export async function stopDaemons(graceMs = 5_000): Promise<StopResult> {
   holdWake();
   const daemons = await runningDaemons();
@@ -94,6 +99,10 @@ export async function stopDaemons(graceMs = 5_000): Promise<StopResult> {
 }
 
 function kill(pid: number, signal: NodeJS.Signals): void {
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+    return;
+  }
   try {
     process.kill(pid, signal);
   } catch {

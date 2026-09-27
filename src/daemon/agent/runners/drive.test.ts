@@ -12,6 +12,7 @@ import { codexRunner } from './codex';
 import { launch, runJson, runStream } from './drive';
 import { jsonContext, streamContext } from './fixtures/support';
 import { RunError, type Plan, type Runner, type StreamReader, type StreamSink } from './types';
+import { bits, modeOf } from '../../test/modes';
 
 /** Each line the stand-in prints is one sink call, as JSON: ["text", "hello"]. */
 const replay: StreamReader = (line, sink) => {
@@ -88,6 +89,21 @@ describe('a streamed run', () => {
     });
   });
 
+  test("a plan's input reaches the agent on stdin, which is then closed, and never on its command line", async () => {
+    const script = `let heard = ''; process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
+      console.log(JSON.stringify(['text', heard + ' | argv:' + process.argv.slice(1).join(' ')]));
+      console.log('["done","end_turn"]');
+    });`;
+    const { said } = await run(standIn(script, (real) => ({ ...real, input: 'what does "this" page cost?\nand the next one' })));
+    expect(said).toBe('what does "this" page cost?\nand the next one | argv:');
+  });
+
+  test('an agent gone before it reads its input fails the run as usual, and the daemon carries on', async () => {
+    const script = 'process.exit(3)';
+    const refused = await failure(run(standIn(script, (real) => ({ ...real, input: 'x'.repeat(1 << 20) }))));
+    expect(refused).toMatchObject({ code: 'AGENT_FAILED' });
+  });
+
   test('a run that never names a session reports none, so a stale one is not resumed', async () => {
     expect((await run(standIn(printing(['done', 'end_turn'])))).outcome).toEqual({ stopReason: 'end_turn', sessionId: null });
   });
@@ -110,10 +126,10 @@ describe('a streamed run', () => {
     const cwd = join(antigravityRunner.workspace('run'), 'files-conversation');
     expect({
       said,
-      directory: statSync(cwd).mode & 0o777,
-      instructions: statSync(join(cwd, 'AGENTS.md')).mode & 0o777,
-      mcpConfig: statSync(join(cwd, '.agents', 'mcp_config.json')).mode & 0o777,
-    }).toEqual({ said: expect.stringMatching(/^You are Browsentic\.\n/), directory: 0o700, instructions: 0o600, mcpConfig: 0o600 });
+      directory: modeOf(cwd),
+      instructions: modeOf(join(cwd, 'AGENTS.md')),
+      mcpConfig: modeOf(join(cwd, '.agents', 'mcp_config.json')),
+    }).toEqual({ said: expect.stringMatching(/^You are Browsentic\.\n/), directory: bits(0o700), instructions: bits(0o600), mcpConfig: bits(0o600) });
   });
 
   test("a folder a conversation keeps is new again on every turn, so the sweep ages it from its last", async () => {

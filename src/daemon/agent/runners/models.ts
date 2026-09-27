@@ -1,10 +1,10 @@
-import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { AGENTS, isModelId, type AgentKind, type ModelList } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import type { AgentSettings } from '../config';
+import { spawnCli, stopTree, type CliProcess } from './command';
 import { childEnv } from './drive';
 import type { Listing, ModelLister, Runner } from './types';
 
@@ -121,6 +121,13 @@ function list(kind: AgentKind, bin: string, args: string[]): Promise<Listing | {
   const command = `"${[basename(bin), ...args].join(' ')}"`;
   const group = process.platform !== 'win32';
 
+  let child: CliProcess;
+  try {
+    child = spawnCli(bin, args, { cwd, env: { ...childEnv(kind), NO_COLOR: '1' }, detached: group });
+  } catch (error) {
+    return Promise.resolve({ error: (error as Error).message });
+  }
+
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -133,17 +140,11 @@ function list(kind: AgentKind, bin: string, args: string[]): Promise<Listing | {
       resolve(result);
     };
 
-    const child = spawn(bin, args, {
-      cwd,
-      env: { ...childEnv(kind), NO_COLOR: '1' },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: group,
-    });
     // The whole group, so a wrapper script's own children go with it.
     const stop = (error: string) => {
       try {
         if (group && child.pid) process.kill(-child.pid, 'SIGKILL');
-        else child.kill('SIGKILL');
+        else stopTree(child, 'SIGKILL');
       } catch {
         child.kill('SIGKILL');
       }
