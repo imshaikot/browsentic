@@ -95,6 +95,27 @@ yet, so the popup, the docs and the release notes say *beta*. What that means in
 
 [Choosing an agent](agents.md) has the per-agent detail. Please report what you find.
 
+## Windows is experimental
+
+The daemon runs on Windows and its tests run there on every change, but nobody has yet taken the
+whole of it — setup, pairing, a side-panel run, a cancelled one — through a Windows desktop. Until
+someone has:
+
+- **An agent installed with npm is started through the program its `.cmd` names**, never through
+  `cmd.exe`, which can pass neither a prompt's many lines nor page text intact. A batch file that is
+  not an npm or pnpm shim is reported as *unusable*: set that agent's `bin` to the `.exe` it runs.
+- **A command line holds at most 32,767 characters.** Claude Code takes its message on stdin and its
+  prompt from a file, so it never meets the limit. Codex's `exec` fallback, Qwen Code and Grok Build
+  pass the prompt as an argument, and a turn with long site notes, attached files or fetched data can
+  pass it; that run fails saying so, before anything starts.
+- **Containment is less proven.** Cursor's kernel sandbox has no Windows backend, so only its deny
+  rules apply. Codex's read-only sandbox and Grok's workspace sandbox have not been measured on
+  Windows; treat either as less fenced off there than on macOS or Linux.
+- **Stopping a run ends the agent and everything it started at once**, because Windows has no signal
+  a CLI could clean up on.
+
+Please report what you find.
+
 ## MCP clients cannot answer a prompt
 
 Anything the policy would confirm resolves to **deny** for an external MCP client, because there is

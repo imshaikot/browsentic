@@ -87,7 +87,8 @@ and shown the same way, and its result is sealed, fenced and turned into a pictu
 [`src/daemon/agent/runners/`](../../src/daemon/agent/runners/) — which turns it into an argv, a working
 directory and any files that CLI reads from disk. A shared driver (`runners/drive.ts`) does the
 spawning, the abort wiring and the line reading; the runner only decides *what to say* and *how to
-read the answer back*.
+read the answer back*. The driver starts every CLI through `runners/command.ts`, the only place an
+agent CLI is spawned or stopped — see [Windows](#windows).
 
 **Adding an agent is one file plus one line in `runners/index.ts`.**
 
@@ -95,9 +96,9 @@ Every runner is given the same five things, by whichever mechanism its CLI suppo
 
 | | Claude Code | Codex | Antigravity | Mistral Vibe | Grok Build | Cursor CLI | Qwen Code | OpenCode |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Run | `claude -p --output-format stream-json` | `codex app-server`, held over stdin for the turn; `codex exec --json` when it is refused, when `agents.codex.transport` is `"exec"`, and for one-shots | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` | `opencode run --format json --pure --agent browsentic-contained` |
+| Run | `claude -p --output-format stream-json`, the message on stdin | `codex app-server`, held over stdin for the turn; `codex exec --json` when it is refused, when `agents.codex.transport` is `"exec"`, and for one-shots | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` | `opencode run --format json --pure --agent browsentic-contained` |
 | MCP server | `--mcp-config` + `--strict-mcp-config` | none: the tools go to `thread/start` as `dynamicTools`, and each of the user's servers is switched off in the thread's config. `exec`: `-c mcp_servers.browsentic.*` under `--ignore-user-config`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, allowed as `Mcp(browsentic:*)` with every other server denied by name | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk | `mcp.browsentic` in `OPENCODE_CONFIG_CONTENT`, each tool allowed by name on the run's own agent |
-| System prompt | `--append-system-prompt`, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `developerInstructions` on `thread/start` (`-c developer_instructions` on `exec`), kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
+| System prompt | `--append-system-prompt-file`, a file per run, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `developerInstructions` on `thread/start` (`-c developer_instructions` on `exec`), kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
 | Follow-up turns | `--resume <session>` | `thread/resume` (`exec resume <thread>`); either resumes a thread the other began | `--conversation <id>` | `--resume <session>`, re-read from the folder the session began in | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it | `--resume <session>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it | `--session <id>`, from a session store of Browsentic's own (`OPENCODE_DB`) |
 | Kept off the machine by | `--allowedTools` + `--disallowedTools` | the user's MCP servers off (`--ignore-user-config` on `exec`), `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.shell_tool=false`, `-c features.view_image=false`, `-c features.multi_agent=false` | its own permission rules | `--enabled-tools`, which is an allowlist | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` | deny rules in `.cursor/cli.json`, plus `--sandbox enabled` | `--safe-mode`, `--exclude-tools`, `--approval-mode default` | an agent whose permission opens on `"*": "deny"`, `--pure`, `OPENCODE_DISABLE_PROJECT_CONFIG`, `OPENCODE_DISABLE_SHARE` |
 
@@ -217,6 +218,27 @@ What the spawned process may touch on the machine is a separate concern with its
 point — see [Guardrails § Spawn containment](guardrails.md#spawn-containment). It is vetted at
 `launch()`, before `spawn()`, and a plan that has lost its containment does not start.
 
+### Windows
+
+`spawnCli()` and `stopTree()` in `runners/command.ts` start and stop every agent CLI — a run, a
+one-shot, the readiness probe, a model list — and are where Windows differs:
+
+- **An npm install is a batch file.** `codex` is `codex.cmd`, which `spawn()` does not find on
+  `PATH` and refuses to run without a shell. A shell is no answer: a prompt runs to many lines,
+  which `cmd.exe` cannot pass as one argument, and it carries page text, which `cmd.exe` would
+  interpret. `resolveCommand()` looks the command up by `PATHEXT`, reads an npm or pnpm shim, and
+  starts what it names — the `.exe`, or the script under the daemon's own Node. Any other batch file
+  is `AGENT_UNUSABLE`, naming the `bin` setting to change.
+- **A command line is capped at 32,767 characters**, and one past it fails `AGENT_FAILED` before
+  anything starts. Claude Code takes its message on stdin (`Plan.input`) and its prompt from a file,
+  so no turn reaches the cap; Codex's `exec` fallback, Qwen Code and Grok Build still pass the
+  prompt in argv.
+- **No console window.** The daemon has none, so every spawn passes `windowsHide`.
+- **No signals.** A kill ends one process and leaves what it started running, so `stopTree()` ends
+  the whole tree with `taskkill /T /F`, at once, and `browsentic stop` does the same to the daemon.
+  `browsentic mcp` exits when its stdin closes, on every platform, so a server whose client was
+  killed does not hold its socket to the daemon.
+
 ---
 
 ## Prompt assembly
@@ -306,7 +328,7 @@ panel ──attach────► background ──indexFile               sessi
    outline, facts, notes, coverage — or a `rejected` verdict when the file will not open.
    `validateFileReport()` clamps every field, and an answer that does not parse is `failed`.
 3. **Ending it.** `runJson()` takes an `accept` callback: the moment stdout holds an answer it
-   accepts, the task settles and the CLI is stopped (SIGTERM, then SIGKILL after 5 s) rather than
+   accepts, the task settles and the CLI is stopped (SIGTERM, then SIGKILL after 5 s; on Windows, its whole tree at once) rather than
    waited out. `finally` deletes the scratch copy and drops the registry entry; the report alone is
    kept for up to two minutes, for a turn sent while it was still being written. Claude Code is run
    with `--no-session-persistence` and Codex with `--ephemeral`, so neither keeps the session; the

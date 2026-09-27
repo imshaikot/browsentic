@@ -307,7 +307,7 @@ In `~/.browsentic/config.json`:
 | Key | Default | Effect |
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on. The agent picker writes this. |
-| `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. |
+| `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. On Windows it may name the `.cmd` npm installed, or the `.exe` itself. |
 | `agents.<name>.model` | `sonnet` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. A value that starts with a dash or holds a space is ignored, so a typo cannot pass the CLI a flag. |
 | `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
@@ -333,6 +333,8 @@ Claude runner's settings.
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
 | Cursor CLI: *Authentication required* | The daemon inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
 | Cursor CLI on Windows | Cursor's sandbox has no Windows backend, so only the deny rules apply there. The browser still works; the machine is less fenced off than on macOS or Linux. |
+| Windows: `AGENT_UNUSABLE`, *a batch file Browsentic cannot see through* | The agent's command is a batch file that is not an npm or pnpm shim. Set `agents.<name>.bin` to the `.exe` it runs. |
+| Windows: *This turn is too long for Windows to start* | Codex's `exec` fallback, Qwen Code and Grok Build pass the prompt as an argument, which Windows caps at 32,767 characters. Start a new conversation, or leave out long site notes and attachments. See [Limits](limits.md#windows-is-experimental). |
 | `AGENT_UNSAFE`: *Grok Build offered this run …* | Grok offered tools Browsentic never asks for, so the run was stopped before the model saw them. Update Grok Build and Browsentic, and report it if it persists. |
 | Qwen Code: *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier has ended. Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL`. |
 | Qwen Code cannot find a key you have exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; `ANTHROPIC_*` and `GEMINI_*` are sealed away. Point Qwen at one of the first four. |
