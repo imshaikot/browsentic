@@ -1,9 +1,10 @@
+import { join, posix, win32 } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { AGENT_KINDS, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { mcpServerFor, RUNNERS } from '../agent/runners';
 import type { Plan, StreamContext } from '../agent/runners/types';
 import { stateDir } from '../lockfile';
-import { CONTAINMENT, sealEnv, sealedAway, vetPlan, type SpawnMode } from './spawn';
+import { CONTAINMENT, sealEnv, sealedAway, vetPlan, within, type SpawnMode } from './spawn';
 
 const settingsFor = (kind: AgentKind) => ({ bin: AGENTS[kind].bin });
 
@@ -479,6 +480,36 @@ describe('spawn containment', () => {
 
     test('a sibling path is not inside the state dir', () => {
       expect(vetPlan('claude', 'run', { ...claudeRun, cwd: `${stateDir}-evil` }, stateDir)).toHaveLength(1);
+    });
+
+    test('a path that climbs out of the state dir is not inside it, whatever it starts with', () => {
+      expect(vetPlan('antigravity', 'run', { ...agyRun, cwd: join(stateDir, 'agents', '..', '..', 'elsewhere') }, stateDir)).toHaveLength(1);
+    });
+  });
+
+  describe('inside the state dir, by each platform’s path rules', () => {
+    const home = 'C:\\Users\\sam\\.browsentic';
+
+    test('a Windows folder under it is inside, however its drive letter is cased', () => {
+      expect(within(`${home}\\agents\\grok\\run\\c1`, home, win32)).toBe(true);
+      expect(within('c:\\users\\SAM\\.browsentic\\agents', home, win32)).toBe(true);
+      expect(within(home, home, win32)).toBe(true);
+    });
+
+    test('a Windows sibling, another drive, or a climb out is not inside', () => {
+      expect(within(`${home}-evil\\agents`, home, win32)).toBe(false);
+      expect(within('D:\\Users\\sam\\.browsentic', home, win32)).toBe(false);
+      expect(within(`${home}\\agents\\..\\..\\Documents`, home, win32)).toBe(false);
+    });
+
+    test('a folder whose name only begins with two dots is still inside', () => {
+      expect(within('/home/sam/.browsentic/..cache', '/home/sam/.browsentic', posix)).toBe(true);
+      expect(within(`${home}\\..cache`, home, win32)).toBe(true);
+    });
+
+    test('POSIX spells it with slashes, and compares case by case', () => {
+      expect(within('/home/sam/.browsentic/agents/vibe/run', '/home/sam/.browsentic', posix)).toBe(true);
+      expect(within('/home/sam/.Browsentic/agents', '/home/sam/.browsentic', posix)).toBe(false);
     });
   });
 
