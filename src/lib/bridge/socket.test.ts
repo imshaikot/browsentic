@@ -46,6 +46,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const connections = () => readFileSync(logPath, 'utf8').match(/connected from/g)?.length ?? 0;
 /** Past the first retry the backoff can schedule, which lands within a second. */
 const RETRY_WINDOW_MS = 1_200;
+/** A fresh import of the worker, up to 3 s for the link and the retry window: past vitest's 5 s once the whole suite shares the machine. */
+const TEST_TIMEOUT_MS = 20_000;
 
 async function daemonState(): Promise<DaemonState | undefined> {
   return (await fakeBrowser.storage.session.get('browsentic/daemon'))['browsentic/daemon'] as DaemonState | undefined;
@@ -86,6 +88,6 @@ describe('keeping one link to the daemon', () => {
     await wait(RETRY_WINDOW_MS);
     expect(connections() - before).toBe(1);
     expect((await daemonState())?.connected).toBe(true);
-  });
+  }, TEST_TIMEOUT_MS);
 
 });
