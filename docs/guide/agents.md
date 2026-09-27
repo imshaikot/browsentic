@@ -65,12 +65,13 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 | Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` |
 | Default model | `sonnet`, the newest Sonnet | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
 | Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever | a variant the model defines, e.g. `high` or `max` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, your `config.toml` left out, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, no MCP server but the browser's, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
 
-All eight get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
-and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
-the rest of your machine — see [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment)
-for exactly what each flag buys.
+All eight get the same system prompt, the same browser tools — over a `browsentic` MCP server pointed
+back at the daemon, or for Codex handed to it directly — and the same [approval gate](approvals.md).
+What differs is how well each one can be fenced off from the rest of your machine — see
+[internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment) for
+exactly what each flag buys.
 
 **Keep whichever you use reasonably current.** Browsentic passes flags that contain the run. A build
 too old to understand them fails the run with an explicit "update it" message rather than running
@@ -91,43 +92,54 @@ the daemon restarts it cannot know what a conversation holds, so the first follo
 whole prompt once. The agent's prompt cache is untouched either way, because nothing that came before
 changes.
 
-### Codex keeps the browser tools out of sight
+### Codex gets the browser tools as its own
 
-Codex does not put an MCP server's tools in the model's list. They are deferred behind its
-`tool_search`, and on a code-mode model (`gpt-5.6-terra` and the like) they exist only inside its
-`exec` sandbox. Left to itself, a model answers a question about the page from the tools it *can*
-see — its own memory, or a web search — without ever looking at your browser.
+Codex runs through its **app-server** — the interface its own editor extensions use — held open for
+the length of a turn. Browsentic hands it the browser tools directly, so they are in the model's
+list from the first request, rather than as an MCP server whose tools Codex would defer until the
+model searched for them. Its replies stream in as they are written, and the context card shows how
+full its window is. Each tool call it makes comes back to the daemon and goes through the same gate,
+approvals and timeline as a Claude Code run's.
 
-So a Codex run is given a section of prompt saying where its browser tools are and how to load them,
-and it is told to read the page rather than recall it. Web search is switched off unless the run is
-[mapping a site](features/site-maps.md), and sub-agents, goal memory, connector apps, plugins, image
-generation, Codex's own browser and computer use, and the list of your Codex skills are switched off
-for good measure. A code-mode model can still spawn sub-agents — nothing in Codex 0.155 turns that
-off — but they share the run's browser tools, so each of their actions still goes through the same
-approval gate and shows on the timeline.
+The app-server interface is marked experimental. If a Codex build refuses it, the same turn runs
+through `codex exec` instead and later turns go straight there until the daemon restarts; the two
+resume each other's conversations. `"transport": "exec"` under `agents.codex` in `config.json`
+chooses exec outright.
 
-**Codex runs without your `config.toml`.** A `-c` flag merges into that file rather than replacing
-it, so every MCP server you gave Codex would start beside the browser — with its tools on offer and no
-approval gate in front of them — and settings on a `browsentic` entry of your own would land on the
-run's. Browsentic starts Codex with `--ignore-user-config` instead. Your sign-in still comes from
-`~/.codex`, and the `model` and `model_reasoning_effort` at the top of your `config.toml` still apply
-when nothing is picked in the popup. Profiles, custom model providers and everything else in the file
-do not reach a side-panel run.
+Your `config.toml` still applies on the app-server — your model, provider and profile among it —
+except its MCP servers: Browsentic asks Codex which there are and switches each one off for the
+thread, and a run in which one starts anyway is stopped (`AGENT_UNSAFE`). Through exec, Browsentic
+starts Codex with `--ignore-user-config` instead, because a `-c` flag only merges into that file:
+`mcp_servers={}` clears nothing, and settings on a `browsentic` entry of your own would land on the
+run's. Your sign-in comes from `~/.codex` either way, and through exec the `model` and
+`model_reasoning_effort` at the top of your `config.toml` still apply when nothing is picked in the
+popup.
 
-**It has no shell and no image viewer.** Both read your disk, and a browsing run has the page for
-that. Codex still offers its patch tool — nothing switches it off — and its read-only sandbox refuses
-every write. If a run ever reports a shell command or a changed file anyway, Browsentic stops it
-(`AGENT_UNSAFE`). The file analyst reading a text file keeps the shell, read-only; a picture is
-attached to its message instead of opened.
+**Through exec, Codex keeps the tools out of sight.** They are deferred behind its `tool_search`,
+and on a code-mode model (`gpt-5.6-terra` and the like) they exist only inside its `exec` sandbox.
+Left to itself, a model answers a question about the page from the tools it *can* see — its own
+memory, or a web search — so an exec run is given a section of prompt saying where its browser
+tools are and how to load them. Its replies arrive whole, and it reports tokens only for a whole
+turn, added up over every request in it and every turn before, so the context card shows no count
+for it rather than a wrong one.
 
-**Codex cuts a tool result at 10,000 tokens** by default, which a whole-page snapshot can pass.
-Browsentic raises that to 25,000, the ceiling Claude Code puts on the same result. A code-mode model
-also has to ask for it at the top of every `exec` script, which the prompt tells it to do. A result
-past 25,000 is still cut, so the prompt asks for smaller reads too.
+**Either way it has no shell and no image viewer.** Both read your disk, and a browsing run has the
+page for that. Codex still offers its patch tool — nothing switches it off — and its read-only
+sandbox refuses every write. If a run ever reports a shell command or a changed file anyway,
+Browsentic stops it. Web search is switched off unless the run is [mapping a site](features/site-maps.md),
+and so are sub-agents, goal memory, connector apps, plugins, image generation, Codex's own browser
+and computer use, and the list of your Codex skills. A code-mode model can still spawn sub-agents —
+nothing in Codex 0.155 turns that off — but they share the run's browser tools, so each of their
+actions goes through the same approval gate and shows on the timeline.
 
-**It does not say how full its window is.** Codex reports tokens only for a whole turn, added up over
-every request in it and every turn before, so the context card shows no count for it rather than a
-wrong one.
+A code-mode model calls the tools from inside its `exec` scripts. There a result holding a
+screenshot comes back as one string, the picture's `data:` URL on its first line, and the prompt
+tells the model to pass that line to `image()`. **Codex cuts a tool result at 10,000 tokens** by
+default; Browsentic raises that to 25,000, the ceiling Claude Code puts on the same result, and the
+prompt asks a code-mode script to raise its own and to read in smaller pieces.
+
+The file analyst reading a text file keeps the shell, read-only; a picture is attached to its
+message instead of opened. One-shots always run through exec.
 
 ### Mistral Vibe is in beta
 
