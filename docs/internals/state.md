@@ -16,9 +16,9 @@ Nothing lives in the repository.
 ├── stopped                    only after `browsentic stop`: the helper leaves the daemon down
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
 ├── skills/                    hand-written skill overrides
-├── cli/                       macOS app only: the command, the daemon, bundled skills, the extension payload
-├── bin/                       macOS app only: the `browsentic` and `browsentic-mcp` launchers
-└── runtime/node/              macOS app only, and only when the Mac had no Node 20+: a private copy from nodejs.org
+├── cli/                       desktop apps only: the command, the daemon, bundled skills, the extension payload
+├── bin/                       desktop apps only: the `browsentic` and `browsentic-mcp` launchers (.exe on Windows)
+└── runtime/node/              desktop apps only, and only when the computer had no Node 20+: a private copy from nodejs.org
 
 ~/browsentic/                  (paths configurable)
 ├── extension/chrome-mv3/      the unpacked extension `browsentic setup` installs
@@ -32,13 +32,13 @@ Nothing lives in the repository.
 | --- | --- | --- |
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
 | `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
-| `config.json` | You, the agent picker, and the settings page and Mac app for `theme` and `guardrails` | Re-read before every run — no restart needed — and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
+| `config.json` | You, the agent picker, and the settings page and desktop app for `theme` and `guardrails` | Re-read before every run — no restart needed — and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
 | `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw. Each browser gets a manifest in its own `NativeMessagingHosts` folder (a registry key on Windows) naming the extension origins allowed to use it; pairing adds the new one. `browsentic uninstall` removes both |
 | `stopped` | `browsentic stop` and `restart` | While it exists the helper starts no daemon, so a paired browser cannot undo a stop. The next daemon to start removes it |
-| `cli/`, `bin/`, `runtime/` | [Browsentic.app](../guide/mac-app.md) | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
+| `cli/`, `bin/`, `runtime/` | The [macOS](../guide/mac-app.md) or [Windows](../guide/windows-app.md) app | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
 ## The one that is not yours

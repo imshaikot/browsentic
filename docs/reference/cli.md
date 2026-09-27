@@ -108,8 +108,8 @@ configurations written against the older name keep working.
 | `browsentic downloads clear` | Delete all of them |
 | `browsentic token` | The control token, for MCP clients. Not for the browser |
 
-`agent`, `skills`, `approvals`, `tasks` and `downloads` take `--json`. It is what the [macOS app](../guide/mac-app.md)
-reads, so the app and a terminal can never disagree about what is on disk.
+`agent`, `skills`, `approvals`, `tasks` and `downloads` take `--json`. It is what the [macOS](../guide/mac-app.md) and
+[Windows](../guide/windows-app.md) apps read, so an app and a terminal can never disagree about what is on disk.
 
 ## Lifecycle
 
@@ -140,6 +140,8 @@ Not the CLI, but frequently wanted alongside it:
 | `yarn check` | Both type checks plus both fixture suites |
 | `yarn mac:app` | Build both halves, then `dist/mac/Browsentic.app` around them (macOS only) |
 | `yarn mac:dmg` | The same, wrapped in `dist/mac/Browsentic-<version>.dmg` |
+| `yarn win:app` | Build both halves, then the Windows app's installer around them (Windows, or macOS with `cargo-xwin`) |
+| `yarn win:preview` | The Windows app's window in a browser, against a stand-in daemon |
 | `yarn check:intent "<utterance>"` | Explain how one instruction would be routed |
 
 Full list: [internals/contributing.md](../internals/contributing.md).

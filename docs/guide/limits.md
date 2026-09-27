@@ -97,9 +97,9 @@ yet, so the popup, the docs and the release notes say *beta*. What that means in
 
 ## Windows is experimental
 
-The daemon runs on Windows and its tests run there on every change, but nobody has yet taken the
-whole of it — setup, pairing, a side-panel run, a cancelled one — through a Windows desktop. Until
-someone has:
+The daemon runs on Windows and its tests run there on every change. On a Windows 11 desktop it has
+been set up, paired and driven from the side panel by Claude Code; a cancelled run, the other agents
+and the [Windows app](windows-app.md) have not been taken through one yet. Until they have:
 
 - **An agent installed with npm is started through the program its `.cmd` names**, never through
   `cmd.exe`, which can pass neither a prompt's many lines nor page text intact. A batch file that is
