@@ -71,6 +71,8 @@ export function ContextCard({ breakdown }: { breakdown: ContextBreakdown }) {
                 'Antigravity does not report token counts.'
               ) : breakdown.agent === 'vibe' ? (
                 'Mistral Vibe does not report token counts.'
+              ) : breakdown.agent === 'codex' ? (
+                'Codex does not report how full its window is.'
               ) : (
                 'Token counts appear after the agent’s first reply.'
               )}

@@ -4,6 +4,7 @@
 {"id":"1","msg":{"type":"agent_message_delta","delta":"It costs "}}
 {"id":"1","msg":{"type":"agent_message_delta","delta":"$12."}}
 {"id":"1","msg":{"type":"agent_message","message":"It costs $12."}}
-{"id":"1","msg":{"type":"web_search_begin","query":"acme pricing"}}
+{"id":"1","msg":{"type":"web_search_begin","call_id":"ws_1"}}
+{"id":"1","msg":{"type":"web_search_end","call_id":"ws_1","query":"acme pricing"}}
 {"id":"1","msg":{"type":"token_count","info":{"total_token_usage":{"input_tokens":30000,"output_tokens":80},"last_token_usage":{"input_tokens":16000,"output_tokens":30}}}}
 {"id":"1","msg":{"type":"task_complete","last_agent_message":"It costs $12."}}

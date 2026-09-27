@@ -5,6 +5,18 @@ import type { AgentSettings } from '../config';
 
 const RUN_DIR_TTL_MS = 24 * 60 * 60_000;
 
+/**
+ * How long a CLI should wait on one browser tool call before giving up on it. An approval card
+ * waits on the user, page_awaitMonitor up to ten minutes, and a call the CLI abandons still runs
+ * once the user answers — after the model has been told it failed.
+ */
+export const MCP_CALL_TIMEOUT_MS = 30 * 60_000;
+
+/** What the user reads when the agent CLI started but the browser tools it was given did not. */
+export const browserToolsDidNotStart = (label: string): string =>
+  `${label} could not start Browsentic's browser tools, so this run could not reach the page. ` +
+  'Run "browsentic restart", then send the message again.';
+
 /** Concurrent runs each get their own workspace; yesterday's are nobody's. */
 export function sweepRunDirs(base: string, ttlMs = RUN_DIR_TTL_MS): void {
   let entries: string[];

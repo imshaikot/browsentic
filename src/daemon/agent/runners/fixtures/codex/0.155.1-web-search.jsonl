@@ -1,0 +1,6 @@
+# Recorded from codex 0.155.1 through the runner's own plan, with a local stand-in for the model: one live web search, opened and closed under the same id.
+{"type":"thread.started","thread_id":"01a0e2a1-0346-7aa0-8967-7964b30d9116"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"web_search","id":"ws_01a0e2a1-038c-72f1-b448-c2ec55a7d7de","query":"weather","action":{"type":"search","query":"weather"}}}
+{"type":"item.completed","item":{"id":"item_0","type":"web_search","id":"ws_01a0e2a1-038c-72f1-b448-c2ec55a7d7de","query":"weather","action":{"type":"search","query":"weather"}}}
+{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":10,"reasoning_output_tokens":0}}

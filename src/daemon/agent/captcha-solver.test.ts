@@ -75,7 +75,7 @@ describe('solving with the analyst in the loop', () => {
   test('an agent that cannot see pictures leaves the challenge to the caller untouched', async () => {
     const { invoke } = extension(open());
     const answer = analyst({ tiles: [3] });
-    expect(await solveCaptchaWithAnalyst(invoke, {}, { ...config, agent: 'codex' }, answer)).toEqual(open());
+    expect(await solveCaptchaWithAnalyst(invoke, {}, { ...config, agent: 'vibe' }, answer)).toEqual(open());
     expect(answer).not.toHaveBeenCalled();
   });
 });

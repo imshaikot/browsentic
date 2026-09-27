@@ -88,6 +88,15 @@ describe('reading an attached file', () => {
     expect([await named(png, 'picture.txt'), await named(Buffer.from('a,b'), 'data.png')]).toEqual(['picture.txt.png', 'data.png.txt']);
   });
 
+  test('a picture is handed over as one too, for an agent that takes it attached rather than opened', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+    agent.mockResolvedValue(REPORT);
+    await analyzeFile(frame(png, { name: 'receipt.png' }), config, new AbortController().signal);
+    await analyze(csv);
+    const [picture, text] = agent.mock.calls;
+    expect([picture[3].image === /The file is at (\S+)\. /.exec(picture[0])?.[1], text[3].image]).toEqual([true, undefined]);
+  });
+
   test('the task is ended as soon as a usable report is in, and not by anything short of one', async () => {
     await analyze(csv);
     const { accept } = agent.mock.calls[0][3];

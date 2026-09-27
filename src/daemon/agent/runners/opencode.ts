@@ -5,7 +5,7 @@ import { dirname, join, relative } from 'node:path';
 import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { MCP_SERVER_NAME } from './claude';
-import { conversationDir, effortOf, parseJsonLine, sweepRunDirs } from './util';
+import { conversationDir, effortOf, MCP_CALL_TIMEOUT_MS, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
 /**
@@ -32,9 +32,6 @@ const WEB_TOOLS = ['webfetch', 'websearch'];
 
 /** Claude Code's 25,000-token MCP ceiling. OpenCode's own 50 KB cut points the model at a saved copy it has no tool to open. */
 const RESULT_BYTES = 100_000;
-
-/** OpenCode abandons an MCP call after a minute; an approval card waits on the user, and page_awaitMonitor up to ten. */
-const TOOL_TIMEOUT_MS = 30 * 60_000;
 
 const TRUNCATION = `A tool result over ${RESULT_BYTES / 1000} KB comes back cut, and the saved copy OpenCode points to cannot be opened in this run, so ask for less at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back.`;
 
@@ -221,7 +218,7 @@ const server = (mcp: McpServer) => ({
   command: [mcp.command, ...mcp.args],
   environment: mcp.env,
   enabled: true,
-  timeout: TOOL_TIMEOUT_MS,
+  timeout: MCP_CALL_TIMEOUT_MS,
 });
 
 /** Title generation is a model call per new session that the panel already makes for itself. */

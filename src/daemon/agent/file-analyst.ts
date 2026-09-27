@@ -155,6 +155,7 @@ export async function analyzeFile(req: AnalyzeFileFrame, config: AgentConfig, si
   try {
     const output = await runAgentJson(promptFor(path, req.name, kind), config, stop.signal, {
       reads: true,
+      image: kind === 'image' ? path : undefined,
       timedOut: 'Reading the file took too long.',
       empty: 'The file analyst returned nothing.',
       accept: (text) => readReport(text, agent, kind) !== null,

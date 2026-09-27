@@ -47,6 +47,8 @@ export interface JsonContext {
   workspace: string;
   /** The prompt names a file in the workspace that the agent has to open. */
   reads: boolean;
+  /** That file is this picture, for a CLI that takes an image attached rather than opened. */
+  image?: string;
 }
 
 export interface StreamSink {
@@ -94,6 +96,11 @@ export interface Runner {
   reader(): StreamReader;
   /** This CLI's stream has no closing event, so exiting cleanly is how it says the turn is over. */
   endsOnExit?: boolean;
+  /**
+   * A resumed session goes on sending the system prompt it began with, whatever a later turn
+   * passes, so what changed since has to reach it in the turn's own message.
+   */
+  keepsFirstPrompt?: boolean;
   json(context: JsonContext): Plan;
   /** What a one-shot of this CLI is known to open when handed a file. Text alone when unsaid. */
   opens?: readonly FileKind[];
