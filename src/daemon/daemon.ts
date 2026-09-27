@@ -15,7 +15,6 @@ import {
   type SkillCatalog,
   type SocketFrame,
 } from '@/lib/actions/protocol';
-import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { TaskList } from '@/lib/schedules/task';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
@@ -53,7 +52,7 @@ import { solveCaptchaWithAnalyst } from './agent/captcha-solver';
 import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
-import { configPath, readAgentConfig, writeActiveAgent, writeAgentModel, writeGuardrailSetting } from './agent/config';
+import { readAgentConfig, writeActiveAgent, writeAgentModel } from './agent/config';
 import { agentSkills } from './agent/agent-skills';
 import { agentState, grantRunner, refreshModelLists } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
@@ -78,18 +77,16 @@ import {
   blocked,
   decide,
   describe as describeDecision,
-  guardrailSettings,
   policyFrom,
   sealSecrets,
-  settingWritable,
   summary as summarizeDecision,
 } from './guardrails';
 import { log } from './log';
+import { applyPreference, markConfig, preferencesNow, watchConfig } from './preferences';
 import { readLockfile, writeLockfile, clearLockfile, releaseWake, type Lockfile } from './lockfile';
 import { daemonPorts } from './ports';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
-type GuardrailFrame = Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>;
 type TaskFrame = Extract<SocketFrame, { t: 'tasks' | 'saveTask' | 'deleteTask' | 'pauseTasks' }>;
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
@@ -179,6 +176,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const agents = new Map<ExtensionLink, AgentSession>();
   const analyses = new FileAnalyses();
   const controls = new Set<WebSocket>();
+  const settingsWatchers = new Set<WebSocket>();
+  let configSeen = markConfig();
+  const unwatchConfig = watchConfig(() => configChanged());
   let controlSeq = 0;
   const manifestListeners = new Set<() => void>();
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -431,15 +431,20 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
             source.send({ t: 'agentInfo', id: request.id, result: state });
             // The catalog's agent-skill half belongs to the agent that just took over.
             if (request.t === 'setAgent') pushSkillCatalog(source);
-            if (request.t !== 'agentState') announceAgent(source);
+            if (request.t === 'grantAgent') announceAgent(source);
+            else if (request.t !== 'agentState') configChanged(source);
           });
           return;
         }
         if (request.t === 'listSkills') {
           return source.send({ t: 'skillCatalog', id: request.id, result: skillCatalogNow(request.refresh === true) });
         }
-        if (request.t === 'guardrails' || request.t === 'setGuardrail') {
-          return source.send({ t: 'guardrailInfo', id: request.id, result: settleGuardrail(request) });
+        if (request.t === 'preferences') {
+          return source.send({ t: 'preferencesInfo', id: request.id, result: success(preferencesNow()) });
+        }
+        if (request.t === 'setPreference') {
+          source.send({ t: 'preferencesInfo', id: request.id, result: applyPreference(request.change) });
+          return configChanged(source);
         }
         if (request.t === 'taskDone') return scheduler.finished(request.taskId, request.result);
         if (request.t === 'runTaskNow') {
@@ -490,6 +495,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     void pushAgentState(accepted);
     watchModels();
     pushSkillCatalog(accepted);
+    accepted.send({ t: 'preferencesInfo', id: '', result: success(preferencesNow()) });
     accepted.send({ t: 'taskList', id: '', result: success(scheduler.list()) });
     scheduler.linkOpened();
     if (!known) await adoptExtensionManifest(accepted);
@@ -527,6 +533,27 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     for (const link of openLinks()) pushSkillCatalog(link);
   }
 
+  /**
+   * Hands every open surface what config.json now says, once per change however many paths
+   * noticed it: the write's own caller already has the answer, so it is skipped.
+   */
+  function configChanged(except?: ExtensionLink): void {
+    const mark = markConfig();
+    if (mark.file === configSeen.file) return;
+    const agentMoved = mark.agent !== configSeen.agent;
+    configSeen = mark;
+    const preferences = success(preferencesNow());
+    for (const link of openLinks()) {
+      if (link === except) continue;
+      link.send({ t: 'preferencesInfo', id: '', result: preferences });
+      if (agentMoved) {
+        void pushAgentState(link);
+        pushSkillCatalog(link);
+      }
+    }
+    for (const ws of settingsWatchers) send(ws, { event: 'settings-changed' });
+  }
+
   async function settleAgent(request: AgentFrame): Promise<ActionResult<AgentState>> {
     if (request.t !== 'agentState' && !isAgentKind(request.agent)) {
       return failure('INVALID_INPUT', `"${String(request.agent)}" is not an agent Browsentic knows.`);
@@ -562,21 +589,6 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         if (changed || force) for (const link of openLinks()) void pushAgentState(link);
       })
       .catch((error: unknown) => log(`could not refresh the model lists: ${String(error)}`));
-  }
-
-  function settleGuardrail(request: GuardrailFrame): ActionResult<GuardrailSettings> {
-    if (request.t === 'setGuardrail') {
-      if (!settingWritable(request.setting, request.value)) {
-        return failure(
-          'INVALID_INPUT',
-          `"${request.setting}" is not a guardrail the panel may set. Locked rules are edited in ${configPath}.`,
-        );
-      }
-      writeGuardrailSetting(request.setting, request.value);
-      log(`guardrail ${request.setting} → ${request.value === null ? 'default' : String(request.value)}`);
-    }
-    const config = readAgentConfig();
-    return success(guardrailSettings(config.guardrails ?? {}, config.requireApproval, configPath));
   }
 
   function settleTasks(request: TaskFrame): ActionResult<TaskList> {
@@ -696,6 +708,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   function acceptControl(ws: WebSocket): void {
     const client = `c${++controlSeq}`;
     const binding: Binding = { usedAt: 0 };
+    // A connection that has spoken for an agent run is that run's own tool server, and a run
+    // never gets to loosen the guardrails it is running under.
+    let speaksForRun = false;
     controls.add(ws);
     scheduleIdleExit();
     ws.on('message', async (raw) => {
@@ -705,6 +720,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       } catch {
         return log('dropped unparseable control frame');
       }
+      if ((request.op === 'describe' || request.op === 'invoke') && request.runId) speaksForRun = true;
       if (request.op === 'describe') {
         return send(ws, { id: request.id, op: 'describe', ...describeFor(request.runId, binding) });
       }
@@ -754,9 +770,26 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         const listed = isAgentKind(request.models);
         if (listed) await refreshModelLists(readAgentConfig(), { force: true, only: request.models });
         const state = await agentState(readAgentConfig(), { refresh: !!changed || listed });
-        if (changed || listed) announceAgent();
-        else watchModels();
+        if (request.set) configChanged();
+        if (request.grant || listed) announceAgent();
+        else if (!request.set) watchModels();
         return send(ws, { id: request.id, op: 'agent', state });
+      }
+      if (request.op === 'preferences') {
+        if (request.watch) settingsWatchers.add(ws);
+        return send(ws, { id: request.id, op: 'preferences', result: success(preferencesNow()) });
+      }
+      if (request.op === 'setPreference') {
+        if (speaksForRun) {
+          log(`control ${client} tried to change a setting from inside an agent run; refused`);
+          return send(ws, {
+            id: request.id,
+            op: 'preferences',
+            result: failure('BLOCKED', 'An agent run cannot change the settings it runs under. Change them from the settings page or the Mac app.'),
+          });
+        }
+        send(ws, { id: request.id, op: 'preferences', result: applyPreference(request.change) });
+        return configChanged();
       }
       if (request.op === 'revoke') {
         const { session: id, origin } = request;
@@ -770,6 +803,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     });
     const drop = () => {
       controls.delete(ws);
+      settingsWatchers.delete(ws);
       scheduleIdleExit();
     };
     ws.on('close', drop);
@@ -886,6 +920,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   async function stop(): Promise<void> {
     if (idleTimer) clearTimeout(idleTimer);
     scheduler.stop();
+    unwatchConfig();
     for (const link of [...links.values()]) link.close('daemon shutting down');
     for (const ws of controls) ws.close(1001, 'daemon shutting down');
     wss.close();

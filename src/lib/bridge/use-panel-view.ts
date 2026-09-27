@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
-import type { PanelTab } from '@/lib/rail/events';
+import { isPanelTab, type PanelTab } from '@/lib/rail/events';
 import { PANEL_COLLAPSED_KEY, PANEL_TAB_KEY } from './panel-view';
 
 export function usePanelCollapsed(): [boolean, (collapsed: boolean) => void] {
@@ -8,7 +8,7 @@ export function usePanelCollapsed(): [boolean, (collapsed: boolean) => void] {
 }
 
 export function usePanelTab(): [PanelTab, (tab: PanelTab) => void] {
-  return useStoredLocal(PANEL_TAB_KEY, 'chat' as PanelTab, (value): value is PanelTab => typeof value === 'string');
+  return useStoredLocal<PanelTab>(PANEL_TAB_KEY, 'chat', isPanelTab);
 }
 
 function useStoredLocal<T>(

@@ -106,7 +106,9 @@ the consequential actions. `unattended: 'allow'` goes back to waiving them.
 ### The settings screen
 
 `guardrailSettings()` in [settings.ts](../../src/daemon/guardrails/settings.ts) describes the policy to
-the side panel's Settings tab. Everything it returns is derived from `DEFAULT_RULES` and the live
+the two screens that edit it: the extension's settings page and the Mac app's Settings tab. Both reach
+it through [preferences.ts](../../src/daemon/preferences.ts), over the extension socket and `/control`
+respectively, and a change from either — or a hand edit — is pushed to the other. Everything it returns is derived from `DEFAULT_RULES` and the live
 config, so a rule added to the policy appears in the screen with no second edit, and a rule whose
 title or reason changes says the new thing in both places.
 
@@ -121,6 +123,10 @@ the key, so config.json only names real decisions and a changed default still re
 
 `settingWritable()` is the gate: unknown ids, locked rules and wrong-shaped values are refused at
 the daemon, not just hidden in the UI.
+
+**A run cannot loosen its own rules.** `/control` is also how an agent run's tool server reaches the
+daemon, so a control connection that has carried a `runId` is refused `setPreference` with `BLOCKED`.
+The Mac app and a plain MCP client never send one.
 
 ### Overriding
 

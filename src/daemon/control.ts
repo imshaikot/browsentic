@@ -1,6 +1,7 @@
 import type { ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { Preferences } from '@/lib/settings/preferences';
 
 export interface BridgeStatus {
   connected: boolean;
@@ -40,7 +41,10 @@ export type ControlRequest =
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
   | { id: string; op: 'revoke'; session?: string; origin?: string }
-  | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind; models?: AgentKind };
+  | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind; models?: AgentKind }
+  /** `watch` also subscribes this caller to `settings-changed`, which no other caller is sent. */
+  | { id: string; op: 'preferences'; watch?: boolean }
+  | { id: string; op: 'setPreference'; change: unknown };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[] }
@@ -51,7 +55,10 @@ export type ControlMessage =
   | { id: string; op: 'sessions'; sessions: SessionSummary[] }
   | { id: string; op: 'revoke'; revoked: number }
   | { id: string; op: 'agent'; state: AgentState }
-  | { event: 'manifest-changed' };
+  | { id: string; op: 'preferences'; result: ActionResult<Preferences> }
+  | { event: 'manifest-changed' }
+  /** config.json changed, from any side: read the preferences and the agent state again. */
+  | { event: 'settings-changed' };
 
 export interface Described {
   tools: ToolDescriptor[];

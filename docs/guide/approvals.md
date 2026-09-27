@@ -171,13 +171,19 @@ gate stops being information.
 
 ---
 
-## The Settings tab
+## The settings page
 
-Everything below is editable from **Settings** in the side panel, without opening a file.
+Everything below is editable without opening a file, from two places that edit the same rows:
+
+- **The extension's settings page** — the sliders button in the side panel's header or the popup,
+  or right-click the toolbar icon → **Options** — under **Guardrails**.
+- **The Mac app's Settings tab**, in its **Guardrails** card.
+
+A change made in one shows up in the other at once, and so does a hand edit of the file.
 
 The screen is a list of **overrides**, not a list of switches that turn protection on. Every row
 starts off, meaning "use the default Browsentic ships" — so a fresh install has an empty settings
-tab and the posture you get is the posture described here, whether or not you ever open it.
+page and the posture you get is the posture described here, whether or not you ever open it.
 
 Turning a row on reveals **Allow / Ask / Block** and writes that one line to
 `~/.browsentic/config.json`. Turning it back off removes the line rather than writing a value equal
@@ -193,6 +199,9 @@ accident. Hand-editing config.json still works if you genuinely mean it.
 
 Credential sealing appears in the list with no switch at all, because there is nothing to turn off:
 it is what keeps a plaintext password off the socket in the first place.
+
+An agent run cannot use either screen's route to loosen its own rules: the daemon refuses a
+settings change from a connection that has acted for a run, with `BLOCKED`.
 
 ---
 

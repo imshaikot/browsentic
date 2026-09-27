@@ -3,7 +3,8 @@
 Everything is optional. Browsentic works with no config file at all.
 
 Settings live in `~/.browsentic/config.json`. The daemon re-reads it before every run, so an edit
-applies to the next thing you ask — no restart.
+applies to the next thing you ask — no restart. It also watches the file, so the extension's settings
+page and the Mac app show a hand edit the moment you save it.
 
 `BROWSENTIC_HOME` relocates the whole state directory if you need it somewhere other than
 `~/.browsentic`. See [internals/state.md](../internals/state.md) for the full disk layout.
@@ -22,6 +23,7 @@ Nothing here is required; this shows every key in one place.
   },
   "requireApproval": ["page.submitForm"],
   "maxConcurrentRuns": 3,
+  "theme": "midnight",
   "guardrails": {
     "rules": { "raw-html-read": "allow" },
     "unattended": "deny",
@@ -70,9 +72,9 @@ Eight tab sessions may be *open* at once regardless; that ceiling is compiled in
 
 ## Approvals and guardrails
 
-Most of this section has a UI: the side panel's **Settings** tab writes these same keys, one row at
-a time. Rows start off — meaning "use the default" — so an install that never opens the tab has no
-`guardrails` key at all. Turning a row back off deletes its line rather than writing the default,
+Most of this section has a UI: the extension's settings page and the Mac app's Settings tab both write
+these same keys, one row at a time. Rows start off — meaning "use the default" — so an install that
+never opens either has no `guardrails` key at all. Turning a row back off deletes its line rather than writing the default,
 which is why a hand-edited file and a panel-edited file look the same.
 
 | Key | Default | Notes |
@@ -114,12 +116,19 @@ ceiling is clamped; a value that is not a number ≥ 1 falls back to the default
 
 ## Appearance
 
-The panel's theme is not in this file. It is a row of tiles in the side panel's **Settings** tab —
-**Ember** (warm near-black, cyan), **Midnight** (cool blue-black, violet), **Phosphor** (a green
-CRT) and **Daylight** (ink on paper) — and one click repaints the panel and the popup together.
-Each tile is drawn in the theme it offers, so the preview is the thing itself.
+| Key | Default | Notes |
+| --- | --- | --- |
+| `theme` | absent (Ember) | `ember`, `midnight`, `phosphor` or `daylight` — the look of the side panel, the popup and the settings page |
 
-The choice is stored in the browser, never sent to the daemon, and needs nothing paired to work.
+It is a row of tiles under **Appearance** on the extension's settings page, and under **Browser theme**
+in the Mac app's Settings tab — **Ember** (warm near-black, cyan), **Midnight** (cool blue-black,
+violet), **Phosphor** (a green CRT) and **Daylight** (ink on paper). Each tile is drawn in the theme it
+offers, so the preview is the thing itself.
+
+One theme serves every paired browser: picking one anywhere repaints the panel, the popup and the
+settings page in all of them. A browser that has never been paired keeps its choice to itself and
+hands it to the daemon when it first connects; one picked while the daemon is unreachable is handed
+over at the next connect. The Mac app's own window keeps its separate System / Light / Dark setting.
 
 ---
 

@@ -31,6 +31,8 @@ struct SettingsView: View {
                 }
             }
 
+            BrowserSettings()
+
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     SwitchRow(

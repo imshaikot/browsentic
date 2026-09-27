@@ -82,6 +82,82 @@ struct AgentState: Decodable, Equatable {
     var catalog: [AgentDescriptor]?
 }
 
+/// What config.json holds for every surface. The extension's settings page reads and writes the same values.
+struct Preferences: Decodable, Equatable {
+    /// Nil until someone picks one; every paired browser shows Ember until then.
+    let theme: String?
+    let guardrails: GuardrailSettings
+}
+
+struct GuardrailSettings: Decodable, Equatable {
+    struct Switch: Decodable, Equatable {
+        let enabled: Bool
+        let overridden: Bool
+    }
+
+    struct Unattended: Decodable, Equatable {
+        let effect: String
+        let overridden: Bool
+    }
+
+    let rules: [GuardrailRule]
+    let fence: Switch
+    let unattended: Unattended
+    let hosts: [String]
+    let configPath: String
+}
+
+struct GuardrailRule: Decodable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    let reason: String
+    /// The effect with nothing overridden.
+    let fallback: String
+    /// Present only when someone chose one.
+    let choice: String?
+    let locked: Bool?
+
+    var isLocked: Bool { locked == true }
+
+    enum CodingKeys: String, CodingKey {
+        case choice = "override"
+        case id, title, reason, fallback, locked
+    }
+}
+
+enum RuleEffect: String, CaseIterable, Identifiable {
+    case allow, confirm, deny
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .allow: "Allow"
+        case .confirm: "Ask"
+        case .deny: "Block"
+        }
+    }
+
+    static func label(_ raw: String) -> String { RuleEffect(rawValue: raw)?.label ?? raw.capitalized }
+}
+
+/// A daemon answer shaped `{ ok, data }` or `{ ok, error }`, as the whole socket protocol is.
+struct Outcome<Value: Decodable>: Decodable {
+    struct Failure: Decodable, LocalizedError {
+        let code: String
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    let ok: Bool
+    let data: Value?
+    let error: Failure?
+
+    func value() throws -> Value {
+        if ok, let data { return data }
+        throw error ?? Failure(code: "MALFORMED", message: ControlError.malformed.localizedDescription)
+    }
+}
+
 struct Skill: Decodable, Identifiable, Equatable {
     let name: String
     let description: String

@@ -27,7 +27,7 @@ import {
 } from '@/lib/actions/protocol';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { FileReport } from '@/lib/files/report';
-import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
+import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
@@ -79,6 +79,8 @@ export interface DaemonState {
   agent?: AgentState;
   /** What the / picker offers: the daemon's skills plus the active agent CLI's own. Pushed on connect and when either changes. */
   skillCatalog?: SkillCatalog;
+  /** The settings config.json holds for every surface. Pushed on connect and whenever the file changes. */
+  preferences?: Preferences;
   error?: string;
   lastChangeAt: number;
 }
@@ -93,6 +95,11 @@ let runListener: ((runId: string, event: RunEvent) => void) | null = null;
 const welcomeListeners = new Set<() => void>();
 let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
 let taskRunner: ((order: TaskOrder) => Promise<ActionResult>) | null = null;
+let preferencesListener: ((preferences: Preferences) => void) | null = null;
+
+export function onPreferences(listener: (preferences: Preferences) => void): void {
+  preferencesListener = listener;
+}
 
 export function onTaskOrder(runner: (order: TaskOrder) => Promise<ActionResult>): void {
   taskRunner = runner;
@@ -287,28 +294,28 @@ export function readSkillCatalog(refresh = false): Promise<ActionResult<SkillCat
   });
 }
 
-const pendingGuardrailOps = new Map<string, (result: ActionResult<GuardrailSettings>) => void>();
+const pendingPreferenceOps = new Map<string, (result: ActionResult<Preferences>) => void>();
 
-export function readGuardrails(): Promise<ActionResult<GuardrailSettings>> {
-  return guardrailOp({ t: 'guardrails', id: crypto.randomUUID() });
+export function readPreferences(): Promise<ActionResult<Preferences>> {
+  return preferenceOp({ t: 'preferences', id: crypto.randomUUID() });
 }
 
-export function setGuardrail(setting: string, value: GuardrailValue): Promise<ActionResult<GuardrailSettings>> {
-  return guardrailOp({ t: 'setGuardrail', id: crypto.randomUUID(), setting, value });
+export function setPreference(change: PreferenceChange): Promise<ActionResult<Preferences>> {
+  return preferenceOp({ t: 'setPreference', id: crypto.randomUUID(), change });
 }
 
-function guardrailOp(
-  frame: Extract<SocketFrame, { t: 'guardrails' | 'setGuardrail' }>,
-): Promise<ActionResult<GuardrailSettings>> {
+function preferenceOp(
+  frame: Extract<SocketFrame, { t: 'preferences' | 'setPreference' }>,
+): Promise<ActionResult<Preferences>> {
   if (!post(frame)) {
     return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
   }
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      pendingGuardrailOps.delete(frame.id);
+      pendingPreferenceOps.delete(frame.id);
       resolve(failure('TIMEOUT', 'The daemon did not answer in time.'));
     }, AGENT_TIMEOUT_MS);
-    pendingGuardrailOps.set(frame.id, (result) => {
+    pendingPreferenceOps.set(frame.id, (result) => {
       clearTimeout(timer);
       resolve(result);
     });
@@ -644,9 +651,11 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       return;
     }
 
-    case 'guardrailInfo': {
-      pendingGuardrailOps.get(frame.id)?.(frame.result);
-      pendingGuardrailOps.delete(frame.id);
+    case 'preferencesInfo': {
+      if (frame.result.ok) await setState({ preferences: frame.result.data, lastChangeAt: Date.now() });
+      pendingPreferenceOps.get(frame.id)?.(frame.result);
+      pendingPreferenceOps.delete(frame.id);
+      if (frame.result.ok) preferencesListener?.(frame.result.data);
       return;
     }
 

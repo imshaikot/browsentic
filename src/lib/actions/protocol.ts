@@ -4,7 +4,7 @@ import type { FileReport, FileVerdict } from '@/lib/files/report';
 import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
-import type { GuardrailSettings, GuardrailValue } from '@/lib/settings/guardrails';
+import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
@@ -12,7 +12,7 @@ import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedul
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 20;
+export const SOCKET_PROTOCOL_VERSION = 21;
 
 export const EXTERNAL_RUN_ID = 'external';
 
@@ -46,8 +46,8 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgent'; agent: AgentKind }
   | { channel: typeof BRIDGE_CHANNEL; op: 'setAgentModel'; agent: AgentKind; model: string | null }
   | { channel: typeof BRIDGE_CHANNEL; op: 'grantAgent'; agent: AgentKind }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'guardrails' }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'setGuardrail'; setting: string; value: GuardrailValue }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'preferences' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'setPreference'; change: PreferenceChange }
   | { channel: typeof BRIDGE_CHANNEL; op: 'tasks' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveTask'; task: unknown }
   | { channel: typeof BRIDGE_CHANNEL; op: 'deleteTask'; taskId: string }
@@ -254,9 +254,9 @@ export type SocketFrame =
   | { t: 'agentInfo'; id: string; result: ActionResult<AgentState> }
   | { t: 'listSkills'; id: string; refresh?: boolean }
   | { t: 'skillCatalog'; id: string; result: ActionResult<SkillCatalog> }
-  | { t: 'guardrails'; id: string }
-  | { t: 'setGuardrail'; id: string; setting: string; value: GuardrailValue }
-  | { t: 'guardrailInfo'; id: string; result: ActionResult<GuardrailSettings> }
+  | { t: 'preferences'; id: string }
+  | { t: 'setPreference'; id: string; change: PreferenceChange }
+  | { t: 'preferencesInfo'; id: string; result: ActionResult<Preferences> }
   | { t: 'tasks'; id: string }
   | { t: 'saveTask'; id: string; task: unknown }
   | { t: 'deleteTask'; id: string; taskId: string }
@@ -296,8 +296,8 @@ export const EXTENSION_REQUEST_FRAMES = [
   'setAgentModel',
   'grantAgent',
   'listSkills',
-  'guardrails',
-  'setGuardrail',
+  'preferences',
+  'setPreference',
   'tasks',
   'saveTask',
   'deleteTask',

@@ -1,8 +1,15 @@
-import type { ThemeId } from '@/lib/bridge/theme';
+import type { ThemeId } from '@/lib/settings/theme';
 
 export const RAIL_CHANNEL = 'browsentic/rail';
 
-export type PanelTab = 'chat' | 'history' | 'skills' | 'recordings' | 'tasks' | 'settings';
+export const PANEL_TABS = ['chat', 'history', 'skills', 'recordings', 'tasks'] as const;
+
+export type PanelTab = (typeof PANEL_TABS)[number];
+
+/** A tab the panel no longer has — Settings moved to its own page — opens on Chat instead. */
+export function isPanelTab(value: unknown): value is PanelTab {
+  return (PANEL_TABS as readonly unknown[]).includes(value);
+}
 
 export type RailTone = 'off' | 'pending' | 'live' | 'busy' | 'listening' | 'warn';
 
@@ -89,21 +96,6 @@ export const RAIL_TABS: { id: PanelTab; label: string; paths: string[] }[] = [
       'M3 10h5',
       'M8 2v4',
       'M22 16a6 6 0 1 1-12 0 6 6 0 0 1 12 0',
-    ],
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    paths: [
-      'M10 5H3',
-      'M12 19H3',
-      'M14 3v4',
-      'M16 17v4',
-      'M21 12h-9',
-      'M21 19h-5',
-      'M21 5h-7',
-      'M8 10v4',
-      'M8 12H3',
     ],
   },
 ];

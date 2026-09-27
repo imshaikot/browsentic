@@ -19,12 +19,18 @@ enum ControlError: LocalizedError {
 actor ControlClient {
     private var task: URLSessionWebSocketTask?
     private var pending: [String: CheckedContinuation<Data, Error>] = [:]
+    private let (eventStream, eventSink) = AsyncStream.makeStream(of: String.self)
     private(set) var lock: Lockfile?
 
     var isOpen: Bool { task?.state == .running }
 
-    func connect(_ lock: Lockfile) {
-        if self.lock == lock, isOpen { return }
+    /// What the daemon says without being asked, from whichever socket is open at the time.
+    nonisolated var events: AsyncStream<String> { eventStream }
+
+    /// True when this opened a new socket, which has subscribed to nothing yet.
+    @discardableResult
+    func connect(_ lock: Lockfile) -> Bool {
+        if self.lock == lock, isOpen { return false }
         close()
         var request = URLRequest(url: URL(string: "ws://127.0.0.1:\(lock.port)/control")!)
         request.setValue("Bearer \(lock.token)", forHTTPHeaderField: "Authorization")
@@ -34,6 +40,7 @@ actor ControlClient {
         self.lock = lock
         task.resume()
         listen(on: task)
+        return true
     }
 
     func close() {
@@ -70,6 +77,24 @@ actor ControlClient {
         if let set { frame["set"] = set }
         if let grant { frame["grant"] = grant }
         return try await request(frame, as: Reply<AgentState>.self, key: "state", timeout: 60)
+    }
+
+    /// The settings the extension's settings page edits too. `watch` subscribes this socket to `settings-changed`.
+    func preferences(watch: Bool = false) async throws -> Preferences {
+        try await request(["op": "preferences", "watch": watch], as: Reply<Outcome<Preferences>>.self, key: "result").value()
+    }
+
+    func setTheme(_ theme: BrowserTheme) async throws -> Preferences {
+        try await setPreference(["kind": "theme", "theme": theme.rawValue])
+    }
+
+    /// `value` is an effect, a switch's Bool, or nil to go back to the default Browsentic ships.
+    func setGuardrail(_ setting: String, to value: Any?) async throws -> Preferences {
+        try await setPreference(["kind": "guardrail", "setting": setting, "value": value ?? NSNull()])
+    }
+
+    private func setPreference(_ change: [String: Any]) async throws -> Preferences {
+        try await request(["op": "setPreference", "change": change], as: Reply<Outcome<Preferences>>.self, key: "result").value()
     }
 
     private struct Reply<Value: Decodable>: Decodable {
@@ -146,9 +171,9 @@ actor ControlClient {
             failAll(ControlError.offline)
         case .success(let message):
             if case .string(let text) = message, let data = text.data(using: .utf8),
-               let frame = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let id = frame["id"] as? String {
-                settle(id, .success(data))
+               let frame = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let id = frame["id"] as? String { settle(id, .success(data)) }
+                if let event = frame["event"] as? String { eventSink.yield(event) }
             }
             listen(on: task)
         }

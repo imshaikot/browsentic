@@ -52,6 +52,33 @@ import Testing
         #expect(session.extensionId == "abcdef")
     }
 
+    @Test func preferencesCarryALockedRuleAndOneLeftOnItsDefault() throws {
+        let result = #"""
+        {"ok":true,"data":{"theme":null,"guardrails":{"rules":[
+        {"id":"secret-in-url","title":"Secret in a URL","reason":"A credential never travels in a query string.","fallback":"deny","locked":true},
+        {"id":"form-submission","title":"Submits a form","reason":"Submitting a form is a consequential action.","fallback":"confirm","override":"allow"},
+        {"id":"file-upload","title":"Uploads one of the user's files","reason":"It hands the file to the site.","fallback":"confirm"}],
+        "fence":{"enabled":true,"overridden":false},"unattended":{"effect":"deny","overridden":false},"hosts":[],"configPath":"/Users/x/.browsentic/config.json"}}}
+        """#
+        let preferences = try JSONDecoder().decode(Outcome<Preferences>.self, from: Data(result.utf8)).value()
+        #expect(preferences.theme == nil)
+        #expect(preferences.guardrails.rules.map(\.isLocked) == [true, false, false])
+        #expect(preferences.guardrails.rules.map(\.choice) == [nil, "allow", nil])
+        #expect(RuleEffect.label(preferences.guardrails.rules[1].fallback) == "Ask")
+    }
+
+    @Test func aRefusedChangeThrowsTheDaemonsOwnMessage() throws {
+        let result = #"{"ok":false,"error":{"code":"BLOCKED","message":"An agent run cannot change the settings it runs under."}}"#
+        let outcome = try JSONDecoder().decode(Outcome<Preferences>.self, from: Data(result.utf8))
+        #expect(throws: Outcome<Preferences>.Failure.self) { try outcome.value() }
+        #expect((try? outcome.value()) == nil)
+        #expect(outcome.error?.localizedDescription == "An agent run cannot change the settings it runs under.")
+    }
+
+    @Test func everyBrowserThemeIsOneTheExtensionKnows() {
+        #expect(BrowserTheme.allCases.map(\.rawValue) == ["ember", "midnight", "phosphor", "daylight"])
+    }
+
     @Test func timestampsReadTheDaemonsIsoStrings() {
         #expect(Timestamp.date("2026-09-17T14:21:45.381Z") != nil)
         #expect(Timestamp.ago("not a date") == "not a date")

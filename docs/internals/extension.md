@@ -81,10 +81,10 @@ it is the documented escape hatch.
 
 ## The panel's tabs
 
-`PanelNav` owns the tab strip: **Chat**, **History**, **Skills**, **Recordings**, **Schedules**,
-**Settings**.
-Adding one is a variant in `PanelTab`, an entry in `TABS`, and a branch in the side panel's body —
-there is no router.
+`PanelNav` owns the tab strip: **Chat**, **History**, **Skills**, **Recordings**, **Schedules**.
+Adding one is an entry in `PANEL_TABS` (which `PanelTab` is derived from), an entry in `TABS` and
+`RAIL_TABS`, and a branch in the side panel's body — there is no router. A stored tab that is no
+longer in `PANEL_TABS` — `settings`, from before it moved out — opens on Chat.
 
 **The strip labels as much as it can afford.** A `ResizeObserver` measures the width the labelled
 row actually needs and steps through three fits: every label, then only the open tab's, then icons
@@ -94,12 +94,34 @@ learned, which is what keeps the strip from flapping between two fits at one pan
 practice five labels want ~485 px and one wants ~225 px, so a side panel at its usual size lands on
 the middle fit.
 
-**Settings** is two halves with nothing in common. **Guardrails** lives on the daemon rather than in
-extension storage, like the Schedules tab's tasks: it reads and writes `~/.browsentic/config.json`
-through two bridge ops, `guardrails` and `setGuardrail`, which forward to the socket frames of the
-same name. The extension holds no copy — every write returns the daemon's fresh view, which is what
-the panel then renders, and the whole half is empty until the daemon is up. **Appearance** never
-leaves the browser, which is why it sits above and renders whether or not anything is paired.
+## The settings page
+
+Settings are not a panel tab. They are the extension's options page, `entrypoints/options/`, which
+WXT turns into `options_ui` with `open_in_tab` on both browsers — so it needs no permission, Chrome
+lists it as **Options** on the toolbar icon's menu, and Firefox as **Preferences** in about:addons.
+The panel's header, the popup's header and the connection sheet open it with
+`runtime.openOptionsPage()`, which focuses a settings tab already open rather than adding another.
+
+The page is a sidebar of four sections — **Appearance**, **Guardrails**, **Agent**, **Connection** —
+with the open one in the URL hash, so a reload or a link lands on it. **Agent** and **Connection** are
+the same `AgentPicker` and `DaemonLink` the popup and the connection sheet show; those keep theirs,
+so a blocked run is still one click from its fix.
+
+**Appearance and Guardrails are shared with the Mac app**, and the daemon keeps both in
+`~/.browsentic/config.json`:
+
+- Two bridge ops, `preferences` and `setPreference`, forward to the socket frames of the same name.
+  The answer, `preferencesInfo`, is also pushed on connect and after every change to the file,
+  whoever made it, and lands in `DaemonState.preferences`. The guardrail section renders that, so a
+  row flipped in the Mac app moves here without a reload.
+- **The theme stays in `storage.local` too**, because every surface paints from it before any socket
+  exists. `servePreferences()` in [preferences.ts](../../src/lib/bridge/preferences.ts) keeps the two in
+  step:
+  - A push writes the daemon's theme locally.
+  - A local pick is sent up, unless it only echoes the push.
+  - A pick made while the daemon could not be told sets `browsentic/theme.unsynced`, and wins at the
+    next connect. So does a pick made before the browser was ever paired, when config.json names no
+    theme yet.
 
 ### Themes
 

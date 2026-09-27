@@ -32,7 +32,7 @@ Nothing lives in the repository.
 | --- | --- | --- |
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
 | `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
-| `config.json` | You, and the agent picker | Re-read before every run — no restart needed. [Reference](../guide/configuration.md) |
+| `config.json` | You, the agent picker, and the settings page and Mac app for `theme` and `guardrails` | Re-read before every run — no restart needed — and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
@@ -69,7 +69,11 @@ state under `browsentic/dictation`, and the approvals it has already announced u
 `browsentic/approvalsAnnounced`) — a restarted browser never comes back with a microphone on.
 Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
 (`browsentic/pushToTalk`) and whether this browser's speech service has ever worked
-(`browsentic/speechService`) are kept in `storage.local`. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
+(`browsentic/speechService`) are kept in `storage.local`.
+
+**The theme** is config.json's `theme`, mirrored into `storage.local` under `browsentic/theme` so a
+page paints before any socket is up. `browsentic/theme.unsynced` marks a pick the daemon has not heard
+yet, handed over at the next connect. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
 timers — none of what a page reported about itself outlives the browser that reported it.
 
 ## Relocating

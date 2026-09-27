@@ -54,6 +54,9 @@ final class AppModel: ObservableObject {
     @Published var sessions: [BrowserSession] = []
     @Published var pairing: PairingCode?
     @Published var agents: AgentState?
+    @Published var preferences: Preferences?
+    /// The running daemon never answered for its settings: it predates this app and needs a restart.
+    @Published var preferencesUnsupported = false
     @Published var skills: SkillListing?
     @Published var grants: [Grant] = []
     @Published var downloads: DownloadListing?
@@ -71,6 +74,7 @@ final class AppModel: ObservableObject {
     private(set) var node: NodeInstall?
     private let control = ControlClient()
     private var poller: Task<Void, Never>?
+    private var eventWatcher: Task<Void, Never>?
     private var updateWatcher: Task<Void, Never>?
 
     var cli: CLI? { node.map(CLI.init) }
@@ -220,6 +224,13 @@ final class AppModel: ObservableObject {
     // MARK: Daemon
 
     func startPolling() {
+        eventWatcher?.cancel()
+        eventWatcher = Task { [weak self, control] in
+            for await event in control.events where event == "settings-changed" {
+                await self?.loadPreferences()
+                await self?.loadAgents()
+            }
+        }
         poller?.cancel()
         poller = Task { [weak self] in
             while !Task.isCancelled {
@@ -231,7 +242,9 @@ final class AppModel: ObservableObject {
 
     func refresh() async {
         guard let lock = Self.readLock() else { return markOff() }
-        await control.connect(lock)
+        if await control.connect(lock) {
+            Task { await self.loadPreferences(watch: true) }
+        }
         do {
             let status = try await control.status()
             let sessions = try await control.sessions()
@@ -255,6 +268,7 @@ final class AppModel: ObservableObject {
         status = nil
         sessions = []
         pairing = nil
+        preferences = nil
     }
 
     private static func readLock() -> Lockfile? {
@@ -304,6 +318,23 @@ final class AppModel: ObservableObject {
     func loadAgents() async {
         guard let cli else { return }
         if let state = try? await cli.agents() { agents = state }
+    }
+
+    func loadPreferences(watch: Bool = false) async {
+        do {
+            preferences = try await control.preferences(watch: watch)
+            preferencesUnsupported = false
+        } catch ControlError.timeout {
+            preferencesUnsupported = true
+        } catch {}
+    }
+
+    func setBrowserTheme(_ theme: BrowserTheme) async {
+        await perform("theme") { _, control in self.preferences = try await control.setTheme(theme) }
+    }
+
+    func setGuardrail(_ setting: String, to value: Any?) async {
+        await perform("guardrail:\(setting)") { _, control in self.preferences = try await control.setGuardrail(setting, to: value) }
     }
 
     func selectAgent(_ kind: String) async {

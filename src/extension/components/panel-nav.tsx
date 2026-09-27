@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { BookOpen, CalendarClock, Clapperboard, History, MessagesSquare, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { BookOpen, CalendarClock, Clapperboard, History, MessagesSquare, type LucideIcon } from 'lucide-react';
 
 import { type PanelTab } from '@/lib/rail/events';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,6 @@ export const TABS: { id: PanelTab; label: string; icon: LucideIcon }[] = [
   { id: 'skills', label: 'Skills', icon: BookOpen },
   { id: 'recordings', label: 'Recordings', icon: Clapperboard },
   { id: 'tasks', label: 'Schedules', icon: CalendarClock },
-  { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
 ];
 
 /** Every label, then only the open tab's, then none — whichever the strip has room for. */
