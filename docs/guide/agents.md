@@ -65,7 +65,7 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 | Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` |
 | Default model | `sonnet`, the newest Sonnet | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
 | Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none — set `thinking` in Vibe's own config | `low`…`xhigh` | none — put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none — the model id is the only lever | a variant the model defines, e.g. `high` or `max` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, your `config.toml` left out, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
 
 All eight get the same system prompt, the same `browsentic` MCP server pointed back at the daemon,
 and the same [approval gate](approvals.md). What differs is how well each one can be fenced off from
@@ -76,6 +76,21 @@ for exactly what each flag buys.
 too old to understand them fails the run with an explicit "update it" message rather than running
 uncontained.
 
+### Follow-up messages, on Claude Code and Codex
+
+Both keep the system prompt a conversation began with. Claude Code records it on the first request
+and sends that record on every resume (its `--system-prompt-snapshot`, on by default), and Codex does
+the same with its developer instructions. A later message that changes what the agent should know —
+an element picked with A-Eye, a skill attached from the picker, a different skill for the job, notes
+for the site you have moved to — would otherwise never reach it.
+
+So Browsentic carries what changed in the message itself: a short *instructions for this message*
+section ahead of your words, holding only the parts that differ from what the conversation already
+has, and naming any that no longer apply. A message that changes nothing carries nothing extra. After
+the daemon restarts it cannot know what a conversation holds, so the first follow-up restates the
+whole prompt once. The agent's prompt cache is untouched either way, because nothing that came before
+changes.
+
 ### Codex keeps the browser tools out of sight
 
 Codex does not put an MCP server's tools in the model's list. They are deferred behind its
@@ -85,13 +100,34 @@ see — its own memory, or a web search — without ever looking at your browser
 
 So a Codex run is given a section of prompt saying where its browser tools are and how to load them,
 and it is told to read the page rather than recall it. Web search is switched off unless the run is
-[mapping a site](features/site-maps.md), and sub-agents, goal memory, connector apps and plugin suggestions
-are switched off for good measure.
+[mapping a site](features/site-maps.md), and sub-agents, goal memory, connector apps, plugins, image
+generation, Codex's own browser and computer use, and the list of your Codex skills are switched off
+for good measure. A code-mode model can still spawn sub-agents — nothing in Codex 0.155 turns that
+off — but they share the run's browser tools, so each of their actions still goes through the same
+approval gate and shows on the timeline.
+
+**Codex runs without your `config.toml`.** A `-c` flag merges into that file rather than replacing
+it, so every MCP server you gave Codex would start beside the browser — with its tools on offer and no
+approval gate in front of them — and settings on a `browsentic` entry of your own would land on the
+run's. Browsentic starts Codex with `--ignore-user-config` instead. Your sign-in still comes from
+`~/.codex`, and the `model` and `model_reasoning_effort` at the top of your `config.toml` still apply
+when nothing is picked in the popup. Profiles, custom model providers and everything else in the file
+do not reach a side-panel run.
+
+**It has no shell and no image viewer.** Both read your disk, and a browsing run has the page for
+that. Codex still offers its patch tool — nothing switches it off — and its read-only sandbox refuses
+every write. If a run ever reports a shell command or a changed file anyway, Browsentic stops it
+(`AGENT_UNSAFE`). The file analyst reading a text file keeps the shell, read-only; a picture is
+attached to its message instead of opened.
 
 **Codex cuts a tool result at 10,000 tokens** by default, which a whole-page snapshot can pass.
 Browsentic raises that to 25,000, the ceiling Claude Code puts on the same result. A code-mode model
 also has to ask for it at the top of every `exec` script, which the prompt tells it to do. A result
 past 25,000 is still cut, so the prompt asks for smaller reads too.
+
+**It does not say how full its window is.** Codex reports tokens only for a whole turn, added up over
+every request in it and every turn before, so the context card shows no count for it rather than a
+wrong one.
 
 ### Mistral Vibe is in beta
 
