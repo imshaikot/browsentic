@@ -61,7 +61,7 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic restart          stop the daemon and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
 
-  agent, skills, approvals, tasks and downloads take --json, which is what the macOS app reads.
+  agent, skills, approvals, tasks and downloads take --json, which is what the desktop app reads.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -530,6 +530,11 @@ async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; res
   console.log(`  Then open the sidebar and say what you want.\n`);
 }
 
+const APP_REMOVAL = {
+  darwin: 'drag Browsentic.app from Applications to the Trash',
+  win32: 'uninstall Browsentic in Settings › Apps › Installed apps',
+} as const;
+
 /**
  * Remove Browsentic in one command.
  *
@@ -576,7 +581,7 @@ async function uninstall(argv: string[]): Promise<void> {
   console.log('    live in extension storage rather than on disk.');
   if (kind === 'global') console.log('\n    the command itself:  npm rm -g browsentic');
   if (kind === 'repo') console.log('\n    the global link:     yarn daemon:unlink');
-  if (kind === 'app') console.log('\n    the app itself:      drag Browsentic.app from Applications to the Trash');
+  if (kind === 'app') console.log(`\n    the app itself:      ${APP_REMOVAL[process.platform === 'win32' ? 'win32' : 'darwin']}`);
   console.log('\n    the entry in your MCP client, e.g.  claude mcp remove browsentic');
 
   if (flag('dry-run')) {

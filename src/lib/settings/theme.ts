@@ -1,6 +1,6 @@
 /**
  * The extension's four looks, named once for every side that sets one: the extension's own
- * settings page, the Mac app, and config.json, where the daemon keeps the choice so each
+ * settings page, the desktop app, and config.json, where the daemon keeps the choice so each
  * paired browser opens in the same one.
  */
 

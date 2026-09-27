@@ -58,6 +58,12 @@ npx browsentic setup
 curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
+**Windows** — one line in PowerShell installs [the Windows app](docs/guide/windows-app.md), which brings Node and everything else ([experimental](docs/guide/limits.md#windows-is-experimental)):
+
+```powershell
+irm https://browsentic.com/install.ps1 | iex
+```
+
 Full install and setup guide, Firefox included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
 
 ## Key Capabilities

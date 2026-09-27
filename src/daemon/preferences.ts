@@ -1,5 +1,5 @@
 /**
- * The settings two surfaces share: the extension's settings page and the Mac app both read
+ * The settings two surfaces share: the extension's settings page and the desktop app both read
  * and write them here, and config.json is the only copy. A change from either side, from the
  * CLI, or from a hand edit of the file reaches every open surface through `watchConfig`.
  */

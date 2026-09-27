@@ -1,5 +1,5 @@
 /**
- * Everything a person can set from either the extension's settings page or the Mac app. The
+ * Everything a person can set from either the extension's settings page or the desktop app. The
  * daemon keeps it in config.json and hands the same snapshot to both, after every change,
  * whichever side made it — or a hand edit of the file.
  */

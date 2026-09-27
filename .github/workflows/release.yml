@@ -3,7 +3,7 @@
 # The tag is both the trigger and the source of truth. CI bumps nothing and tags nothing:
 # it rebuilds the tagged commit from scratch, checks the build agrees with the tag, and
 # publishes the three store archives under a release of that name, then the Mac app, the
-# signed Firefox add-on and the MCP Registry entry in their own jobs. So the whole local half
+# Windows app, the signed Firefox add-on and the MCP Registry entry in their own jobs. So the whole local half
 # of a release is "bump both package.json files and server.json, commit, tag vX.Y.Z, push
 # the tag".
 #
@@ -293,6 +293,111 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "dist/mac/Browsentic-${GITHUB_REF_NAME#v}.dmg" --clobber
+
+  # ---------------------------------------------------------------------------------------
+  # The Windows app, beside the Mac one: a per-user installer for each architecture, with the
+  # signature its in-app updater checks, then the latest.json that installed copies poll. A job of
+  # its own for the same reason as the Mac app: a failure here leaves a release without an
+  # installer, never an installer without a release.
+  #
+  # The updater's key comes from two repository secrets, TAURI_SIGNING_PRIVATE_KEY and
+  # TAURI_SIGNING_PRIVATE_KEY_PASSWORD; its public half is in tauri.conf.json, and a release built
+  # without it could never update itself, so the job fails instead. Authenticode waits on Azure
+  # Trusted Signing: until AZURE_* secrets exist the installer is unsigned, SmartScreen warns on a
+  # downloaded copy, and the one-line PowerShell install, which leaves no download mark, does not.
+  # ---------------------------------------------------------------------------------------
+  windows-app:
+    needs: release
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            target: x86_64-pc-windows-msvc
+          - arch: arm64
+            target: aarch64-pc-windows-msvc
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Add the Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/windows
+          key: ${{ matrix.target }}
+
+      - name: Build the extension and the daemon the app carries
+        run: |
+          yarn_bin=$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)
+          echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
+          node "$yarn_bin" install --immutable
+          node "$yarn_bin" --cwd src/daemon install --immutable
+          node "$yarn_bin" build
+          node "$yarn_bin" daemon:build
+
+      - name: Build and sign the installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_CODE_SIGNING_NAME: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
+          AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::no TAURI_SIGNING_PRIVATE_KEY secret: an installer the updater cannot verify would strand every copy on this version"
+            exit 1
+          fi
+          authenticode=()
+          if [ -n "$AZURE_CLIENT_ID" ]; then
+            cargo install --locked trusted-signing-cli
+            sign="trusted-signing-cli -e $AZURE_ENDPOINT -a $AZURE_CODE_SIGNING_NAME -c $AZURE_CERT_PROFILE_NAME -d Browsentic %1"
+            authenticode=(--config "{\"bundle\":{\"windows\":{\"signCommand\":\"$sign\"}}}")
+          else
+            echo "::warning::no AZURE_CLIENT_ID secret, so this installer is unsigned and SmartScreen warns on a downloaded copy"
+          fi
+          node "$YARN" tauri build --target ${{ matrix.target }} "${authenticode[@]}"
+          version="${GITHUB_REF_NAME#v}"
+          bundle="src/windows/target/${{ matrix.target }}/release/bundle/nsis"
+          mkdir -p dist/windows
+          cp "$bundle/Browsentic_${version}_${{ matrix.arch }}-setup.exe" "dist/windows/Browsentic-${version}-${{ matrix.arch }}-setup.exe"
+          cp "$bundle/Browsentic_${version}_${{ matrix.arch }}-setup.exe.sig" "dist/windows/Browsentic-${version}-${{ matrix.arch }}-setup.exe.sig"
+
+      - name: Attach the installer to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/windows/* --clobber
+
+  windows-feed:
+    needs: windows-app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Point installed Windows apps at this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --pattern 'Browsentic-*-setup.exe.sig' --dir signatures
+          node scripts/windows-latest-json.ts "${GITHUB_REF_NAME#v}" signatures > latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber
 
   # ---------------------------------------------------------------------------------------
   # The Firefox add-on release Firefox will actually install: the firefox zip, signed by

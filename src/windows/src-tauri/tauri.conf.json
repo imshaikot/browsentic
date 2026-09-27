@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Browsentic",
+  "mainBinaryName": "Browsentic",
+  "version": "../../daemon/package.json",
+  "identifier": "com.imshaikot.browsentic",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "yarn win:payload && yarn win:ui:dev",
+    "beforeBuildCommand": "yarn win:payload && yarn win:ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Browsentic",
+        "width": 1040,
+        "height": 760,
+        "minWidth": 940,
+        "minHeight": 680,
+        "center": true,
+        "backgroundColor": "#110A06"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Browsentic",
+    "homepage": "https://browsentic.com",
+    "copyright": "MIT License",
+    "category": "DeveloperTool",
+    "shortDescription": "Your browser, driven by the AI agent you already run",
+    "createUpdaterArtifacts": true,
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": {
+      "resources/payload/": "payload/",
+      "resources/launcher/": "launcher/"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "./installer-hooks.nsh",
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0MDRFRkQ2RjcyMUUzNzEKUldSeDR5SDMxdThFTkkxZXVFa0Y1OVhpTTVaTGdIQmdXV0RpMXliclZnRi81QVJFVEl6dDkwSzUK",
+      "endpoints": ["https://github.com/imshaikot/browsentic/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

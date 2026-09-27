@@ -4,7 +4,7 @@ A native app that installs Browsentic and runs it from a window. It is the same 
 same daemon as [`npx browsentic setup`](install.md) — the app carries them inside itself, lays them
 down in `~/.browsentic`, and then drives them, so nothing here needs a terminal.
 
-Requires macOS 14 or newer, on Apple silicon or Intel.
+Requires macOS 14 or newer, on Apple silicon or Intel. On Windows, the [Windows app](windows-app.md) is the same thing.
 
 ---
 
