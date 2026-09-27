@@ -71,6 +71,14 @@ reuse the exact tool surface an external client gets, while still being gated di
 control invoke, and the daemon routes those to `AgentSession.invokeForRun()` — the gated path — instead
 of `invokeExternal()`. It also causes `browsentic_saveSiteMap` to be published as a tool.
 
+**Codex takes the same tools another way.** Its app-server is handed them as its own tools, and each
+call comes back to the daemon over the runner's stdin rather than through a child MCP server. The
+runner answers it from a [tool host](../../src/daemon/tool-host.ts) — the list-and-call half of
+`server.ts`, shared by both — over a `RemoteBridge` on the daemon's own control socket carrying the
+run id: the door the MCP child would have used. So the call still reaches `invokeForRun()`, is gated
+and shown the same way, and its result is sealed, fenced and turned into a picture by the same code.
+[Below](#a-cli-held-over-stdin).
+
 ---
 
 ## Runners
@@ -87,15 +95,15 @@ Every runner is given the same five things, by whichever mechanism its CLI suppo
 
 | | Claude Code | Codex | Antigravity | Mistral Vibe | Grok Build | Cursor CLI | Qwen Code | OpenCode |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Run | `claude -p --output-format stream-json` | `codex exec --json` | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` | `opencode run --format json --pure --agent browsentic-contained` |
-| MCP server | `--mcp-config` + `--strict-mcp-config` | `-c mcp_servers.browsentic.*` under `--ignore-user-config`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, allowed as `Mcp(browsentic:*)` with every other server denied by name | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk | `mcp.browsentic` in `OPENCODE_CONFIG_CONTENT`, each tool allowed by name on the run's own agent |
-| System prompt | `--append-system-prompt`, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `-c developer_instructions`, kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
-| Follow-up turns | `--resume <session>` | `exec resume <thread>` | `--conversation <id>` | `--resume <session>`, re-read from the folder the session began in | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it | `--resume <session>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it | `--session <id>`, from a session store of Browsentic's own (`OPENCODE_DB`) |
-| Kept off the machine by | `--allowedTools` + `--disallowedTools` | `--ignore-user-config`, `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.shell_tool=false`, `-c features.view_image=false`, `-c features.multi_agent=false` | its own permission rules | `--enabled-tools`, which is an allowlist | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` | deny rules in `.cursor/cli.json`, plus `--sandbox enabled` | `--safe-mode`, `--exclude-tools`, `--approval-mode default` | an agent whose permission opens on `"*": "deny"`, `--pure`, `OPENCODE_DISABLE_PROJECT_CONFIG`, `OPENCODE_DISABLE_SHARE` |
+| Run | `claude -p --output-format stream-json` | `codex app-server`, held over stdin for the turn; `codex exec --json` when it is refused, when `agents.codex.transport` is `"exec"`, and for one-shots | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` | `opencode run --format json --pure --agent browsentic-contained` |
+| MCP server | `--mcp-config` + `--strict-mcp-config` | none: the tools go to `thread/start` as `dynamicTools`, and each of the user's servers is switched off in the thread's config. `exec`: `-c mcp_servers.browsentic.*` under `--ignore-user-config`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, allowed as `Mcp(browsentic:*)` with every other server denied by name | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk | `mcp.browsentic` in `OPENCODE_CONFIG_CONTENT`, each tool allowed by name on the run's own agent |
+| System prompt | `--append-system-prompt`, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `developerInstructions` on `thread/start` (`-c developer_instructions` on `exec`), kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
+| Follow-up turns | `--resume <session>` | `thread/resume` (`exec resume <thread>`); either resumes a thread the other began | `--conversation <id>` | `--resume <session>`, re-read from the folder the session began in | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it | `--resume <session>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it | `--session <id>`, from a session store of Browsentic's own (`OPENCODE_DB`) |
+| Kept off the machine by | `--allowedTools` + `--disallowedTools` | the user's MCP servers off (`--ignore-user-config` on `exec`), `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.shell_tool=false`, `-c features.view_image=false`, `-c features.multi_agent=false` | its own permission rules | `--enabled-tools`, which is an allowlist | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` | deny rules in `.cursor/cli.json`, plus `--sandbox enabled` | `--safe-mode`, `--exclude-tools`, `--approval-mode default` | an agent whose permission opens on `"*": "deny"`, `--pure`, `OPENCODE_DISABLE_PROJECT_CONFIG`, `OPENCODE_DISABLE_SHARE` |
 
 **Two CLIs do not put the browser tools in the model's list, and both are told so in the prompt.**
 Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a
-`browsentic__` prefix. Codex defers them behind its own `tool_search`, and a code-mode model
+`browsentic__` prefix. Codex on its `exec` fallback defers them behind its own `tool_search`, and a code-mode model
 (`tool_mode: "code_mode_only"` in its model catalog) reaches them only from inside `exec`, as
 `tools.mcp__browsentic__*`, where an image reaches the model only if the script passes it to
 `image()`. Left unsaid, a model answers from what it can see — its memory, or the web search Codex
@@ -133,24 +141,68 @@ column, and Claude Code's kept prompt and failed-server rows, were measured agai
 themselves (Codex 0.155.1, Claude Code 2.1.283) with a stand-in model endpoint —
 [below](#measuring-a-cli-without-spending-a-model-call) — not read off their docs.
 
-| | Claude Code | Codex (`exec`) |
-| --- | --- | --- |
-| Browser tools in the model's list | all of them | deferred behind `tool_search`; a code-mode model reaches them only inside `exec` — the prompt says so |
-| The user's own MCP servers | kept out by `--strict-mcp-config` | kept out by `--ignore-user-config`: a `-c` merges into `config.toml`, so `mcp_servers={}` cleared nothing, and keys on the user's own `browsentic` entry (an `enabled_tools` list) landed on the run's |
-| The user's defaults | `settings.json` applies | the `model` and `model_reasoning_effort` at the top of `config.toml`, carried over by hand; nothing else in the file |
-| Shell and disk | denied by name | `features.shell_tool=false` and `features.view_image=false`, which remove the tools from every model and every sub-agent; `apply_patch` has no switch and the read-only sandbox refuses its writes |
-| A browser server that did not start | the run fails (`init` reports `failed`) | the run fails (`required=true`) |
-| Replies | streamed | whole, message by message |
-| Window size on the context card | per request | none: `turn.completed` adds up every request of the turn and every turn of the thread |
-| Web search rows | opened and closed | opened and closed |
-| A long browser call | waits | waits: 0.155.1 sat out a 330-second call; `tool_timeout_sec` is set to 30 minutes, the OpenCode ceiling, in case a later Codex applies its documented one-minute default |
-| A changed system prompt on a follow-up | resent in the message ([below](#a-prompt-the-session-keeps)) | the same |
-| Files the analyst opens | text, PDF, image | text (through the shell, read-only) and image (attached with `--image`); a PDF through `--image` becomes "image content omitted" |
-| Sub-agents | denied (`Task`) | `features.multi_agent=false`; a code-mode model's own sub-agents cannot be switched off, but share the run's tools, so their calls are gated and shown |
-| The user's skills in the prompt | no (`Skill` denied) | no (`skills.include_instructions=false`) |
+| | Claude Code | Codex (app-server, the default) | Codex (`exec`) |
+| --- | --- | --- | --- |
+| Browser tools in the model's list | all of them | all of them, from the first request; a code-mode model gets each declared inside `exec` | deferred behind `tool_search`; a code-mode model reaches them only inside `exec` — the prompt says so |
+| The user's own MCP servers | kept out by `--strict-mcp-config` | switched off one by one in the thread's config, from the list `config/read` gives; one that starts anyway stops the run | kept out by `--ignore-user-config`: a `-c` merges into `config.toml`, so `mcp_servers={}` cleared nothing, and keys on the user's own `browsentic` entry (an `enabled_tools` list) landed on the run's |
+| The user's defaults | `settings.json` applies | the whole of `config.toml` but its MCP servers — model, provider, profile | the `model` and `model_reasoning_effort` at the top of `config.toml`, carried over by hand; nothing else in the file |
+| Shell and disk | denied by name | `features.shell_tool=false` and `features.view_image=false` on its argv; `apply_patch` as on `exec` | `features.shell_tool=false` and `features.view_image=false`, which remove the tools from every model and every sub-agent; `apply_patch` has no switch and the read-only sandbox refuses its writes |
+| A browser server that did not start | the run fails (`init` reports `failed`) | there is none to start | the run fails (`required=true`) |
+| Replies | streamed | streamed (`item/agentMessage/delta`) | whole, message by message |
+| Window size on the context card | per request | per request (`thread/tokenUsage/updated.last`) | none: `turn.completed` adds up every request of the turn and every turn of the thread |
+| Web search rows | opened and closed | opened and closed | opened and closed |
+| A long browser call | waits | waits on the answer to `item/tool/call` | waits: 0.155.1 sat out a 330-second call; `tool_timeout_sec` is set to 30 minutes, the OpenCode ceiling, in case a later Codex applies its documented one-minute default |
+| A changed system prompt on a follow-up | resent in the message ([below](#a-prompt-the-session-keeps)) | resent in the message: `thread/resume` keeps the first `developerInstructions` too | the same |
+| Files the analyst opens | text, PDF, image | — one-shots always go through `exec` | text (through the shell, read-only) and image (attached with `--image`); a PDF through `--image` becomes "image content omitted" |
+| Sub-agents | denied (`Task`) | `features.multi_agent=false`; a code-mode model's own cannot be switched off, and their tool calls come back over stdin like the parent's | `features.multi_agent=false`; a code-mode model's own sub-agents cannot be switched off, but share the run's tools, so their calls are gated and shown |
+| The user's skills in the prompt | no (`Skill` denied) | no (`skills.include_instructions=false`) | no (`skills.include_instructions=false`) |
 
 Both CLIs still load the user's hooks and their user-level instruction file (`~/.claude/CLAUDE.md`,
 `~/.codex/AGENTS.md`). That is symmetric, and left alone.
+
+### A CLI held over stdin
+
+Every other runner is handed its turn on argv and read line by line. Codex's app-server is spoken to
+instead: `Runner.converse()` returns a `Conversation` — a plan to spawn, the messages to `open` with,
+and a `read(line, sink, io)` that may write back — and `drive.ts` spawns it with stdin piped. For
+Codex, in [`codex-app-server.ts`](../../src/daemon/agent/runners/codex-app-server.ts):
+
+```
+runner ──initialize {experimentalApi}──────────► app-server
+       ──initialized, config/read ─────────────►            which MCP servers config.toml names
+       ──thread/start {dynamicTools, config: each server off, developerInstructions}
+          or thread/resume {threadId, config}
+       ◄── thread id ───────── now holding: sink.session(id)
+       ──turn/start {the message}──────────────►
+       ◄── item/tool/call ──── tool host → invokeForRun → answer {contentItems, success}
+       ◄── item/agentMessage/delta, thread/tokenUsage/updated, webSearch items
+       ◄── turn/completed ──── done; stdin is closed and the app-server exits
+```
+
+- **The tool list is fixed when the thread starts**, and `thread/resume` takes none. So `thread/start`
+  lists what the run is offered now, and what it is withholding — the page-code tools, until the
+  user turns Live tool on — goes in a `browsentic` namespace with `deferLoading`, which Codex offers
+  only through its search. `Described.withheld` carries those from the daemon. A call to one while it
+  is still withheld is refused by `invokeForRun()` as `LIVE_TOOLS_OFF`, as on any other runner.
+- **Only the run's own thread speaks.** A code-mode model's sub-agents run on threads of their own;
+  their tool calls are answered, their words are not forwarded.
+- **Anything else it asks the client** — an approval, a question for the user — is answered with a
+  JSON-RPC error, so it never waits on nobody.
+- **It is vetted as its own spawn mode**, `conversation`: `CONTAINMENT.codex.conversation` requires
+  the sandbox and the switches on the app-server's argv, and a runner with no such entry cannot hold
+  one. The app-server has no `--ignore-user-config`, so the MCP servers are switched off at runtime
+  instead, and an `mcpServer/startupStatus/updated` from any of them — even before the thread is
+  named — ends the run with `AGENT_UNSAFE`. So do a `commandExecution`, `fileChange` or `mcpToolCall`
+  item.
+- **Refused, it falls back.** An `initialize` or `config/read` error, a `thread/start` error that
+  JSON-RPC calls an unknown method or parameter, or an app-server that exits before it holds a
+  thread, fails the turn with `CONVERSATION_REFUSED` before anything reached the user. `runStream()`
+  then runs the same turn through `stream()` — `exec` — and the runner's `declined()` keeps that
+  Codex on `exec` until the daemon restarts. Any other error fails the turn as usual.
+
+The app-server interface is marked experimental. Codex's own editor extensions use it; the
+transcript in `fixtures/codex/0.155.1-app-server-turn.jsonl` is what 0.155.1 printed, and
+`codex app-server generate-ts --experimental --out <dir>` prints the current shapes.
 
 ### Readiness
 
