@@ -166,6 +166,17 @@ describe('a recorded turn', () => {
     expect([calls.filter(([signal]) => signal === 'text'), vi.mocked(tools.call).mock.calls.length]).toEqual([[], 1]);
   });
 
+  test('a call the daemon cannot be reached for is answered as failed, not left waiting', async () => {
+    const { written, tools, feed } = hold({ bin: 'codex-unreachable' });
+    vi.mocked(tools.call).mockRejectedValueOnce(new Error('socket closed'));
+    await feed({ id: 5, method: 'item/tool/call', params: { tool: 'page_echo', arguments: {} } });
+    expect(written.at(-1)).toEqual({
+      jsonrpc: '2.0',
+      id: 5,
+      result: { contentItems: [{ type: 'inputText', text: 'DAEMON_UNREACHABLE: Error: socket closed' }], success: false },
+    });
+  });
+
   test('a web search opens a row when it starts and closes it when it ends', async () => {
     const { calls, feed } = hold({ bin: 'codex-search' });
     await feed(response(1), response(2), response(3));

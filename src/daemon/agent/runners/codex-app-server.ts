@@ -98,17 +98,18 @@ export function appServerTurn(context: StreamContext, turn: AppServerTurn): Conv
       .catch((error: unknown) => sink.fail('AGENT_FAILED', `Browsentic could not list its browser tools for Codex: ${String(error)}`));
   };
 
-  const answerToolCall = (io: ConversationIO, sink: StreamSink, id: Message['id'], params: Message['params']) => {
+  // A call the daemon cannot be reached for is answered as failed, in the `CODE: message` shape every tool failure takes.
+  const answerToolCall = (io: ConversationIO, id: Message['id'], params: Message['params']) => {
     const tool = String(params?.tool ?? '');
     const args = (params?.arguments ?? {}) as Record<string, unknown>;
     context
       .tools()
       .then((host) => host.call(tool, args))
-      .then((reply) => io.write({ jsonrpc: '2.0', id, result: toolResult(reply) }))
-      .catch((error: unknown) => {
-        io.write({ jsonrpc: '2.0', id, result: { contentItems: [{ type: 'inputText', text: `TOOL_FAILED: ${String(error)}` }], success: false } });
-        if (!holding) sink.fail('AGENT_FAILED', String(error));
-      });
+      .then(
+        (reply) => io.write({ jsonrpc: '2.0', id, result: toolResult(reply) }),
+        (error: unknown) =>
+          io.write({ jsonrpc: '2.0', id, result: { contentItems: [{ type: 'inputText', text: `DAEMON_UNREACHABLE: ${String(error)}` }], success: false } }),
+      );
   };
 
   const onResponse = (message: Message, io: ConversationIO, sink: StreamSink) => {
@@ -227,7 +228,7 @@ export function appServerTurn(context: StreamContext, turn: AppServerTurn): Conv
       } catch {
         return;
       }
-      if (message.method === 'item/tool/call' && message.id !== undefined) return answerToolCall(io, sink, message.id, message.params);
+      if (message.method === 'item/tool/call' && message.id !== undefined) return answerToolCall(io, message.id, message.params);
       // Anything else it asks of the client — an approval, a question for the user — has no one to answer it.
       if (message.method && message.id !== undefined) {
         return io.write({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `Browsentic does not answer ${message.method}` } });
