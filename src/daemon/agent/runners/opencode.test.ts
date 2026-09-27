@@ -31,6 +31,7 @@ beforeEach(() => {
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   vi.stubEnv('HOME', home);
+  vi.stubEnv('USERPROFILE', home);
   for (const name of ['XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'OPENCODE_API_KEY', 'OPENCODE_AUTH_CONTENT']) vi.stubEnv(name, '');
 });
 

@@ -24,6 +24,7 @@ beforeEach(() => {
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   vi.stubEnv('HOME', home);
+  vi.stubEnv('USERPROFILE', home);
 });
 
 afterEach(() => {

@@ -9,6 +9,8 @@ const realHome = homedir();
 const home = realpathSync(mkdtempSync(join(tmpdir(), 'browsentic-test-')));
 
 process.env.HOME = home;
+// Windows reads the home directory from USERPROFILE, not HOME.
+process.env.USERPROFILE = home;
 process.env.BROWSENTIC_HOME = join(home, '.browsentic');
 process.env.BROWSENTIC_PORTS = '0';
 delete process.env.BROWSENTIC_AGENT_RUN;

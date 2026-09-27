@@ -23,6 +23,7 @@ beforeEach(() => {
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   vi.stubEnv('HOME', home);
+  vi.stubEnv('USERPROFILE', home);
   vi.stubEnv('QWEN_HOME', '');
   for (const name of ['QWEN_API_KEY', 'OPENAI_API_KEY', 'DASHSCOPE_API_KEY', 'BAILIAN_CODING_PLAN_API_KEY']) {
     vi.stubEnv(name, '');
