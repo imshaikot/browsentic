@@ -10,7 +10,10 @@ import { configPath, type AgentSettings } from '../config';
 import { stateDir } from '../../lockfile';
 import { log } from '../../log';
 import {
+  CONVERSATION_REFUSED,
   RunError,
+  type Conversation,
+  type ConversationIO,
   type JsonContext,
   type Plan,
   type RunOutcome,
@@ -25,6 +28,9 @@ const STRIPPED = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'BROWSENTIC_AGENT_RUN'
 
 type Child = ChildProcessByStdio<Writable | null, Readable, Readable>;
 
+/** What a plan is spawned with: stdin stays closed unless the CLI is held in a conversation over it. */
+type Stdin = 'ignore' | 'pipe';
+
 /**
  * Vet, then spawn. Every run reaches the CLI through here, so this is where a plan that
  * has lost its containment is stopped — before the process exists, not after it has
@@ -36,6 +42,7 @@ export function launch(
   settings: AgentSettings,
   plan: Plan,
   signal: AbortSignal,
+  stdin: Stdin = 'ignore',
 ): { child: Child; release: () => void; stop: () => void } {
   const problems = vetPlan(kind, mode, plan, stateDir);
   if (problems.length) {
@@ -64,7 +71,7 @@ export function launch(
   const child = spawn(settings.bin, plan.args, {
     cwd: plan.cwd,
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [stdin, 'pipe', 'pipe'],
   }) as Child;
 
   const kill = () => {
@@ -98,26 +105,67 @@ function spawnError(runner: Runner, settings: AgentSettings, error: NodeJS.Errno
   return error.code === 'ENOENT' ? notInstalled(runner, settings) : new RunError('AGENT_FAILED', error.message);
 }
 
-export function runStream(
+/**
+ * A turn, through the conversation the runner offers when it has one. A conversation the CLI will
+ * not hold — an older build, a handshake it refuses — is dropped before anything reached the user,
+ * and the same turn goes through the runner's plain stream instead.
+ */
+export async function runStream(
   runner: Runner,
   context: StreamContext,
   signal: AbortSignal,
   emit: (event: RunEvent) => void,
 ): Promise<RunOutcome> {
-  const plan = runner.stream(context);
+  const conversation = runner.converse?.(context);
+  if (conversation) {
+    try {
+      return await drive(runner, context, conversation.plan, signal, emit, conversation);
+    } catch (error) {
+      if (!(error instanceof RunError) || error.code !== CONVERSATION_REFUSED) throw error;
+      log(`${runner.kind} would not hold a conversation (${error.message}); running this turn from its plan instead`);
+    }
+  }
+  return drive(runner, context, runner.stream(context), signal, emit);
+}
+
+function drive(
+  runner: Runner,
+  context: StreamContext,
+  plan: Plan,
+  signal: AbortSignal,
+  emit: (event: RunEvent) => void,
+  conversation?: Conversation,
+): Promise<RunOutcome> {
   const label = AGENTS[runner.kind].label;
+  const mode = conversation ? 'conversation' : 'run';
 
   return new Promise<RunOutcome>((resolve, reject) => {
-    const { child, release, stop } = launch(runner.kind, 'run', context.settings, plan, signal);
+    const { child, release, stop } = launch(runner.kind, mode, context.settings, plan, signal, conversation ? 'pipe' : 'ignore');
 
     let sessionId: string | null = null;
     let settled = false;
     let stderrTail = '';
 
+    const io: ConversationIO = {
+      write: (message) => {
+        if (child.stdin?.writable) child.stdin.write(`${JSON.stringify(message)}\n`);
+      },
+    };
+
+    // A conversation ends when its stdin does; the CLI is asked to go, and stopped if it lingers.
+    const hangUp = () => {
+      if (!child.stdin) return;
+      child.stdin.end();
+      const lingering = setTimeout(stop, KILL_GRACE_MS);
+      lingering.unref();
+      child.once('close', () => clearTimeout(lingering));
+    };
+
     const settle = (outcome: () => void) => {
       if (settled) return;
       settled = true;
       outcome();
+      hangUp();
     };
 
     // What the agent says reaches the user and the transcript, so it goes through the
@@ -153,12 +201,13 @@ export function runStream(
       stderrTail = (stderrTail + chunk.toString()).slice(-2_000);
     });
 
-    const read = runner.reader();
+    const reader = runner.reader();
+    const read = (line: string) => (conversation ? conversation.read(line, sink, io) : reader(line, sink));
     const lines = createInterface({ input: child.stdout });
     lines.on('line', (line) => {
       if (!line.trim()) return;
       try {
-        read(line, sink);
+        read(line);
       } catch (error) {
         log(`${runner.kind} runner could not read a stream line: ${String(error)}`);
       }
@@ -172,6 +221,11 @@ export function runStream(
       release();
       if (settled) return;
       if (signal.aborted) return settle(() => reject(new RunError('CANCELLED', 'Run cancelled.')));
+      if (conversation && !conversation.holding) {
+        const reason = `it exited with code ${exitCode}${tail(stderrTail)}`;
+        conversation.declined(reason);
+        return settle(() => reject(new RunError(CONVERSATION_REFUSED, reason)));
+      }
       if (runner.endsOnExit && exitCode === 0) return sink.done('end_turn');
       const hint = runner.hint?.(stderrTail);
       settle(() =>
@@ -183,6 +237,8 @@ export function runStream(
         ),
       );
     });
+
+    conversation?.open(io);
   });
 }
 

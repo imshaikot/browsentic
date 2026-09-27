@@ -1,5 +1,5 @@
 import { once } from 'node:events';
-import { existsSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -8,6 +8,7 @@ import { AGENTS } from '@/lib/agents/catalog';
 import { logPath, stateDir } from '../../lockfile';
 import { configPath } from '../config';
 import { antigravityRunner } from './antigravity';
+import { codexRunner } from './codex';
 import { launch, runJson, runStream } from './drive';
 import { jsonContext, streamContext } from './fixtures/support';
 import { RunError, type Plan, type Runner, type StreamReader, type StreamSink } from './types';
@@ -34,12 +35,16 @@ const printing = (...lines: unknown[]) =>
 
 const node = { bin: process.execPath };
 
+/** Browser tools with nothing in them, for a runner that asks for its own. */
+const noTools = async () => ({ list: async () => ({ tools: [], withheld: [] }), call: async () => ({ content: [] }) });
+
 const run = async (
   runner: Runner,
   { runId = 'drive-run', conversation = 'conversation-1', signal = new AbortController().signal, bin = node.bin } = {},
 ) => {
   const events: RunEvent[] = [];
-  const outcome = await runStream(runner, streamContext({ bin }, { runId, conversation }), signal, (event) => events.push(event));
+  const context = streamContext({ bin }, { runId, conversation, tools: noTools });
+  const outcome = await runStream(runner, context, signal, (event) => events.push(event));
   return { outcome, events, said: events.flatMap((event) => (event.kind === 'text' ? [event.delta] : [])).join('') };
 };
 
@@ -172,6 +177,68 @@ describe('a streamed run', () => {
       code: 'AGENT_MISSING',
       message: `Could not run "${join(stateDir, 'no-such-agy')}" — Antigravity is not installed, or not on the daemon's PATH. Install it (${AGENTS.antigravity.install}), or set {"agents":{"antigravity":{"bin":"/absolute/path/to/agy"}}} in ${configPath}.`,
     });
+  });
+});
+
+/**
+ * A Node script in place of `codex`, so Codex's real plans are vetted and spawned as they would be.
+ * It notes each subcommand it was started with, then plays the part `behaviour` gives it.
+ */
+function codexStandIn(name: string, behaviour: string): { bin: string; started: () => string[] } {
+  const bin = join(stateDir, `${name}.js`);
+  const log = join(stateDir, `${name}.log`);
+  rmSync(log, { force: true });
+  writeFileSync(
+    bin,
+    `#!${process.execPath}\nconst fs = require('node:fs');\nfs.appendFileSync(${JSON.stringify(log)}, process.argv[2] + '\\n');\n${behaviour}\n`,
+    { mode: 0o755 },
+  );
+  return { bin, started: () => (existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : []) };
+}
+
+/** Enough of the app-server to hold one turn: each request answered, then a reply and the end of the turn. */
+const APP_SERVER = `
+if (process.argv[2] !== 'app-server') process.exit(9);
+const reply = (id, result) => console.log(JSON.stringify({ jsonrpc: '2.0', id, result }));
+const note = (method, params) => console.log(JSON.stringify({ jsonrpc: '2.0', method, params }));
+require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+  const { id, method } = JSON.parse(line);
+  if (method === 'initialize') reply(id, {});
+  if (method === 'config/read') reply(id, { config: {} });
+  if (method === 'thread/start') reply(id, { thread: { id: 'thread-held' } });
+  if (method === 'turn/start') {
+    reply(id, { turn: { id: 'turn-1' } });
+    note('item/agentMessage/delta', { threadId: 'thread-held', itemId: 'm1', delta: 'Held over stdin.' });
+    note('turn/completed', { threadId: 'thread-held', turn: { status: 'completed' } });
+  }
+});
+process.stdin.on('end', () => process.exit(0));
+`;
+
+const EXEC = `
+if (process.argv[2] !== 'exec') { console.error("error: unrecognized subcommand 'app-server'"); process.exit(2); }
+console.log(JSON.stringify({ type: 'thread.started', thread_id: 'thread-exec' }));
+console.log(JSON.stringify({ type: 'item.completed', item: { id: 'm1', type: 'agent_message', text: 'Through exec.' } }));
+console.log(JSON.stringify({ type: 'turn.completed' }));
+`;
+
+describe('a turn held as a conversation', () => {
+  test('is spoken to over stdin, and the CLI goes when its stdin is closed', async () => {
+    const codex = codexStandIn('codex-held', APP_SERVER);
+    const { outcome, said } = await run(codexRunner, { bin: codex.bin });
+    expect([outcome, said, codex.started()]).toEqual([{ stopReason: 'end_turn', sessionId: 'thread-held' }, 'Held over stdin.', ['app-server']]);
+  });
+
+  test('a Codex with no app-server runs the same turn through exec, and its later turns go straight there', async () => {
+    const codex = codexStandIn('codex-no-app-server', EXEC);
+    const first = await run(codexRunner, { bin: codex.bin });
+    const second = await run(codexRunner, { bin: codex.bin });
+    expect([first.outcome, first.said, second.said, codex.started()]).toEqual([
+      { stopReason: 'end_turn', sessionId: 'thread-exec' },
+      'Through exec.',
+      'Through exec.',
+      ['app-server', 'exec', 'exec'],
+    ]);
   });
 });
 

@@ -28,8 +28,11 @@
 
 import { AGENTS, isModelId, type AgentKind } from '@/lib/agents/catalog';
 
-/** `run` drives the browser; `task` is a one-shot that must not reach it at all. */
-export type SpawnMode = 'run' | 'task';
+/**
+ * `run` drives the browser; `task` is a one-shot that must not reach it at all; `conversation` drives
+ * the browser too, through a CLI held over stdin and handed the tools in-process rather than over MCP.
+ */
+export type SpawnMode = 'run' | 'task' | 'conversation';
 
 /** Structural view of a runner's `Plan`. Kept local so guardrails never import runners. */
 export interface SpawnPlan {
@@ -100,6 +103,8 @@ interface Containment {
   readonly note: string;
   readonly run: Requirements;
   readonly task: Requirements;
+  /** Only a runner that holds conversations has these; any other refuses to start one. */
+  readonly conversation?: Requirements;
 }
 
 /**
@@ -203,6 +208,21 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
     task: {
       // Left out, config.toml takes its MCP servers with it; `mcp_servers={}` alone clears none of them.
       required: ['--ignore-user-config', 'sandbox_mode="read-only"', 'approval_policy="never"', 'features.multi_agent=false'],
+      pairs: [],
+      files: [],
+    },
+    // The app-server has no --ignore-user-config. It is handed the browser tools in-process and no MCP
+    // server of Browsentic's; each one config.toml names is switched off for the thread once Codex has
+    // said which there are, and one that starts anyway stops the run.
+    conversation: {
+      required: [
+        'app-server',
+        'sandbox_mode="read-only"',
+        'approval_policy="never"',
+        'features.multi_agent=false',
+        'features.shell_tool=false',
+        'features.view_image=false',
+      ],
       pairs: [],
       files: [],
     },
@@ -389,8 +409,9 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
  */
 export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home: string): string[] {
   const rules = CONTAINMENT[kind][mode];
-  const problems: string[] = [];
   const label = `${AGENTS[kind].label} (${mode})`;
+  if (!rules) return [`${label} has no containment written for it.`];
+  const problems: string[] = [];
 
   for (const arg of rules.required) {
     if (!plan.args.includes(arg)) problems.push(`${label} is spawned without ${arg}.`);
