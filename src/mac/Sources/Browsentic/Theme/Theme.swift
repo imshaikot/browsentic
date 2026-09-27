@@ -59,3 +59,47 @@ extension Font {
         .system(size: size, weight: weight, design: .monospaced)
     }
 }
+
+/// The extension's four looks, which this app can pick for every paired browser. The swatches are
+/// globals.css' oklch tokens converted once, the same way `Palette` was; a change there is re-derived here.
+enum BrowserTheme: String, CaseIterable, Identifiable {
+    case ember, midnight, phosphor, daylight
+
+    struct Swatches {
+        let ground: Color
+        let surface: Color
+        let ink: Color
+        let inkFaint: Color
+        let brand: Color
+        let accents: [Color]
+    }
+
+    var id: String { rawValue }
+    var name: String { rawValue.capitalized }
+
+    var note: String {
+        switch self {
+        case .ember: "Warm near-black, cyan brand."
+        case .midnight: "Cool blue-black, violet brand."
+        case .phosphor: "A green CRT, grain turned up."
+        case .daylight: "Ink on paper, for a bright room."
+        }
+    }
+
+    var swatches: Swatches {
+        switch self {
+        case .ember: Self.swatches(0x110A06, 0x201611, 0xF7F0E9, 0x83766E, 0x3BE1E1, [0xFE804C, 0x63EA89, 0xF7C243])
+        case .midnight: Self.swatches(0x080D17, 0x151C2C, 0xEEF1FA, 0x747C8C, 0xB6AAFF, [0xFF807F, 0x2FF0B2, 0xFFC75A])
+        case .phosphor: Self.swatches(0x040C06, 0x0D1C10, 0xD1F9D8, 0x668B6D, 0x4BF58C, [0xFF9757, 0xC8F23C, 0xFAD03E])
+        case .daylight: Self.swatches(0xFCFBF8, 0xF0ECE7, 0x2C231D, 0x7D7068, 0x007791, [0xC04307, 0x187E36, 0xA66300])
+        }
+    }
+
+    private static func swatches(_ ground: UInt32, _ surface: UInt32, _ ink: UInt32, _ inkFaint: UInt32, _ brand: UInt32, _ accents: [UInt32]) -> Swatches {
+        Swatches(ground: color(ground), surface: color(surface), ink: color(ink), inkFaint: color(inkFaint), brand: color(brand), accents: accents.map(color))
+    }
+
+    private static func color(_ hex: UInt32) -> Color {
+        Color(.sRGB, red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
+    }
+}
