@@ -120,8 +120,12 @@ jobs:
           echo "YARN=$yarn_bin" >> "$GITHUB_ENV"
           node "$yarn_bin" install --immutable
 
+      # tauri-build refuses to compile while a bundled resource folder is missing; the payload itself
+      # is staged only for an installer (scripts/windows-payload.ts), which the tests do not need.
       - name: Build the window the app embeds
-        run: node "$YARN" win:ui
+        run: |
+          node "$YARN" win:ui
+          mkdir -p src/windows/src-tauri/resources/payload src/windows/src-tauri/resources/launcher
 
       - name: Build and test the app and its launcher
         working-directory: src/windows
