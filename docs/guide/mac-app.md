@@ -61,6 +61,13 @@ itself; on later launches that takes about two seconds.
 
 The tabs float at the top; ⌘1–⌘7 switch between them.
 
+![The daemon running, the extension connected and in sync, a newer build waiting for a reload, and the update check.](../assets/mac-app/overview.webp "Overview")
+![A one-time pairing code a click away, and Google Chrome paired, connected and ready to unpair.](../assets/mac-app/browsers.webp "Browsers")
+![Every agent CLI with its version and a model select, and Codex the one running the side panel.](../assets/mac-app/agents.webp "Agents")
+![The three folders skills are read from, a filter, and a card for every skill the agent can route to.](../assets/mac-app/skills.webp "Skills")
+![The daemon log, followed live as the daemon restarts and the extension reconnects.](../assets/mac-app/logs.webp "Logs")
+![The update check, this window’s appearance, the theme every paired browser uses, and the guardrails.](../assets/mac-app/settings.webp "Settings")
+
 | Tab | What you do there |
 | --- | --- |
 | **Overview** | Turn the daemon on and off with the power button, restart it, see its address, version and whether the extension is connected and in sync. Copy the extension’s path, or open `chrome://extensions` in your browser with the path already on the clipboard |
