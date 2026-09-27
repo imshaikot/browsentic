@@ -192,11 +192,30 @@ describe('reading the stream', () => {
     expect(read('tool-loop.hand-written.jsonl', 'tool')).toEqual([]);
   });
 
-  test('its own web tools are announced under the ids Claude gave them', () => {
-    expect(read('web-search.hand-written.jsonl', 'tool')).toEqual([
+  test('its own web tools are announced under the ids Claude gave them, and closed as their results come back', () => {
+    expect(read('web-search.hand-written.jsonl').filter(([signal]) => signal === 'tool' || signal === 'toolResult')).toEqual([
       ['tool', 'toolu_ws', 'WebSearch'],
       ['tool', 'toolu_wf', 'WebFetch'],
+      ['toolResult', 'toolu_ws', true],
+      ['toolResult', 'toolu_wf', false],
     ]);
+  });
+
+  // Claude Code carries on without a server that failed, and its model answers without ever seeing the page.
+  test('browser tools that did not start stop the run, in the words a Codex run uses', () => {
+    expect(read('2.1.283-mcp-failed.jsonl').slice(0, 2)).toEqual([
+      ['session', '9160ef97-27f3-45bb-aaee-3024305cbc0c'],
+      [
+        'fail',
+        'AGENT_FAILED',
+        'Claude Code could not start Browsentic\'s browser tools, so this run could not reach the page. Run "browsentic restart", then send the message again.',
+      ],
+    ]);
+  });
+
+  test('a browser server still starting, or one that connected, is no failure', () => {
+    const init = (status: string) => ({ type: 'system', subtype: 'init', session_id: 's-1', mcp_servers: [{ name: 'browsentic', status }] });
+    expect([readLines(init('pending')), readLines(init('connected'))]).toEqual([[['session', 's-1']], [['session', 's-1']]]);
   });
 
   test('nothing a subagent says, calls or spends reaches the run', () => {
@@ -275,6 +294,12 @@ describe('what a failed start is explained as', () => {
   test('anything else is left to the exit code', () => {
     expect(claudeRunner.hint?.('Error: connect ECONNREFUSED')).toBeNull();
   });
+});
+
+// Measured against 2.1.283 (`--system-prompt-snapshot`, on by default): a resume is sent the first turn's
+// --append-system-prompt, whatever a later turn passes.
+test('keeps the prompt its session began with, so the daemon carries what changed in the message', () => {
+  expect(claudeRunner.keepsFirstPrompt).toBe(true);
 });
 
 test("the user's own skills are listed from ~/.claude/skills", () => {
