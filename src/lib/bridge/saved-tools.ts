@@ -35,6 +35,8 @@ export interface SavedTool {
   code: string;
   /** The zero-argument entry point `/` invokes. */
   fn: string;
+  /** Also run it by itself on every visit to its scope, as a user script Chrome injects. */
+  autoRun?: boolean;
   createdAt: number;
 }
 
@@ -64,6 +66,23 @@ export async function saveTool(tool: SavedTool): Promise<void> {
   // same page is a correction, not a second tool.
   const kept = tools.filter((held) => held.name !== tool.name);
   await browser.storage.local.set({ [TOOLS_KEY]: [tool, ...kept].slice(0, MAX_SAVED_TOOLS) });
+}
+
+export async function setAutoRun(id: string, autoRun: boolean): Promise<SavedTool | null> {
+  const tools = await listSavedTools();
+  const changed = tools.find((tool) => tool.id === id);
+  if (!changed) return null;
+  changed.autoRun = autoRun;
+  await browser.storage.local.set({ [TOOLS_KEY]: tools });
+  return changed;
+}
+
+/** Fires with the whole list whenever it changes, from any context. */
+export function onSavedToolsChange(listener: (tools: SavedTool[]) => void): void {
+  browser.storage.local.onChanged.addListener((changes) => {
+    const change = changes[TOOLS_KEY];
+    if (change) listener(Array.isArray(change.newValue) ? (change.newValue as SavedTool[]) : []);
+  });
 }
 
 export async function forgetSavedTool(id: string): Promise<SavedToolMeta | null> {

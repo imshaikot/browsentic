@@ -438,13 +438,24 @@ export default function App() {
       </div>
 
       {showTools && (
-        <SavedToolList tools={run.tools} onForget={run.forgetTool} onClose={() => setShowTools(false)} />
+        <SavedToolList
+          tools={run.tools}
+          autoRunReady={run.autoRunReady}
+          onAutoRun={run.setAutoRun}
+          onForget={run.forgetTool}
+          onClose={() => setShowTools(false)}
+        />
       )}
 
       {tab === 'chat' && (
         <footer className="shrink-0 border-t border-line p-3">
           {run.toolOffer && (
-            <KeepToolPrompt offer={run.toolOffer} onKeep={run.keepTool} onDismiss={run.dismissTool} />
+            <KeepToolPrompt
+              offer={run.toolOffer}
+              autoRunReady={run.autoRunReady}
+              onKeep={run.keepTool}
+              onDismiss={run.dismissTool}
+            />
           )}
           <Composer
             voice={voice}
