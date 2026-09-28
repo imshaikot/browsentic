@@ -13,6 +13,7 @@ first.
 | [Hands-free](hands-free.md) | Put the panel away and talk to the page through a mic you can drag anywhere |
 | [Instant commands](instant-commands.md) | "go back", "scroll to the top" — the things that run in milliseconds without waking an agent |
 | [A-Eye](a-eye.md) | Point at an element instead of describing it, and let it point back when it needs to |
+| [Profile](profile.md) | Your details and standing rules, saved once, so it fills a form with the real thing instead of guessing |
 | [Skills](skills.md) | How an instruction gets routed to the right playbook, and how to write your own |
 
 ## Acting on a page

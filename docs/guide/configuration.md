@@ -133,6 +133,38 @@ over at the next connect. The Mac app's own window keeps its separate System / L
 
 ---
 
+## Profile
+
+The **Profile** section of the settings page writes `~/.browsentic/profile.json` — a file of its own,
+so this one stays free of personal details. It is re-read before every run and watched like this one,
+and every field in it is optional:
+
+```json
+{
+  "fields": {
+    "givenName": "Ada",
+    "familyName": "Lovelace",
+    "email": "ada@example.com",
+    "street": "12 St James’s Square\nFlat 3",
+    "country": "United Kingdom"
+  },
+  "details": [{ "label": "Frequent flyer", "value": "BA 123456" }],
+  "instructions": "Always choose the cheapest shipping."
+}
+```
+
+| Key | Limit | Notes |
+| --- | --- | --- |
+| `fields` | 300 characters each | `givenName`, `familyName`, `email`, `phone`, `street`, `city`, `region`, `postalCode`, `country`, `company`, `jobTitle` |
+| `details` | 20 entries; label 60, value 300 characters | Anything the fields do not cover |
+| `instructions` | 4,000 characters | Kept on every task |
+
+An entry that breaks a limit, or a key the page does not know, is left out rather than cut short —
+the daemon logs that it did. What the agent is told, and what is refused, is in
+[Profile](features/profile.md).
+
+---
+
 ## Things that are not configurable
 
 Compiled-in ceilings, listed here so you do not go looking for a key that does not exist:
