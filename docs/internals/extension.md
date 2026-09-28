@@ -54,8 +54,9 @@ a `browser_specific_settings.gecko` block the Chrome build has no use for:
   behind whichever agent CLI the user runs.
 - **`strict_min_version: 140.0`** — the first Firefox that understands the data-collection key.
 
-Three permissions are filtered out of that build, `sidePanel`, `debugger` and `offscreen`: Firefox has
-none of them, and AMO's validator flags each name it does not know. The Firefox sidebar is `sidebar_action`, which WXT
+Four permissions are filtered out of that build, `sidePanel`, `debugger`, `offscreen` and
+`userScripts`: Firefox's Manifest V2 build has no use for any of them, and AMO's validator flags each
+name it does not know. The Firefox sidebar is `sidebar_action`, which WXT
 derives from the same entrypoint, and the nine tools that need the debugger are left off the list a
 Firefox build offers (see [Background vs content script](#background-vs-content-script)).
 
@@ -385,6 +386,33 @@ only; **Always on ‹site›** stays in the panel.
 `browsentic setup` registered. That host runs `ensureDaemon` and exits. `browsentic stop` leaves
 `~/.browsentic/stopped` behind, and while it is there the host starts nothing; the next daemon to
 start, by any other path, removes it.
+
+## Saved tools that run on every visit
+
+A saved tool keeps its code in `storage.local` under `browsentic/savedTools`, and `autoRun` on its
+record says whether it should run by itself. That flag is the truth. `auto-run.ts` mirrors it into
+Chrome's `userScripts` API, one registration per tool with the id `browsentic-tool-<id>`, in the
+`MAIN` world at `document_idle`. The mirror is brought back into line whenever the list changes
+(`storage.local.onChanged`), whenever the worker starts, and on the one-minute `browsentic/autoRun`
+alarm. It compares code and match patterns and re-registers only what differs.
+
+The `debugger` path that `/` uses would be wrong here. It shows a bar on every attach, fails with
+DevTools open, and would have to be driven on each navigation from the worker. A user script is
+injected by the browser itself, is exempt from the page's CSP, and outlives a restart. The cost is
+Chrome's own per-extension **Allow User Scripts** switch (Developer mode before Chrome 138), which no
+API can flip. Until it is on, `chrome.userScripts` is undefined, and `autoRunReady()` turns that
+into the `autoRunReady` flag on the run port's `tools` message. Turning it on raises no event and
+does not restart the extension; the API just appears in the running worker. So while the panel
+shows a tool waiting on it, the panel sends `listTools` every two seconds, which reconciles first.
+The alarm covers a closed panel.
+
+The registration matches the whole host, on any port. Scope is decided inside the page by the rule
+`/` applies: the exact origin, then the slug of the first path segment. That keeps it right on
+single-page sites. There, arriving at `/watch` is a history entry and not a load, so the script also
+listens to the Navigation API's `currententrychange`. It runs the entry point on each arrival into
+scope, not on each move within it, once `load` has fired and the DOM has gone 400 ms without a
+mutation (3 s at most). The approved code is wrapped the way the installer wraps it, and it is
+evaluated once per document.
 
 ---
 
