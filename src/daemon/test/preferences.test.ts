@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import { WebSocket } from 'ws';
@@ -9,8 +9,10 @@ import { clearAuth } from '../auth-store';
 import { configPath, writeAgentModel } from '../agent/config';
 import { startDaemon, type Daemon } from '../daemon';
 import { readLockfile } from '../lockfile';
+import { profilePath } from '../profile';
 import { RemoteBridge } from '../remote-bridge';
 import { FakeBrowser, type Profile } from './fake-browser';
+import { bits, modeOf } from './modes';
 
 const unpacked = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop';
 const chrome: Profile = { origin: unpacked, installId: 'install-chrome-0001', browser: 'Google Chrome' };
@@ -27,7 +29,10 @@ afterAll(async () => {
   await daemon?.stop();
 });
 
-beforeEach(() => rmSync(configPath, { force: true }));
+beforeEach(() => {
+  rmSync(configPath, { force: true });
+  rmSync(profilePath, { force: true });
+});
 
 afterEach(async () => {
   for (const each of opened) each.close();
@@ -163,5 +168,84 @@ describe('settings shared by the extension and the Mac app', () => {
     await vi.waitFor(() => expect(browser.agent?.runners.find((runner) => runner.kind === 'claude')?.model).toBe('opus'), {
       timeout: 10_000,
     });
+  });
+});
+
+describe('the profile the settings page keeps for the agent', () => {
+  const ada = {
+    fields: { givenName: 'Ada', email: 'ada@example.com', phone: '+8801711234567' },
+    details: [{ label: 'Frequent flyer', value: 'BA 123456' }],
+    instructions: 'Always choose the cheapest shipping.',
+  };
+  const saveFrom = (browser: FakeBrowser, profile: object) =>
+    browser.ask({ t: 'setPreference', id: randomUUID(), change: { kind: 'profile', profile } } as never);
+  const refusal = (frame: SocketFrame) => (frame.t === 'preferencesInfo' && !frame.result.ok ? frame.result.error.message : undefined);
+
+  test('a profile saved in one browser lands in profile.json alone, and reaches the other browser and the Mac app', async () => {
+    const [first, second] = [await paired(chrome), await paired(brave)];
+    const app = await macApp();
+
+    const answer = await saveFrom(first, { ...ada, fields: { ...ada.fields, familyName: '  ' } });
+    expect(answer.t === 'preferencesInfo' && answer.result.ok && answer.result.data.profile).toEqual(ada);
+
+    await vi.waitFor(() => expect(second.preferences?.profile).toEqual(ada));
+    await vi.waitFor(() => expect(app.events).toContain('settings-changed'));
+    expect(JSON.parse(readFileSync(profilePath, 'utf8'))).toEqual(ada);
+    expect(modeOf(profilePath)).toBe(bits(0o600));
+    expect(existsSync(configPath)).toBe(false);
+  });
+
+  test('a hand edit of profile.json reaches every browser', async () => {
+    const browser = await paired(chrome);
+    await vi.waitFor(() => expect(browser.preferences).not.toBeNull());
+    mkdirSync(dirname(profilePath), { recursive: true });
+    writeFileSync(profilePath, JSON.stringify({ fields: { email: 'ada@lovelace.dev' }, details: [], instructions: '' }));
+
+    await vi.waitFor(() => expect(browser.preferences?.profile.fields.email).toBe('ada@lovelace.dev'));
+  });
+
+  test('a key, a password or a card number is refused by name and written nowhere', async () => {
+    const browser = await paired(chrome);
+    const answers = await Promise.all(
+      [
+        { ...ada, instructions: 'My Anthropic key is sk-ant-api03-abcdefghijklmnopqrstuvwx' },
+        { ...ada, details: [{ label: 'Wi-Fi password', value: 'correct-horse-battery' }] },
+        { ...ada, details: [{ label: 'Card', value: '4111 1111 1111 1111' }] },
+      ].map((profile) => saveFrom(browser, profile)),
+    );
+    expect(answers.map(refusal)).toEqual([
+      expect.stringContaining('“Instructions” looks like a password, key or card number'),
+      expect.stringContaining('“Wi-Fi password” looks like'),
+      expect.stringContaining('“Card” looks like'),
+    ]);
+    expect(existsSync(profilePath)).toBe(false);
+  });
+
+  test('a phone number is never taken for a card, however its digits add up', async () => {
+    const browser = await paired(chrome);
+    const answers = await Promise.all(
+      ['+8801711234567', '4111 1111 1111 1111', '+44 20 7946 0958'].map((phone) =>
+        saveFrom(browser, { fields: { phone }, details: [], instructions: '' }),
+      ),
+    );
+    expect(answers.map(refusal)).toEqual([undefined, undefined, undefined]);
+  });
+
+  test('saving an empty profile removes the file, so nothing about the user is left on disk', async () => {
+    const browser = await paired(chrome);
+    await saveFrom(browser, ada);
+    expect(existsSync(profilePath)).toBe(true);
+
+    const answer = await saveFrom(browser, { fields: { email: ' ' }, details: [], instructions: '' });
+    expect(answer.t === 'preferencesInfo' && answer.result.ok && answer.result.data.profile).toEqual({ fields: {}, details: [], instructions: '' });
+    expect(existsSync(profilePath)).toBe(false);
+  });
+
+  test('a control connection that has spoken for an agent run cannot rewrite the profile', async () => {
+    const app = await macApp();
+    await app.ask({ op: 'describe', runId: 'run-under-guard' });
+    const refused = await app.ask({ op: 'setPreference', change: { kind: 'profile', profile: ada } });
+    expect(refused.result).toMatchObject({ ok: false, error: { code: 'BLOCKED' } });
+    expect(existsSync(profilePath)).toBe(false);
   });
 });

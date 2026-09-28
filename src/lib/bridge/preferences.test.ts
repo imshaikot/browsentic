@@ -3,6 +3,7 @@ import { fakeBrowser } from 'wxt/testing';
 import { failure, success } from '@/lib/actions/protocol';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { Preferences } from '@/lib/settings/preferences';
+import { EMPTY_PROFILE } from '@/lib/settings/profile';
 import type { ThemeId } from '@/lib/settings/theme';
 
 const socket = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ const guardrails = {} as GuardrailSettings;
 
 /** What the socket does with a pushed snapshot: record it as the daemon's state, then hand it over. */
 async function push(theme: ThemeId | null): Promise<void> {
-  const preferences = { theme, guardrails };
+  const preferences = { theme, guardrails, profile: EMPTY_PROFILE };
   await fakeBrowser.storage.session.set({ 'browsentic/daemon': { connected: true, paired: true, preferences, lastChangeAt: 0 } });
   socket.listener?.(preferences);
 }
@@ -34,7 +35,7 @@ const handed = () => socket.setPreference.mock.calls.map(([change]) => change.th
 describe('one theme for this browser and config.json', () => {
   beforeEach(() => {
     fakeBrowser.reset();
-    socket.setPreference.mockReset().mockImplementation(async (change) => success({ theme: change.theme, guardrails }));
+    socket.setPreference.mockReset().mockImplementation(async (change) => success({ theme: change.theme, guardrails, profile: EMPTY_PROFILE }));
     servePreferences();
   });
 
@@ -69,7 +70,7 @@ describe('one theme for this browser and config.json', () => {
     await fakeBrowser.storage.local.set({ [THEME_KEY]: 'midnight' });
     await vi.waitFor(async () => expect((await local())[THEME_UNSYNCED_KEY]).toBe(true));
 
-    socket.setPreference.mockImplementation(async (change) => success({ theme: change.theme, guardrails }));
+    socket.setPreference.mockImplementation(async (change) => success({ theme: change.theme, guardrails, profile: EMPTY_PROFILE }));
     socket.setPreference.mockClear();
     await push('ember');
     await vi.waitFor(() => expect(handed()).toEqual(['midnight']));
