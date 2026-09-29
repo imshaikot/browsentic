@@ -205,6 +205,12 @@ export default function App() {
     void run.restore(sessionId);
   }
 
+  /** The chat shows the tab in front, so watching a run brings its tab forward. */
+  function watch(sessionId: string) {
+    open('chat');
+    run.focusSession(sessionId);
+  }
+
   function replayRecording(recording: StoredRecordingMeta) {
     open('chat');
     run.send(`Replay my recording “${recording.name}” (id ${recording.id}).`);
@@ -267,7 +273,9 @@ export default function App() {
     setVoiceEnabled(false);
   }
 
-  const runningCount = run.sessions.filter((session) => session.runId).length;
+  const running = run.sessions.filter((session) => session.runId);
+  const runningCount = running.length;
+  const watched = running.find((session) => session.sessionId === run.sessionId) ?? running[0];
   const offChatRun = runningCount > 0 && tab !== 'chat';
   const hasBanners = offChatRun || !!run.recording || run.monitors.length > 0 || !!run.draft;
   const counts = {
@@ -338,19 +346,16 @@ export default function App() {
       <SessionRail
         sessions={run.sessions}
         activeSessionId={run.sessionId}
-        onFocus={(id) => {
-          open('chat');
-          run.focusSession(id);
-        }}
+        onFocus={watch}
         onEnd={run.endSession}
       />
 
       {hasBanners && (
         <div className="max-h-[45%] shrink-0 overflow-y-auto px-3 pt-2">
-          {offChatRun && (
+          {offChatRun && watched && (
             <button
               type="button"
-              onClick={() => open('chat')}
+              onClick={() => watch(watched.sessionId)}
               className="enters mb-2 flex w-full items-center gap-2 rounded-xl border border-brand/35 bg-brand/8 px-2.5 py-2 text-left transition-colors hover:bg-brand/12"
             >
               <span className="glow-dot size-1.5 shrink-0 animate-pulse rounded-full bg-brand text-brand" />
@@ -407,7 +412,7 @@ export default function App() {
               sessions={run.sessions}
               seed={taskSeed}
               onSeedTaken={takeSeed}
-              onWatch={run.focusSession}
+              onWatch={watch}
             />
           ) : (
             <RecordingPanel
