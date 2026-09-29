@@ -102,12 +102,21 @@ lists it as **Options** on the toolbar icon's menu, and Firefox as **Preferences
 The panel's header, the popup's header and the connection sheet open it with
 `runtime.openOptionsPage()`, which focuses a settings tab already open rather than adding another.
 
-The page is a sidebar of four sections — **Appearance**, **Guardrails**, **Agent**, **Connection** —
-with the open one in the URL hash, so a reload or a link lands on it. **Agent** and **Connection** are
-the same `AgentPicker` and `DaemonLink` the popup and the connection sheet show; those keep theirs,
-so a blocked run is still one click from its fix.
+The page is a sidebar of four sections — **Extension**, **Guardrails**, **Agent**, **Connection** —
+with the open one in the URL hash, so a reload or a link lands on it; an unknown hash,
+such as the old `#appearance`, lands on **Extension**. **Agent** and **Connection** are the same
+`AgentPicker` and `DaemonLink` the popup and the connection sheet show; those keep theirs, so a
+blocked run is still one click from its fix.
 
-**Appearance and Guardrails are shared with the Mac app**, and the daemon keeps both in
+**Extension** is the theme, then what belongs to this browser alone, in `storage.local`: the
+right-click items (`browsentic/contextMenu`), the keyboard shortcuts, and hold to talk
+(`browsentic/pushToTalk`, the switch the orb's menu writes too). The shortcuts are the manifest's
+`commands`, declared from [shortcuts.ts](../../src/lib/settings/shortcuts.ts) with suggested keys; the
+page lists them with `commands.getAll()`, re-read whenever it comes back into view, because the
+browser owns the keys and only its own page changes them — `chrome://extensions/shortcuts`
+(`edge://` on Edge), or `commands.openShortcutSettings()` on Firefox.
+
+**The theme and Guardrails are shared with the Mac app**, and the daemon keeps both in
 `~/.browsentic/config.json`:
 
 - Two bridge ops, `preferences` and `setPreference`, forward to the socket frames of the same name.
@@ -202,9 +211,18 @@ own side of the same problem: on injection it removes any rail element left by a
 life, and on a back/forward-cache restore it drops the cached rail and asks the background for the
 current state with the rail channel's `sync` op.
 
-The same panel-presence signal drives the context menu: the item reads **Open Browsentic** or
-**Close Browsentic** to match, and a click on *Close* shuts the panel — Firefox's background closes
-the sidebar inside the gesture, Chromium panels are told over the run port to close themselves.
+The same panel-presence signal drives the context menu, which
+[launchers.ts](../../src/lib/bridge/launchers.ts) repaints from scratch — `removeAll`, then one
+`create` per item, one paint at a time — whenever the panel opens or closes, hands-free starts or
+ends, the settings page switches an item, or the speech service is found missing. **Open Browsentic**
+reads **Close Browsentic** while a panel is open, and a click on *Close* shuts it — Firefox's
+background closes the sidebar inside the gesture, Chromium panels are told over the run port to
+close themselves. **Open Browsentic (Hands Free)** exists only where `handsFreeSupported()` says
+speech works, reads **Close Browsentic (Hands Free)** while the orb is up, and toggles
+`browsentic/handsFree`, exactly as the panel's detach button and the popup's **Open hands-free** do.
+The `toggle-side-panel` and `toggle-hands-free` shortcuts go through the same two toggles; the panel
+opens before anything is awaited, because both a menu click and a shortcut hand over a gesture the
+first `await` would spend.
 
 Pages that refuse content scripts — `chrome://`, the Web Store, the new-tab page — get no rail.
 That is the same `TAB_UNREACHABLE` set as everywhere else, and it is why the toolbar icon and the

@@ -60,9 +60,10 @@ how many runs are live, and its edge picks up the working colour. It stays minim
 reopen it.
 
 The rail is drawn into the page, so it cannot appear on pages Browsentic is not allowed into —
-`chrome://` pages, the Chrome Web Store and the new tab page. The toolbar icon and the right-click
-**Open Browsentic** item always work; while the panel is open, that item reads **Close Browsentic**
-and closes it instead.
+`chrome://` pages, the Chrome Web Store and the new tab page. The toolbar icon, the right-click
+**Open Browsentic** item and the **Open or close the side panel** shortcut (**Alt+Shift+B**,
+**⌥⇧B** on a Mac, unless something else already had it) always work; while the panel is open, the
+item reads **Close Browsentic** and the shortcut closes it instead.
 
 The rail belongs to the minimized state alone. Closing the panel with the browser's own close
 button removes any rail from every page — only the header's collapse button leaves one behind.

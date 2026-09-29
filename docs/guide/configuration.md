@@ -121,7 +121,7 @@ ceiling is clamped; a value that is not a number ≥ 1 falls back to the default
 | --- | --- | --- |
 | `theme` | absent (Ember) | `ember`, `midnight`, `phosphor` or `daylight` — the look of the side panel, the popup and the settings page |
 
-It is a row of tiles under **Appearance** on the extension's settings page, and under **Browser theme**
+It is a row of tiles under **Appearance** in the **Extension** section of the extension's settings page, and under **Browser theme**
 in the Mac app's Settings tab — **Ember** (warm near-black, cyan), **Midnight** (cool blue-black,
 violet), **Phosphor** (a green CRT) and **Daylight** (ink on paper). Each tile is drawn in the theme it
 offers, so the preview is the thing itself.
@@ -130,6 +130,20 @@ One theme serves every paired browser: picking one anywhere repaints the panel, 
 settings page in all of them. A browser that has never been paired keeps its choice to itself and
 hands it to the daemon when it first connects; one picked while the daemon is unreachable is handed
 over at the next connect. The Mac app's own window keeps its separate System / Light / Dark setting.
+
+### The Extension section
+
+Below the theme, the same section holds what belongs to one browser alone. None of it is in
+`config.json`; each browser keeps its own.
+
+| Block | What it sets |
+| --- | --- |
+| **Right-click menu** | Whether a right-click on a page offers **Open Browsentic** (the side panel) and **Open Browsentic (Hands Free)**. Both are on until you switch one off. With both on, the browser gathers them under a **Browsentic** entry |
+| **Keyboard shortcuts** | Shows the keys for **Open the popup**, **Open or close the side panel** and **Start or stop hands-free**. The browser owns these: it gives the side panel **Alt+Shift+B** and hands-free **Alt+Shift+H** (**⌥⇧B**, **⌥⇧H** on a Mac) at install unless something else already has them, and **Change shortcuts** opens its own shortcuts page. Firefox has the popup and the sidebar only |
+| **Hands-free** | **Hold to talk** — the same switch as the mic's own menu |
+
+The hands-free item, shortcut and block show only in a browser that can transcribe speech — see
+[Hands-free → Which browsers](features/hands-free.md#which-browsers).
 
 ---
 
