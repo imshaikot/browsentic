@@ -33,7 +33,10 @@ export function writeHandsFree(state: HandsFreeState | null): Promise<void> {
     : browser.storage.session.remove(HANDS_FREE_KEY);
 }
 
-export const startHandsFree = (): Promise<void> => writeHandsFree({ muted: false, since: Date.now() });
+/** Hold to talk: the orb listens only while left Control is held. Kept across restarts, unlike hands-free itself. */
+export const PUSH_TO_TALK_KEY = 'browsentic/pushToTalk';
+
+export const startHandsFree =(): Promise<void> => writeHandsFree({ muted: false, since: Date.now() });
 
 export const endHandsFree = (): Promise<void> => writeHandsFree(null);
 
