@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import { manifestCommands } from './src/lib/settings/shortcuts';
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -31,6 +32,7 @@ export default defineConfig({
       ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen']),
     ],
     host_permissions: ['<all_urls>'],
+    commands: manifestCommands(browser === 'firefox'),
     // Release Firefox installs only what addons.mozilla.org has signed, and signing needs a
     // permanent id. The update URL is polled daily; the release job publishes updates.json
     // next to each signed .xpi, and `releases/latest` always resolves to the newest one.

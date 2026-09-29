@@ -12,14 +12,14 @@ import { nameStoredSession } from '@/lib/bridge/session-store';
 import { analyzeStoredRecording, resumePendingAnalyses } from '@/lib/bridge/recording-store';
 import { ingestSample, monitorsForTab, serveMonitor } from '@/lib/bridge/monitor';
 import { appendEvents, recordingStateFor, serveRecorder } from '@/lib/bridge/recorder';
-import { closePanels, onPanelPresence, serveRunPorts, serveTabSessions, sweepFiles } from '@/lib/bridge/run-port';
+import { onPanelPresence, serveRunPorts, serveTabSessions, sweepFiles } from '@/lib/bridge/run-port';
 import { clearStrandedRail, serveRail, setPanelCollapsed, syncRail } from '@/lib/bridge/rail';
 import { serveTimers } from '@/lib/bridge/timer';
 import { serveTaskNotices } from '@/lib/bridge/task-notices';
 import { serveToast } from '@/lib/bridge/toast';
 import { serveHandsFree } from '@/lib/bridge/hands-free';
 import { endHandsFree } from '@/lib/bridge/panel-view';
-import { closeSidebar, openSidePanel } from '@/lib/bridge/side-panel';
+import { serveLaunchers } from '@/lib/bridge/launchers';
 import { servePreferences } from '@/lib/bridge/preferences';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
@@ -39,8 +39,6 @@ import {
   setUpAgent,
   taskOp,
 } from '@/lib/bridge/socket';
-
-const OPEN_PANEL_MENU = 'open-side-panel';
 
 export default defineBackground(() => {
   serveDebuggerEvents();
@@ -196,33 +194,11 @@ export default defineBackground(() => {
     });
   });
 
-  const menuReady = browser.contextMenus
-    .removeAll()
-    .then(() =>
-      browser.contextMenus.create({ id: OPEN_PANEL_MENU, title: 'Open Browsentic', contexts: ['all'] }),
-    );
-
-  let panelOpen = false;
   onPanelPresence((open) => {
-    panelOpen = open;
-    void menuReady.then(() =>
-      browser.contextMenus.update(OPEN_PANEL_MENU, {
-        title: open ? 'Close Browsentic' : 'Open Browsentic',
-      }),
-    );
     if (!open) void clearStrandedRail();
   });
 
-  browser.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId !== OPEN_PANEL_MENU || tab?.windowId == null) return;
-    if (panelOpen) {
-      if (import.meta.env.FIREFOX) void closeSidebar();
-      else closePanels();
-      return;
-    }
-    void openSidePanel(tab.windowId);
-  });
-
+  serveLaunchers();
   serveDiagnostics();
   serveFrameFocus();
   serveCodeToolkits();

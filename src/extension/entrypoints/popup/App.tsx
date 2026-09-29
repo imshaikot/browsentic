@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mic, MicOff, PanelRightOpen, Send, SlidersHorizontal } from 'lucide-react';
+import { AudioLines, Mic, MicOff, PanelRightOpen, Send, SlidersHorizontal } from 'lucide-react';
 
 import { AgentPicker } from '@/extension/components/agent-picker';
 import { Wordmark } from '@/extension/components/brand';
@@ -8,8 +8,10 @@ import { StatusPill, describeStatus, type StatusBlocker } from '@/extension/comp
 import { Button } from '@/extension/components/ui/button';
 import { Input } from '@/extension/components/ui/input';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { startHandsFree } from '@/lib/bridge/panel-view';
 import { openSidePanel } from '@/lib/bridge/side-panel';
 import { useRun } from '@/lib/bridge/use-run';
+import { useHandsFreeSupported } from '@/lib/bridge/use-speech';
 import { useVoiceComposer } from '@/lib/bridge/use-voice-composer';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,7 @@ export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [micOn, setMicOn] = useState(false);
+  const handsFree = useHandsFreeSupported();
 
   const paired = daemon?.paired ?? false;
 
@@ -32,6 +35,11 @@ export default function App() {
       await openSidePanel(win.id);
       window.close();
     }
+  }
+
+  async function goHandsFree() {
+    await startHandsFree();
+    window.close();
   }
 
   const voice = useVoiceComposer({
@@ -145,9 +153,16 @@ export default function App() {
             </Button>
           </form>
 
-          <Button variant="outline" size="sm" className="w-full" onClick={revealPanel}>
-            <PanelRightOpen /> Open the side panel
-          </Button>
+          <div className={cn('grid w-full gap-2', handsFree && 'grid-cols-2')}>
+            <Button variant="outline" size="sm" onClick={revealPanel}>
+              <PanelRightOpen /> Open side panel
+            </Button>
+            {handsFree && (
+              <Button variant="outline" size="sm" onClick={goHandsFree}>
+                <AudioLines /> Open hands-free
+              </Button>
+            )}
+          </div>
         </main>
       )}
 
