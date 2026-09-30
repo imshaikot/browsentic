@@ -3,6 +3,7 @@ import { injectContentScript } from '@/lib/actions/client';
 import { describeOwnActions } from '@/lib/bridge/own-actions';
 import { invokeForHarness } from '@/lib/bridge/invoke';
 import { serveDebuggerEvents } from '@/lib/bridge/cdp';
+import { serveAutoRuns } from '@/lib/bridge/auto-run';
 import { serveCodeToolkits } from '@/lib/bridge/code-toolkit';
 import { serveDiagnostics } from '@/lib/bridge/diagnostics';
 import { serveFrameFocus } from '@/lib/bridge/frame-focus';
@@ -202,6 +203,7 @@ export default defineBackground(() => {
   serveDiagnostics();
   serveFrameFocus();
   serveCodeToolkits();
+  serveAutoRuns();
   serveRecorder();
   serveMonitor();
   serveTimers();

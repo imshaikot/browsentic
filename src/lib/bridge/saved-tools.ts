@@ -35,6 +35,7 @@ export interface SavedTool {
   code: string;
   /** The zero-argument entry point `/` invokes. */
   fn: string;
+  autoRun?: boolean;
   createdAt: number;
 }
 
@@ -64,6 +65,20 @@ export async function saveTool(tool: SavedTool): Promise<void> {
   // same page is a correction, not a second tool.
   const kept = tools.filter((held) => held.name !== tool.name);
   await browser.storage.local.set({ [TOOLS_KEY]: [tool, ...kept].slice(0, MAX_SAVED_TOOLS) });
+}
+
+export async function setAutoRun(id: string, autoRun: boolean): Promise<SavedTool | null> {
+  const tools = (await listSavedTools()).map((tool) => (tool.id === id ? { ...tool, autoRun } : tool));
+  const changed = tools.find((tool) => tool.id === id);
+  if (changed) await browser.storage.local.set({ [TOOLS_KEY]: tools });
+  return changed ?? null;
+}
+
+export function onSavedToolsChange(listener: (tools: SavedTool[]) => void): void {
+  browser.storage.local.onChanged.addListener((changes) => {
+    const change = changes[TOOLS_KEY];
+    if (change) listener(Array.isArray(change.newValue) ? (change.newValue as SavedTool[]) : []);
+  });
 }
 
 export async function forgetSavedTool(id: string): Promise<SavedToolMeta | null> {

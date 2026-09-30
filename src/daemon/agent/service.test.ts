@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { FOCUS_SHOT_ACTION } from '@/lib/actions/reserved';
 import type { RunEvent } from '@/lib/actions/protocol';
 import { failure } from '@/lib/actions/protocol';
+import { profilePath } from '../profile';
 import { configPath } from './config';
 import { stubCli } from './runners/fixtures/support';
 import { AgentSession } from './service';
@@ -135,5 +136,66 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
       [false, false],
     ]);
     expect(said.every((message) => message.endsWith('what does this cost?'))).toBe(true);
+  });
+});
+
+describe("the user's profile in a run", () => {
+  test('reaches the system prompt, and a later edit reaches a resumed turn', async () => {
+    const dir = `${dirname(configPath)}/profile-turns`;
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const agent = stubCli(
+      join(dir, 'claude'),
+      `const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log('2.1.283 (Claude Code)');
+  process.exit(0);
+}
+const turn = ${JSON.stringify(dir)} + '/turn-' + fs.readdirSync(${JSON.stringify(dir)}).filter((name) => name.startsWith('turn-')).length;
+const prompt = fs.readFileSync(process.argv[process.argv.indexOf('--append-system-prompt-file') + 1], 'utf8');
+let heard = '';
+process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
+  fs.writeFileSync(turn, JSON.stringify({ prompt, heard }));
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1', mcp_servers: [{ name: 'browsentic', status: 'connected' }] }));
+  console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
+});`,
+    );
+    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    const saveProfile = (email: string) =>
+      writeFileSync(profilePath, JSON.stringify({ fields: { email }, details: [], instructions: 'Always choose the cheapest shipping.' }));
+    const done: string[] = [];
+    const turns = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void ((event.kind === 'done' || event.kind === 'error') && done.push(runId)),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    const turn = async (id: string) => {
+      turns.handle({ t: 'instruct', id, text: 'sign me up for the newsletter', context: { sessionId: 's1' } });
+      await vi.waitFor(() => expect(done).toContain(id), { timeout: 5_000 });
+    };
+
+    try {
+      saveProfile('ada@example.com');
+      await turn('r1');
+      saveProfile('ada@lovelace.dev');
+      await turn('r2');
+    } finally {
+      turns.dispose();
+      rmSync(profilePath, { force: true });
+    }
+    const [first, second] = [0, 1].map((n) => JSON.parse(readFileSync(`${dir}/turn-${n}`, 'utf8')) as { prompt: string; heard: string });
+
+    expect([
+      first.prompt.includes('# About the user'),
+      first.prompt.includes('Email: ada@example.com'),
+      first.prompt.includes('Always choose the cheapest shipping.'),
+      first.heard,
+    ]).toEqual([true, true, true, 'sign me up for the newsletter']);
+    expect([
+      second.heard.startsWith("# Browsentic's instructions for this message"),
+      second.heard.includes('Email: ada@lovelace.dev'),
+      second.heard.includes('Always choose the cheapest shipping.'),
+    ]).toEqual([true, true, false]);
   });
 });

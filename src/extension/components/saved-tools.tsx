@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Check, Trash2, X, Zap } from 'lucide-react';
 
 import { Button } from '@/extension/components/ui/button';
+import { Switch } from '@/extension/components/ui/switch';
+import { openUserScriptSettings } from '@/lib/bridge/auto-run';
 import type { ToolOffer } from '@/lib/bridge/code-toolkit';
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
 import { displayName, slugify } from '@/lib/skills/saved-tool';
@@ -14,15 +16,21 @@ import { displayName, slugify } from '@/lib/skills/saved-tool';
  */
 export function KeepToolPrompt({
   offer,
+  autoRunReady,
   onKeep,
   onDismiss,
 }: {
   offer: ToolOffer;
-  onKeep: (slug: string) => void;
+  autoRunReady: boolean;
+  onKeep: (slug: string, autoRun: boolean) => void;
   onDismiss: () => void;
 }) {
   const [slug, setSlug] = useState(offer.suggestedSlug);
-  useEffect(() => setSlug(offer.suggestedSlug), [offer.suggestedSlug]);
+  const [autoRun, setAutoRun] = useState(false);
+  useEffect(() => {
+    setSlug(offer.suggestedSlug);
+    setAutoRun(false);
+  }, [offer.toolkitId, offer.suggestedSlug]);
 
   const clean = slugify(slug) || offer.suggestedSlug;
   const where = offer.segment === 'root' ? offer.host : `${offer.host}/${offer.segment}`;
@@ -54,11 +62,17 @@ export function KeepToolPrompt({
         runs with /{displayName({ host: offer.host, segment: offer.segment }, clean)}
       </p>
 
+      <label className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-dim">
+        <Switch checked={autoRun} onChange={setAutoRun} label={`Also run it on every visit to ${where}`} />
+        Also run it on every visit to {where}
+      </label>
+      {autoRun && !autoRunReady && <AllowUserScripts />}
+
       <div className="mt-2.5 flex gap-1.5">
         <Button variant="ghost" size="sm" className="flex-1" onClick={onDismiss}>
           <X className="size-3" /> No
         </Button>
-        <Button size="sm" className="flex-1" onClick={() => onKeep(clean)}>
+        <Button size="sm" className="flex-1" onClick={() => onKeep(clean, autoRun)}>
           <Check className="size-3" /> Yes, keep it
         </Button>
       </div>
@@ -66,13 +80,29 @@ export function KeepToolPrompt({
   );
 }
 
+function AllowUserScripts() {
+  return (
+    <p className="mt-1.5 text-[10px] leading-relaxed text-amber">
+      Chrome runs a tool on every visit only once <span className="font-medium">Allow User Scripts</span> is on for
+      Browsentic.{' '}
+      <button type="button" onClick={openUserScriptSettings} className="underline underline-offset-2 hover:text-ink">
+        Open settings
+      </button>
+    </p>
+  );
+}
+
 /** `/remove-tools`: everything saved, with a cross on each. */
 export function SavedToolList({
   tools,
+  autoRunReady,
+  onAutoRun,
   onForget,
   onClose,
 }: {
   tools: SavedToolMeta[];
+  autoRunReady: boolean;
+  onAutoRun: (id: string, on: boolean) => void;
   onForget: (id: string) => void;
   onClose: () => void;
 }) {
@@ -93,6 +123,7 @@ export function SavedToolList({
           <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
             Removing one deletes its code from the browser and its note from the daemon.
           </p>
+          {!autoRunReady && tools.some((tool) => tool.autoRun) && <AllowUserScripts />}
         </div>
         <button
           type="button"
@@ -117,6 +148,14 @@ export function SavedToolList({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-[11px] text-ink">{tool.name}</p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">{tool.description}</p>
+                  <label className="mt-1.5 flex items-center gap-2 text-[10px] text-ink-faint">
+                    <Switch
+                      checked={tool.autoRun === true}
+                      onChange={(on) => onAutoRun(tool.id, on)}
+                      label={`Run ${tool.name} on every visit`}
+                    />
+                    Every visit
+                  </label>
                 </div>
                 <button
                   type="button"

@@ -108,6 +108,29 @@ action, so no MCP client can call one.
 Type `/remove-tools` for the list, with a cross beside each. Removing one deletes the code from the
 browser and the note from the daemon together.
 
+### Running one on every visit
+
+The same prompt has a switch that starts off: **Also run it on every visit to youtube.com/watch**.
+Turn it on and the tool runs by itself each time you arrive in its scope, with nothing to type. That
+covers a page load, and a site that never reloads (YouTube, Gmail) moving you there from elsewhere on
+it. Moving between two pages inside the scope is not a new arrival. It runs once the page has loaded
+and its content has stopped changing, waiting at most three seconds, because that is the state you
+watched it work in. `/remove-tools` has the same switch beside each tool, to turn it off again or
+to turn it on for a tool you kept earlier.
+
+It is the code you approved, run in the page's own world, and nothing else. Chrome injects it as a
+user script, so there is no debugging bar, DevTools can stay open, and it keeps running after the
+browser restarts. The daemon's note about the tool says it runs on every visit, so the agent knows
+its effect is usually already on the page. A tool that throws on some visit leaves a line in the page's
+console, starting `Browsentic:`, and the page carries on.
+
+**Chrome asks for one switch of its own first.** Open `chrome://extensions`, then Browsentic's
+**Details**, and turn on **Allow User Scripts**. Chrome before 138 uses Developer mode instead,
+which loading Browsentic unpacked already turned on. Until Chrome allows it, the panel says so and
+offers to open that page. The tool remembers that it should run on every visit. It starts within a
+couple of seconds of Chrome allowing it, or within a minute if the side panel is closed. Like live
+tools themselves, this is Chrome-only.
+
 ## Everything else
 
 | Group | Tools | See |

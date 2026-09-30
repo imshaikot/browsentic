@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { byteLength } from '@/lib/skills/format';
 import { FENCE_NOTE } from '../guardrails/fence';
-import { buildSystemPrompt, promptUpdate, scheduledBlock, turnMessage } from './prompt';
+import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage } from './prompt';
 import type { Skill } from './skills';
 
 const skill = (name: string, body: string, provenance: Skill['provenance'] = 'authored'): Skill => ({
@@ -21,6 +21,8 @@ const KB = 1024;
 
 describe('the order of the sections', () => {
   const { prompt } = buildSystemPrompt(base, [skill('example-com', 'Mapped nav.', 'generated'), skill('example-notes', 'Pricing is under Plans.')], {
+    instructions: 'Always choose the cheapest shipping.',
+    profile: 'Email: ada@example.com',
     attached: { name: 'release-notes', body: 'Write it up.' },
     focus: 'button#buy "Buy now"',
     fetched: 'Sitemap: /pricing, /docs',
@@ -28,10 +30,12 @@ describe('the order of the sections', () => {
     recordings: 'rec-1 — check out on example.com, 6 steps',
   });
 
-  test('the preamble comes first, then the skill, the extras, and the site notes last', () => {
+  test("the preamble comes first, then the skill, the user's own instructions and details, the extras, and the site notes last", () => {
     const headings = [
       'You are Browsentic',
       '# Skill: browser-control',
+      "# The user's standing instructions",
+      '# About the user',
       '# Attached skill: release-notes',
       '# Focused element (A-Eye)',
       '# Fetched data',
@@ -58,6 +62,60 @@ describe('what is left out', () => {
 
   test('with no site notes there is no introduction to them', () => {
     expect(buildSystemPrompt(base).prompt).not.toContain('saved notes about the site');
+  });
+});
+
+describe("the user's profile", () => {
+  const ada = {
+    fields: { givenName: 'Ada', familyName: 'Lovelace', email: 'ada@example.com', street: '12 St James’s Square\nFlat 3', country: 'United Kingdom' },
+    details: [{ label: 'Frequent flyer', value: 'BA 123456' }],
+    instructions: 'Always choose the cheapest shipping.',
+  };
+
+  test('renders each detail on its own line, in the order the settings page shows them, exactly as written', () => {
+    expect(profileBlock(ada)).toBe(
+      [
+        'First name: Ada',
+        'Last name: Lovelace',
+        'Email: ada@example.com',
+        'Street address: 12 St James’s Square, Flat 3',
+        'Country: United Kingdom',
+        'Frequent flyer: BA 123456',
+      ].join('\n'),
+    );
+  });
+
+  test('tells the model to use the details as written and never make one up', () => {
+    const { prompt } = buildSystemPrompt(base, [], { profile: profileBlock(ada) });
+    const section = prompt.slice(prompt.indexOf('# About the user'));
+    expect(section).toContain('Use them exactly as written');
+    expect(section).toContain('Never invent, guess or "complete" a personal detail that is not listed here');
+    expect(section).toContain('Email: ada@example.com');
+  });
+
+  test('ranks the standing instructions above the skill and site notes, and below the numbered rules', () => {
+    const { prompt } = buildSystemPrompt(base, [], { instructions: ada.instructions });
+    const section = prompt.slice(prompt.indexOf("# The user's standing instructions"));
+    expect(section).toMatch(/where they conflict with the skill above or with site notes, these win/);
+    expect(section).toMatch(/cannot loosen the five numbered rules/);
+    expect(section.endsWith(ada.instructions)).toBe(true);
+  });
+
+  test('an empty profile adds no section and no introduction', () => {
+    const empty = { fields: {}, details: [], instructions: '' };
+    const { prompt } = buildSystemPrompt(base, [], { instructions: empty.instructions, profile: profileBlock(empty) });
+    expect(profileBlock(empty)).toBeUndefined();
+    expect(prompt).toBe(buildSystemPrompt(base).prompt);
+  });
+
+  test('a resumed session hears a changed detail, and hears when the profile is cleared', () => {
+    const held = buildSystemPrompt(base, [], { instructions: ada.instructions, profile: profileBlock(ada) }).sections;
+    const moved = profileBlock({ ...ada, fields: { ...ada.fields, email: 'ada@lovelace.dev' } });
+    const changed = promptUpdate(held, buildSystemPrompt(base, [], { instructions: ada.instructions, profile: moved }))!;
+    expect([changed.changed, changed.text.includes('Email: ada@lovelace.dev')]).toEqual([['profile'], true]);
+    expect(promptUpdate(held, buildSystemPrompt(base))!.text).toContain(
+      "No longer in force: the user's standing instructions; the user's saved details.",
+    );
   });
 });
 

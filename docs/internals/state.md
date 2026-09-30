@@ -9,6 +9,7 @@ Nothing lives in the repository.
 ├── daemon.json    0600        lockfile: pid, port, control token, protocol + daemon version
 ├── auth.json      0600        outstanding pairing code, session keys per browser
 ├── config.json                optional, hand-written
+├── profile.json   0600        the settings page's Profile: your details and standing instructions
 ├── approvals.json 0600        "always on this site" grants, one action + host per entry
 ├── models.json    0600        each agent CLI's own model list, as last read
 ├── schedules.json 0600        scheduled tasks and the last twenty runs of each
@@ -33,6 +34,7 @@ Nothing lives in the repository.
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
 | `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
 | `config.json` | You, the agent picker, and the settings page and desktop app for `theme` and `guardrails` | Re-read before every run — no restart needed — and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
+| `profile.json` | The settings page's **Profile** section | Only exists while something is filled in: clearing every field deletes it. Re-read before every run and watched like `config.json`; kept apart from it so the config never holds personal details. [Reference](../guide/configuration.md#profile) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
@@ -56,6 +58,10 @@ the extension's `browser.storage.session` under `browsentic/secrets`, capped at 
 after two hours and emptied by the browser on restart. The daemon never receives one.
 
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
+
+**Saved tools** keep their code in the extension's `storage.local` under `browsentic/savedTools`; the
+daemon gets only a markdown note. A tool set to run on every visit is also registered with Chrome as
+a user script, rebuilt from that list whenever it changes, so removing a tool removes both.
 
 **Attached files** stay there too: the bytes under `browsentic:file:<id>`, and the index under
 `browsentic:files`, where each entry records the conversation it belongs to, the file analyst's

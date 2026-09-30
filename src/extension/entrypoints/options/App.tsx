@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link2, Puzzle, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { Link2, Puzzle, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { AgentPicker } from '@/extension/components/agent-picker';
@@ -7,38 +7,50 @@ import { Wordmark } from '@/extension/components/brand';
 import { DaemonLink } from '@/extension/components/daemon-link';
 import { ExtensionSettings, SettingsGroup } from '@/extension/components/extension-settings';
 import { GuardrailSettings } from '@/extension/components/guardrail-settings';
+import { ProfileSettings } from '@/extension/components/profile-settings';
 import { StatusPill, describeStatus } from '@/extension/components/status-pill';
 import { ThemePicker } from '@/extension/components/theme-picker';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useTheme } from '@/lib/bridge/use-theme';
 import { cn } from '@/lib/utils';
 
-type SectionId = 'extension' | 'guardrails' | 'agent' | 'connection';
+type SectionId = 'extension' | 'profile' | 'guardrails' | 'agent' | 'connection';
 
-const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string }[] = [
+const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string; View: ComponentType }[] = [
   {
     id: 'extension',
     label: 'Extension',
     icon: Puzzle,
     blurb: 'How the extension looks and how you reach it. Every paired browser and the desktop app share the look; the right-click menu, the shortcuts and the rest belong to this browser.',
+    View: Extension,
+  },
+  {
+    id: 'profile',
+    label: 'Profile',
+    icon: UserRound,
+    blurb: 'What the agent may use about you — for forms, sign-ups and checkouts — and rules it keeps to on every task. Anything filled in here reaches the model with each run, so it uses these exact values instead of guessing.',
+    View: ProfileSettings,
   },
   {
     id: 'guardrails',
     label: 'Guardrails',
     icon: ShieldCheck,
     blurb: 'What the agent may do without asking you first. A run takes its policy when it starts, so a change applies to the next one. The desktop app’s Settings tab edits the same rows.',
+    View: GuardrailSettings,
   },
   {
     id: 'agent',
     label: 'Agent',
     icon: Sparkles,
     blurb: 'Which agent CLI the side panel drives, and on which model. A switch here or in the desktop app reaches every paired browser.',
+    View: Agent,
   },
   {
     id: 'connection',
     label: 'Connection',
     icon: Link2,
     blurb: 'The link between this browser and the Browsentic daemon on this computer.',
+    View: Connection,
   },
 ];
 
@@ -116,15 +128,7 @@ export default function App() {
             <p className="text-sm leading-relaxed text-ink-dim">{current.blurb}</p>
           </header>
           <div key={section} className="enters mt-8">
-            {section === 'extension' ? (
-              <Extension />
-            ) : section === 'guardrails' ? (
-              <GuardrailSettings />
-            ) : section === 'agent' ? (
-              <Agent />
-            ) : (
-              <Connection />
-            )}
+            <current.View />
           </div>
         </div>
       </main>

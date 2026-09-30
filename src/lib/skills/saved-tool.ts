@@ -17,7 +17,7 @@ import { SKILL_NAME_RE } from './format';
 export const ROOT_SEGMENT = 'root';
 
 /** Long enough for three readable parts, short enough to sit in a menu row. */
-const MAX_SLUG = 48;
+export const MAX_SLUG = 48;
 
 export interface ToolScope {
   /** Hostname, lowercased, without a leading `www.`. */

@@ -29,7 +29,8 @@ export default defineConfig({
       'notifications', 'downloads', 'nativeMessaging',
       // Firefox has no sidePanel, debugger or offscreen permission, and addons.mozilla.org flags each name it does not know.
       // offscreen is the hidden page hands-free mode listens through once the side panel is closed.
-      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen']),
+      // userScripts runs a saved tool on every visit, once the user turns on Allow User Scripts.
+      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen', 'userScripts']),
     ],
     host_permissions: ['<all_urls>'],
     commands: manifestCommands(browser === 'firefox'),
