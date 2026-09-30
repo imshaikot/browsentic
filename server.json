@@ -10,12 +10,12 @@
     "source": "github",
     "subfolder": "src/daemon"
   },
-  "version": "0.7.11",
+  "version": "0.7.14",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "browsentic",
-      "version": "0.7.11",
+      "version": "0.7.14",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }]
     }
