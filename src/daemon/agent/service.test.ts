@@ -139,8 +139,6 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
   });
 });
 
-// The profile is read fresh for every run, so what the settings page saved reaches the next one — and a
-// follow-up in a conversation whose agent keeps its first prompt hears the change in its message.
 describe("the user's profile in a run", () => {
   test('reaches the system prompt, and a later edit reaches a resumed turn', async () => {
     const dir = `${dirname(configPath)}/profile-turns`;

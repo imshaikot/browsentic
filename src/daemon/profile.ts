@@ -1,8 +1,4 @@
-/**
- * The user's profile, kept in its own file beside config.json so the config stays safe to paste
- * into a bug report. Read fresh on every run, like the config, and written only by the settings
- * page — an empty profile removes the file, so it only ever names what someone filled in.
- */
+/** Kept out of config.json so the config stays safe to paste into a bug report. */
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

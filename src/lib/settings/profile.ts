@@ -1,15 +1,16 @@
-/**
- * What the user tells the agent about themselves from the settings page: the details a form may
- * ask for, and rules for every task. The daemon keeps it in profile.json and puts whatever is
- * filled in into each side-panel run's system prompt, so the model uses these values rather than
- * guessing at them.
- */
+export interface ProfileField {
+  readonly id: string;
+  readonly label: string;
+  readonly autocomplete: string;
+  readonly type?: 'email' | 'tel';
+  readonly multiline?: boolean;
+}
 
 export const PROFILE_FIELDS = [
   { id: 'givenName', label: 'First name', autocomplete: 'given-name' },
   { id: 'familyName', label: 'Last name', autocomplete: 'family-name' },
-  { id: 'email', label: 'Email', autocomplete: 'email' },
-  { id: 'phone', label: 'Phone', autocomplete: 'tel' },
+  { id: 'email', label: 'Email', autocomplete: 'email', type: 'email' },
+  { id: 'phone', label: 'Phone', autocomplete: 'tel', type: 'tel' },
   { id: 'street', label: 'Street address', autocomplete: 'street-address', multiline: true },
   { id: 'city', label: 'City', autocomplete: 'address-level2' },
   { id: 'region', label: 'State / region', autocomplete: 'address-level1' },
@@ -17,7 +18,7 @@ export const PROFILE_FIELDS = [
   { id: 'country', label: 'Country', autocomplete: 'country-name' },
   { id: 'company', label: 'Company', autocomplete: 'organization' },
   { id: 'jobTitle', label: 'Job title', autocomplete: 'organization-title' },
-] as const;
+] as const satisfies readonly ProfileField[];
 
 export type ProfileFieldId = (typeof PROFILE_FIELDS)[number]['id'];
 
@@ -28,9 +29,7 @@ export interface ProfileDetail {
 
 export interface UserProfile {
   readonly fields: Partial<Record<ProfileFieldId, string>>;
-  /** Anything the fixed fields do not cover, labelled by the user. */
   readonly details: readonly ProfileDetail[];
-  /** Rules the user wants kept on every task. */
   readonly instructions: string;
 }
 
@@ -64,23 +63,22 @@ export function isUserProfile(value: unknown): value is UserProfile {
   );
 }
 
-/** Trimmed, with every empty field and every detail missing a label or a value left out. */
 export function normalizeProfile(profile: UserProfile): UserProfile {
-  const fields: Partial<Record<ProfileFieldId, string>> = {};
-  for (const { id } of PROFILE_FIELDS) {
-    const text = profile.fields[id]?.trim();
-    if (text) fields[id] = text;
-  }
-  const details = profile.details
-    .map((detail) => ({ label: detail.label.trim(), value: detail.value.trim() }))
-    .filter((detail) => detail.label && detail.value);
-  return { fields, details, instructions: profile.instructions.trim() };
+  return {
+    fields: Object.fromEntries(
+      PROFILE_FIELDS.flatMap(({ id }) => {
+        const text = profile.fields[id]?.trim();
+        return text ? [[id, text]] : [];
+      }),
+    ),
+    details: profile.details
+      .map((detail) => ({ label: detail.label.trim(), value: detail.value.trim() }))
+      .filter((detail) => detail.label && detail.value),
+    instructions: profile.instructions.trim(),
+  };
 }
 
-/**
- * What a hand-edited profile.json can be read as: every entry that fits kept, anything that does
- * not left out, never cut short — a truncated phone number is worse than none.
- */
+/** Drops what does not fit rather than cutting it short: a truncated phone number is worse than none. */
 export function asUserProfile(value: unknown): UserProfile {
   if (!isRecord(value)) return EMPTY_PROFILE;
   const fields = isRecord(value.fields)

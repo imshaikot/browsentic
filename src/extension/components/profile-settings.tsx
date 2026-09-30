@@ -12,6 +12,7 @@ import {
   PROFILE_LIMITS,
   sameProfile,
   type ProfileDetail,
+  type ProfileField,
   type ProfileFieldId,
   type UserProfile,
 } from '@/lib/settings/profile';
@@ -23,10 +24,7 @@ const GROUPS: { title: string; fields: ProfileFieldId[] }[] = [
   { title: 'Work', fields: ['company', 'jobTitle'] },
 ];
 
-const FIELD = Object.fromEntries(PROFILE_FIELDS.map((field) => [field.id, field])) as Record<
-  ProfileFieldId,
-  (typeof PROFILE_FIELDS)[number]
->;
+const FIELD = Object.fromEntries(PROFILE_FIELDS.map((field) => [field.id, field])) as Record<ProfileFieldId, ProfileField>;
 
 const MARKER = 'profile';
 
@@ -79,7 +77,7 @@ export function ProfileSettings() {
         <Group key={title} title={title}>
           <div className="grid gap-3 p-4 sm:grid-cols-2">
             {fields.map((id) => {
-              const { label, autocomplete } = FIELD[id];
+              const { label, autocomplete, type = 'text', multiline } = FIELD[id];
               const common = {
                 value: profile.fields[id] ?? '',
                 autoComplete: autocomplete,
@@ -87,15 +85,11 @@ export function ProfileSettings() {
                 disabled: saving,
               };
               return (
-                <Field key={id} label={label} wide={id === 'street'}>
-                  {id === 'street' ? (
+                <Field key={id} label={label} wide={multiline}>
+                  {multiline ? (
                     <Textarea rows={2} {...common} onChange={(event) => setField(id, event.target.value)} />
                   ) : (
-                    <Input
-                      type={id === 'email' ? 'email' : id === 'phone' ? 'tel' : 'text'}
-                      {...common}
-                      onChange={(event) => setField(id, event.target.value)}
-                    />
+                    <Input type={type} {...common} onChange={(event) => setField(id, event.target.value)} />
                   )}
                 </Field>
               );

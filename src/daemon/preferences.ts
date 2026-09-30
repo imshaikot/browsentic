@@ -69,15 +69,13 @@ function saveProfile(profile: UserProfile): ActionResult<Preferences> {
   return success(preferencesNow());
 }
 
-/** The label of the first entry that holds a secret. A phone number is never read as a card, however its digits add up. */
 function secretIn(profile: UserProfile): string | undefined {
-  const field = PROFILE_FIELDS.find(({ id }) =>
-    findSecrets(profile.fields[id] ?? '').some((span) => id !== 'phone' || span.kind !== 'card'),
-  );
-  if (field) return field.label;
-  const detail = profile.details.find((each) => findSecrets(`${each.label}: ${each.value}`).length);
-  if (detail) return detail.label;
-  return findSecrets(profile.instructions).length ? 'Instructions' : undefined;
+  const entries = [
+    ...PROFILE_FIELDS.map(({ id, label }) => ({ label, text: profile.fields[id] ?? '', phone: id === 'phone' })),
+    ...profile.details.map(({ label, value }) => ({ label, text: `${label}: ${value}`, phone: false })),
+    { label: 'Instructions', text: profile.instructions, phone: false },
+  ];
+  return entries.find(({ text, phone }) => findSecrets(text).some((span) => !(phone && span.kind === 'card')))?.label;
 }
 
 /** What config.json and profile.json hold right now, and the part of it a change of agent or model moves. */

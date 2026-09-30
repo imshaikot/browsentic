@@ -106,9 +106,7 @@ export interface BuiltPrompt {
 }
 
 export interface PromptExtras {
-  /** The user's standing instructions from the settings page. */
   instructions?: string;
-  /** The user's saved details, already rendered by `profileBlock`. */
   profile?: string;
   fetched?: string;
   /** The element the user pointed at with A-Eye, already rendered as a block. */

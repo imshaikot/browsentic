@@ -7,10 +7,6 @@ import { useDaemonState } from './use-daemon-state';
 
 type PreferenceRequest = { op: 'preferences' } | { op: 'setPreference'; change: PreferenceChange };
 
-/**
- * The settings the daemon last pushed to this browser, and a way to change them, for a settings
- * screen. `busy` names what is in flight — `load`, or the marker a change was sent with.
- */
 export function usePreferences() {
   const daemon = useDaemonState();
   const connected = daemon?.connected ?? false;
