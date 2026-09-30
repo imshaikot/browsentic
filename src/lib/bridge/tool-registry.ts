@@ -33,7 +33,6 @@ export interface KeepRequest {
   code: string;
   /** User-editable last name segment; falls back to the suggestion on the offer. */
   slug?: string;
-  /** Run it by itself on every visit to its scope as well. */
   autoRun?: boolean;
 }
 
@@ -62,7 +61,6 @@ export async function keepTool(request: KeepRequest): Promise<SavedToolMeta> {
   return withoutCode(tool);
 }
 
-/** The flag is the truth; the user script follows it from the store's change listener. */
 export async function switchAutoRun(id: string, autoRun: boolean): Promise<void> {
   const tool = await setAutoRun(id, autoRun);
   if (tool) await saveSkill(skillFor(tool)).catch(() => undefined);

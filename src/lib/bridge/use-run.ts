@@ -15,7 +15,6 @@ import type { TabSession } from './tab-sessions';
 
 const RECONNECT_MS = 1_000;
 
-/** How often the panel asks again while a tool waits on Chrome's Allow User Scripts switch. */
 const USER_SCRIPTS_RECHECK_MS = 2_000;
 
 const EXTERNAL_VIEW = 'external';
@@ -53,7 +52,6 @@ export interface Run {
   tools: SavedToolMeta[];
   /** Raised a second after an approved toolkit lands, asking whether to keep it. */
   toolOffer: ToolOffer | null;
-  /** Whether Chrome will run a tool on every visit yet — false until Allow User Scripts is on. */
   autoRunReady: boolean;
   keepTool: (slug?: string, autoRun?: boolean) => void;
   dismissTool: () => void;

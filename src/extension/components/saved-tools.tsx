@@ -13,8 +13,6 @@ import { displayName, slugify } from '@/lib/skills/saved-tool';
  * The offer, a second after an approved toolkit lands. It shows the name it would take
  * rather than asking for one, because the answer is usually yes and the name is usually
  * right — but the last segment stays editable, since that is the part the user will type.
- * Running on every visit starts off: it is a second decision, about code that will then
- * run without being asked for.
  */
 export function KeepToolPrompt({
   offer,
@@ -82,7 +80,6 @@ export function KeepToolPrompt({
   );
 }
 
-/** Chrome keeps user scripts behind a per-extension switch that no API can flip, so point at it. */
 function AllowUserScripts() {
   return (
     <p className="mt-1.5 text-[10px] leading-relaxed text-amber">
@@ -95,7 +92,7 @@ function AllowUserScripts() {
   );
 }
 
-/** `/remove-tools`: everything saved, with a cross on each and whether it runs on every visit. */
+/** `/remove-tools`: everything saved, with a cross on each. */
 export function SavedToolList({
   tools,
   autoRunReady,

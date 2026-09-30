@@ -32,7 +32,6 @@ interface FakePage {
   load: () => void;
 }
 
-/** Just enough of a page for the injected source: a location, the Navigation API, a DOM that can change and load. */
 function openPage(url: string, saved: SavedTool = tool(), readyState = 'complete'): FakePage {
   const location = new URL(url);
   const document = { readyState, documentElement: {} };
