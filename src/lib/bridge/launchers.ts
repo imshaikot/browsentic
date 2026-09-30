@@ -19,28 +19,23 @@ function repaintMenu(): void {
 async function paintMenu(): Promise<void> {
   const [choice, speech, handsFree] = await Promise.all([readContextMenuChoice(), handsFreeSupported(), readHandsFree()]);
   await browser.contextMenus.removeAll();
-  for (const item of describeMenu({ choice, speech, panelOpen, handsFree: handsFree !== null })) {
-    browser.contextMenus.create({ ...item, contexts: ['all'] });
-  }
+  describeMenu({ choice, speech, panelOpen, handsFree: handsFree !== null }).forEach((item) =>
+    browser.contextMenus.create({ ...item, contexts: ['all'] }),
+  );
 }
 
 /** Called with a user gesture that the first await would spend, so the panel opens before anything is awaited. */
 function togglePanel(windowId: number): void {
-  if (!panelOpen) {
-    void openSidePanel(windowId);
-    return;
-  }
-  if (import.meta.env.FIREFOX) void closeSidebar();
+  if (!panelOpen) void openSidePanel(windowId);
+  else if (import.meta.env.FIREFOX) void closeSidebar();
   else closePanels();
 }
 
-/** Starting it closes every panel, and the orb takes the microphone once the background paints it. */
 async function toggleHandsFree(): Promise<void> {
   if (await readHandsFree()) return endHandsFree();
   if (await handsFreeSupported()) await startHandsFree();
 }
 
-/** The ways into Browsentic from outside its own pages: the right-click menu and the keyboard shortcuts. */
 export function serveLaunchers(): void {
   onPanelPresence((open) => {
     panelOpen = open;

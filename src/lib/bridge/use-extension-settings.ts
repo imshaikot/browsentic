@@ -41,9 +41,8 @@ export const useContextMenuChoice = (): [ContextMenuChoice, (next: ContextMenuCh
 
 export const usePushToTalk = (): [boolean, (on: boolean) => void] => useLocalSetting(PUSH_TO_TALK_KEY, isOn);
 
-/** Read again whenever this page comes back into view, since the keys are changed on the browser's own page. */
-export function useShortcuts(): Shortcut[] | null {
-  const [shortcuts, setShortcuts] = useState<Shortcut[] | null>(null);
+export function useShortcuts(): Shortcut[] | undefined {
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>();
 
   useEffect(() => {
     let live = true;

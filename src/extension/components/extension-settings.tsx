@@ -8,7 +8,6 @@ import { openShortcutSettings, useContextMenuChoice, usePushToTalk, useShortcuts
 import { useHandsFreeSupported } from '@/lib/bridge/use-speech';
 import { cn } from '@/lib/utils';
 
-/** What belongs to this browser alone: where Browsentic shows up in it, and how it is reached from the keyboard. */
 export function ExtensionSettings() {
   const handsFree = useHandsFreeSupported();
   return (

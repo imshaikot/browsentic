@@ -1,9 +1,3 @@
-/**
- * The keyboard shortcuts the manifest declares. The browser keeps the keys, not Browsentic:
- * it assigns the suggested ones on install unless something else holds them, and the user
- * changes them on the browser's own shortcuts page.
- */
-
 export const PANEL_SHORTCUT = 'toggle-side-panel';
 export const HANDS_FREE_SHORTCUT = 'toggle-hands-free';
 
@@ -16,7 +10,6 @@ interface ManifestCommand {
   suggested_key?: { default: string };
 }
 
-/** Firefox has its own names for the popup and the sidebar, and no hands-free to start. */
 export function manifestCommands(firefox: boolean): Record<string, ManifestCommand> {
   if (firefox) {
     return {
@@ -47,7 +40,6 @@ export interface Shortcut {
   keys: string[];
 }
 
-/** The browser's own list, in the order the settings page shows it, each named the same way everywhere. */
 export function shortcutsOf(commands: readonly { name?: string; description?: string; shortcut?: string }[]): Shortcut[] {
   return commands
     .flatMap(({ name, description, shortcut }) =>
@@ -69,6 +61,5 @@ export function keysOf(shortcut: string): string[] {
   return [...modifiers, ...(key ? [key] : [])];
 }
 
-/** Edge answers to its own scheme; every other Chromium browser takes chrome://. */
 export const shortcutsPageFor = (brand: string | undefined): string =>
   brand === 'Microsoft Edge' ? 'edge://extensions/shortcuts' : 'chrome://extensions/shortcuts';
