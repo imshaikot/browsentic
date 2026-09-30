@@ -205,7 +205,6 @@ export default function App() {
     void run.restore(sessionId);
   }
 
-  /** The chat shows the tab in front, so watching a run brings its tab forward. */
   function watch(sessionId: string) {
     open('chat');
     run.focusSession(sessionId);
