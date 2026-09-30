@@ -35,12 +35,13 @@ import {
   type Scope,
 } from '../guardrails';
 import { log } from '../log';
+import { readProfile } from '../profile';
 import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
+import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState, RUNNERS } from './runners';
 import {
@@ -387,7 +388,10 @@ export class AgentSession {
           emit,
           wait: (fileId, signal) => this.deps.awaitAnalysis?.(fileId, signal) ?? Promise.resolve(null),
         });
+        const profile = readProfile();
         built = buildSystemPrompt(routed.base, routed.overlays, {
+          instructions: profile.instructions,
+          profile: profileBlock(profile),
           attached,
           focus: focusBlock(context?.focus),
           attachments: handover.known,

@@ -12,7 +12,7 @@ import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedul
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 21;
+export const SOCKET_PROTOCOL_VERSION = 22;
 
 export const EXTERNAL_RUN_ID = 'external';
 

@@ -1,6 +1,7 @@
 import { AGENT_LIST, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
+import { EMPTY_PROFILE } from '@/lib/settings/profile';
 import type { AgentListing, Backend, CliOutput, InstallStamp, Lockfile, NodeInstall, Preferences } from './backend';
 
 /**
@@ -20,7 +21,7 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
   let active: AgentKind = 'claude';
   const models: Partial<Record<AgentKind, string>> = {};
   const listeners = new Set<(event: string) => void>();
-  let preferences: Preferences = { theme: null, guardrails: guardrails(`${home}\\.browsentic\\config.json`) };
+  let preferences: Preferences = { theme: null, guardrails: guardrails(`${home}\\.browsentic\\config.json`), profile: EMPTY_PROFILE };
 
   const ok = (stdout: string): CliOutput => ({ ok: true, code: 0, stdout, stderr: '' });
   const later = <T>(value: T, ms = 350) => new Promise<T>((resolve) => setTimeout(() => resolve(value), instant ? 0 : ms));
@@ -37,7 +38,7 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
 
   const replies: Record<string, (frame: Record<string, unknown>) => Record<string, unknown>> = {
     status: () => ({
-      status: { connected: true, daemonVersion: version, protocolVersion: 21, port: 8765, manifestInSync: true, extensionVersion: version, connectedBrowsers: 1, pairedBrowsers: 1, pairingPending: false },
+      status: { connected: true, daemonVersion: version, protocolVersion: 22, port: 8765, manifestInSync: true, extensionVersion: version, connectedBrowsers: 1, pairedBrowsers: 1, pairingPending: false },
     }),
     sessions: () => ({
       sessions: [
@@ -50,7 +51,12 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
     preferences: () => ({ result: { ok: true, data: preferences } }),
     setPreference: ({ change }) => {
       const next = change as PreferenceChange;
-      preferences = next.kind === 'theme' ? { ...preferences, theme: next.theme } : { ...preferences, guardrails: applyGuardrail(preferences.guardrails, next.setting, next.value) };
+      preferences =
+        next.kind === 'theme'
+          ? { ...preferences, theme: next.theme }
+          : next.kind === 'profile'
+            ? { ...preferences, profile: next.profile }
+            : { ...preferences, guardrails: applyGuardrail(preferences.guardrails, next.setting, next.value) };
       listeners.forEach((listener) => listener('settings-changed'));
       return { result: { ok: true, data: preferences } };
     },

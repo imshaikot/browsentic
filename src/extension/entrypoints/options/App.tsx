@@ -1,18 +1,19 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link2, Palette, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { Link2, Palette, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { AgentPicker } from '@/extension/components/agent-picker';
 import { Wordmark } from '@/extension/components/brand';
 import { DaemonLink } from '@/extension/components/daemon-link';
 import { GuardrailSettings } from '@/extension/components/guardrail-settings';
+import { ProfileSettings } from '@/extension/components/profile-settings';
 import { StatusPill, describeStatus } from '@/extension/components/status-pill';
 import { ThemePicker } from '@/extension/components/theme-picker';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useTheme } from '@/lib/bridge/use-theme';
 import { cn } from '@/lib/utils';
 
-type SectionId = 'appearance' | 'guardrails' | 'agent' | 'connection';
+type SectionId = 'appearance' | 'profile' | 'guardrails' | 'agent' | 'connection';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string }[] = [
   {
@@ -20,6 +21,12 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string 
     label: 'Appearance',
     icon: Palette,
     blurb: 'How the side panel, the popup and this page look. Every paired browser follows the same choice, and the desktop app can change it too.',
+  },
+  {
+    id: 'profile',
+    label: 'Profile',
+    icon: UserRound,
+    blurb: 'What the agent may use about you — for forms, sign-ups and checkouts — and rules it keeps to on every task. Anything filled in here reaches the model with each run, so it uses these exact values instead of guessing.',
   },
   {
     id: 'guardrails',
@@ -117,6 +124,8 @@ export default function App() {
           <div key={section} className="enters mt-8">
             {section === 'appearance' ? (
               <Appearance />
+            ) : section === 'profile' ? (
+              <ProfileSettings />
             ) : section === 'guardrails' ? (
               <GuardrailSettings />
             ) : section === 'agent' ? (
