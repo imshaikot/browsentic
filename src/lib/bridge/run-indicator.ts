@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { INDICATOR_CHANNEL, INDICATOR_COLOR } from '@/lib/indicator/events';
 import { syncRail } from './rail';
+import { tellTab } from './tab-message';
 import { readTabSessions } from './tab-sessions';
 
 type BadgeAction = {
@@ -46,7 +47,5 @@ async function paint(tabId: number, busy: boolean): Promise<void> {
     }
   }
 
-  await browser.tabs
-    .sendMessage(tabId, { channel: INDICATOR_CHANNEL, op: busy ? 'busy' : 'idle' })
-    .catch(() => undefined);
+  await tellTab(tabId, { channel: INDICATOR_CHANNEL, op: busy ? 'busy' : 'idle' });
 }
