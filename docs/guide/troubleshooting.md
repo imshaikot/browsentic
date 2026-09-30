@@ -103,6 +103,8 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | `DEBUGGER_UNAVAILABLE` | DevTools is open on that tab | Close DevTools, or use `page_clickElement` instead of `page_trustedClick` |
 | `RUN_IN_PROGRESS` | One instruction at a time per tab | Cancel the running one, or use another tab |
 | `TAB_IN_USE` | That tab belongs to another Browsentic conversation | Switch to it from the Sessions strip |
+| A tool set to run on every visit never runs | Chrome keeps user scripts off until you allow them for the extension | `chrome://extensions` → Browsentic → **Details** → **Allow User Scripts**. See [Running one on every visit](features/page-actions.md#running-one-on-every-visit) |
+| A tool set to run on every visit ran but changed nothing | It ran before the site had drawn what it changes, or the site changed its markup | The page's console has a `Browsentic:` line if it threw. Run it with `/` to check it still works, and make a new one with the Live tool switch if it does not |
 
 ## Behaviour that looks wrong but is not
 

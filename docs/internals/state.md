@@ -59,6 +59,10 @@ after two hours and emptied by the browser on restart. The daemon never receives
 
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
 
+**Saved tools** keep their code in the extension's `storage.local` under `browsentic/savedTools`; the
+daemon gets only a markdown note. A tool set to run on every visit is also registered with Chrome as
+a user script, rebuilt from that list whenever it changes, so removing a tool removes both.
+
 **Attached files** stay there too: the bytes under `browsentic:file:<id>`, and the index under
 `browsentic:files`, where each entry records the conversation it belongs to, the file analyst's
 report and the agent session that report was handed to. A conversation's files are deleted when it

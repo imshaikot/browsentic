@@ -19,6 +19,7 @@ import { deleteSkill, saveSkill } from './socket';
 import {
   forgetSavedTool,
   saveTool,
+  setAutoRun,
   uniqueName,
   withoutCode,
   type SavedTool,
@@ -32,6 +33,7 @@ export interface KeepRequest {
   code: string;
   /** User-editable last name segment; falls back to the suggestion on the offer. */
   slug?: string;
+  autoRun?: boolean;
 }
 
 export async function keepTool(request: KeepRequest): Promise<SavedToolMeta> {
@@ -49,6 +51,7 @@ export async function keepTool(request: KeepRequest): Promise<SavedToolMeta> {
     origin: offer.origin,
     code,
     fn: offer.fn,
+    autoRun: request.autoRun === true,
     createdAt: Date.now(),
   };
 
@@ -56,6 +59,11 @@ export async function keepTool(request: KeepRequest): Promise<SavedToolMeta> {
   // Best effort: the tool works from `/` whether or not the daemon is up to hear about it.
   await saveSkill(skillFor(tool)).catch(() => undefined);
   return withoutCode(tool);
+}
+
+export async function switchAutoRun(id: string, autoRun: boolean): Promise<void> {
+  const tool = await setAutoRun(id, autoRun);
+  if (tool) await saveSkill(skillFor(tool)).catch(() => undefined);
 }
 
 export async function dropTool(id: string): Promise<SavedToolMeta | null> {
@@ -88,6 +96,9 @@ function skillFor(tool: SavedTool): SkillDraft {
       '',
       `It runs from the side panel, by typing \`/${tool.name}\`. It is already approved, so it`,
       'needs no further permission and costs no round trip.',
+      ...(tool.autoRun
+        ? ['', `It also runs by itself on every visit to ${where}, so its effect is usually already on the page.`]
+        : []),
       '',
       '## What you should do',
       '',

@@ -16,10 +16,11 @@ import { planReplay, type ReplayCall } from '@/lib/recordings/replay';
 import type { TaskContext, TaskJob, TaskOrder, TaskResult } from '@/lib/schedules/task';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
+import { autoRunReady, syncAutoRuns } from './auto-run';
 import { onToolOffer, runSavedTool, toolkitCode, type ToolOffer } from './code-toolkit';
 import { CONTEXT_COMMAND, isContextCommand, type ContextBreakdown } from './commands';
 import { listSavedTools, withoutCode, type SavedToolMeta } from './saved-tools';
-import { dropTool, keepTool } from './tool-registry';
+import { dropTool, keepTool, switchAutoRun } from './tool-registry';
 import { tryFastPath } from './fast-path';
 import { dropDiagnosticsForSession } from './diagnostics';
 import {
@@ -114,9 +115,10 @@ export type RunCommand =
   | { op: 'startRecording'; captureValues: boolean }
   | { op: 'stopRecording' }
   | { op: 'stopMonitor'; monitorId: string }
-  | { op: 'keepTool'; toolkitId: string; tabId: number; slug?: string }
+  | { op: 'keepTool'; toolkitId: string; tabId: number; slug?: string; autoRun?: boolean }
   | { op: 'dismissTool'; toolkitId: string }
   | { op: 'forgetTool'; id: string }
+  | { op: 'autoRunTool'; id: string; on: boolean }
   | { op: 'runTool'; id: string; tab: TabAnchor }
   | { op: 'listTools' }
   | { op: 'attach'; file: NewFile; tab: TabAnchor }
@@ -134,7 +136,7 @@ export type RunMessage =
   | { op: 'monitor'; state: MonitorState }
   | { op: 'toolOffer'; offer: ToolOffer }
   | { op: 'toolOfferSettled'; toolkitId: string }
-  | { op: 'tools'; tools: SavedToolMeta[] }
+  | { op: 'tools'; tools: SavedToolMeta[]; autoRunReady: boolean }
   | { op: 'close' };
 
 const ports = new Set<Browser.runtime.Port>();
@@ -251,7 +253,7 @@ export function serveRunPorts(): void {
       post(port, { op: 'mapDraft', sessionId: held.sessionId, draft: held.draft });
     }
     void currentRecording().then((state) => post(port, { op: 'recording', state }));
-    void listSavedTools().then((tools) => post(port, { op: 'tools', tools: tools.map(withoutCode) }));
+    void toolsMessage().then((message) => post(port, message));
     void activeMonitorStates().then((states) => {
       for (const state of states) post(port, { op: 'monitor', state });
     });
@@ -365,7 +367,9 @@ function handle(command: RunCommand): void {
       void serialized(async () => {
         const offer = pendingOffers.get(command.toolkitId);
         const code = offer ? await toolkitCode(command.tabId, command.toolkitId) : null;
-        if (offer && code) await keepTool({ offer, code, slug: command.slug }).catch(() => undefined);
+        if (offer && code) {
+          await keepTool({ offer, code, slug: command.slug, autoRun: command.autoRun }).catch(() => undefined);
+        }
         pendingOffers.delete(command.toolkitId);
         broadcast({ op: 'toolOfferSettled', toolkitId: command.toolkitId });
         await publishTools();
@@ -381,6 +385,12 @@ function handle(command: RunCommand): void {
         await publishTools();
       });
       return;
+    case 'autoRunTool':
+      void serialized(async () => {
+        await switchAutoRun(command.id, command.on);
+        await publishTools();
+      });
+      return;
     case 'runTool':
       void serialized(async () => {
         const result = await runSavedTool(command.tab.tabId, command.tab.url, command.id);
@@ -388,7 +398,7 @@ function handle(command: RunCommand): void {
       });
       return;
     case 'listTools':
-      void publishTools();
+      void syncAutoRuns().then(publishTools);
       return;
     case 'attach':
       void serialized(() => attach(command.file, command.tab));
@@ -442,8 +452,12 @@ function toolRunItem(id: string, result: { ok: boolean; error?: { code: string; 
     : notice('error', `${result.error?.code}: ${result.error?.message}`);
 }
 
+async function toolsMessage(): Promise<RunMessage> {
+  return { op: 'tools', tools: (await listSavedTools()).map(withoutCode), autoRunReady: autoRunReady() };
+}
+
 async function publishTools(): Promise<void> {
-  broadcast({ op: 'tools', tools: (await listSavedTools()).map(withoutCode) });
+  broadcast(await toolsMessage());
 }
 
 async function absorb(runId: string, event: RunEvent): Promise<void> {

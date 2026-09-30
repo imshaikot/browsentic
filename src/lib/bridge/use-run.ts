@@ -15,6 +15,8 @@ import type { TabSession } from './tab-sessions';
 
 const RECONNECT_MS = 1_000;
 
+const USER_SCRIPTS_RECHECK_MS = 2_000;
+
 const EXTERNAL_VIEW = 'external';
 
 export type { RunItem };
@@ -50,9 +52,11 @@ export interface Run {
   tools: SavedToolMeta[];
   /** Raised a second after an approved toolkit lands, asking whether to keep it. */
   toolOffer: ToolOffer | null;
-  keepTool: (slug?: string) => void;
+  autoRunReady: boolean;
+  keepTool: (slug?: string, autoRun?: boolean) => void;
   dismissTool: () => void;
   forgetTool: (id: string) => void;
+  setAutoRun: (id: string, on: boolean) => void;
   runTool: (id: string) => void;
   /** Gives a file the panel has stored to the conversation of the tab in front, which reads it. */
   attachFile: (file: NewFile) => void;
@@ -66,6 +70,7 @@ export function useRun(): Run {
   const [monitors, setMonitors] = useState<MonitorState[]>([]);
   const [offer, setOffer] = useState<ToolOffer | null>(null);
   const [tools, setTools] = useState<SavedToolMeta[]>([]);
+  const [autoRunReady, setAutoRunReady] = useState(false);
   const [bySession, setBySession] = useState<Record<string, RunItem[]>>({});
   const port = useRef<Browser.runtime.Port | null>(null);
 
@@ -134,6 +139,7 @@ export function useRun(): Run {
           setOffer((held) => (held?.toolkitId === runMessage.toolkitId ? null : held));
         } else if (runMessage.op === 'tools') {
           setTools(runMessage.tools);
+          setAutoRunReady(runMessage.autoRunReady);
         } else if (runMessage.op === 'close') {
           window.close();
         } else {
@@ -172,6 +178,13 @@ export function useRun(): Run {
   useEffect(() => {
     if (sessionId) post({ op: 'replay', sessionId });
   }, [sessionId, post]);
+
+  const awaitingUserScripts = !autoRunReady && (!!offer || tools.some((tool) => tool.autoRun));
+  useEffect(() => {
+    if (!awaitingUserScripts) return;
+    const recheck = setInterval(() => post({ op: 'listTools' }), USER_SCRIPTS_RECHECK_MS);
+    return () => clearInterval(recheck);
+  }, [awaitingUserScripts, post]);
 
   const items = useMemo(() => {
     const own = sessionId ? (bySession[sessionId] ?? []) : [];
@@ -249,9 +262,12 @@ export function useRun(): Run {
     }, [post]),
     tools,
     toolOffer: offer,
+    autoRunReady,
     keepTool: useCallback(
-      (slug?: string) => {
-        if (offer && tab.tabId != null) post({ op: 'keepTool', toolkitId: offer.toolkitId, tabId: tab.tabId, slug });
+      (slug?: string, autoRun?: boolean) => {
+        if (offer && tab.tabId != null) {
+          post({ op: 'keepTool', toolkitId: offer.toolkitId, tabId: tab.tabId, slug, autoRun });
+        }
       },
       [offer, post, tab.tabId],
     ),
@@ -261,6 +277,12 @@ export function useRun(): Run {
     forgetTool: useCallback(
       (id: string) => {
         post({ op: 'forgetTool', id });
+      },
+      [post],
+    ),
+    setAutoRun: useCallback(
+      (id: string, on: boolean) => {
+        post({ op: 'autoRunTool', id, on });
       },
       [post],
     ),
