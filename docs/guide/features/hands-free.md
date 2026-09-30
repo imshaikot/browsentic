@@ -5,22 +5,28 @@ and everything you would reach for in the panel is a hover away.
 
 Hands-free exists only in browsers that can turn speech into text — Chrome, Edge, and the other
 Chromium browsers with a speech service behind them. Anywhere else there is no detach button, no
-`/hands-free` and no mic on the page (see [Which browsers](#which-browsers)).
+`/hands-free`, no **Open hands-free** in the popup, no right-click item and no mic on the page (see
+[Which browsers](#which-browsers)).
 
 ---
 
 ## Turning it on
 
-Either of:
+Any of:
 
 - the **detach** button in the side panel's header, just left of minimize
 - typing **`/hands-free`** in the composer — the `/` menu offers it as soon as you type `/hand`, and
   `/hand-free` works too
+- **Open hands-free** in the toolbar popup, beside **Open side panel**
+- **Open Browsentic (Hands Free)** when you right-click a page; while the mic is on, it reads
+  **Close Browsentic (Hands Free)** and takes it away
+- the **Start or stop hands-free** shortcut — **Alt+Shift+H** (**⌥⇧H** on a Mac) unless something
+  else already had it; see [Settings → Extension](../configuration.md#the-extension-section)
 
-The panel folds down into a mic and closes, and the same mic rises at the bottom middle of the page.
-It follows you from tab to tab. Opening the side panel again — from the mic's own menu, the toolbar
-icon or the right-click **Open Browsentic** item — turns hands-free off; the panel and the mic never
-listen at the same time.
+From the panel, it folds down into a mic and closes; from anywhere else the mic simply appears. It
+rises at the bottom middle of the page and follows you from tab to tab. Opening the side panel again
+— from the mic's own menu, the toolbar icon or the right-click **Open Browsentic** item — turns
+hands-free off; the panel and the mic never listen at the same time.
 
 Hands-free lasts until you open the panel or the browser closes. A browser that restarts comes back
 with the panel, never with a microphone already on.
@@ -109,7 +115,7 @@ Browsentic offers hands-free only where it can actually hear you:
 | **Chrome, Edge** | Offered |
 | **Firefox** | Never offered — it has no speech recognition, and no hidden page to listen from |
 | **Brave** | Never offered — it ships the speech API with no service behind it, so every attempt fails |
-| **Other Chromium browsers** | Offered until their speech service first fails without ever having transcribed a word. From then on the detach button and `/hands-free` are gone, and a mic already on the page leaves with a note saying why |
+| **Other Chromium browsers** | Offered until their speech service first fails without ever having transcribed a word. From then on the detach button, `/hands-free`, the popup button and the right-click item are gone, and a mic already on the page leaves with a note saying why |
 
 A browser whose speech service has transcribed even once keeps hands-free for good: a later failure
 there is a dropped connection, not a missing service. And one written off can win it back — dictate

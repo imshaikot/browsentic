@@ -33,6 +33,8 @@ export function writeHandsFree(state: HandsFreeState | null): Promise<void> {
     : browser.storage.session.remove(HANDS_FREE_KEY);
 }
 
+export const PUSH_TO_TALK_KEY = 'browsentic/pushToTalk';
+
 export const startHandsFree = (): Promise<void> => writeHandsFree({ muted: false, since: Date.now() });
 
 export const endHandsFree = (): Promise<void> => writeHandsFree(null);

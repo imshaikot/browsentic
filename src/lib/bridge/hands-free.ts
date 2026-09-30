@@ -20,7 +20,7 @@ import {
 import { pickFocusIn } from './aeye';
 import { putBytes } from './file-store';
 import { openMicPermissionPage } from './mic-permission';
-import { HANDS_FREE_KEY, endHandsFree, readHandsFree, writeHandsFree, type HandsFreeState } from './panel-view';
+import { HANDS_FREE_KEY, PUSH_TO_TALK_KEY, endHandsFree, readHandsFree, writeHandsFree, type HandsFreeState } from './panel-view';
 import { attachFile, closePanels, onPanelPresence, onTurnSettled, runCommand } from './run-port';
 import { openSidePanel } from './side-panel';
 import { TAB_SESSIONS_KEY, readTabSessions, type PendingApproval, type TabAnchor, type TabSession } from './tab-sessions';
@@ -30,7 +30,6 @@ import { showToast } from './toast';
 import { DAEMON_STATE_KEY, type DaemonState } from './socket';
 
 export const ORB_POSITION_KEY = 'browsentic/orbPosition';
-export const PUSH_TO_TALK_KEY = 'browsentic/pushToTalk';
 const DICTATION_KEY = 'browsentic/dictation';
 /** Approvals already announced elsewhere, kept where a revived worker still finds them. */
 const ANNOUNCED_KEY = 'browsentic/approvalsAnnounced';

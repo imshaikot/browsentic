@@ -75,7 +75,8 @@ state under `browsentic/dictation`, and the approvals it has already announced u
 `browsentic/approvalsAnnounced`) — a restarted browser never comes back with a microphone on.
 Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
 (`browsentic/pushToTalk`) and whether this browser's speech service has ever worked
-(`browsentic/speechService`) are kept in `storage.local`.
+(`browsentic/speechService`) are kept in `storage.local`, along with which right-click items this
+browser shows (`browsentic/contextMenu`, both on when absent).
 
 **The theme** is config.json's `theme`, mirrored into `storage.local` under `browsentic/theme` so a
 page paints before any socket is up. `browsentic/theme.unsynced` marks a pick the daemon has not heard
