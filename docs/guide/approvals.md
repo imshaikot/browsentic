@@ -25,6 +25,12 @@ survives restarts, and **only ever short-circuits a `confirm`**. A `deny` stays 
 those are the ones you are not meant to be able to click past. The button is hidden when a run has
 no single site to attach a grant to.
 
+**A card the agent stops waiting for comes down.** If the agent's CLI gives up on the call, the run
+is stopped, or the agent moves on to something else, the card is withdrawn, and an answer after that
+does nothing: an approval never runs an action the agent is no longer waiting on. Cursor CLI gives
+up on any call after a minute, so there a card you have not answered is handed back to the agent,
+which asks again under the same card until you decide.
+
 ```sh
 browsentic approvals              # what no longer asks
 browsentic approvals clear        # forget all of them

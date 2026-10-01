@@ -77,11 +77,12 @@ exactly what each flag buys.
 too old to understand them fails the run with an explicit "update it" message rather than running
 uncontained.
 
-### Follow-up messages, on Claude Code and Codex
+### Follow-up messages, on Claude Code, Codex and Cursor
 
-Both keep the system prompt a conversation began with. Claude Code records it on the first request
-and sends that record on every resume (its `--system-prompt-snapshot`, on by default), and Codex does
-the same with its developer instructions. A later message that changes what the agent should know —
+All three keep the system prompt a conversation began with. Claude Code records it on the first
+request and sends that record on every resume (its `--system-prompt-snapshot`, on by default), Codex
+does the same with its developer instructions, and Cursor answers a resumed turn from the `AGENTS.md`
+the conversation started with. A later message that changes what the agent should know —
 an element picked with A-Eye, a skill attached from the picker, a different skill for the job, notes
 for the site you have moved to — would otherwise never reach it.
 
@@ -186,19 +187,36 @@ rate-limited before the model answered. Expect rough edges, and please report th
 
 ### Cursor CLI is in beta
 
-Browsentic's Cursor runner was checked against `cursor-agent 2026.09.18-9a7762b`: every flag it
-passes is accepted, a real turn was read back from its stream, and the deny rules were measured
-refusing a shell command in a headless run. What has not been through it yet is a whole
-conversation in the side panel — the browser tools reaching a page, and a follow-up turn resuming.
-Expect rough edges there, and please report them.
+Browsentic's Cursor runner was measured against `cursor-agent 2026.09.18-9a7762b` through its own
+plan: the browser tools reaching the model, a picture, a long result, a call that runs past a
+minute, a resumed turn, its containment, and a one-shot reading a PNG and a PDF.
 
 - **Sign in first.** Run `cursor-agent login`, or set `CURSOR_API_KEY`. Until then a run fails with
   *Authentication required*.
-- **Your own Cursor MCP servers are denied by name.** A project config does not replace the global
-  `~/.cursor/mcp.json`, so every server you configured for Cursor itself would otherwise load
-  beside Browsentic's — including your own `browsentic` entry, which reaches the browser without a
-  run's approval gate. Browsentic reads that file and denies each of them for the run. It never
-  writes to it.
+- **Each turn approves the run's own MCP server.** Cursor starts a project's MCP server only once it
+  is approved, and an approval covers that exact configuration, which names the run. So before each
+  turn Browsentic runs `cursor-agent mcp enable browsentic` in the run's folder — that one server,
+  never `--approve-mcps`, which would approve every server you have. Each adds a line to that
+  folder's `mcp-approvals.json` under `~/.cursor/projects`.
+- **The model looks a tool up before its first call.** Cursor shows the model a tool's schema only
+  when it asks for it, so the first browser action of a conversation takes one step more than on
+  Claude Code; the run's prompt has it look up everything the job needs at once.
+- **Cursor gives up on a tool call after 60 seconds.** An approval you have not answered by then
+  stays on screen: the agent is told you have not decided yet and asks again, under the same card,
+  until you do. Anything else it does takes the request down, and an answer after that does
+  nothing. Waits inside a call — a monitor, a pick, a captcha, a download — are cut to fit, and
+  picked up again with the next call.
+- **Text over 40,000 bytes never reaches the model.** Cursor would put a longer result in a file the
+  run is not allowed to read, so Browsentic refuses it instead (`RESULT_TOO_LARGE`) and the model
+  asks for the page a piece at a time. A long text read is split into pieces that fit.
+- **No context count.** Cursor reports tokens added up over every request in a turn, so the context
+  card shows none rather than a wrong one.
+- **Your own Cursor MCP servers, and every plugin's, are denied.** A project config does not replace
+  the global `~/.cursor/mcp.json`, so every server you configured for Cursor itself would otherwise
+  load beside Browsentic's — including your own `browsentic` entry, which reaches the browser
+  without a run's approval gate. Browsentic reads that file and denies each of them for the run,
+  and denies every plugin's server, `plugin-*`, as one. It never writes to that file. If a server it
+  denied answers a call anyway, the run is stopped.
 - **Reasoning effort goes in the model id.** Cursor has no effort flag; it takes bracket overrides
   instead, so set `agents.cursor.model` to something like `claude-opus-4-8[effort=high]`.
 - **On Windows, only the deny rules apply.** Cursor's kernel sandbox is macOS and Linux only.

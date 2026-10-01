@@ -19,7 +19,7 @@ import { grokRunner } from './grok';
 import { modelsFor, refreshModels } from './models';
 import { opencodeRunner } from './opencode';
 import { qwenRunner } from './qwen';
-import type { McpServer, Runner } from './types';
+import type { CallLimits, McpServer, Runner } from './types';
 import { installHint } from './util';
 import { vibeRunner } from './vibe';
 
@@ -43,9 +43,14 @@ const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');
  * called as `browsentic-mcp`; called any other way it prints help, which an agent would read
  * as a broken handshake. BROWSENTIC_AGENT_RUN separately forces serving, so this is belt and
  * braces, but the explicit argument is the one that says what is meant.
+ *
+ * A CLI that keeps long results from the model has its limit passed on, so the server refuses
+ * what would be kept rather than sending it.
  */
-export function mcpServerFor(runId: string): McpServer {
-  return { command: process.execPath, args: [cliPath, 'mcp'], env: { BROWSENTIC_AGENT_RUN: runId } };
+export function mcpServerFor(runId: string, limits?: CallLimits): McpServer {
+  const env: Record<string, string> = { BROWSENTIC_AGENT_RUN: runId };
+  if (limits?.resultBytes) env.BROWSENTIC_RESULT_BYTES = String(limits.resultBytes);
+  return { command: process.execPath, args: [cliPath, 'mcp'], env };
 }
 
 export interface SelectedRunner {

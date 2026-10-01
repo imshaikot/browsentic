@@ -8,6 +8,7 @@ import { IMAGE_NOTE, fence, sealSecrets, shouldFence, type Policy } from './guar
 const SCREENSHOT_TOOL = 'page_screenshot';
 const PICK_TOOL = 'page_pickElement';
 const CAPTCHA_TOOL = 'page_solveCaptcha';
+const EXTRACT_TOOL = 'page_extractText';
 
 const FOCUS_SHOT_TOOL = {
   name: toolNameFor(FOCUS_SHOT_ACTION),
@@ -118,10 +119,31 @@ export interface ToolReply {
  */
 export interface ToolHost {
   list(): Promise<ToolList>;
-  call(name: string, args: Record<string, unknown>): Promise<ToolReply>;
+  /** `signal` aborts when the client stops waiting, so an approval the call waits on is withdrawn. */
+  call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply>;
 }
 
-export function toolHost(bridge: Bridge, { agentRun = false, policy, tag }: { agentRun?: boolean; policy: Policy; tag: string }): ToolHost {
+interface HostOptions {
+  agentRun?: boolean;
+  /** The most text, in UTF-8 bytes, the CLI on the other end passes to its model; unset for no limit. */
+  resultBytes?: number;
+  policy: Policy;
+  tag: string;
+}
+
+export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy, tag }: HostOptions): ToolHost {
+  const answer = async (name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply> => {
+    if (name === STATUS_TOOL) return render(await status(bridge));
+    const action = actionNameFor(name);
+    const result = await bridge.invoke(action, resultBytes && name === EXTRACT_TOOL ? fitRead(args, resultBytes) : args, signal);
+    const fenceWith = shouldFence(action, policy) ? tag : undefined;
+    if (name === SCREENSHOT_TOOL) return renderScreenshot(result);
+    if (name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
+    if (name === PICK_TOOL) return renderPick(result, fenceWith);
+    if (name === CAPTCHA_TOOL) return renderCaptcha(result, fenceWith);
+    return render(result, fenceWith);
+  };
+
   return {
     async list() {
       const { tools: actions, reserved = agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [], withheld = [] } = await bridge.describe();
@@ -141,17 +163,44 @@ export function toolHost(bridge: Bridge, { agentRun = false, policy, tag }: { ag
       };
     },
 
-    async call(name, args) {
-      if (name === STATUS_TOOL) return render(await status(bridge));
-      const action = actionNameFor(name);
-      const result = await bridge.invoke(action, args);
-      const fenceWith = shouldFence(action, policy) ? tag : undefined;
-      if (name === SCREENSHOT_TOOL) return renderScreenshot(result);
-      if (name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
-      if (name === PICK_TOOL) return renderPick(result, fenceWith);
-      if (name === CAPTCHA_TOOL) return renderCaptcha(result, fenceWith);
-      return render(result, fenceWith);
+    async call(name, args, signal) {
+      const reply = await answer(name, args, signal);
+      return resultBytes ? withinLimit(reply, resultBytes) : reply;
     },
+  };
+}
+
+/**
+ * A read sized so its group fits the limit whatever the text: four bytes a character covers any
+ * script and the JSON it is escaped into. The rest comes in the next group, by its cursor.
+ */
+function fitRead(args: Record<string, unknown>, resultBytes: number): Record<string, unknown> {
+  const most = Math.floor(resultBytes / 4);
+  const asked = typeof args.maxLength === 'number' ? args.maxLength : Infinity;
+  return { ...args, maxLength: Math.min(asked, most) };
+}
+
+/**
+ * The reply, or a refusal when its text is longer than the CLI passes on. Counted as Cursor counts
+ * it — its text blocks joined by a blank line, pictures aside — and refused whole rather than cut,
+ * because a cut body is not JSON any more and loses the fence's closing line.
+ */
+function withinLimit(reply: ToolReply, resultBytes: number): ToolReply {
+  const text = reply.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n\n');
+  const bytes = Buffer.byteLength(text, 'utf8');
+  if (bytes <= resultBytes) return reply;
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text:
+          `RESULT_TOO_LARGE: The call went through, but its result came to ${bytes.toLocaleString('en')} bytes, and the agent CLI ` +
+          `running you keeps anything over ${resultBytes.toLocaleString('en')} from you, so it was not sent. Do not repeat an action ` +
+          'for its result; ask for less at a time instead — page_extractText with a smaller maxLength and the cursor it hands back, ' +
+          'page_getPageInfo with a smaller maxPerKind, or a target that narrows the read to one element.',
+      },
+    ],
   };
 }
 

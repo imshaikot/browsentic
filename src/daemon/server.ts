@@ -33,7 +33,7 @@ const RESOURCES = [
   },
 ] as const;
 
-export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean } = {}): Server {
+export function createMcpServer(bridge: Bridge, version: string, opts: { agentRun?: boolean; resultBytes?: number } = {}): Server {
   // Page text is marked as data on the way out, for every client — the system prompt
   // that says so only reaches Browsentic's own runs. The tag is per-process so a page
   // cannot author a closing marker.
@@ -59,12 +59,14 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
     },
   );
 
-  const tools = toolHost(bridge, { agentRun: opts.agentRun, policy, tag });
+  const tools = toolHost(bridge, { agentRun: opts.agentRun, resultBytes: opts.resultBytes, policy, tag });
 
   // A client listed again sees whatever is withheld once it is offered, so there is nothing to list ahead.
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: (await tools.list()).tools }));
 
-  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => ({ ...(await tools.call(params.name, params.arguments ?? {})) }));
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => ({
+    ...(await tools.call(params.name, params.arguments ?? {}, extra.signal)),
+  }));
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({ resources: [...RESOURCES] }));
 
