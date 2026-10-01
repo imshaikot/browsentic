@@ -20,6 +20,7 @@ import { scopeOf, slugFromPurpose } from '@/lib/skills/saved-tool';
 import { send, withDebugger } from './cdp';
 import { mainWorldOf, type FrameContext } from './frame-context';
 import { getSavedTool, scopeMatches } from './saved-tools';
+import { refusalForTab } from './site-guard';
 
 const TOOLKITS_KEY = 'browsentic/codeToolkits';
 
@@ -171,9 +172,12 @@ function offerToKeep(toolkit: StoredToolkit, url: string | undefined, called: st
 /**
  * The `/` path. No guardrail runs here and none should: this code was read and approved
  * when it was saved, the user asked for it by name just now, and the daemon is not in the
- * loop at all — which is also what keeps it out of reach of an MCP client.
+ * loop at all — which is also what keeps it out of reach of an MCP client. Blocked sites
+ * are the exception: they bind the user's own tools too.
  */
 export async function runSavedTool(tabId: number, url: string | undefined, toolId: string): Promise<ActionResult> {
+  const refused = await refusalForTab(tabId);
+  if (refused) return refused;
   const tool = await getSavedTool(toolId);
   if (!tool) return failure('UNKNOWN_TOOL', 'That tool is no longer saved.');
   if (!scopeMatches(tool, url)) {

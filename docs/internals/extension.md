@@ -103,7 +103,7 @@ lists it as **Options** on the toolbar icon's menu, and Firefox as **Preferences
 The panel's header, the popup's header and the connection sheet open it with
 `runtime.openOptionsPage()`, which focuses a settings tab already open rather than adding another.
 
-The page is a sidebar of five sections — **Extension**, **Profile**, **Guardrails**, **Agent**, **Connection** —
+The page is a sidebar of six sections — **Extension**, **Profile**, **Guardrails**, **Blocked sites**, **Agent**, **Connection** —
 with the open one in the URL hash, so a reload or a link lands on it; an unknown hash,
 such as the old `#appearance`, lands on **Extension**. **Agent** and **Connection** are the same
 `AgentPicker` and `DaemonLink` the popup and the connection sheet show; those keep theirs, so a
@@ -116,6 +116,32 @@ right-click items (`browsentic/contextMenu`), the keyboard shortcuts, and hold t
 page lists them with `commands.getAll()`, re-read whenever it comes back into view, because the
 browser owns the keys and only its own page changes them — `chrome://extensions/shortcuts`
 (`edge://` on Edge), or `commands.openShortcutSettings()` on Firefox.
+
+**Blocked sites** is the one section the daemon never sees. Its list is `browsentic/blockedSites` in
+`storage.local`, written only by `useBlockedSites()` on this page, and no socket frame carries it in
+either direction — the point of it is to bind the agent, so it cannot live on the agent's side of the
+socket. It is enforced here, in three layers:
+
+- **The gate** at the top of `invokeForHarness` ([invoke.ts](../../src/lib/bridge/invoke.ts)) checks the
+  target tab's `url` and `pendingUrl`, every frame on the focused path, and where the action would send
+  the browser (`navigate`, `captureDownload`). It is written as a list of exemptions — actions that touch
+  no tab, and `openTab`/`switchTab`/`closeTab`, which check the tab they pick in
+  [tabs.ts](../../src/lib/bridge/tabs.ts) — so an action added later is gated without anyone remembering
+  to. It also refuses any tab that is not an http(s) page, which is what keeps the debugger-backed
+  actions off the extension's own pages. After the action, the tab is checked again, and a result from a
+  tab that landed somewhere blocked is replaced by the refusal.
+- **The content script** re-checks its own frame's `location.href` before dispatching
+  ([host.ts](../../src/lib/actions/host.ts)).
+- **Everything that does not pass through the gate** checks for itself through
+  [site-guard.ts](../../src/lib/bridge/site-guard.ts): the scheduled-task tab, saved tools and their user
+  scripts, A-Eye, the recorder, monitors and diagnostics (which also end when their tab moves onto a
+  blocked site, or the list changes under them), recordings offered to the agent, and the run start,
+  which drops the tab's URL and the picked element.
+
+The list is read from storage on every check — a woken worker's memory is not the truth — and a value
+that is not a list refuses every web page rather than none. The pattern grammar is in
+[blocked-sites.ts](../../src/lib/settings/blocked-sites.ts), one RegExp per pattern so that a user
+script can carry the ones for its own origin.
 
 **The theme and Guardrails are shared with the Mac app**, and the daemon keeps both in
 `~/.browsentic/config.json`:

@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { SITE_BLOCKED } from '@/lib/settings/blocked-sites';
 import {
   MAX_EVENTS,
   MAX_RECORDING_MS,
@@ -15,12 +16,15 @@ import {
   putRecording,
   type StoredRecordingMeta,
 } from './recording-store';
+import { onBlockedSitesChange, siteBlocked, tabUrls } from './site-guard';
 
 const ACTIVE_KEY = 'browsentic/recording';
 export const WARN_ALARM = 'browsentic/recording-warn';
 export const STOP_ALARM = 'browsentic/recording-stop';
 
-export type StopReason = 'user' | 'timeout' | 'tab-closed';
+export type StopReason = 'user' | 'timeout' | 'tab-closed' | 'site-blocked';
+
+const NOT_RECORDED = 'This site is on your Blocked sites list, so Browsentic will not record it.';
 
 export interface ActiveRecording {
   id: string;
@@ -69,9 +73,10 @@ export async function currentRecording(): Promise<RecordingState | null> {
 
 export async function recordingStateFor(
   tabId: number | undefined,
+  pageUrl?: string,
 ): Promise<{ recording: boolean; captureValues: boolean }> {
   const active = await readActive();
-  const match = !!active && active.tabId === tabId;
+  const match = !!active && active.tabId === tabId && !(await siteBlocked(pageUrl));
   return { recording: match, captureValues: match ? active!.captureValues : false };
 }
 
@@ -92,6 +97,7 @@ export async function startRecording(opts: {
   if (!/^https?:/.test(opts.url)) {
     return failure('UNSUPPORTED', 'Only http(s) pages can be recorded.');
   }
+  if (await siteBlocked(opts.url)) return failure(SITE_BLOCKED, NOT_RECORDED);
 
   const active: ActiveRecording = {
     id: crypto.randomUUID(),
@@ -113,10 +119,10 @@ export async function startRecording(opts: {
   return success(state);
 }
 
-export async function appendEvents(tabId: number | undefined, events: RecordedEvent[]): Promise<void> {
+export async function appendEvents(tabId: number | undefined, events: RecordedEvent[], pageUrl?: string): Promise<void> {
   if (!events.length) return;
   const active = await readActive();
-  if (!active || active.tabId !== tabId) return;
+  if (!active || active.tabId !== tabId || (await siteBlocked(pageUrl))) return;
   if (active.events.length >= MAX_EVENTS) {
     await stopRecording('timeout');
     return;
@@ -167,6 +173,10 @@ export function serveRecorder(): void {
     void (async () => {
       const active = await readActive();
       if (!active || active.tabId !== tabId) return;
+      if (await siteBlocked(changeInfo.url)) {
+        await stopRecording('site-blocked');
+        return;
+      }
       const last = active.events[active.events.length - 1];
       if (last?.kind === 'navigate' && last.url === changeInfo.url) return;
       await appendEvents(tabId, [{ t: Date.now(), kind: 'navigate', url: changeInfo.url! }]);
@@ -177,6 +187,15 @@ export function serveRecorder(): void {
     void (async () => {
       const active = await readActive();
       if (active?.tabId === tabId) await stopRecording('tab-closed');
+    })();
+  });
+
+  onBlockedSitesChange(() => {
+    void (async () => {
+      const active = await readActive();
+      if (!active) return;
+      const tab = await browser.tabs.get(active.tabId).catch(() => null);
+      if (await siteBlocked(...tabUrls(tab))) await stopRecording('site-blocked');
     })();
   });
 

@@ -3,6 +3,7 @@ import { routeIntent } from '@/lib/intent';
 import { START_RECORDING_ACTION, STOP_RECORDING_ACTION } from '@/lib/recordings/events';
 import { invokeForHarness } from './invoke';
 import { startActiveTabRecording, stopRecording } from './recorder';
+import { isBlockedRefusal } from './site-guard';
 
 export async function tryFastPath(
   text: string,
@@ -27,7 +28,7 @@ export async function tryFastPath(
   });
 
   if (!result.ok) {
-    if (isRecordingAction(action)) return true;
+    if (isRecordingAction(action) || isBlockedRefusal(result)) return true;
     console.debug(`[browsentic] fast path ${ruleId} (${score}) failed, escalating:`, result.error.code);
     return false;
   }

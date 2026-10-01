@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import type { SavedRecording } from '@/lib/actions/protocol';
 import { hostOf, originOf, type RecordedEvent } from '@/lib/recordings/events';
 import { validateRecordingWorkflow, type RecordingWorkflow } from '@/lib/recordings/workflow';
+import { siteBlocked } from './site-guard';
 import { analyzeRecording } from './socket';
 
 export const RECORDINGS_INDEX_KEY = 'browsentic:recordings';
@@ -93,6 +94,14 @@ export async function analyzeStoredRecording(recordingId: string): Promise<void>
     return;
   }
 
+  if (await recordedOnBlockedSite(meta.startUrl, body.events)) {
+    await updateRecordingMeta(recordingId, {
+      status: 'error',
+      error: 'It visits a site on the Blocked sites list, so it was not sent to be turned into steps.',
+    });
+    return;
+  }
+
   await updateRecordingMeta(recordingId, { status: 'analyzing', error: undefined });
   const result = await analyzeRecording({
     id: meta.id,
@@ -161,4 +170,8 @@ export function asSavedRecording(meta: StoredRecordingMeta): SavedRecording {
     capturedValues: meta.capturedValues,
     durationMs: meta.durationMs,
   };
+}
+
+export function recordedOnBlockedSite(startUrl: string, events: readonly RecordedEvent[] = []): Promise<boolean> {
+  return siteBlocked(startUrl, ...events.flatMap((event) => (event.kind === 'navigate' ? [event.url] : [])));
 }

@@ -3,6 +3,7 @@ import { pickElement } from '@/lib/actions/page/pick-element';
 import { success, type ActionResult } from '@/lib/actions/protocol';
 import { describeFrame, focusedFrame, frameOffset, TOP_FRAME } from './frame-focus';
 import { blobToDataUrl, captureViewport } from './screenshot';
+import { refusalForTab } from './site-guard';
 
 export interface PickShot {
   dataUrl: string;
@@ -30,9 +31,13 @@ export async function pickInTab(
   tab: { id: number; windowId?: number },
   input?: unknown,
 ): Promise<ActionResult> {
+  const refused = await refusalForTab(tab.id);
+  if (refused) return refused;
   const picked = await invokeInTab(tab.id, pickElement.name, input);
   if (!picked.ok) return picked;
 
+  const moved = await refusalForTab(tab.id);
+  if (moved) return moved;
   const { capture, ...data } = picked.data as { capture?: PickCapture } & Record<string, unknown>;
   const placed = capture ? await inTabViewport(tab.id, capture) : null;
   const shot = placed ? await shootRegion(tab.windowId, placed).catch(() => null) : null;

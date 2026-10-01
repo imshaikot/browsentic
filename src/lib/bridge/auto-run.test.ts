@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Browser } from 'wxt/browser';
 import { fakeBrowser } from 'wxt/testing';
+import { BLOCKED_SITES_KEY, blockedBy, compileBlockedSites, patternsFor } from '@/lib/settings/blocked-sites';
 import { autoRunSource, QUIET_MS, SETTLE_CAP_MS, syncAutoRuns } from './auto-run';
 import { saveTool, scopeMatches, type SavedTool } from './saved-tools';
 
@@ -32,7 +33,7 @@ interface FakePage {
   load: () => void;
 }
 
-function openPage(url: string, saved: SavedTool = tool(), readyState = 'complete'): FakePage {
+function openPage(url: string, saved: SavedTool = tool(), readyState = 'complete', blocked: string[] = []): FakePage {
   const location = new URL(url);
   const document = { readyState, documentElement: {} };
   const marks: string[] = [];
@@ -57,7 +58,7 @@ function openPage(url: string, saved: SavedTool = tool(), readyState = 'complete
   }
   const console = { warn: (...args: unknown[]) => warnings.push(args) };
 
-  new Function('location', 'document', 'window', 'MutationObserver', 'console', autoRunSource(saved))(
+  new Function('location', 'document', 'window', 'MutationObserver', 'console', autoRunSource(saved, blocked))(
     location,
     document,
     window,
@@ -178,6 +179,46 @@ describe('the script Chrome injects', () => {
   });
 });
 
+describe('a blocked path on the tool’s own site', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const sourcesFor = (patterns: string[], origin = 'https://www.youtube.com') =>
+    patternsFor(origin, compileBlockedSites(patterns)!).map(({ source }) => source);
+
+  test('is skipped on arrival and on a single-page move onto it', async () => {
+    const blocked = sourcesFor(['youtube.com/watch?v=secret']);
+    const page = openPage('https://www.youtube.com/watch?v=secret', tool(), 'complete', blocked);
+    await vi.advanceTimersByTimeAsync(QUIET_MS);
+    expect(page.marks).toEqual([]);
+
+    page.go('https://www.youtube.com/watch?v=a');
+    await vi.advanceTimersByTimeAsync(QUIET_MS);
+    page.go('https://www.youtube.com/results');
+    await vi.advanceTimersByTimeAsync(QUIET_MS);
+    page.go('https://www.youtube.com/watch?v=secret&t=1');
+    await vi.advanceTimersByTimeAsync(QUIET_MS);
+    expect(page.marks).toEqual(['https://www.youtube.com/watch?v=a']);
+  });
+
+  test('only the patterns that could match the tool’s site travel with it', () => {
+    expect(sourcesFor(['mybank.com', 'youtube.com/watch?v=secret', 'www.youtube.com:8443'])).toHaveLength(1);
+  });
+
+  test.each([
+    'https://www.youtube.com/watch?v=secret',
+    'https://www.youtube.com/watch/%73ecret',
+    'https://www.youtube.com//watch/secret',
+    'https://www.youtube.com/watch?v=open',
+    'https://www.youtube.com/watch/secrets',
+  ])('the page decides %s the way the extension does', async (url) => {
+    const patterns = ['youtube.com/watch?v=secret', 'youtube.com/watch/secret'];
+    const page = openPage(url, tool(), 'complete', sourcesFor(patterns));
+    await vi.advanceTimersByTimeAsync(QUIET_MS);
+    expect(page.marks.length === 0).toBe(blockedBy(url, compileBlockedSites(patterns)!) !== null);
+  });
+});
+
 function stubUserScripts(registered: UserScript[] = []) {
   const scripts = new Map(registered.map((script) => [script.id, script]));
   const api = {
@@ -235,6 +276,26 @@ describe('keeping Chrome in step with the saved list', () => {
     await syncAutoRuns();
     expect(api.register).toHaveBeenCalledTimes(2);
     expect(scripts.get('browsentic-tool-t1')?.js?.[0]?.code).toContain('tools.mark = () => 2;');
+  });
+
+  test('never registers a tool whose whole site is blocked, and brings it back once unblocked', async () => {
+    const { scripts } = stubUserScripts();
+    await saveTool(tool());
+    await fakeBrowser.storage.local.set({ [BLOCKED_SITES_KEY]: ['youtube.com'] });
+    await syncAutoRuns();
+    expect(scripts.size).toBe(0);
+
+    await fakeBrowser.storage.local.set({ [BLOCKED_SITES_KEY]: ['youtube.com/watch?v=secret'] });
+    await syncAutoRuns();
+    expect(scripts.get('browsentic-tool-t1')?.js?.[0]?.code).toContain('watch\\\\?v=secret');
+  });
+
+  test('registers nothing while the blocked list cannot be read', async () => {
+    const { scripts } = stubUserScripts();
+    await saveTool(tool());
+    await fakeBrowser.storage.local.set({ [BLOCKED_SITES_KEY]: 'youtube.com' });
+    await syncAutoRuns();
+    expect(scripts.size).toBe(0);
   });
 
   test('leaves scripts it did not register alone', async () => {

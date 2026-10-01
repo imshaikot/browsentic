@@ -85,6 +85,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | --- | --- | --- |
 | `DECLINED` | Approval gate | The user said no. **Final** — do not seek another route to the same effect |
 | `BLOCKED` | Policy | A `deny` rule matched, or a `confirm` with nobody to answer it. The message names why. [Guide](../guide/approvals.md) |
+| `SITE_BLOCKED` | Extension | The page — or where the action would take the browser, or where it ended up — is on the user's Blocked sites list. Also returned for every page action while that list cannot be read. **Final** — do not retry or reach it another way; tell the user. [Guide](../guide/features/blocked-sites.md) |
 | `SECRET_NOT_RELEASABLE` | Extension | A sealed secret placeholder was passed somewhere it cannot be released. Only `page_fillInput`'s `value` and `page_typeText`'s `text` release one |
 | `SECRET_EXPIRED` | Extension | That placeholder is no longer held — it aged out, or it was read in an earlier browser session. Read the value again |
 | `MAPPING_READ_ONLY` | Mapping gate | A mapping run may only call the 14 read-only actions (plus `page_clickElement` when `allowClicks` is on) |

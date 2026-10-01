@@ -72,12 +72,12 @@ export default defineBackground(() => {
       return;
     }
     if (message.op === 'recordEvents' && Array.isArray(message.events)) {
-      void appendEvents(sender.tab?.id, message.events);
+      void appendEvents(sender.tab?.id, message.events, sender.url);
       sendResponse(success(true));
       return;
     }
     if (message.op === 'recordingState') {
-      recordingStateFor(sender.tab?.id)
+      recordingStateFor(sender.tab?.id, sender.url)
         .then((state) => sendResponse(success(state)))
         .catch(() => sendResponse(success({ recording: false, captureValues: false })));
       return true;
@@ -88,12 +88,12 @@ export default defineBackground(() => {
       return;
     }
     if (message.op === 'monitorSample' && typeof message.monitorId === 'string') {
-      void ingestSample(sender.tab?.id, message.monitorId, message.sample);
+      void ingestSample(sender.tab?.id, message.monitorId, message.sample, sender.url);
       sendResponse(success(true));
       return;
     }
     if (message.op === 'monitorState') {
-      monitorsForTab(sender.tab?.id)
+      monitorsForTab(sender.tab?.id, sender.url)
         .then(sendResponse)
         .catch(() => sendResponse(success({ monitors: [] })));
       return true;
