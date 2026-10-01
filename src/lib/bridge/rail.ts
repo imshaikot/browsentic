@@ -11,6 +11,7 @@ import { listSkillMeta } from './skill-store';
 import { PANEL_COLLAPSED_KEY, PANEL_TAB_KEY, readPanelCollapsed, readPanelTab } from './panel-view';
 import { THEME_KEY, readTheme } from './theme';
 import { openSidePanel } from './side-panel';
+import { tellTab } from './tab-message';
 import { readTabSessions } from './tab-sessions';
 import type { DaemonState } from './socket';
 
@@ -79,7 +80,7 @@ async function paintTab(tabId: number): Promise<void> {
 
 function post(tabId: number | undefined, discarded: boolean | undefined, command: unknown) {
   if (tabId == null || discarded) return undefined;
-  return browser.tabs.sendMessage(tabId, command).catch(() => undefined);
+  return tellTab(tabId, command);
 }
 
 async function describeRail(): Promise<RailView> {
