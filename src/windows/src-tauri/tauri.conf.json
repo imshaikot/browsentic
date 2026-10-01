@@ -32,7 +32,7 @@
     "targets": ["nsis"],
     "publisher": "Browsentic",
     "homepage": "https://browsentic.com",
-    "copyright": "MIT License",
+    "copyright": "Copyright © 2026 Shahriar. Apache License 2.0.",
     "category": "DeveloperTool",
     "shortDescription": "Your browser, driven by the AI agent you already run",
     "createUpdaterArtifacts": true,

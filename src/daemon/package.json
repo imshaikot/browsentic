@@ -4,7 +4,7 @@
   "version": "0.7.15",
   "description": "A browser extension with an AI side panel that hands your real, logged-in browser to the AI agent you already run. Installs the extension, runs the local daemon, and optionally speaks MCP.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "packageManager": "yarn@4.17.1",
   "homepage": "https://browsentic.com",
   "repository": {

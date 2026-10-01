@@ -137,7 +137,7 @@ Bugs and ideas are welcome — start at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Browsentic is MIT licensed.
+Browsentic is licensed under the [Apache License 2.0](LICENSE). Versions up to 0.7.15 were released under the MIT License.
 
 - **Source Available**: Always visible source code
 - **Local First**: No cloud component, no telemetry, no account

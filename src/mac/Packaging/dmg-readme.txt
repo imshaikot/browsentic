@@ -17,4 +17,4 @@ scroll down to the Browsentic line and press Open Anyway. Or run this once:
 
     xattr -dr com.apple.quarantine /Applications/Browsentic.app
 
-Free and open source, MIT. https://browsentic.com
+Free and open source, Apache 2.0. https://browsentic.com

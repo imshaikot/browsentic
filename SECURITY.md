@@ -42,7 +42,7 @@ disk and never cross the socket.
 ## Disclaimer and liability
 
 Browsentic is provided **"as is", without warranty of any kind**, under the terms of the
-[MIT License](LICENSE). In no event shall the authors be liable for any claim, damages, or
+[Apache License 2.0](LICENSE). In no event shall the authors be liable for any claim, damages, or
 other liability arising from the software or its use. In plain language, that means:
 
 - **You are responsible for what you approve and where you point it.** The approval gate names
