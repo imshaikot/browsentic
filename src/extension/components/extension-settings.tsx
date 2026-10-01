@@ -123,7 +123,7 @@ export function SettingsGroup({
   );
 }
 
-function Row({ title, note, children }: { title: string; note?: string; children?: ReactNode }) {
+export function Row({ title, note, children }: { title: string; note?: string; children?: ReactNode }) {
   return (
     <div className={cn('flex gap-6 px-4 py-3.5', note ? 'items-start' : 'items-center')}>
       <div className="min-w-0 flex-1">

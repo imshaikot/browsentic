@@ -127,3 +127,31 @@ import Testing
         #expect(!UpdatePhase.checking.isInstalling)
     }
 }
+
+@Suite struct AboutTests {
+    @Test func opensTheBugFormWithTheVersionsFilledIn() {
+        let url = About.bugReport(environment: "App 0.7.15+build · Daemon off & idle", agent: "Codex 0.42.0")
+        let fields = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(url.absoluteString.hasPrefix("https://github.com/imshaikot/browsentic/issues/new?"))
+        #expect(url.query?.contains("%2Bbuild") == true)
+        #expect(fields.map(\.name) == ["template", "environment", "agent"])
+        #expect(fields.first { $0.name == "template" }?.value == "bug_report.yml")
+    }
+
+    @Test func leavesTheAgentToTheReporterWhenNoneIsKnown() {
+        let fields = URLComponents(url: About.bugReport(environment: "App 0.7.15", agent: nil), resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(!fields.contains { $0.name == "agent" })
+    }
+
+    @Test func namesTheActiveAgentWithTheReleaseItsCLIPrinted() throws {
+        let json = #"{"active":"claude","runners":[{"kind":"claude","bin":"claude","ready":true,"version":"2.1.284 (Claude Code)"}],"catalog":[{"kind":"claude","label":"Claude Code","vendor":"Anthropic","bin":"claude","install":"npm i -g @anthropic-ai/claude-code","docs":"https://example.com","models":[]}]}"#
+        let state = try JSONDecoder().decode(AgentState.self, from: Data(json.utf8))
+        #expect(About.agent(state) == "Claude Code 2.1.284")
+        #expect(About.agent(nil) == nil)
+    }
+
+    @Test func readsTheVersionsAsOneLine() {
+        #expect(About.describe([About.Row(label: "App", value: "0.7.15"), About.Row(label: "Protocol", value: "22")]) == "App 0.7.15 · Protocol 22")
+    }
+}
+

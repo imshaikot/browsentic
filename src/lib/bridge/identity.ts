@@ -30,19 +30,46 @@ async function installId(): Promise<string> {
   return minted;
 }
 
-export function brandFrom(brands: readonly { brand: string }[]): string | undefined {
-  const named = brands.map(({ brand }) => brand).filter((brand) => !PLACEHOLDER_BRAND.test(brand));
-  return named.find((brand) => brand !== 'Chromium') ?? named[0];
+interface Brand {
+  brand: string;
+  version?: string;
 }
+
+function productOf<T extends Brand>(brands: readonly T[]): T | undefined {
+  const named = brands.filter(({ brand }) => !PLACEHOLDER_BRAND.test(brand));
+  return named.find(({ brand }) => brand !== 'Chromium') ?? named[0];
+}
+
+export function brandFrom(brands: readonly Brand[]): string | undefined {
+  return productOf(brands)?.brand;
+}
+
+export function releaseFrom(brands: readonly Brand[]): string | undefined {
+  const product = productOf(brands);
+  return product && [product.brand, product.version].filter(Boolean).join(' ');
+}
+
+const geckoRuntime = () =>
+  browser.runtime as typeof browser.runtime & { getBrowserInfo(): Promise<{ name: string; version: string }> };
+
+const chromiumBrands = (): Brand[] => (navigator as Navigator & { userAgentData?: { brands?: Brand[] } }).userAgentData?.brands ?? [];
 
 async function browserName(): Promise<string | undefined> {
   try {
+    if (import.meta.env.FIREFOX) return (await geckoRuntime().getBrowserInfo()).name;
+    return brandFrom(chromiumBrands());
+  } catch {
+    return undefined;
+  }
+}
+
+export async function browserRelease(): Promise<string | undefined> {
+  try {
     if (import.meta.env.FIREFOX) {
-      const gecko = browser.runtime as typeof browser.runtime & { getBrowserInfo(): Promise<{ name: string }> };
-      return (await gecko.getBrowserInfo()).name;
+      const { name, version } = await geckoRuntime().getBrowserInfo();
+      return `${name} ${version}`;
     }
-    const agent = navigator as Navigator & { userAgentData?: { brands?: { brand: string }[] } };
-    return brandFrom(agent.userAgentData?.brands ?? []);
+    return releaseFrom(chromiumBrands());
   } catch {
     return undefined;
   }

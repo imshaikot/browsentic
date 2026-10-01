@@ -56,7 +56,7 @@ runs its shell commands through.
 
 ## The window
 
-The tabs float at the top; Ctrl+1 to Ctrl+7 switch between them. Ctrl+Shift+D turns the daemon
+The tabs float at the top; Ctrl+1 to Ctrl+8 switch between them. Ctrl+Shift+D turns the daemon
 on or off, Ctrl+Shift+R restarts it, and Ctrl+Shift+P gets a new pairing code.
 
 | Tab | What you do there |
@@ -68,6 +68,7 @@ on or off, Ctrl+Shift+R restarts it, and Ctrl+Shift+P gets a new pairing code.
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `%USERPROFILE%\.browsentic\daemon.log`, followed live |
 | **Settings** | Light, dark or system appearance for this window; whether the daemon starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
+| **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in — nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
 
 The Browsentic icon in the notification area shows the daemon's state and has the same on, off and
 restart, and a left click opens the window.

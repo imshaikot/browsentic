@@ -15,6 +15,7 @@ struct MainView: View {
                     case .activity: ActivityView()
                     case .logs: LogsView()
                     case .settings: SettingsView()
+                    case .about: AboutView()
                     }
                 }
                 .frame(maxWidth: 880)
@@ -33,7 +34,7 @@ struct MainView: View {
     }
 }
 
-/// The view switcher floats at the top centre, ⌘1…⌘7.
+/// The view switcher floats at the top centre, ⌘1…⌘8.
 private struct TabCapsule: View {
     @EnvironmentObject private var model: AppModel
     @Namespace private var highlight

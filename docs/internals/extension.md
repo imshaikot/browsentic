@@ -103,7 +103,7 @@ lists it as **Options** on the toolbar icon's menu, and Firefox as **Preferences
 The panel's header, the popup's header and the connection sheet open it with
 `runtime.openOptionsPage()`, which focuses a settings tab already open rather than adding another.
 
-The page is a sidebar of five sections — **Extension**, **Profile**, **Guardrails**, **Agent**, **Connection** —
+The page is a sidebar of six sections — **Extension**, **Profile**, **Guardrails**, **Agent**, **Connection**, **About** —
 with the open one in the URL hash, so a reload or a link lands on it; an unknown hash,
 such as the old `#appearance`, lands on **Extension**. **Agent** and **Connection** are the same
 `AgentPicker` and `DaemonLink` the popup and the connection sheet show; those keep theirs, so a
@@ -116,6 +116,14 @@ right-click items (`browsentic/contextMenu`), the keyboard shortcuts, and hold t
 page lists them with `commands.getAll()`, re-read whenever it comes back into view, because the
 browser owns the keys and only its own page changes them — `chrome://extensions/shortcuts`
 (`edge://` on Edge), or `commands.openShortcutSettings()` on Firefox.
+
+**About** reads, writes and sends nothing. Its links and the bug report's URL come from
+[src/lib/about.ts](../../src/lib/about.ts), which the Windows app shares; the Mac app keeps the same
+in `About.swift`. The versions are the manifest's, the build target (`import.meta.env.FIREFOX`), the
+daemon's from `DaemonState`, `SOCKET_PROTOCOL_VERSION`, the active agent, the browser's release
+(`userAgentData.brands`, or `runtime.getBrowserInfo()` on Firefox) and `runtime.getPlatformInfo()`.
+**Report a bug** opens the `bug_report.yml` issue form with those in its `environment` and `agent`
+fields; nothing leaves the browser until the reader submits it on GitHub.
 
 **The theme and Guardrails are shared with the Mac app**, and the daemon keeps both in
 `~/.browsentic/config.json`:
