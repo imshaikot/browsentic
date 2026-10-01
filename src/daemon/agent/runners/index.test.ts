@@ -70,6 +70,13 @@ describe('the registry', () => {
       env: { BROWSENTIC_AGENT_RUN: 'run-7' },
     });
   });
+
+  test('an agent that keeps long results from its model has its server told the limit', () => {
+    expect([mcpServerFor('run-7', RUNNERS.cursor.limits).env, mcpServerFor('run-7', RUNNERS.claude.limits).env]).toEqual([
+      { BROWSENTIC_AGENT_RUN: 'run-7', BROWSENTIC_RESULT_BYTES: '40000' },
+      { BROWSENTIC_AGENT_RUN: 'run-7' },
+    ]);
+  });
 });
 
 describe('readiness probes', () => {

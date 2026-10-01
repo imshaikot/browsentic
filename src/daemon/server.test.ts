@@ -46,7 +46,7 @@ function fakeBridge(answers: Record<string, ActionResult> | Answer = {}, status:
   return { bridge, asked, changeManifest: () => listeners.forEach((listener) => listener()) };
 }
 
-async function connect(bridge: Bridge, opts: { agentRun?: boolean } = {}): Promise<Client> {
+async function connect(bridge: Bridge, opts: { agentRun?: boolean; resultBytes?: number } = {}): Promise<Client> {
   const server = createMcpServer(bridge, '0.0.0-test', opts);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' });
@@ -138,6 +138,58 @@ describe('a tool call', () => {
       content: [{ type: 'text', text: 'TARGET_NOT_FOUND: No element matched "Buy".' }],
     });
   });
+});
+
+describe('a result, for an agent CLI that keeps long ones from its model', () => {
+  const LIMIT = 40_000;
+
+  test('over the limit is refused whole, saying the call went through and how to ask for less', async () => {
+    const client = await connect(fakeBridge({ 'page.getPageInfo': success({ links: 'x'.repeat(LIMIT) }) }).bridge, { resultBytes: LIMIT });
+    const result = await call(client, 'page_getPageInfo');
+    const [text] = texts(result);
+    expect([result.isError, text.startsWith('RESULT_TOO_LARGE: The call went through'), text.includes('maxPerKind')]).toEqual([true, true, true]);
+  });
+
+  test('is counted in bytes, so text that fits in characters can still be over', async () => {
+    const client = await connect(fakeBridge({ 'page.getPageInfo': success({ title: 'é'.repeat(LIMIT / 2) }) }).bridge, { resultBytes: LIMIT });
+    expect((await call(client, 'page_getPageInfo')).isError).toBe(true);
+  });
+
+  test('within it comes back as is, and a picture beside it does not count', async () => {
+    const big = `data:image/png;base64,${'A'.repeat(200_000)}`;
+    const client = await connect(fakeBridge({ 'page.screenshot': success({ dataUrl: big, format: 'png', width: 1280, height: 800 }) }).bridge, { resultBytes: LIMIT });
+    const result = await call(client, 'page_screenshot');
+    expect([result.isError, result.content.map((part) => part.type)]).toEqual([undefined, ['image', 'text']]);
+  });
+
+  test('a long read is asked for a group that fits, and a short one as asked', async () => {
+    const { bridge, asked } = fakeBridge({ 'page.extractText': success({ content: 'Pricing' }) });
+    const client = await connect(bridge, { resultBytes: LIMIT });
+    for (const args of [{}, { maxLength: 100_000 }, { maxLength: 500 }]) await call(client, 'page_extractText', args);
+    expect(asked.map(([, input]) => (input as { maxLength?: number }).maxLength)).toEqual([10_000, 10_000, 500]);
+  });
+
+  test('with no limit, nothing is refused or narrowed', async () => {
+    const { bridge, asked } = fakeBridge({ 'page.extractText': success({ content: 'x'.repeat(100_000) }) });
+    const result = await call(await connect(bridge), 'page_extractText', { maxLength: 100_000 });
+    expect([result.isError, asked]).toEqual([undefined, [['page.extractText', { maxLength: 100_000 }]]]);
+  });
+});
+
+test('a call the client stops waiting for tells the bridge so', async () => {
+  let given: AbortSignal | undefined;
+  const { bridge } = fakeBridge();
+  bridge.invoke = (_action, _input, signal) => {
+    given = signal;
+    return new Promise((resolve) => signal?.addEventListener('abort', () => resolve(failure('CANCELLED', 'gone'))));
+  };
+  const client = await connect(bridge);
+  const abandoned = new AbortController();
+  const pending = client.callTool({ name: 'page_clickElement', arguments: {} }, undefined, { signal: abandoned.signal });
+  await expect.poll(() => given).toBeDefined();
+  abandoned.abort();
+  await expect(pending).rejects.toThrow();
+  await expect.poll(() => given?.aborted).toBe(true);
 });
 
 describe('a screenshot', () => {

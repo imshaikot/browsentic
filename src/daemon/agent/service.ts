@@ -10,7 +10,14 @@ import {
   type RunContext,
   type RunEvent,
 } from '@/lib/actions/protocol';
+import { awaitMonitor } from '@/lib/actions/page/await-monitor';
+import { callSiteTool } from '@/lib/actions/page/call-site-tool';
+import { captureDownload } from '@/lib/actions/page/capture-download';
 import { openTab } from '@/lib/actions/page/open-tab';
+import { pickElement } from '@/lib/actions/page/pick-element';
+import { runCode } from '@/lib/actions/page/run-code';
+import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
+import { waitForElement } from '@/lib/actions/page/wait-for-element';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import type { FileReport } from '@/lib/files/report';
@@ -44,6 +51,7 @@ import { handOver, type Handover } from './attachments';
 import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState, RUNNERS } from './runners';
+import type { CallLimits } from './runners/types';
 import {
   discardStaging,
   mapTargetFor,
@@ -94,6 +102,10 @@ interface ActiveRun {
   approved: Set<string>;
   /** A schedule started it: an approval nobody answers is declined rather than awaited forever. */
   scheduled: boolean;
+  /** What the agent's CLI does to a tool call, which every call of this run has to fit inside. */
+  limits?: CallLimits;
+  /** An approval still on the user's screen after its call was handed back, until the agent calls again. */
+  parked?: Waiting;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
@@ -101,10 +113,32 @@ const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
 /** Getting past a captcha takes a call per round; one yes covers every round of that run. */
 const HELD_FOR_RUN = new Set([CAPTCHA_ACTION]);
 
+/** Actions whose `timeoutMs` is how long the call itself waits, not how long something runs after it. */
+const WAITS = [awaitMonitor, pickElement, solveCaptcha, waitForElement, runCode, callSiteTool, captureDownload];
+
+/** How long before a CLI abandons a call it is answered: the result still has to cross two processes. */
+const CALL_MARGIN_MS = 10_000;
+
+/** The least a wait is cut to, which every waiting action accepts. */
+const SHORTEST_WAIT_MS = 5_000;
+
 interface Decision {
   allow: boolean;
   remember?: boolean;
   unanswered?: boolean;
+  /** The call was abandoned, or the agent moved on, before the user answered. */
+  withdrawn?: boolean;
+}
+
+/** A call waiting on the user's approval. */
+interface Waiting {
+  key: string;
+  toolId: string;
+  action: string;
+  input: unknown;
+  /** Why it needs approval, for the log. */
+  why: string;
+  decision: Promise<Decision>;
 }
 
 export class AgentSession {
@@ -174,12 +208,23 @@ export class AgentSession {
     };
   }
 
-  async invokeForRun(runId: string, action: string, input?: unknown): Promise<ActionResult> {
+  /** `signal` aborts when the caller stops waiting for this call, so nothing it asked for outlives it. */
+  async invokeForRun(runId: string, action: string, input?: unknown, signal?: AbortSignal): Promise<ActionResult> {
     const run = this.runs.get(runId);
     if (!run) {
       return failure('RUN_INACTIVE', 'This agent run is no longer active');
     }
+    const startedAt = Date.now();
     const emit = (event: RunEvent) => this.deps.emit(runId, event);
+    const key = callKey(action, input);
+    const parked = run.parked;
+    if (parked?.key === key) {
+      run.parked = undefined;
+      log(`agent run ${runId} is back for ${action}, still waiting on the user`);
+      return this.answered(run, parked, signal, startedAt);
+    }
+    this.withdraw(run);
+
     const toolId = randomUUID();
     emit({ kind: 'tool', toolId, action, input });
 
@@ -221,7 +266,10 @@ export class AgentSession {
         emit({ kind: 'toolResult', toolId, ok: false, summary: summarize(input, gate.result) });
         return gate.result;
       }
-      const result = await this.deps.invoke(action, input, { saveTo: gate.saveTo, tabId: run.map.tabId });
+      const result = await this.deps.invoke(action, this.withinCall(run, action, input, startedAt), {
+        saveTo: gate.saveTo,
+        tabId: run.map.tabId,
+      });
       noteMappingResult(run.map, action, result);
       log(`agent → ${action} ${result.ok ? 'ok' : result.error.code}`);
       emit({ kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
@@ -237,29 +285,98 @@ export class AgentSession {
     }
     if (decision.effect === 'confirm' && !(run.site && isGranted(action, run.site)) && !run.approved.has(action)) {
       emit({ kind: 'approval', toolId, action, input, site: run.site });
-      const answer = await this.awaitDecision(run, toolId);
-      if (answer.unanswered) {
-        log(`agent run ${runId} got no answer on ${action}: ${describeDecision(decision)}`);
-        emit({ kind: 'toolResult', toolId, ok: false, summary: 'nobody answered in time' });
-        return unanswered();
-      }
-      if (!answer.allow) {
-        log(`agent run ${runId} declined ${action}: ${describeDecision(decision)}`);
-        emit({ kind: 'toolResult', toolId, ok: false, summary: 'declined by the user' });
-        return declined();
-      }
-      if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
-      if (HELD_FOR_RUN.has(action)) run.approved.add(action);
+      const waiting = { key, toolId, action, input, why: describeDecision(decision), decision: this.awaitDecision(run, toolId) };
+      return this.answered(run, waiting, signal, startedAt);
     }
+    return this.perform(run, toolId, action, input, startedAt);
+  }
 
-    const result = await this.deps.invoke(action, input, { runId, hosts: scope.hosts });
+  /**
+   * Acts on the user's answer to an approval — or, when the CLI would abandon the call before they
+   * give one, hands the call back with the request left on their screen, for the agent to call again.
+   */
+  private async answered(run: ActiveRun, waiting: Waiting, signal: AbortSignal | undefined, startedAt: number): Promise<ActionResult> {
+    const { toolId, action, why } = waiting;
+    const emit = (event: RunEvent) => this.deps.emit(run.id, event);
+    const answer = await this.answerWithin(run, waiting, signal, startedAt);
+    if (answer === 'parked') {
+      run.parked = waiting;
+      log(`agent run ${run.id} handed ${action} back unanswered, before its CLI stops waiting`);
+      return failure(
+        'APPROVAL_PENDING',
+        'The user has not answered yet, and the request is still on their screen. Make this same call again, with the same input, ' +
+          'to keep waiting for their answer. Any other call withdraws the request.',
+      );
+    }
+    if (answer.withdrawn) {
+      log(`agent run ${run.id} stopped waiting on ${action}: ${why}`);
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'the agent stopped waiting' });
+      return failure('CANCELLED', 'The call was abandoned before the user answered.');
+    }
+    if (answer.unanswered) {
+      log(`agent run ${run.id} got no answer on ${action}: ${why}`);
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'nobody answered in time' });
+      return unanswered();
+    }
+    if (!answer.allow) {
+      log(`agent run ${run.id} declined ${action}: ${why}`);
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'declined by the user' });
+      return declined();
+    }
+    if (answer.remember && run.site) rememberGrant(action, run.site, new Date().toISOString());
+    if (HELD_FOR_RUN.has(action)) run.approved.add(action);
+    return this.perform(run, toolId, action, waiting.input, startedAt);
+  }
+
+  private async perform(run: ActiveRun, toolId: string, action: string, input: unknown, startedAt: number): Promise<ActionResult> {
+    const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
+    const result = await this.deps.invoke(action, this.withinCall(run, action, input, startedAt), { runId: run.id, hosts: scope.hosts });
     if (action === openTab.name && result.ok) {
       const opened = (result.data as { tabId?: unknown } | null)?.tabId;
       if (typeof opened === 'number') run.ownedTabIds.push(opened);
     }
     log(`agent → ${action} ${result.ok ? 'ok' : result.error.code}`);
-    emit({ kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
+    this.deps.emit(run.id, { kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
     return result;
+  }
+
+  /** The user's answer, or `parked` once the call is about to outlast what the CLI will wait for one. */
+  private answerWithin(run: ActiveRun, waiting: Waiting, signal: AbortSignal | undefined, startedAt: number): Promise<Decision | 'parked'> {
+    const callMs = run.limits?.callMs;
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const abandon = () => run.pending.get(waiting.toolId)?.({ allow: false, withdrawn: true });
+      const finish = (answer: Decision | 'parked') => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abandon);
+        resolve(answer);
+      };
+      void waiting.decision.then(finish);
+      if (callMs !== undefined) timer = setTimeout(() => finish('parked'), Math.max(callMs - CALL_MARGIN_MS - (Date.now() - startedAt), 0));
+      if (signal?.aborted) abandon();
+      else signal?.addEventListener('abort', abandon, { once: true });
+    });
+  }
+
+  /** A parked request the agent did not come back for leaves the user's screen, and a late yes does nothing. */
+  private withdraw(run: ActiveRun): void {
+    const parked = run.parked;
+    if (!parked) return;
+    run.parked = undefined;
+    run.pending.get(parked.toolId)?.({ allow: false, withdrawn: true });
+    log(`agent run ${run.id} withdrew its request for ${parked.action}`);
+    this.deps.emit(run.id, { kind: 'toolResult', toolId: parked.toolId, ok: false, summary: 'the agent stopped waiting' });
+  }
+
+  /** The input, with a wait cut short enough that the call ends before the CLI abandons it. */
+  private withinCall(run: ActiveRun, action: string, input: unknown, startedAt: number): unknown {
+    const callMs = run.limits?.callMs;
+    const waits = WAITS.find((candidate) => candidate.name === action);
+    if (callMs === undefined || !waits) return input;
+    const parsed = waits.input.safeParse(input ?? {});
+    if (!parsed.success) return input;
+    const left = Math.max(callMs - CALL_MARGIN_MS - (Date.now() - startedAt), SHORTEST_WAIT_MS);
+    return (parsed.data as { timeoutMs: number }).timeoutMs <= left ? input : { ...(input as object), timeoutMs: left };
   }
 
   dispose(): void {
@@ -348,6 +465,7 @@ export class AgentSession {
       liveTools: context?.liveTools === true,
       approved: new Set(),
       scheduled: context?.task !== undefined,
+      limits: RUNNERS[config.agent].limits,
     };
     this.runs.set(runId, run);
     if (run.liveTools && sessionId) this.codeListed.add(sessionId);
@@ -447,6 +565,7 @@ export class AgentSession {
         signal: run.abort.signal,
         emit,
       });
+      this.withdraw(run);
       if (!mapping) {
         if (sessionId) {
           if (outcome.sessionId) {
@@ -462,6 +581,7 @@ export class AgentSession {
       log(`agent run ${runId} finished (${outcome.stopReason})`);
       emit({ kind: 'done', stopReason: outcome.stopReason });
     } catch (error) {
+      this.withdraw(run);
       const { code, message } = error instanceof RunError ? error : new RunError('AGENT_FAILED', String(error));
       log(`agent run ${runId} failed: ${code}: ${message}`);
       emit({ kind: 'error', code, message });
@@ -572,6 +692,7 @@ export class AgentSession {
       this.deps.emit(runId, { kind: 'done', stopReason: 'cancelled' });
       return;
     }
+    this.withdraw(cancelled);
     for (const [, settle] of cancelled.pending) settle({ allow: false });
     cancelled.pending.clear();
     cancelled.abort.abort();
@@ -593,6 +714,18 @@ export class AgentSession {
       run.abort.signal.addEventListener('abort', () => settle({ allow: false }), { once: true });
     });
   }
+}
+
+/** Two calls are the same call when they name the same action with the same input, in whatever key order. */
+function callKey(action: string, input: unknown): string {
+  return `${action}\u0000${JSON.stringify(sortedKeys(input) ?? null)}`;
+}
+
+function sortedKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortedKeys);
+  if (!value || typeof value !== 'object') return value;
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(Object.keys(record).sort().map((key) => [key, sortedKeys(record[key])]));
 }
 
 function siteOf(url?: string): string | undefined {

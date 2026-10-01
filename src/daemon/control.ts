@@ -38,6 +38,8 @@ export type ControlRequest =
   | { id: string; op: 'describe'; runId?: string }
   | { id: string; op: 'status' }
   | { id: string; op: 'invoke'; action: string; input?: unknown; runId?: string; keepAlive?: boolean }
+  /** The caller stopped waiting for the invoke it sent as `id`: an approval it was waiting on is withdrawn. Never answered. */
+  | { id: string; op: 'cancel' }
   | { id: string; op: 'pair' }
   | { id: string; op: 'sessions' }
   | { id: string; op: 'revoke'; session?: string; origin?: string }
@@ -74,7 +76,8 @@ export interface Described {
 
 export interface Bridge {
   describe(): Promise<Described>;
-  invoke(action: string, input?: unknown): Promise<ActionResult>;
+  /** `signal` aborts when whoever asked stops waiting, which the daemon is then told. */
+  invoke(action: string, input?: unknown, signal?: AbortSignal): Promise<ActionResult>;
   status(): Promise<BridgeStatus>;
   onManifestChanged(listener: () => void): void;
   close(): Promise<void>;

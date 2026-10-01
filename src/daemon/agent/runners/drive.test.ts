@@ -9,6 +9,7 @@ import { logPath, stateDir } from '../../lockfile';
 import { configPath } from '../config';
 import { antigravityRunner } from './antigravity';
 import { codexRunner } from './codex';
+import { cursorRunner } from './cursor';
 import { launch, runJson, runStream } from './drive';
 import { jsonContext, streamContext, stubCli } from './fixtures/support';
 import { RunError, type Plan, type Runner, type StreamReader, type StreamSink } from './types';
@@ -179,6 +180,42 @@ describe('a streamed run', () => {
 
   test('an agent that exits early and silently says only that', async () => {
     expect(await failure(run(standIn('process.exit(3);')))).toEqual({ code: 'AGENT_FAILED', message: 'Antigravity exited with code 3 before finishing' });
+  });
+
+  describe('a set-up step', () => {
+    // Cursor's real plan, whose containment allows one set-up step, run by a stand-in that notes
+    // the step in its folder and says, during the turn, what it found there.
+    const cursorStub = () =>
+      stubCli(
+        join(stateDir, 'cursor-stub'),
+        `import('node:fs').then(({ existsSync, readFileSync, writeFileSync }) => {
+          const args = process.argv.slice(2);
+          if (args[0] === 'mcp') {
+            writeFileSync('approved', args.join(' '));
+            if (process.env.STUB_REFUSES) console.error('no such server');
+            process.exit(process.env.STUB_REFUSES ? 1 : 0);
+          }
+          const approved = existsSync('approved') ? readFileSync('approved', 'utf8') : 'nothing';
+          console.log(JSON.stringify(['text', approved]));
+          console.log(JSON.stringify(['done', 'end_turn']));
+        });`,
+      );
+    const cursorStandIn: Runner = { ...cursorRunner, reader: () => replay };
+
+    test("runs in the run's folder before the turn starts", async () => {
+      const { said } = await run(cursorStandIn, { bin: cursorStub() });
+      expect(said).toBe('mcp enable browsentic');
+    });
+
+    test('that fails stops the turn before it starts, saying which step and what it printed', async () => {
+      vi.stubEnv('STUB_REFUSES', '1');
+      const { code, message } = (await failure(run(cursorStandIn, { bin: cursorStub() }))) as RunError;
+      expect([code, message.includes('"mcp enable browsentic" exited with code 1'), message.includes('no such server')]).toEqual([
+        'AGENT_FAILED',
+        true,
+        true,
+      ]);
+    });
   });
 
   test('a cancelled run ends as cancelled, not as a failure', async () => {

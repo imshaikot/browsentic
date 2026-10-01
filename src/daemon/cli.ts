@@ -164,7 +164,10 @@ switch (command) {
 async function serve(): Promise<void> {
   const lock = await ensureDaemon();
   const bridge = await RemoteBridge.connect(lock.port, lock.token, process.env.BROWSENTIC_AGENT_RUN);
-  const server = createMcpServer(bridge, pkg.version, { agentRun: !!process.env.BROWSENTIC_AGENT_RUN });
+  const server = createMcpServer(bridge, pkg.version, {
+    agentRun: !!process.env.BROWSENTIC_AGENT_RUN,
+    resultBytes: Number(process.env.BROWSENTIC_RESULT_BYTES) || undefined,
+  });
   await server.connect(new StdioServerTransport());
   log(`stdio MCP server attached to daemon on port ${lock.port}`);
 

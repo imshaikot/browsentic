@@ -80,7 +80,8 @@ describe('a streamed run', () => {
             "Shell(*)",
             "Write(**)",
             "Read(**)",
-            "WebFetch(*)"
+            "WebFetch(*)",
+            "Mcp(plugin-*:*)"
           ]
         }
       }
@@ -99,9 +100,22 @@ describe('a streamed run', () => {
           },
           {
             "content": "You are Browsentic.
+
+      # Reaching the browser from Cursor
+
+      Your browser tools are on the \`browsentic\` MCP server, and Cursor shows you a tool's schema only when you look it up with \`GetMcpTools\`. Start by calling it with \`server: "browsentic"\` and \`pattern: "^(page_|browsentic_)"\` to see them all, then fetch the schema of every tool this job needs in one step, in parallel, before the first call. The page the user means is the one open in their browser: read it with these tools, never from memory or from the shell.
+
+      A tool result longer than 40,000 bytes is refused, so ask for a page a piece at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back. A call that answers \`APPROVAL_PENDING\` is waiting on the user: make the same call again, with the same input, to keep waiting.
       ",
             "path": "AGENTS.md",
           },
+        ],
+        "prepare": [
+          [
+            "mcp",
+            "enable",
+            "browsentic",
+          ],
         ],
       }
     `);
@@ -125,10 +139,17 @@ describe('a streamed run', () => {
     expect(stream({ conversation: '../../../etc' }).cwd).toBe(join(cursorRunner.workspace('run'), '_________etc'));
   });
 
-  test('a run denies the shell, writing and reading, and allows only its own MCP server', () => {
+  test("a run denies the shell, writing, reading and every plugin's MCP server, and allows only its own", () => {
     expect(JSON.parse(fileIn(stream(), '.cursor/cli.json'))).toEqual({
-      permissions: { allow: ['Mcp(browsentic:*)'], deny: ['Shell(*)', 'Write(**)', 'Read(**)', 'WebFetch(*)'] },
+      permissions: { allow: ['Mcp(browsentic:*)'], deny: ['Shell(*)', 'Write(**)', 'Read(**)', 'WebFetch(*)', 'Mcp(plugin-*:*)'] },
     });
+  });
+
+  test('every turn approves its own MCP server, and only that one, before it starts', () => {
+    expect([stream().prepare, stream({ sessionId: SESSION }).prepare]).toEqual([
+      [['mcp', 'enable', 'browsentic']],
+      [['mcp', 'enable', 'browsentic']],
+    ]);
   });
 
   test('research is the only thing that lets a page be fetched from outside the browser', () => {
@@ -144,13 +165,23 @@ describe('a streamed run', () => {
       'Write(**)',
       'Read(**)',
       'WebFetch(*)',
+      'Mcp(plugin-*:*)',
       'Mcp(linear:*)',
       'Mcp(sentry:*)',
     ]);
   });
 
-  test('the system prompt is the whole of AGENTS.md', () => {
-    expect(fileIn(stream(), 'AGENTS.md')).toBe('You are Browsentic.\n');
+  test('AGENTS.md is the system prompt, then how to look the browser tools up', () => {
+    const prompt = fileIn(stream(), 'AGENTS.md');
+    expect([prompt.startsWith('You are Browsentic.\n\n# Reaching the browser from Cursor\n'), prompt.includes('GetMcpTools')]).toEqual([true, true]);
+  });
+
+  test('a session keeps the prompt it began with, so a follow-up carries what changed', () => {
+    expect(cursorRunner.keepsFirstPrompt).toBe(true);
+  });
+
+  test('a call is abandoned at 60 s, and text past 40,000 bytes never reaches the model', () => {
+    expect(cursorRunner.limits).toEqual({ callMs: 60_000, resultBytes: 40_000 });
   });
 
   test('the sandbox profile is read-only with no network of its own', () => {
@@ -231,17 +262,24 @@ describe('a one-shot task', () => {
   test('runs and tasks never share a directory', () => {
     expect(cursorRunner.workspace('run')).not.toBe(cursorRunner.workspace('task'));
   });
+
+  test('a task approves no MCP server, having none', () => {
+    expect(task().prepare).toBeUndefined();
+  });
+
+  test('a task can open a text file, a PDF or a picture', () => {
+    expect(cursorRunner.opens).toEqual(['text', 'pdf', 'image']);
+  });
 });
 
 describe('reading the stream', () => {
-  test('a recorded turn reports its session, its text, what it spent, and that it is done', () => {
+  test('a recorded turn reports its session, its text and that it is done — not its usage, which adds up every request', () => {
     expect(read('2026.09.18-turn.jsonl')).toEqual([
       ['session', RECORDED],
       ['text', 'hello'],
       ['text', ' from'],
       ['text', ' cursor'],
       ['session', RECORDED],
-      ['usage', { contextTokens: 18682, outputTokens: 51 }],
       ['done', 'end_turn'],
     ]);
   });
@@ -277,22 +315,59 @@ describe('reading the stream', () => {
     expect(calls).toEqual([['tool', 'call-9', 'read']]);
   });
 
-  test('a browser call is left to the daemon, which already puts it on the timeline', () => {
-    const calls = readThrough(cursorRunner, [
-      JSON.stringify({
-        type: 'tool_call',
-        subtype: 'started',
-        call_id: 'call-10',
-        tool_call: { mcpToolCall: { args: { server: 'browsentic', name: 'page_getPageInfo' } } },
-      }),
-      JSON.stringify({
-        type: 'tool_call',
-        subtype: 'started',
-        call_id: 'call-11',
-        tool_call: { mcpToolCall: { args: { server: 'linear', name: 'create_issue' } } },
-      }),
+  test('browser calls and their schema lookups are left off the timeline; Cursor’s own tools open and close a row', () => {
+    const rows = read('2026.09.18-mcp-calls.jsonl').filter(([signal]) => signal === 'tool' || signal === 'toolResult');
+    expect(rows.map(([signal, , detail]) => `${signal} ${String(detail)}`)).toEqual([
+      'tool read',
+      'toolResult false',
+      'tool shell',
+      'toolResult false',
+      'tool shell',
+      'toolResult false',
+      'tool grep',
+      'toolResult true',
+      'tool shell',
+      'toolResult false',
     ]);
-    expect(calls).toEqual([['tool', 'call-11', 'linear:create_issue']]);
+  });
+
+  test('a recorded turn that called the browser says what the model answered', () => {
+    const said = read('2026.09.18-mcp-calls.jsonl', 'text').map(([, text]) => text).join('');
+    expect([said.includes('t52 answered: number 52.'), said.includes('orange')]).toEqual([true, true]);
+  });
+
+  test('a resumed turn reports the same session, and the shell call the run refused', () => {
+    const calls = read('2026.09.18-resumed.jsonl');
+    expect([
+      new Set(calls.filter(([signal]) => signal === 'session').map(([, id]) => id)).size,
+      calls.filter(([signal]) => signal === 'tool' || signal === 'toolResult').map(([signal, , detail]) => `${signal} ${String(detail)}`),
+      calls.at(-1),
+    ]).toEqual([1, ['tool shell', 'toolResult false'], ['done', 'end_turn']]);
+  });
+
+  test('a browser call Cursor gave up on at 60 s puts nothing on the timeline itself', () => {
+    const calls = read('2026.09.18-mcp-timeout.jsonl');
+    expect([calls.some(([signal]) => signal === 'tool'), calls.at(-1)]).toEqual([false, ['done', 'end_turn']]);
+  });
+
+  test('another MCP server answering a call stops the run, since the run denies every server but its own', () => {
+    const call = (subtype: string, result?: unknown) =>
+      JSON.stringify({
+        type: 'tool_call',
+        subtype,
+        call_id: 'call-12',
+        tool_call: { mcpToolCall: { args: { providerIdentifier: 'plugin-acme-tools', toolName: 'wipe' }, result } },
+      });
+    expect([
+      readThrough(cursorRunner, [call('started'), call('completed', { error: { error: 'denied' } })]),
+      readThrough(cursorRunner, [call('started'), call('completed', { success: { content: [] } })]).at(-1)?.slice(0, 2),
+    ]).toEqual([
+      [
+        ['tool', 'call-12', 'plugin-acme-tools:wipe'],
+        ['toolResult', 'call-12', false],
+      ],
+      ['fail', 'AGENT_UNSAFE'],
+    ]);
   });
 
   test('a failure arrives as is_error on the closing result', () => {

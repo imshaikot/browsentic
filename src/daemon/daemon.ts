@@ -716,6 +716,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     // A connection that has spoken for an agent run is that run's own tool server, and a run
     // never gets to loosen the guardrails it is running under.
     let speaksForRun = false;
+    // Invokes still going on this connection, so a caller that stops waiting can say so.
+    const inflight = new Map<string, AbortController>();
     controls.add(ws);
     scheduleIdleExit();
     ws.on('message', async (raw) => {
@@ -732,15 +734,21 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       if (request.op === 'status') {
         return send(ws, { id: request.id, op: 'status', status: statusNow(routeFor(binding)) });
       }
+      if (request.op === 'cancel') {
+        inflight.get(request.id)?.abort();
+        return;
+      }
       if (request.op === 'invoke') {
         const working = request.keepAlive
           ? setInterval(() => send(ws, { id: request.id, op: 'working' }), INVOKE_KEEPALIVE_MS)
           : undefined;
+        const abandoned = new AbortController();
+        inflight.set(request.id, abandoned);
         let result: ActionResult;
         try {
           if (request.runId) {
             result =
-              (await sessionRunning(request.runId)?.invokeForRun(request.runId, request.action, request.input)) ??
+              (await sessionRunning(request.runId)?.invokeForRun(request.runId, request.action, request.input, abandoned.signal)) ??
               failure('RUN_INACTIVE', 'This agent run is no longer active');
             if (!result.ok && result.error.code === 'RUN_INACTIVE') {
               log(`control ${client} invoked ${request.action} for inactive run ${request.runId}`);
@@ -750,6 +758,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
           }
         } finally {
           clearInterval(working);
+          inflight.delete(request.id);
         }
         return send(ws, { id: request.id, op: 'invoke', result });
       }
@@ -807,6 +816,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       }
     });
     const drop = () => {
+      // A tool server gone mid-call has no one left to answer: its approvals come off the screen.
+      for (const call of inflight.values()) call.abort();
       controls.delete(ws);
       settingsWatchers.delete(ws);
       scheduleIdleExit();
