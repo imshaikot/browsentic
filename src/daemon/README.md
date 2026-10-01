@@ -79,4 +79,4 @@ Full documentation lives at **[browsentic.com/docs](https://browsentic.com/docs/
 [tool reference](https://browsentic.com/docs/reference/tools/) and the
 [architecture](https://browsentic.com/docs/internals/).
 
-Source: [github.com/imshaikot/browsentic](https://github.com/imshaikot/browsentic) · MIT
+Source: [github.com/imshaikot/browsentic](https://github.com/imshaikot/browsentic) · Apache 2.0

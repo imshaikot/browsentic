@@ -2,7 +2,7 @@
   "name": "browsentic",
   "version": "0.7.15",
   "description": "Browsentic — agentic browsing driven by the AI agent you already run",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "packageManager": "yarn@4.17.1",

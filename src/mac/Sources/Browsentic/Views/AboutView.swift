@@ -28,7 +28,7 @@ struct AboutView: View {
             Card {
                 HStack(spacing: 16) {
                     BrandMark().frame(width: 48, height: 48)
-                    SectionTitle(title: "Browsentic", subtitle: "\(model.appVersion) · your browser’s superpower · free and open source, MIT.")
+                    SectionTitle(title: "Browsentic", subtitle: "\(model.appVersion) · your browser’s superpower · free and open source, Apache 2.0.")
                     Spacer(minLength: 0)
                     LinkButton(title: "browsentic.com", url: About.Link.site)
                     LinkButton(title: "Source", url: About.Link.repository)

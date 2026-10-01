@@ -97,5 +97,5 @@ Be the person you would want reviewing your first PR. The specifics are in the
 
 ## License
 
-Browsentic is [MIT licensed](LICENSE). Contributions are accepted under the same terms:
+Browsentic is licensed under the [Apache License 2.0](LICENSE). Contributions are accepted under the same terms:
 inbound = outbound, no CLA.
