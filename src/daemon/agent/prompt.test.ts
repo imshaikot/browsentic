@@ -54,6 +54,11 @@ describe('the order of the sections', () => {
   });
 });
 
+test('a blocked site is a stop, not a detour', () => {
+  const { prompt } = buildSystemPrompt(base, []);
+  expect(prompt).toMatch(/SITE_BLOCKED means the user has put that site off-limits, so do not retry it or reach it another way/);
+});
+
 describe('what is left out', () => {
   test('extras that are empty or only whitespace add no section', () => {
     const { prompt } = buildSystemPrompt(base, [], { focus: '  ', fetched: '', attachments: '\n', recordings: ' ' });
