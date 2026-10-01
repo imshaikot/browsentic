@@ -74,15 +74,10 @@ struct SettingsView: View {
             }
 
             Card {
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionTitle(title: "About", subtitle: "Browsentic \(model.appVersion) · free and open source, MIT.")
-                    HStack(spacing: 8) {
-                        Button("browsentic.com") { NSWorkspace.shared.open(URL(string: "https://browsentic.com")!) }.buttonStyle(QuietButtonStyle())
-                        Button("Source") { NSWorkspace.shared.open(URL(string: "https://github.com/imshaikot/browsentic")!) }.buttonStyle(QuietButtonStyle())
-                        Button("Run the checks again") { model.phase = .preflight; Task { await model.runPreflight() } }.buttonStyle(QuietButtonStyle())
-                        Spacer()
-                        Button("Uninstall…") { confirmingUninstall = true }.buttonStyle(QuietButtonStyle(tint: Palette.danger))
-                    }
+                HStack(spacing: 16) {
+                    SectionTitle(title: "Uninstall", subtitle: "Stops the daemon, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs.")
+                    Spacer(minLength: 0)
+                    Button("Uninstall…") { confirmingUninstall = true }.buttonStyle(QuietButtonStyle(tint: Palette.danger))
                 }
             }
         }

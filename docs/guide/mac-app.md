@@ -59,7 +59,7 @@ itself; on later launches that takes about two seconds.
 
 ## The window
 
-The tabs float at the top; ⌘1–⌘7 switch between them.
+The tabs float at the top; ⌘1–⌘8 switch between them.
 
 ![The daemon running, the extension connected and in sync, a newer build waiting for a reload, and the update check.](../assets/mac-app/overview.webp "Overview")
 ![A one-time pairing code a click away, and Google Chrome paired, connected and ready to unpair.](../assets/mac-app/browsers.webp "Browsers")
@@ -77,6 +77,7 @@ The tabs float at the top; ⌘1–⌘7 switch between them.
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `~/.browsentic/daemon.log`, followed live |
 | **Settings** | Light, dark or system appearance for this window; whether the daemon starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
+| **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in — nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
 
 There is also a menu bar item with the daemon’s state and the same on, off and restart.
 
