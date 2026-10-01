@@ -8,6 +8,7 @@ import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { Wordmark } from '@/extension/components/brand';
+import { BLOCKED_HERE, BlockedSiteNote } from '@/extension/components/blocked-site-note';
 import { Composer, type AttachedSkill } from '@/extension/components/composer';
 import { ConnectionSheet } from '@/extension/components/connection-sheet';
 import { DetachVeil } from '@/extension/components/detach-veil';
@@ -33,6 +34,7 @@ import { putBytes } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
+import { useBlockedPattern } from '@/lib/bridge/use-extension-settings';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
@@ -69,6 +71,7 @@ export default function App() {
   const [scheduling, setScheduling] = useState(false);
   const takeSeed = useCallback(() => setTaskSeed(null), []);
   const tabUrl = useActiveTabUrl();
+  const blockedHere = useBlockedPattern(tabUrl);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
@@ -222,6 +225,10 @@ export default function App() {
 
   async function pointAtElement() {
     if (picking) return;
+    if (blockedHere) {
+      setAttachError(BLOCKED_HERE);
+      return;
+    }
     setAttachError(null);
     setPicking(true);
     const outcome = await pickFocus();
@@ -231,6 +238,10 @@ export default function App() {
   }
 
   async function attachPageContext() {
+    if (blockedHere) {
+      setAttachError(BLOCKED_HERE);
+      return;
+    }
     const result = await invokeInActiveTab(getPageInfo, {});
     if (!result.ok) {
       voice.setInput(`${voice.input}\n[couldn’t read this page: ${result.error.message}]\n`);
@@ -453,6 +464,7 @@ export default function App() {
 
       {tab === 'chat' && (
         <footer className="shrink-0 border-t border-line p-3">
+          {blockedHere && <BlockedSiteNote pattern={blockedHere} />}
           {run.toolOffer && (
             <KeepToolPrompt
               offer={run.toolOffer}

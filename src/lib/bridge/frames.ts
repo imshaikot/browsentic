@@ -3,6 +3,7 @@ import { injectContentScript, invokeInTab } from '@/lib/actions/client';
 import { switchFrame } from '@/lib/actions/page/switch-frame';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { describeFrame, framePath, setFramePath, TOP_FRAME, type FrameStep } from './frame-focus';
+import { refusalFor } from './site-guard';
 
 interface EnteredFrame {
   frameId: number;
@@ -38,6 +39,9 @@ export async function switchFrameInTab(tabId: number, topUrl: string | undefined
       }. page.screenshot still shows it and page.trustedClick with a "point" still reaches it.`,
     );
   }
+
+  const refused = await refusalFor(reached.url);
+  if (refused) return refused;
 
   const next = [...path, { frameId: entered.frameId, url: reached.url, selector: entered.selector }];
   await setFramePath(tabId, next);
