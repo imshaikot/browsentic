@@ -129,7 +129,7 @@ The extension dials out to the daemon, because a Manifest V3 service worker cann
 
 ## Privacy and Security
 
-Nothing connects until you pair, both ends prove themselves, consequential actions ask first, and credentials on a page are sealed before the agent sees them. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
+Nothing connects until you pair, both ends prove themselves, consequential actions ask first, credentials on a page are sealed before the agent sees them, and the sites you [block](docs/guide/features/blocked-sites.md) are off-limits to every agent — enforced in the browser, where none of them can reach the list. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
 
 ## Contributing
 
