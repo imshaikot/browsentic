@@ -141,6 +141,7 @@ Full descriptions in [reference/cli.md](../reference/cli.md).
 
 ## Still stuck
 
+- **Report a bug** on the About page — the extension's settings page, or the About tab of the Mac or Windows app — opens GitHub's issue form with your versions already filled in
 - [Limits](limits.md) — it may be a boundary rather than a bug
 - [reference/errors.md](../reference/errors.md) — every code, with what it implies about the next move
 - [internals/](../internals/) — how the piece that is failing actually works

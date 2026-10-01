@@ -1,7 +1,8 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { Link2, Puzzle, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
+import { Info, Link2, Puzzle, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
+import { About } from '@/extension/components/about';
 import { AgentPicker } from '@/extension/components/agent-picker';
 import { Wordmark } from '@/extension/components/brand';
 import { DaemonLink } from '@/extension/components/daemon-link';
@@ -14,7 +15,7 @@ import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useTheme } from '@/lib/bridge/use-theme';
 import { cn } from '@/lib/utils';
 
-type SectionId = 'extension' | 'profile' | 'guardrails' | 'agent' | 'connection';
+type SectionId = 'extension' | 'profile' | 'guardrails' | 'agent' | 'connection' | 'about';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string; View: ComponentType }[] = [
   {
@@ -51,6 +52,13 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string;
     icon: Link2,
     blurb: 'The link between this browser and the Browsentic daemon on this computer.',
     View: Connection,
+  },
+  {
+    id: 'about',
+    label: 'About',
+    icon: Info,
+    blurb: 'Who makes Browsentic, where to get help, and exactly what this browser is running.',
+    View: About,
   },
 ];
 
@@ -113,9 +121,9 @@ export default function App() {
 
           <footer className="mt-auto hidden space-y-2 md:block">
             <StatusPill tone={status.tone}>{status.label}</StatusPill>
-            <p className="font-mono text-[10px] tracking-[0.1em] text-ink-faint">
+            <a href="#about" className="block font-mono text-[10px] tracking-[0.1em] text-ink-faint hover:text-ink-dim">
               v{browser.runtime.getManifest().version}
-            </p>
+            </a>
           </footer>
         </div>
       </aside>

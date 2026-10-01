@@ -26,8 +26,8 @@ import type {
 
 export type Phase = 'preflight' | 'main';
 export type DaemonPhase = 'off' | 'starting' | 'on' | 'stopping';
-export type Tab = 'overview' | 'browsers' | 'agents' | 'skills' | 'activity' | 'logs' | 'settings';
-export const TABS: Tab[] = ['overview', 'browsers', 'agents', 'skills', 'activity', 'logs', 'settings'];
+export type Tab = 'overview' | 'browsers' | 'agents' | 'skills' | 'activity' | 'logs' | 'settings' | 'about';
+export const TABS: Tab[] = ['overview', 'browsers', 'agents', 'skills', 'activity', 'logs', 'settings', 'about'];
 
 export type CheckId = 'system' | 'node' | 'command' | 'extensionFiles' | 'browser' | 'agent';
 export const CHECKS: CheckId[] = ['system', 'node', 'command', 'extensionFiles', 'browser', 'agent'];

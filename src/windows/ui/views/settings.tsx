@@ -88,17 +88,16 @@ export function SettingsView({ model, state }: { model: Model; state: State }) {
       </Card>
 
       <Card>
-        <div className="space-y-3">
-          <SectionTitle title="About" subtitle={`Browsentic ${info?.version ?? ''} · free and open source, MIT.`} />
-          <div className="flex flex-wrap items-center gap-2">
-            <QuietButton onClick={() => void model.openUrl('https://browsentic.com')}>browsentic.com</QuietButton>
-            <QuietButton onClick={() => void model.openUrl('https://github.com/imshaikot/browsentic')}>Source</QuietButton>
-            <QuietButton onClick={() => model.showPreflight()}>Run the checks again</QuietButton>
-            <div className="flex-1" />
-            <QuietButton tint="danger" onClick={() => setConfirming(true)}>
-              Uninstall…
-            </QuietButton>
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <SectionTitle
+              title="Uninstall"
+              subtitle="Stops the daemon, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs."
+            />
           </div>
+          <QuietButton tint="danger" onClick={() => setConfirming(true)}>
+            Uninstall…
+          </QuietButton>
         </div>
       </Card>
 

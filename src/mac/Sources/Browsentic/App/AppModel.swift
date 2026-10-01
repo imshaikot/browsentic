@@ -17,7 +17,7 @@ enum DaemonPhase: Equatable {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case overview, browsers, agents, skills, activity, logs, settings
+    case overview, browsers, agents, skills, activity, logs, settings, about
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
@@ -30,6 +30,7 @@ enum Tab: String, CaseIterable, Identifiable {
         case .activity: "checkmark.shield"
         case .logs: "text.alignleft"
         case .settings: "gearshape"
+        case .about: "info.circle"
         }
     }
 }
@@ -115,9 +116,7 @@ final class AppModel: ObservableObject {
     private func evaluate(_ id: CheckID) async -> CheckState {
         switch id {
         case .system:
-            let os = ProcessInfo.processInfo.operatingSystemVersion
-            let chip = NodeRuntime.architecture == "arm64" ? "Apple silicon" : "Intel"
-            return .passed("macOS \(os.majorVersion).\(os.minorVersion) · \(chip)")
+            return .passed(About.system)
         case .node:
             node = await NodeRuntime.locate()
             guard let node else { return .missing("Version \(NodeRuntime.minimumMajor) or newer runs the daemon. A private copy goes in \(Paths.tilde(Paths.runtime)).") }

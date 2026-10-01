@@ -1,7 +1,8 @@
-import { AlignLeft, BookOpen, Globe, Power, Settings, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { AlignLeft, BookOpen, Globe, Info, Power, Settings, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { TABS, type Model, type State, type Tab } from '../model';
+import { AboutView } from './about';
 import { ActivityView } from './activity';
 import { AgentsView } from './agents';
 import { BrowsersView } from './browsers';
@@ -18,6 +19,7 @@ const TAB: Record<Tab, { label: string; icon: LucideIcon; view: typeof OverviewV
   activity: { label: 'Activity', icon: ShieldCheck, view: ActivityView },
   logs: { label: 'Logs', icon: AlignLeft, view: LogsView },
   settings: { label: 'Settings', icon: Settings, view: SettingsView },
+  about: { label: 'About', icon: Info, view: AboutView },
 };
 
 export function MainView({ model, state }: { model: Model; state: State }) {
@@ -34,7 +36,7 @@ export function MainView({ model, state }: { model: Model; state: State }) {
   );
 }
 
-/** The view switcher floats at the top centre, Ctrl+1…Ctrl+7. */
+/** The view switcher floats at the top centre, Ctrl+1…Ctrl+8. */
 function TabCapsule({ model, state }: { model: Model; state: State }) {
   return (
     <nav className="absolute top-1.5 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full border border-line bg-surface/80 p-1 shadow-[0_6px_18px_rgb(0_0_0/0.25)] backdrop-blur-md">
