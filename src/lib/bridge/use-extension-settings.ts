@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
+import { BLOCKED_SITES_KEY, blockedBy, compileBlockedSites } from '@/lib/settings/blocked-sites';
 import { shortcutsOf, shortcutsPageFor, type Shortcut } from '@/lib/settings/shortcuts';
 import { CONTEXT_MENU_KEY, asContextMenuChoice, type ContextMenuChoice } from './context-menu';
 import { brandFrom } from './identity';
@@ -40,6 +41,21 @@ export const useContextMenuChoice = (): [ContextMenuChoice, (next: ContextMenuCh
   useLocalSetting(CONTEXT_MENU_KEY, asContextMenuChoice);
 
 export const usePushToTalk = (): [boolean, (on: boolean) => void] => useLocalSetting(PUSH_TO_TALK_KEY, isOn);
+
+const asPatterns = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+
+/** The one writer of the blocked-sites list. Nothing on the daemon's side of the socket can reach this key. */
+export const useBlockedSites = (): [string[], (next: string[]) => void] => useLocalSetting(BLOCKED_SITES_KEY, asPatterns);
+
+export function useBlockedPattern(url: string | undefined): string | null {
+  const [patterns] = useBlockedSites();
+  return useMemo(() => blockedBy(url, compileBlockedSites(patterns) ?? []), [url, patterns]);
+}
+
+export function openBlockedSites(): void {
+  void browser.tabs.create({ url: `${browser.runtime.getURL('/options.html')}#blocked` });
+}
 
 export function useShortcuts(): Shortcut[] | undefined {
   const [shortcuts, setShortcuts] = useState<Shortcut[]>();

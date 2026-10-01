@@ -78,6 +78,9 @@ Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-ta
 (`browsentic/speechService`) are kept in `storage.local`, along with which right-click items this
 browser shows (`browsentic/contextMenu`, both on when absent).
 
+**Blocked sites** are `browsentic/blockedSites` in `storage.local` — a list of patterns, up to 500, that
+the daemon never receives. Removing the extension removes it; each browser keeps its own.
+
 **The theme** is config.json's `theme`, mirrored into `storage.local` under `browsentic/theme` so a
 page paints before any socket is up. `browsentic/theme.unsynced` marks a pick the daemon has not heard
 yet, handed over at the next connect. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and

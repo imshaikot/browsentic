@@ -1,6 +1,8 @@
 import { browser, type Browser } from 'wxt/browser';
+import { blockedBy, patternsFor } from '@/lib/settings/blocked-sites';
 import { MAX_SLUG, ROOT_SEGMENT } from '@/lib/skills/saved-tool';
 import { listSavedTools, onSavedToolsChange, type SavedTool } from './saved-tools';
+import { onBlockedSitesChange, readBlockedSites } from './site-guard';
 
 const SCRIPT_PREFIX = 'browsentic-tool-';
 
@@ -33,6 +35,7 @@ export function openUserScriptSettings(): void {
 export function serveAutoRuns(): void {
   if (import.meta.env.FIREFOX) return;
   onSavedToolsChange(() => void syncAutoRuns());
+  onBlockedSitesChange(() => void syncAutoRuns());
   browser.alarms.create(SYNC_ALARM, { periodInMinutes: 1 });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === SYNC_ALARM) void syncAutoRuns();
@@ -49,8 +52,15 @@ export function syncAutoRuns(): Promise<void> {
 
 async function reconcile(): Promise<void> {
   if (import.meta.env.FIREFOX || !autoRunReady()) return;
+  const blocked = await readBlockedSites();
+  const runnable = blocked
+    ? (await listSavedTools()).filter((tool) => tool.autoRun && !blockedBy(`${tool.origin}/`, blocked))
+    : [];
   const wanted = new Map(
-    (await listSavedTools()).filter((tool) => tool.autoRun).map((tool) => [scriptIdOf(tool), scriptFor(tool)]),
+    runnable.map((tool) => [
+      scriptIdOf(tool),
+      scriptFor(tool, patternsFor(tool.origin, blocked ?? []).map(({ source }) => source)),
+    ]),
   );
   const ours = (await browser.userScripts.getScripts()).filter((script) => script.id.startsWith(SCRIPT_PREFIX));
   const current = new Set(ours.filter((script) => sameScript(script, wanted.get(script.id))).map((script) => script.id));
@@ -66,11 +76,11 @@ function scriptIdOf(tool: SavedTool): string {
   return `${SCRIPT_PREFIX}${tool.id}`;
 }
 
-function scriptFor(tool: SavedTool): UserScript {
+function scriptFor(tool: SavedTool, blocked: readonly string[]): UserScript {
   return {
     id: scriptIdOf(tool),
     matches: [hostPattern(tool.origin)],
-    js: [{ code: autoRunSource(tool) }],
+    js: [{ code: autoRunSource(tool, blocked) }],
     runAt: 'document_idle',
     world: 'MAIN',
   };
@@ -91,17 +101,33 @@ function sameScript(registered: UserScript, wanted: UserScript | undefined): boo
   );
 }
 
-export function autoRunSource(tool: AutoRunTool): string {
+/**
+ * A tool whose whole site is blocked is never registered. A path-level block can only be
+ * honoured by the page itself, so the patterns for this origin travel with the script —
+ * best-effort, since page code shares the world it runs in.
+ */
+export function autoRunSource(tool: AutoRunTool, blocked: readonly string[] = []): string {
   return `(() => {
   const origin = ${JSON.stringify(tool.origin)};
   const segment = ${JSON.stringify(tool.scope.segment)};
   const entry = ${JSON.stringify(tool.fn)};
   const label = ${JSON.stringify(tool.name)};
+  const blocked = ${JSON.stringify(blocked)}.map((source) => new RegExp(source, 'i'));
 
   const slug = (text) =>
     text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, ${MAX_SLUG}).replace(/-+$/, '');
+  const spelled = (escape, hex) => {
+    const char = String.fromCharCode(parseInt(hex, 16));
+    return /[a-z0-9._~-]/i.test(char) ? char : escape;
+  };
+  const here = () =>
+    location.hostname.replace(/\\.+$/, '') +
+    (location.port ? ':' + location.port : '') +
+    location.pathname.replace(/%([0-9a-f]{2})/gi, spelled).replace(/\\/{2,}/g, '/') +
+    location.search;
   const inScope = () => {
     if (location.origin !== origin) return false;
+    if (blocked.some((rule) => rule.test(here()))) return false;
     const [first = ''] = location.pathname.split('/').filter(Boolean);
     return (slug(first) || ${JSON.stringify(ROOT_SEGMENT)}) === segment;
   };

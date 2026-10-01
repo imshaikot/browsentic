@@ -42,7 +42,8 @@ import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
 import { installToolkit, runToolkit } from '@/lib/bridge/code-toolkit';
 import { callSiteToolInTab, listSiteToolsInTab, pageInfoWithSiteTools } from '@/lib/bridge/site-tools';
 import { captureFromPage } from '@/lib/bridge/downloads';
-import { focusedUrl, forgetFrameFocus, TOP_FRAME } from '@/lib/bridge/frame-focus';
+import { focusedUrl, forgetFrameFocus, framePath, TOP_FRAME } from '@/lib/bridge/frame-focus';
+import { blockedRefusal, refusalFor, refusalForTab, siteCheck, tabUrls } from '@/lib/bridge/site-guard';
 import { switchFrameInTab } from '@/lib/bridge/frames';
 import { listMeta, readBytes } from '@/lib/bridge/file-store';
 import {
@@ -53,7 +54,7 @@ import {
 } from '@/lib/bridge/diagnostics';
 import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } from '@/lib/bridge/monitor';
 import { startJobTimer, stopJobTimer, timerStatusFor } from '@/lib/bridge/timer';
-import { listRecordings as listStoredMeta, readRecordingBody } from '@/lib/bridge/recording-store';
+import { listRecordings as listStoredMeta, readRecordingBody, recordedOnBlockedSite } from '@/lib/bridge/recording-store';
 import { pickInTab } from '@/lib/bridge/pick';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
@@ -74,14 +75,115 @@ export async function invokeForHarness(
   tabId?: number,
   runId?: string,
 ): Promise<ActionResult> {
+  const refused = await guardTarget(action, input, tabId, runId);
+  if (refused) return refused;
+
   const release = await releaseForAction(action, input);
   if (release.refused.length) return failure('SECRET_NOT_RELEASABLE', REFUSED_MESSAGE);
   if (release.unresolved.length) return failure('SECRET_EXPIRED', EXPIRED_MESSAGE);
 
   const result = await dispatch(action, release.input, tabId, runId);
+  const landed = await guardLanding(action, result, tabId, runId);
+  if (landed) return landed;
   const { value } = await sealForPage(result, await targetOrigin(tabId, runId));
   return value;
 }
+
+/** Answered from extension storage alone — they never touch a tab, and what they hand back is filtered where it is kept. */
+const TAB_FREE = new Set(
+  [
+    listFiles,
+    listRecordings,
+    readRecording,
+    readConsole,
+    readNetwork,
+    stopDiagnostics,
+    monitorStatus,
+    stopMonitor,
+    awaitMonitor,
+    startTimer,
+    timerStatus,
+    stopTimer,
+  ].map((action) => action.name),
+);
+
+/** These pick another tab to land on or close, and check that tab where they pick it — in tabs.ts. */
+const PICKS_ITS_TAB = new Set([openTab, switchTab, closeTab].map((action) => action.name));
+
+const WATCHES_A_TAB = new Set([startMonitor, startDiagnostics].map((action) => action.name));
+
+/**
+ * The blocked-sites gate. Every action is checked unless it is named above, so an action
+ * added later is covered without anyone remembering to. The checks are the tab's address,
+ * where it is about to go, every frame on the focused path, and wherever the action itself
+ * would send the browser.
+ */
+async function guardTarget(action: string, input: unknown, tabId?: number, runId?: string): Promise<ActionResult | null> {
+  if (TAB_FREE.has(action) || PICKS_ITS_TAB.has(action)) return null;
+  const owner = runId ? await sessionForRun(runId) : null;
+
+  if (WATCHES_A_TAB.has(action)) {
+    const watched = (input as { tabId?: unknown } | undefined)?.tabId;
+    const tab = typeof watched === 'number' ? await pinnedTab(watched) : await resolveTab(tabId, owner);
+    return refusalFor(...tabUrls(tab));
+  }
+
+  const tab = await resolveTab(tabId, owner);
+  if (tab?.id == null) return null;
+  if (action !== navigate.name && !isWebPage(tab.url || tab.pendingUrl)) {
+    return failure(
+      'TAB_UNREACHABLE',
+      `Tab ${tab.id} is a browser page, not a web page — page actions cannot read or act on it. page.navigate to an absolute http(s) URL first.`,
+    );
+  }
+  const frames = (await framePath(tab.id)).map((step) => step.url);
+  return refusalFor(...tabUrls(tab), ...frames, ...destinationsOf(action, input, tab.url));
+}
+
+/** A redirect, a form or a slow screenshot can leave the tab somewhere blocked; nothing read there goes back. */
+async function guardLanding(action: string, result: ActionResult, tabId?: number, runId?: string): Promise<ActionResult | null> {
+  if (!result.ok || TAB_FREE.has(action) || WATCHES_A_TAB.has(action)) return null;
+  if (action === switchTab.name || action === closeTab.name) return null;
+  const reported = result.data as { tabId?: unknown; finalUrl?: unknown; landedOn?: unknown } | undefined;
+
+  if (action === openTab.name) {
+    return typeof reported?.tabId === 'number' ? refusalFor(...tabUrls(await pinnedTab(reported.tabId))) : null;
+  }
+  const owner = runId ? await sessionForRun(runId) : null;
+  const tab = await resolveTab(tabId, owner);
+  const reportedUrls = [textOf(reported?.finalUrl), textOf(reported?.landedOn)];
+  return tab?.id != null ? refusalForTab(tab.id, ...reportedUrls) : refusalFor(...reportedUrls);
+}
+
+function destinationsOf(action: string, input: unknown, base?: string): (string | undefined)[] {
+  if (action === navigate.name) {
+    const parsed = navigate.input.safeParse(input ?? {});
+    if (!parsed.success) return [];
+    try {
+      const plan = resolveNavigation(parsed.data as NavigateInput, base);
+      return plan.kind === 'url' ? [plan.href] : [];
+    } catch {
+      return [];
+    }
+  }
+  if (action === captureDownload.name) {
+    const url = (input as { url?: unknown } | undefined)?.url;
+    return typeof url === 'string' ? [absoluteUrl(url, base)] : [];
+  }
+  return [];
+}
+
+function absoluteUrl(url: string, base?: string): string | undefined {
+  try {
+    return new URL(url, base).href;
+  } catch {
+    return undefined;
+  }
+}
+
+const textOf = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+
+const isWebPage = (url: string | undefined): boolean => !!url && /^https?:/i.test(url);
 
 async function targetOrigin(tabId?: number, runId?: string): Promise<string | undefined> {
   const owner = runId ? await sessionForRun(runId) : null;
@@ -285,7 +387,9 @@ async function listStoredRecordings(input: unknown): Promise<ActionResult> {
   const filters = input as { host?: unknown; nameContains?: unknown } | undefined;
   const host = typeof filters?.host === 'string' ? filters.host.toLowerCase() : null;
   const needle = typeof filters?.nameContains === 'string' ? filters.nameContains.toLowerCase() : null;
+  const blocked = await siteCheck();
   const recordings = (await listStoredMeta())
+    .filter((r) => !blocked(r.startUrl))
     .filter((r) => !host || r.host.toLowerCase() === host)
     .filter((r) => !needle || `${r.name} ${r.goal ?? ''}`.toLowerCase().includes(needle))
     .map(({ id, name, host: on, status, goal, summary, steps, capturedValues, durationMs, createdAt }) => ({
@@ -311,6 +415,7 @@ async function readStoredRecording(input: unknown): Promise<ActionResult> {
   const meta = (await listStoredMeta()).find((r) => r.id === id);
   if (!meta) return failure('RECORDING_NOT_FOUND', `No recording with id "${id}".`);
   const body = await readRecordingBody(id);
+  if (await recordedOnBlockedSite(meta.startUrl, body?.events)) return blockedRefusal();
   if (!body?.workflow) {
     return failure(
       'RECORDING_NOT_READY',

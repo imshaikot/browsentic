@@ -169,6 +169,12 @@ on an empty tab.
 `normalizeHost` drops a trailing root dot and a leading `www.` or `*.`, so a scope of `example.com`
 covers `www.example.com` and `app.example.com`.
 
+A site the user has **blocked** never reaches this policy. That list is enforced in the extension,
+before `invokeForHarness` dispatches anything, and the daemon never learns it — see
+[extension.md § The settings page](extension.md#the-settings-page). A run started on a blocked tab
+arrives without a `url`, so its scope is the blank-tab one; the extension still refuses the site with
+`SITE_BLOCKED`.
+
 `tabId` pins a run to one tab; `ownedTabIds` are tabs the run opened itself, which count as its own
 for the `leaves-pinned-tab` rule. A bare `page.switchTab` with no arguments only *lists* tabs, so it
 is not a move.

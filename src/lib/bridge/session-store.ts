@@ -3,6 +3,7 @@ import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind } from '@/lib/agents/catalog';
 import { removeFilesFor } from './file-store';
 import type { RunItem } from './run-items';
+import { siteBlocked } from './site-guard';
 import { nameSession } from './socket';
 
 export const SESSIONS_INDEX_KEY = 'browsentic:sessions';
@@ -111,7 +112,7 @@ export async function nameStoredSession(sessionId: string): Promise<void> {
 
   const turns = meta.turns;
   await updateSessionMeta(sessionId, { namingAt: Date.now() });
-  const result = await nameSession({ host: meta.host, messages });
+  const result = await nameSession({ host: (await siteBlocked(meta.url)) ? undefined : meta.host, messages });
   if (result.ok && result.data.title.trim()) {
     await updateSessionMeta(sessionId, {
       title: result.data.title.replace(/\s+/g, ' ').trim().slice(0, MAX_TITLE_CHARS),

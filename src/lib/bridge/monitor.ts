@@ -28,11 +28,14 @@ import {
 } from '@/lib/monitor/events';
 import { hostOf, originOf } from '@/lib/recordings/events';
 import { showToast } from '@/lib/bridge/toast';
+import { onBlockedSitesChange, refusalFor, siteBlocked, tabUrls } from '@/lib/bridge/site-guard';
 
 const MONITORS_KEY = 'browsentic/monitors';
 const DONE_KEY = 'browsentic/monitorsDone';
 
 const NO_CONTENT_SCRIPT = 'Receiving end does not exist';
+
+const MOVED_TO_BLOCKED = 'The tab moved to a site on the Blocked sites list.';
 
 interface ActiveMonitor {
   id: string;
@@ -142,6 +145,8 @@ export async function startTabMonitor(
   if (!/^https?:/i.test(tab.url)) {
     return failure('UNSUPPORTED', 'Only http(s) pages can be watched — browser pages expose nothing to observe.');
   }
+  const refused = await refusalFor(...tabUrls(tab));
+  if (refused) return refused;
 
   const outcome = await locked(async () => {
     const map = await readMonitors();
@@ -212,7 +217,9 @@ export async function ingestSample(
   tabId: number | undefined,
   monitorId: string,
   sample: MonitorSample,
+  pageUrl?: string,
 ): Promise<void> {
+  if (await siteBlocked(pageUrl)) return;
   const updated = await locked(async () => {
     const map = await readMonitors();
     const monitor = map[monitorId];
@@ -389,8 +396,8 @@ export async function awaitMonitorDone(monitorId: string, timeoutMs: number): Pr
   });
 }
 
-export async function monitorsForTab(tabId: number | undefined): Promise<ActionResult> {
-  if (tabId == null) return success({ monitors: [] });
+export async function monitorsForTab(tabId: number | undefined, pageUrl?: string): Promise<ActionResult> {
+  if (tabId == null || (await siteBlocked(pageUrl))) return success({ monitors: [] });
   const map = await readMonitors();
   const monitors = Object.values(map)
     .filter((monitor) => monitor.tabId === tabId)
@@ -425,9 +432,12 @@ export function serveMonitor(): void {
   browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (!changeInfo.url) return;
     void (async () => {
+      const blocked = await siteBlocked(changeInfo.url);
       for (const monitor of Object.values(await readMonitors())) {
         if (monitor.tabId !== tabId) continue;
-        if (originOf(changeInfo.url!) === monitor.origin) {
+        if (blocked) {
+          await finishMonitor(monitor.id, 'tab-navigated', MOVED_TO_BLOCKED);
+        } else if (originOf(changeInfo.url!) === monitor.origin) {
           const noted = await locked(async () => {
             const map = await readMonitors();
             const current = map[monitor.id];
@@ -444,6 +454,15 @@ export function serveMonitor(): void {
             `The tab left ${monitor.host} for ${hostOf(changeInfo.url!) || 'another page'}.`,
           );
         }
+      }
+    })();
+  });
+
+  onBlockedSitesChange(() => {
+    void (async () => {
+      for (const monitor of Object.values(await readMonitors())) {
+        const tab = await browser.tabs.get(monitor.tabId).catch(() => null);
+        if (await siteBlocked(...tabUrls(tab))) await finishMonitor(monitor.id, 'tab-navigated', MOVED_TO_BLOCKED);
       }
     })();
   });

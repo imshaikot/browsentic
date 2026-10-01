@@ -55,9 +55,13 @@ import {
 } from '@/lib/diagnostics/events';
 import { hostOf } from '@/lib/recordings/events';
 import { attachToTab, detachFromTab, onDebuggerEvent, send, serveDetachEvents, settle } from './cdp';
+import { onBlockedSitesChange, refusalFor, siteBlocked, tabUrls } from './site-guard';
 import { watchForLoad } from './tabs';
 
 const DIAGNOSTICS_KEY = 'browsentic/diagnostics';
+
+const MOVED_TO_BLOCKED =
+  'Stopped because the tab moved to a site on the Blocked sites list. Everything it had collected was discarded with it.';
 
 const MAX_HEADERS = 30;
 const MAX_HEADER_CHARS = 400;
@@ -119,6 +123,8 @@ export async function startTabDiagnostics(
   if (!/^https?:/i.test(tab.url)) {
     return failure('UNSUPPORTED', 'Only http(s) pages report a console and network activity — browser pages do not.');
   }
+  const refused = await refusalFor(...tabUrls(tab));
+  if (refused) return refused;
   if (!input.capture.length) {
     return failure('INVALID_INPUT', 'Give "capture" at least one of "console" or "network" — there is nothing to record otherwise.');
   }
@@ -209,6 +215,7 @@ export async function readConsoleFor(input: {
   const picked = await pick(input.diagnosticsId);
   if (!picked.ok) return picked;
   const session = picked.data as DiagnosticsSession;
+  await stopIfOnBlockedSite(session);
 
   const needle = input.contains?.toLowerCase();
   const matched = session.console.filter(
@@ -249,6 +256,7 @@ export async function readNetworkFor(input: {
   const picked = await pick(input.diagnosticsId);
   if (!picked.ok) return picked;
   const session = picked.data as DiagnosticsSession;
+  await stopIfOnBlockedSite(session);
 
   const needle = input.urlContains?.toLowerCase();
   const method = input.method?.toUpperCase();
@@ -466,6 +474,32 @@ export function serveDiagnostics(): void {
   });
 
   browser.tabs.onRemoved.addListener((tabId) => void dropDiagnosticsForTab(tabId));
+
+  browser.tabs.onUpdated.addListener((tabId, change) => {
+    if (!change.url) return;
+    void siteBlocked(change.url).then((blocked) => (blocked ? discardForTab(tabId) : undefined));
+  });
+
+  onBlockedSitesChange(() => {
+    void store().then(async (map) => {
+      for (const session of watching(map)) await stopIfOnBlockedSite(session);
+    });
+  });
+}
+
+/** The blocked page's own requests arrive before the tab reports its new address, so nothing collected is kept. */
+async function discardForTab(tabId: number): Promise<void> {
+  const session = forTab(await store(), tabId);
+  if (!session) return;
+  session.console = [];
+  session.network = [];
+  await finish(session.diagnosticsId, 'stopped', MOVED_TO_BLOCKED);
+}
+
+async function stopIfOnBlockedSite(session: DiagnosticsSession): Promise<void> {
+  if (session.phase !== 'watching') return;
+  const tab = await browser.tabs.get(session.tabId).catch(() => null);
+  if (await siteBlocked(...tabUrls(tab))) await discardForTab(session.tabId);
 }
 
 function receive(tabId: number, method: string, params: Record<string, unknown>): void {

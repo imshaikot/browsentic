@@ -1,9 +1,10 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { Info, Link2, Puzzle, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
+import { Ban, Info, Link2, Puzzle, ShieldCheck, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { About } from '@/extension/components/about';
 import { AgentPicker } from '@/extension/components/agent-picker';
+import { BlockedSitesSettings } from '@/extension/components/blocked-sites-settings';
 import { Wordmark } from '@/extension/components/brand';
 import { DaemonLink } from '@/extension/components/daemon-link';
 import { ExtensionSettings, SettingsGroup } from '@/extension/components/extension-settings';
@@ -15,7 +16,7 @@ import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useTheme } from '@/lib/bridge/use-theme';
 import { cn } from '@/lib/utils';
 
-type SectionId = 'extension' | 'profile' | 'guardrails' | 'agent' | 'connection' | 'about';
+type SectionId = 'extension' | 'profile' | 'guardrails' | 'blocked' | 'agent' | 'connection' | 'about';
 
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string; View: ComponentType }[] = [
   {
@@ -38,6 +39,13 @@ const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; blurb: string;
     icon: ShieldCheck,
     blurb: 'What the agent may do without asking you first. A run takes its policy when it starts, so a change applies to the next one. The desktop app’s Settings tab edits the same rows.',
     View: GuardrailSettings,
+  },
+  {
+    id: 'blocked',
+    label: 'Blocked sites',
+    icon: Ban,
+    blurb: 'Sites Browsentic will never read or act on — no agent, schedule or saved tool can override it. Kept in this browser only; the daemon, the agent and the desktop app cannot see or change it.',
+    View: BlockedSitesSettings,
   },
   {
     id: 'agent',

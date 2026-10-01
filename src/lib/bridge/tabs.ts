@@ -7,6 +7,7 @@ import { openTab } from '@/lib/actions/page/open-tab';
 import { switchTab } from '@/lib/actions/page/switch-tab';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { recordingStateFor } from '@/lib/bridge/recorder';
+import { refusalFor, siteCheck, tabUrls } from '@/lib/bridge/site-guard';
 
 export const LOAD_TIMEOUT_MS = 10_000;
 
@@ -25,6 +26,7 @@ interface TabInfo {
   windowId?: number;
   index?: number;
   url?: string;
+  pendingUrl?: string;
   title?: string;
   active?: boolean;
   pinned?: boolean;
@@ -46,7 +48,8 @@ export async function openNewTab(input: unknown, anchor?: TabRef): Promise<Actio
   const current = (anchor
     ? await browser.tabs.get(anchor.id).catch(() => undefined)
     : (await browser.tabs.query({ active: true, currentWindow: true }))[0]) as TabInfo | undefined;
-  const base = current?.url && isPageUrl(current.url) ? current.url : undefined;
+  const usable = await usableTabs();
+  const base = current && usable(current) ? current.url : undefined;
 
   let href: string;
   try {
@@ -56,6 +59,8 @@ export async function openNewTab(input: unknown, anchor?: TabRef): Promise<Actio
   } catch (error) {
     return error instanceof ActionError ? failure(error.code, error.message) : failure('ACTION_FAILED', String(error));
   }
+  const refused = await refusalFor(href);
+  if (refused) return refused;
 
   const opener =
     current?.id != null && current.windowId != null
@@ -92,11 +97,14 @@ export async function switchToTab(current: TabRef, input: unknown): Promise<Acti
   }
 
   const tabs = await windowTabs(current);
-  if (tabId == null && match == null) return success(inventory(tabs, current));
+  const usable = await usableTabs();
+  if (tabId == null && match == null) return success(inventory(tabs, current, usable));
 
-  const picked = await pickTab(tabs, { tabId, match }, 'switch to');
+  const picked = await pickTab(tabs, { tabId, match }, 'switch to', usable);
   if (!picked.ok) return picked.result;
   const target = picked.tab;
+  const refused = await refusalFor(...tabUrls(target));
+  if (refused) return refused;
 
   if (!isPageUrl(target.url)) {
     return failure(
@@ -127,12 +135,15 @@ export async function closeOpenTab(current: TabRef, input: unknown): Promise<Act
   }
 
   const tabs = await windowTabs(current);
+  const usable = await usableTabs();
   const picked =
     tabId == null && match == null
       ? pickCurrent(tabs, current)
-      : await pickTab(tabs, { tabId, match }, 'close');
+      : await pickTab(tabs, { tabId, match }, 'close', usable);
   if (!picked.ok) return picked.result;
   const target = picked.tab;
+  const refused = await refusalFor(...tabUrls(target));
+  if (refused) return refused;
 
   if (tabs.length <= 1) {
     return failure(
@@ -166,7 +177,7 @@ export async function closeOpenTab(current: TabRef, input: unknown): Promise<Act
   }
 
   const after = await settleAfterClose(current, target.id!);
-  const nowOn = after.active?.url ? clip(after.active.url) : undefined;
+  const nowOn = after.active?.url && usable(after.active) ? clip(after.active.url) : undefined;
   return success({
     performed: nowOn ? `closed ${label(target)} — now on ${nowOn}` : `closed ${label(target)}`,
     closed: describeTab(target),
@@ -217,6 +228,7 @@ async function pickTab(
   tabs: TabInfo[],
   selector: { tabId?: number; match?: string },
   verb: string,
+  usable: Usable,
 ): Promise<Picked> {
   if (selector.tabId != null) {
     const hit = tabs.find((t) => t.id === selector.tabId);
@@ -227,24 +239,22 @@ async function pickTab(
       result: elsewhere
         ? failure(
             'INVALID_TARGET',
-            `Tab ${selector.tabId} is in a different browser window. Browsentic only acts within the window it was opened in — ${openTabsLine(tabs)}`,
+            `Tab ${selector.tabId} is in a different browser window. Browsentic only acts within the window it was opened in — ${openTabsLine(tabs, usable)}`,
           )
         : failure(
             'TARGET_NOT_FOUND',
-            `No tab with id ${selector.tabId} — it has probably been closed. ${openTabsLine(tabs)}`,
+            `No tab with id ${selector.tabId} — it has probably been closed. ${openTabsLine(tabs, usable)}`,
           ),
     };
   }
 
   const needle = selector.match!.trim().toLowerCase();
   if (!needle) return { ok: false, result: failure('INVALID_INPUT', '"match" cannot be empty.') };
-  const hits = tabs
-    .filter(isPageTab)
-    .filter((t) => `${t.title ?? ''} ${t.url ?? ''}`.toLowerCase().includes(needle));
+  const hits = tabs.filter(usable).filter((t) => `${t.title ?? ''} ${t.url ?? ''}`.toLowerCase().includes(needle));
   if (!hits.length) {
     return {
       ok: false,
-      result: failure('TARGET_NOT_FOUND', `No open tab matches "${clip(selector.match!)}". ${openTabsLine(tabs)}`),
+      result: failure('TARGET_NOT_FOUND', `No open tab matches "${clip(selector.match!)}". ${openTabsLine(tabs, usable)}`),
     };
   }
   if (hits.length > 1) {
@@ -259,16 +269,16 @@ async function pickTab(
   return { ok: true, tab: hits[0] };
 }
 
-function inventory(tabs: TabInfo[], current: TabRef) {
-  const usable = tabs.filter(isPageTab);
-  const hidden = tabs.length - usable.length;
-  const shown = usable.slice(0, MAX_LISTED);
+function inventory(tabs: TabInfo[], current: TabRef, usable: Usable) {
+  const listed = tabs.filter(usable);
+  const hidden = tabs.length - listed.length;
+  const shown = listed.slice(0, MAX_LISTED);
   return {
-    performed: `${usable.length} open tab${usable.length === 1 ? '' : 's'} in this window`,
+    performed: `${listed.length} open tab${listed.length === 1 ? '' : 's'} in this window`,
     activeTabId: current.id,
     tabs: shown.map(describeTab),
     ...(hidden ? { hidden } : {}),
-    ...(shown.length < usable.length ? { truncated: true } : {}),
+    ...(shown.length < listed.length ? { truncated: true } : {}),
   };
 }
 
@@ -315,12 +325,18 @@ function tabLines(tabs: TabInfo[]): string {
   return shown.length < tabs.length ? `${lines}; …and ${tabs.length - shown.length} more` : lines;
 }
 
-function openTabsLine(tabs: TabInfo[]): string {
-  const usable = tabs.filter(isPageTab);
-  return usable.length ? `Open tabs: ${tabLines(usable)}` : 'No other web page is open in this window.';
+function openTabsLine(tabs: TabInfo[], usable: Usable): string {
+  const listed = tabs.filter(usable);
+  return listed.length ? `Open tabs: ${tabLines(listed)}` : 'No other web page is open in this window.';
 }
 
-const isPageTab = (tab: TabInfo) => isPageUrl(tab.url);
+type Usable = (tab: TabInfo) => boolean;
+
+/** A tab on a blocked site is treated like a browser page: never listed, never matched, never named. */
+async function usableTabs(): Promise<Usable> {
+  const blocked = await siteCheck();
+  return (tab) => isPageUrl(tab.url) && !blocked(...tabUrls(tab));
+}
 
 const isPageUrl = (url: string | undefined): boolean => !!url && /^https?:/i.test(url);
 

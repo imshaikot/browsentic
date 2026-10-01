@@ -56,6 +56,7 @@ import {
   titleDueAt,
   type StoredSessionMeta,
 } from './session-store';
+import { isBlockedRefusal, refusalFor, siteBlocked, siteCheck, tabUrls } from './site-guard';
 import { recordGeneratedSkill } from './skill-store';
 import { dropTimersForSession, onTimerFire, type TimerHandoff } from './timer';
 import { announceTask, askTaskApproval, dropTaskApproval, takeApprovalAnswer } from './task-notices';
@@ -598,14 +599,16 @@ async function startTurn(
       return 'local';
     }
 
+    const current = await browser.tabs.get(session.currentTabId).catch(() => null);
+    const hidden = await siteBlocked(session.url, ...tabUrls(current), focus?.url);
     const runId = sendInstruction(text, {
-      url: session.url,
+      url: hidden ? undefined : session.url,
       tabId: session.currentTabId,
       sessionId,
       agent: session.agent,
       agentSessionId: session.agentSessionId,
       agentSkillId,
-      focus,
+      focus: hidden ? undefined : focus,
       liveTools,
       files: await attachedFiles(session),
       recordings: await attachedRecordings(),
@@ -852,6 +855,8 @@ async function beginRecording(captureValues: boolean): Promise<void> {
 }
 
 async function startTaskRun(order: TaskOrder): Promise<ActionResult> {
+  const refused = await refusalFor(order.url);
+  if (refused) return refused;
   const opened = await serialized(() => openTaskSession(order));
   if (!opened.ok) return opened;
   await loaded(opened.data.tabId);
@@ -971,16 +976,19 @@ async function replay(
     );
     if (!result.ok) {
       const error = `${result.error.code}: ${result.error.message}`;
-      return handOver(sessionId, order, handOverPrompt({ ...recording, ...call, total: calls.length, error }), {
-        outcome: 'failed',
-        reason: `Step ${call.ordinal} (${call.intent}) failed — ${error}`,
-      });
+      const verdict: TaskVerdict = { outcome: 'failed', reason: `Step ${call.ordinal} (${call.intent}) failed — ${error}` };
+      if (isBlockedRefusal(result)) return endTask(sessionId, verdict);
+      return handOver(sessionId, order, handOverPrompt({ ...recording, ...call, total: calls.length, error }), verdict);
     }
     if (call.action === 'page.extractText') extracted = (result.data as { content?: string } | null)?.content;
   }
-  await serialized(async () => {
+  await endTask(sessionId, replayVerdict(calls.length, extracted));
+}
+
+function endTask(sessionId: string, verdict: TaskVerdict): Promise<void> {
+  return serialized(async () => {
     const session = (await readTabSessions())[sessionId];
-    if (session) await finishTask(session, replayVerdict(calls.length, extracted));
+    if (session) await finishTask(session, verdict);
   });
 }
 
@@ -1052,8 +1060,9 @@ const MAX_CONTEXT_RECORDINGS = 8;
 
 async function attachedRecordings(): Promise<SavedRecording[]> {
   try {
+    const blocked = await siteCheck();
     return (await listRecordings())
-      .filter((recording) => recording.status === 'ready')
+      .filter((recording) => recording.status === 'ready' && !blocked(recording.startUrl))
       .slice(0, MAX_CONTEXT_RECORDINGS)
       .map(asSavedRecording);
   } catch {

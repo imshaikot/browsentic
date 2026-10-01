@@ -110,6 +110,14 @@ block "search for X" on an empty tab.
 `example.com` in scope covers `www.example.com` and `app.example.com`. `["*"]` in
 `guardrails.hosts` disables host confinement entirely.
 
+### Sites that are never in scope
+
+Scope is a question the daemon answers per run, and config.json can widen it. For a site the agent
+must never touch at all, use [Blocked sites](features/blocked-sites.md) instead: the extension enforces
+that list itself, before any of these rules run, and nothing on the daemon's side can read or change
+it. A run started from a blocked tab does not send its address, so it begins unconfined, as from a
+blank tab — and every action on the blocked site is refused all the same.
+
 ---
 
 ## Callers with nobody to ask
