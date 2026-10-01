@@ -97,13 +97,15 @@ Every runner is given the same five things, by whichever mechanism its CLI suppo
 | | Claude Code | Codex | Antigravity | Mistral Vibe | Grok Build | Cursor CLI | Qwen Code | OpenCode |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Run | `claude -p --output-format stream-json`, the message on stdin | `codex app-server`, held over stdin for the turn; `codex exec --json` when it is refused, when `agents.codex.transport` is `"exec"`, and for one-shots | `agy -p --output-format stream-json` | `vibe --prompt … --output streaming --trust --agent ask` | `grok -p --output-format streaming-json` | `cursor-agent -p --output-format stream-json --stream-partial-output` | `qwen -p --output-format stream-json --include-partial-messages` | `opencode run --format json --pure --agent browsentic-contained` |
-| MCP server | `--mcp-config` + `--strict-mcp-config` | none: the tools go to `thread/start` as `dynamicTools`, and each of the user's servers is switched off in the thread's config. `exec`: `-c mcp_servers.browsentic.*` under `--ignore-user-config`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, allowed as `Mcp(browsentic:*)` with every other server denied by name | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk | `mcp.browsentic` in `OPENCODE_CONFIG_CONTENT`, each tool allowed by name on the run's own agent |
-| System prompt | `--append-system-prompt-file`, a file per run, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `developerInstructions` on `thread/start` (`-c developer_instructions` on `exec`), kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
+| MCP server | `--mcp-config` + `--strict-mcp-config` | none: the tools go to `thread/start` as `dynamicTools`, and each of the user's servers is switched off in the thread's config. `exec`: `-c mcp_servers.browsentic.*` under `--ignore-user-config`, with `default_tools_approval_mode="approve"` — headless Codex refuses any MCP call it would have prompted for | `.agents/mcp_config.json` in its cwd | `.vibe/config.toml` in a folder per conversation, every tool granted by name | `.grok/config.toml` in its cwd, loaded with `GROK_FOLDER_TRUST=0`, and approved with `--allow MCPTool(browsentic__*)` | `.cursor/mcp.json` in a folder per conversation, approved each turn with `cursor-agent mcp enable browsentic` (a set-up step the plan carries), allowed as `Mcp(browsentic:*)` with every other server denied by name and every plugin's as `Mcp(plugin-*:*)` | `--mcp-config` + `--allowed-mcp-server-names`, under `--safe-mode`, which drops the ones on disk | `mcp.browsentic` in `OPENCODE_CONFIG_CONTENT`, each tool allowed by name on the run's own agent |
+| System prompt | `--append-system-prompt-file`, a file per run, kept from the first turn ([below](#a-prompt-the-session-keeps)) | `developerInstructions` on `thread/start` (`-c developer_instructions` on `exec`), kept from the first turn | `AGENTS.md` in its cwd | `AGENTS.md` beside its config | `--rules` | `AGENTS.md` in its cwd, kept from the first turn | `--append-system-prompt` | a file in a folder per conversation, named in the config's `instructions` — never the config itself, which OpenCode expands `{file:…}` in |
 | Follow-up turns | `--resume <session>` | `thread/resume` (`exec resume <thread>`); either resumes a thread the other began | `--conversation <id>` | `--resume <session>`, re-read from the folder the session began in | `--session-id <uuid>` names it, `--resume <uuid>` continues it, in a folder named after it | `--resume <session>` | `--session-id <uuid>` names it, `--resume <uuid>` continues it | `--session <id>`, from a session store of Browsentic's own (`OPENCODE_DB`) |
 | Kept off the machine by | `--allowedTools` + `--disallowedTools` | the user's MCP servers off (`--ignore-user-config` on `exec`), `-c sandbox_mode="read-only"`, `-c approval_policy="never"`, `-c features.shell_tool=false`, `-c features.view_image=false`, `-c features.multi_agent=false` | its own permission rules | `--enabled-tools`, which is an allowlist | `--tools`, `--permission-mode dontAsk`, `--deny`, `--sandbox workspace` | deny rules in `.cursor/cli.json`, plus `--sandbox enabled` | `--safe-mode`, `--exclude-tools`, `--approval-mode default` | an agent whose permission opens on `"*": "deny"`, `--pure`, `OPENCODE_DISABLE_PROJECT_CONFIG`, `OPENCODE_DISABLE_SHARE` |
 
-**Two CLIs do not put the browser tools in the model's list, and both are told so in the prompt.**
-Grok reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a
+**Three CLIs do not put the browser tools in the model's list, and each is told so in the prompt.**
+Cursor hands the model a tool's schema only through its own `GetMcpTools`, by pattern or by name, so
+its `AGENTS.md` ends with a section saying to look up every tool the job needs in one step. Grok
+reaches MCP tools only through two meta-tools, `search_tool` and `use_tool`, under a
 `browsentic__` prefix. Codex on its `exec` fallback defers them behind its own `tool_search`, and a code-mode model
 (`tool_mode: "code_mode_only"` in its model catalog) reaches them only from inside `exec`, as
 `tools.mcp__browsentic__*`, where an image reaches the model only if the script passes it to
@@ -114,6 +116,27 @@ Codex also cuts any tool result at 10,000 tokens by default, which its model cat
 `exec` the result is still cut at 10,000 unless the script's first line is
 `// @exec: {"max_output_tokens": 25000}`, and only the prompt can ask for that, so it does. It also
 asks for page reads in pieces.
+
+**A CLI with limits on a tool call declares them** (`Runner.limits`), and the daemon works inside
+them rather than the run finding them out. Cursor abandons a call at 60 s — the MCP SDK's default
+request timeout, which it never overrides — and puts text over 40,000 bytes in a file the run cannot
+read (measured on 2026.09.18). So for its runs:
+
+- an approval still unanswered 10 s before the limit is *parked*: the call returns `APPROVAL_PENDING`
+  with no `toolResult`, so the card stays up, and the same action with the same input rejoins it
+  under the same row. Any other call, the run ending, or Stop withdraws it, and a late answer does
+  nothing;
+- a wait inside a call (`page_awaitMonitor`, `page_pickElement`, `page_solveCaptcha`,
+  `page_captureDownload`, and any `timeoutMs` on `page_runCode`, `page_callSiteTool` or
+  `page_waitForElement`) is cut to what is left of the call;
+- the run's MCP server is started with `BROWSENTIC_RESULT_BYTES`, refuses a result whose text is
+  over it with `RESULT_TOO_LARGE` rather than cutting it, and asks `page_extractText` for groups of a
+  quarter that many characters.
+
+Separately, for every CLI, **a call its client abandons withdraws its approval.** The MCP server
+passes the request's cancel signal to the bridge, which sends `{ op: 'cancel', id }` on the control
+socket, and the daemon aborts that invoke; a tool server whose socket closes mid-call does the same
+for everything it had in flight. Before, a late Allow ran the action after the model had moved on.
 
 **A CLI that re-reads its own folder gets one per conversation, not one per run.** Vibe restores a
 resumed session from the folder it began in, whatever folder it is started in now, so a folder per

@@ -60,6 +60,9 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `TAB_IN_USE` | Extension | That tab belongs to another Browsentic conversation |
 | `RUN_INACTIVE` | AgentSession | The run was cancelled while a tool call was in flight |
 | `APPROVAL_TIMEOUT` | AgentSession | A scheduled run asked for approval and nobody answered within ten minutes, so the action was declined. The agent is told to stop and say what it was about to do |
+| `APPROVAL_PENDING` | AgentSession | The user has not answered an approval yet, and the agent's CLI would abandon the call before they do (Cursor CLI, at 60 s). The request stays on screen: make the **same call again, with the same input**, to keep waiting. Any other call withdraws it |
+| `RESULT_TOO_LARGE` | MCP server | The call went through, but its result is longer than the agent's CLI passes to its model (Cursor CLI: 40,000 bytes). Do not repeat an action for its result; ask for less — `page_extractText` with a smaller `maxLength` and its cursor, `page_getPageInfo` with a smaller `maxPerKind`, or a `target` |
+| `CANCELLED` | AgentSession | The call was abandoned before the user answered its approval, so the request was taken down and a late answer does nothing |
 | `SKILL_UNKNOWN` | AgentSession | The attached agent skill's id no longer resolves — the file moved, changed agents, or outgrew the size cap. Reopen the `/` picker and choose again |
 
 ## Scheduled tasks
@@ -77,7 +80,7 @@ repeatedly: failures carry the *fix* in the message, and a failed tool call neve
 | `AGENT_MISSING` | Runner | The chosen agent's binary is not on the *daemon's* `PATH`. Set `agents.<name>.bin` to an absolute path |
 | `AGENT_NEEDS_PERMISSION` | Runner | Antigravity has no rule allowing Browsentic's MCP tools (`browsentic agent fix antigravity`), Grok Build or Cursor CLI is not signed in (`grok login`, `cursor-agent login`), Qwen Code has no model provider configured (`qwen`, then `/auth`), or OpenCode is signed in to no provider (`opencode auth login`) |
 | `AGENT_UNUSABLE` | Runner | The CLI is present but cannot run — usually too old for the flags Browsentic passes. On Windows, also a batch file that is not an npm or pnpm shim: set `agents.<name>.bin` to the program it runs |
-| `AGENT_UNSAFE` | Runner | The run was stopped before the agent could act on the machine: its plan had lost its containment, which is a bug in Browsentic, or the CLI itself said it had not applied it — Grok Build offering tools Browsentic never asks for, Qwen Code reporting a denied tool or a second MCP server as registered, OpenCode reporting that a tool outside the browser ran, or Codex running a shell command or changing a file with both switched off. Update both, and report it |
+| `AGENT_UNSAFE` | Runner | The run was stopped before the agent could act on the machine: its plan had lost its containment, which is a bug in Browsentic, or the CLI itself said it had not applied it — Grok Build offering tools Browsentic never asks for, Qwen Code reporting a denied tool or a second MCP server as registered, OpenCode reporting that a tool outside the browser ran, Codex running a shell command or changing a file with both switched off, or Cursor CLI getting an answer from an MCP server the run denies. Update both, and report it |
 
 ## Guardrails
 
