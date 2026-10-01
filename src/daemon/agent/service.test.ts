@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { FOCUS_SHOT_ACTION } from '@/lib/actions/reserved';
 import type { RunEvent } from '@/lib/actions/protocol';
-import { failure } from '@/lib/actions/protocol';
+import { failure, success } from '@/lib/actions/protocol';
 import { profilePath } from '../profile';
 import { configPath } from './config';
 import { stubCli } from './runners/fixtures/support';
@@ -85,6 +85,141 @@ describe('answering a captcha', () => {
       prompts: 1,
       invoked: ['page.solveCaptcha', 'page.solveCaptcha'],
     });
+  });
+});
+
+// Cursor abandons a tool call at 60 s, so an approval cannot simply hold the call open until the user answers.
+describe('an approval, on an agent that abandons a call before the user answers', () => {
+  const tracked = async (agent: 'cursor' | 'claude') => {
+    const bin = stubCli(join(dirname(configPath), `${agent}-that-waits`), 'setTimeout(() => {}, 30_000);');
+    writeFileSync(configPath, JSON.stringify(agent === 'cursor' ? { agent, agents: { cursor: { bin } } } : { claudeBin: bin }));
+    const events: RunEvent[] = [];
+    const invoked: [string, unknown][] = [];
+    const running = new AgentSession({
+      invoke: async (action, input) => {
+        invoked.push([action, input]);
+        return success({ done: true });
+      },
+      emit: (_runId: string, event: RunEvent) => void events.push(event),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    running.handle({ t: 'instruct', id: 'r1', text: 'sign me up', context: { sessionId: 's1' } });
+    await vi.waitFor(() => expect(running.offerFor('r1')).not.toBeNull());
+    const asked = () => events.find((event) => event.kind === 'approval') as Extract<RunEvent, { kind: 'approval' }>;
+    const kinds = () => events.flatMap((event) => (['tool', 'approval', 'toolResult'].includes(event.kind) ? [event.kind] : []));
+    const results = () => events.flatMap((event) => (event.kind === 'toolResult' ? [`${event.toolId === asked()?.toolId ? 'asked' : 'other'}: ${event.summary}`] : []));
+    return { running, events, invoked, asked, kinds, results };
+  };
+  const codeOf = (result: { ok: boolean; error?: { code: string } }) => (result.ok ? 'ok' : result.error?.code);
+
+  afterEach(() => vi.useRealTimers());
+
+  test('is handed back before the agent gives up, stays on screen, and the same call again waits on it', async () => {
+    const { running, invoked, asked, kinds } = await tracked('cursor');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const first = running.invokeForRun('r1', 'page.solveCaptcha', {});
+    await vi.advanceTimersByTimeAsync(50_000);
+    const handedBack = codeOf(await first);
+    const shownBeforeAnswer = kinds();
+    const second = running.invokeForRun('r1', 'page.solveCaptcha', {});
+    running.handle({ t: 'decision', id: 'r1', toolId: asked().toolId, allow: true });
+    const answered = codeOf(await second);
+    running.dispose();
+    expect({ handedBack, shownBeforeAnswer, answered, shown: kinds(), invoked: invoked.map(([action]) => action) }).toEqual({
+      handedBack: 'APPROVAL_PENDING',
+      shownBeforeAnswer: ['tool', 'approval'],
+      answered: 'ok',
+      shown: ['tool', 'approval', 'toolResult'],
+      invoked: ['page.solveCaptcha'],
+    });
+  });
+
+  test('is withdrawn by any other call, and a yes that comes after does nothing', async () => {
+    const { running, invoked, asked, results } = await tracked('cursor');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const first = running.invokeForRun('r1', 'page.solveCaptcha', {});
+    await vi.advanceTimersByTimeAsync(50_000);
+    await first;
+    await running.invokeForRun('r1', 'page.getPageInfo', {});
+    running.handle({ t: 'decision', id: 'r1', toolId: asked().toolId, allow: true });
+    running.dispose();
+    expect({ results: results(), invoked: invoked.map(([action]) => action) }).toEqual({
+      results: ['asked: the agent stopped waiting', 'other: done'],
+      invoked: ['page.getPageInfo'],
+    });
+  });
+
+  test('is withdrawn when the run is stopped while it is handed back', async () => {
+    const { running, results } = await tracked('cursor');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const first = running.invokeForRun('r1', 'page.solveCaptcha', {});
+    await vi.advanceTimersByTimeAsync(50_000);
+    await first;
+    running.handle({ t: 'cancel', id: 'r1' });
+    running.dispose();
+    expect(results()).toEqual(['asked: the agent stopped waiting']);
+  });
+
+  test('on any agent, is withdrawn when the caller stops waiting, and a late yes does nothing', async () => {
+    const { running, invoked, asked, results } = await tracked('claude');
+    const abandoned = new AbortController();
+    const call = running.invokeForRun('r1', 'page.solveCaptcha', {}, abandoned.signal);
+    abandoned.abort();
+    const code = codeOf(await call);
+    running.handle({ t: 'decision', id: 'r1', toolId: asked().toolId, allow: true });
+    running.dispose();
+    expect({ code, results: results(), invoked }).toEqual({ code: 'CANCELLED', results: ['asked: the agent stopped waiting'], invoked: [] });
+  });
+
+  test('on an agent that waits as long as it takes, is never handed back', async () => {
+    const { running, asked, kinds } = await tracked('claude');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const call = running.invokeForRun('r1', 'page.solveCaptcha', {});
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    const before = kinds();
+    running.handle({ t: 'decision', id: 'r1', toolId: asked().toolId, allow: true });
+    const code = codeOf(await call);
+    running.dispose();
+    expect({ before, code }).toEqual({ before: ['tool', 'approval'], code: 'ok' });
+  });
+});
+
+describe('a wait inside a call, on an agent that abandons a call at 60 s', () => {
+  const invokedWith = async (agent: 'cursor' | 'claude', action: string, input: unknown) => {
+    const bin = stubCli(join(dirname(configPath), `${agent}-that-waits`), 'setTimeout(() => {}, 30_000);');
+    writeFileSync(configPath, JSON.stringify(agent === 'cursor' ? { agent, agents: { cursor: { bin } } } : { claudeBin: bin }));
+    let seen: unknown;
+    const running = new AgentSession({
+      invoke: async (_action, given) => {
+        seen = given;
+        return success({});
+      },
+      emit: () => {},
+      draft: () => {},
+      actionNames: () => [],
+    });
+    running.handle({ t: 'instruct', id: 'r1', text: 'wait for it', context: { sessionId: 's1' } });
+    await vi.waitFor(() => expect(running.offerFor('r1')).not.toBeNull());
+    await running.invokeForRun('r1', action, input);
+    running.dispose();
+    return seen as { timeoutMs?: number };
+  };
+
+  test('is cut to end before the agent gives up — its own default too — and a short one is left alone', async () => {
+    expect([
+      (await invokedWith('cursor', 'page.awaitMonitor', { monitorId: 'm1' })).timeoutMs,
+      (await invokedWith('cursor', 'page.awaitMonitor', { monitorId: 'm1', timeoutMs: 300_000 })).timeoutMs,
+      (await invokedWith('cursor', 'page.waitForElement', { target: { selector: '#go' }, timeoutMs: 3_000 })).timeoutMs,
+    ].map((timeoutMs) => (timeoutMs === undefined ? 'unset' : timeoutMs <= 50_000 && timeoutMs > 45_000 ? 'cut' : timeoutMs))).toEqual([
+      'cut',
+      'cut',
+      3_000,
+    ]);
+  });
+
+  test('is left as asked on an agent that waits as long as it takes', async () => {
+    expect((await invokedWith('claude', 'page.awaitMonitor', { monitorId: 'm1' })).timeoutMs).toBeUndefined();
   });
 });
 

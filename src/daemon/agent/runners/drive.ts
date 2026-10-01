@@ -24,6 +24,9 @@ import {
 
 const KILL_GRACE_MS = 5_000;
 
+/** A set-up command is bookkeeping in the CLI's own files; one still going after this is stuck. */
+const PREPARE_TIMEOUT_MS = 15_000;
+
 const STRIPPED = ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT', 'BROWSENTIC_AGENT_RUN'];
 
 /** What a plan is spawned with: stdin stays closed unless the CLI is held in a conversation over it. */
@@ -42,6 +45,12 @@ export function launch(
   signal: AbortSignal,
   stdin: Stdin = 'ignore',
 ): { child: CliProcess; release: () => void; stop: () => void } {
+  stage(kind, mode, plan);
+  return start(kind, settings, plan, signal, stdin);
+}
+
+/** Vets the plan and lays its files down — everything before a process of the CLI exists. */
+function stage(kind: AgentKind, mode: SpawnMode, plan: Plan): void {
   const problems = vetPlan(kind, mode, plan, stateDir);
   if (problems.length) {
     throw new RunError(
@@ -61,7 +70,57 @@ export function launch(
   // alone — so a conversation's folder would be swept a day after its first turn, not its last.
   const now = new Date();
   utimesSync(plan.cwd, now, now);
+}
 
+/** Runs a staged plan's set-up commands, one after another, through the same door as the turn. */
+async function prepare(runner: Runner, settings: AgentSettings, plan: Plan, signal: AbortSignal): Promise<void> {
+  for (const args of plan.prepare ?? []) {
+    if (signal.aborted) throw new RunError('CANCELLED', 'Run cancelled.');
+    await new Promise<void>((resolve, reject) => {
+      let child: CliProcess;
+      try {
+        child = spawnCli(settings.bin, args, { cwd: plan.cwd, env: { ...childEnv(runner.kind), ...plan.env } });
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      let output = '';
+      const kill = () => stopTree(child, 'SIGKILL');
+      const timer = setTimeout(kill, PREPARE_TIMEOUT_MS);
+      signal.addEventListener('abort', kill, { once: true });
+      const done = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', kill);
+      };
+      child.stdout.on('data', (chunk: Buffer) => void (output = (output + chunk.toString()).slice(-2_000)));
+      child.stderr.on('data', (chunk: Buffer) => void (output = (output + chunk.toString()).slice(-2_000)));
+      child.on('error', (error: NodeJS.ErrnoException) => {
+        done();
+        reject(spawnError(runner, settings, error));
+      });
+      child.on('close', (code) => {
+        done();
+        if (signal.aborted) return reject(new RunError('CANCELLED', 'Run cancelled.'));
+        if (code === 0) return resolve();
+        const label = AGENTS[runner.kind].label;
+        reject(
+          new RunError(
+            'AGENT_FAILED',
+            runner.hint?.(output) ?? `${label} could not be set up for this turn: "${args.join(' ')}" exited with code ${code}${tail(output)}`,
+          ),
+        );
+      });
+    });
+  }
+}
+
+function start(
+  kind: AgentKind,
+  settings: AgentSettings,
+  plan: Plan,
+  signal: AbortSignal,
+  stdin: Stdin,
+): { child: CliProcess; release: () => void; stop: () => void } {
   const dropped = sealedAway(kind, process.env);
   if (dropped.length) log(`sealed ${dropped.length} credential-shaped variables out of the ${kind} environment`);
   const env = { ...childEnv(kind), ...plan.env };
@@ -125,7 +184,7 @@ export async function runStream(
   return drive(runner, context, runner.stream(context), signal, emit);
 }
 
-function drive(
+async function drive(
   runner: Runner,
   context: StreamContext,
   plan: Plan,
@@ -134,10 +193,11 @@ function drive(
   conversation?: Conversation,
 ): Promise<RunOutcome> {
   const label = AGENTS[runner.kind].label;
-  const mode = conversation ? 'conversation' : 'run';
+  stage(runner.kind, conversation ? 'conversation' : 'run', plan);
+  await prepare(runner, context.settings, plan, signal);
 
   return new Promise<RunOutcome>((resolve, reject) => {
-    const { child, release, stop } = launch(runner.kind, mode, context.settings, plan, signal, conversation ? 'pipe' : 'ignore');
+    const { child, release, stop } = start(runner.kind, context.settings, plan, signal, conversation ? 'pipe' : 'ignore');
 
     let sessionId: string | null = null;
     let settled = false;

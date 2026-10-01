@@ -354,6 +354,29 @@ describe('spawn containment', () => {
       expect(vetPlan('cursor', 'task', opened, stateDir)).toHaveLength(1);
     });
 
+    test("letting a plugin's MCP server answer a cursor run is caught", () => {
+      const opened = rewriting(cursorRun, '.cursor/cli.json', (content) => content.replace('"Mcp(plugin-*:*)"', '"Mcp(plugin-acme-*:*)"'));
+      expect(vetPlan('cursor', 'run', opened, stateDir)).toHaveLength(1);
+    });
+
+    test('a cursor run may approve its own MCP server first, and nothing else', () => {
+      const approving = (prepare: string[][]) => vetPlan('cursor', 'run', { ...cursorRun, prepare }, stateDir);
+      expect([
+        approving([['mcp', 'enable', 'browsentic']]),
+        approving([['mcp', 'enable', 'linear']]),
+        approving([['mcp', 'enable', 'browsentic', '--all']]),
+        approving([['mcp', 'enable', 'browsentic'], ['mcp', 'login', 'browsentic']]),
+      ].map((problems) => problems.length)).toEqual([0, 1, 1, 1]);
+    });
+
+    test('a set-up step is refused for a task, and for every agent that has none', () => {
+      const prepare = [['mcp', 'enable', 'browsentic']];
+      expect([
+        vetPlan('cursor', 'task', { ...cursorTask, prepare }, stateDir),
+        vetPlan('claude', 'run', { ...planOf('claude', 'run'), prepare }, stateDir),
+      ].map((problems) => problems.length)).toEqual([1, 1]);
+    });
+
     // Without --safe-mode the user's own MCP servers, hooks, extensions and permission rules load
     // beside the ones Browsentic passed, and their own browsentic entry reaches the browser ungated.
     test('dropping --safe-mode is caught on both qwen modes', () => {

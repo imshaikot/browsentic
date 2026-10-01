@@ -23,9 +23,35 @@ const PROMPT = 'AGENTS.md';
 const DENIED = ['Shell(*)', 'Write(**)', 'Read(**)'];
 const WEB_TOOL = 'WebFetch(*)';
 
+/** Every installed plugin's MCP server, `plugin-<plugin>-<server>`, loads in every run. */
+const PLUGIN_SERVERS = 'Mcp(plugin-*:*)';
+
+/**
+ * A project's MCP server loads only once it is approved, and the approval is keyed to its exact
+ * config, which names this run, so each turn approves its own. Measured on 2026.09.18: unapproved,
+ * the model was handed no browser tools at all.
+ */
+const APPROVE = ['mcp', 'enable', MCP_SERVER_NAME];
+
+/** Cursor's own tool for looking up an MCP tool's schema, which it asks for before any call. */
+const LOOKUP = 'getMcpTools';
+
 const cursorHome = () => join(homedir(), '.cursor');
 
 const STATUS_TIMEOUT_MS = 5_000;
+
+/** Measured on 2026.09.18: a call is abandoned at 60 s, and text past 40,000 bytes goes to a file the run cannot read. */
+const LIMITS = { callMs: 60_000, resultBytes: 40_000 };
+
+/**
+ * Cursor hands the model an MCP tool's schema only when asked, through `GetMcpTools`. Left to find
+ * that out, it looks up one tool per model turn; told, it looks up what the job needs in one go.
+ */
+const reachingTheBrowser = `# Reaching the browser from Cursor
+
+Your browser tools are on the \`${MCP_SERVER_NAME}\` MCP server, and Cursor shows you a tool's schema only when you look it up with \`GetMcpTools\`. Start by calling it with \`server: "${MCP_SERVER_NAME}"\` and \`pattern: "^(page_|browsentic_)"\` to see them all, then fetch the schema of every tool this job needs in one step, in parallel, before the first call. The page the user means is the one open in their browser: read it with these tools, never from memory or from the shell.
+
+A tool result longer than ${LIMITS.resultBytes.toLocaleString('en')} bytes is refused, so ask for a page a piece at a time — \`page_getPageInfo\` with a small \`maxPerKind\`, \`page_extractText\` with the cursor it hands back. A call that answers \`APPROVAL_PENDING\` is waiting on the user: make the same call again, with the same input, to keep waiting.`;
 
 interface Content {
   type?: string;
@@ -40,7 +66,6 @@ interface Event {
   tool_call?: Record<string, { args?: Record<string, unknown> } | unknown>;
   message?: { role?: string; content?: Content[] };
   result?: string;
-  usage?: { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number; cacheWriteTokens?: number };
   is_error?: boolean;
   error?: string;
   /** Present on a genuine delta. A buffered flush adds `model_call_id`; a final flush has neither. */
@@ -53,6 +78,11 @@ export const cursorRunner: Runner = {
   versionArgs: ['--version'],
   // Cursor has no effort flag; reasoning is a bracket override inside the model id instead.
   efforts: [],
+  // Both measured on 2026.09.18: a one-shot read a PNG and a PDF correctly.
+  opens: ['text', 'pdf', 'image'],
+  // Measured on 2026.09.18: a resumed turn answered from the AGENTS.md its session began with.
+  keepsFirstPrompt: true,
+  limits: LIMITS,
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'cursor', mode),
 
@@ -73,8 +103,9 @@ export const cursorRunner: Runner = {
         { path: MCP_FILE, content: `${JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: context.mcp } }, null, 2)}\n` },
         { path: RULES, content: permissions({ browser: true, research }) },
         { path: SANDBOX, content: sandbox() },
-        { path: PROMPT, content: `${context.systemPrompt.trim()}\n` },
+        { path: PROMPT, content: `${context.systemPrompt.trim()}\n\n${reachingTheBrowser}\n` },
       ],
+      prepare: [APPROVE],
       args: [
         '-p',
         '--output-format',
@@ -100,6 +131,7 @@ export const cursorRunner: Runner = {
     // `result` supply only whatever the deltas had not already covered.
     let said = '';
     const reported = new Set<string>();
+    const closed = new Set<string>();
 
     const push = (text: string, sink: StreamSink) => {
       if (!text) return;
@@ -131,23 +163,28 @@ export const cursorRunner: Runner = {
         }
 
         case 'tool_call': {
-          if (event.subtype !== 'started') return;
           const id = event.call_id;
-          const name = toolOf(event);
-          if (!id || !name || reported.has(id)) return;
-          reported.add(id);
-          return sink.tool(id, name);
+          const call = callOf(event);
+          if (!id || !call) return;
+          if (event.subtype === 'started') {
+            const name = shownAs(call);
+            if (!name || reported.has(id)) return;
+            reported.add(id);
+            return sink.tool(id, name);
+          }
+          if (event.subtype !== 'completed' || !reported.has(id) || closed.has(id)) return;
+          closed.add(id);
+          const ok = succeeded(call);
+          // The run denies every MCP server but its own, so another one answering means a deny did not hold.
+          if (call.server && ok) {
+            return sink.fail('AGENT_UNSAFE', `Cursor CLI reached the MCP server "${call.server}", which this run denies. The run was stopped.`);
+          }
+          return sink.toolResult(id, ok);
         }
 
+        // `usage` here adds up every model request of the turn, so it says nothing about how full the context is.
         case 'result': {
           if (event.session_id) sink.session(event.session_id);
-          if (event.usage) {
-            const { inputTokens = 0, outputTokens = 0, cacheReadTokens = 0, cacheWriteTokens = 0 } = event.usage;
-            sink.usage({
-              contextTokens: inputTokens + cacheReadTokens + cacheWriteTokens + outputTokens,
-              outputTokens,
-            });
-          }
           if (event.is_error) {
             return sink.fail('AGENT_FAILED', event.error?.trim() || event.result?.trim() || 'Cursor CLI reported an error');
           }
@@ -258,7 +295,7 @@ function permissions({ browser, research, reads }: { browser: boolean; research?
   // A run allows only its own server by name. A task denies every server there is, because the
   // user's global mcp.json still loads and a one-shot must not reach the browser at all.
   const allow = browser ? [`Mcp(${MCP_SERVER_NAME}:*)`] : [];
-  if (browser) deny.push(...otherServers().map((name) => `Mcp(${name}:*)`));
+  if (browser) deny.push(PLUGIN_SERVERS, ...otherServers().map((name) => `Mcp(${name}:*)`));
   else deny.push('Mcp(*)');
   return `${JSON.stringify({ permissions: { allow, deny } }, null, 2)}\n`;
 }
@@ -287,20 +324,43 @@ function otherServers(): string[] {
 const textOf = (content: Content[] | undefined): string =>
   (content ?? []).filter((part) => part.type === 'text').map((part) => part.text ?? '').join('');
 
+interface Call {
+  /** The key it arrives under, less `ToolCall` — `read`, `shell`, `mcp`, `getMcpTools`. */
+  kind: string;
+  /** The MCP server it is for, when it is an MCP call. */
+  server?: string;
+  tool?: string;
+  result?: Record<string, unknown>;
+}
+
 /** A tool call names itself by the key it arrives under — `readToolCall`, `shellToolCall`. */
-function toolOf(event: Event): string | undefined {
+function callOf(event: Event): Call | undefined {
   // `tool_call` also carries toolCallId, startedAtMs and hook contexts; only one key names a tool.
   const [key, value] = Object.entries(event.tool_call ?? {}).find(([name]) => name.endsWith('ToolCall')) ?? [];
   if (!key) return undefined;
-  const args = (value as { args?: Record<string, unknown> } | undefined)?.args;
-  const server = args?.['server'];
-  // The daemon already puts its own MCP calls on the timeline; reporting them again double-draws.
-  if (typeof server === 'string') {
-    if (server === MCP_SERVER_NAME) return undefined;
-    const tool = args?.['name'];
-    return `${server}:${typeof tool === 'string' ? tool : key}`;
-  }
-  return key.replace(/ToolCall$/, '');
+  const { args, result } = (value ?? {}) as { args?: Record<string, unknown>; result?: Record<string, unknown> };
+  // An MCP call names its server as `providerIdentifier`; a schema lookup names it as `server`.
+  const server = [args?.['providerIdentifier'], args?.['serverIdentifier'], args?.['server']].find(
+    (name): name is string => typeof name === 'string' && name !== '',
+  );
+  const tool = [args?.['toolName'], args?.['name']].find((name): name is string => typeof name === 'string');
+  return { kind: key.replace(/ToolCall$/, ''), server: server === MCP_SERVER_NAME ? undefined : server, tool, result };
+}
+
+/**
+ * The row a call opens, or none. The daemon puts its own MCP calls on the timeline as they reach it,
+ * and a schema lookup is Cursor's plumbing rather than something the run did.
+ */
+function shownAs(call: Call): string | undefined {
+  if (call.kind === LOOKUP) return undefined;
+  if (call.kind === 'mcp') return call.server ? `${call.server}:${call.tool ?? 'mcp'}` : undefined;
+  return call.kind;
+}
+
+/** A finished call answers `success`, or `error`, `permissionDenied` and the like. */
+function succeeded(call: Call): boolean {
+  const success = call.result?.['success'] as { isError?: boolean } | undefined;
+  return success !== undefined && success.isError !== true;
 }
 
 /** Cursor colours its output, so a pattern has to see the sentence rather than the escapes. */

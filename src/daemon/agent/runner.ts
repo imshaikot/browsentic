@@ -43,7 +43,7 @@ export async function runInstruction(request: RunRequest): Promise<RunOutcome> {
         settings,
         sessionId: request.sessionId,
         workspace: runner.workspace('run'),
-        mcp: mcpServerFor(request.runId),
+        mcp: mcpServerFor(request.runId, runner.limits),
         mcpTools: request.mcpTools,
         tools: tools.open,
       },

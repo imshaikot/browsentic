@@ -101,6 +101,19 @@ describe('asking the daemon', () => {
     ]);
   });
 
+  test('an action its caller stops waiting for is cancelled with the daemon, under the same id', async () => {
+    const abandoned = new AbortController();
+    const pending = bridge.invoke('page.submitForm', {}, abandoned.signal);
+    await vi.waitFor(() => expect(received).toHaveLength(1));
+    abandoned.abort();
+    const result = await pending;
+    await vi.waitFor(() => expect(received).toHaveLength(2));
+    expect([result, received[1]]).toEqual([
+      { ok: false, error: { code: 'CANCELLED', message: 'The caller stopped waiting for this call.' } },
+      { id: received[0].id, op: 'cancel' },
+    ]);
+  });
+
   test('a reply for a request nobody is waiting on, or one that is not JSON, is ignored', async () => {
     answer = ({ id }) => {
       daemonSide.send('not json');

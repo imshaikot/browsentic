@@ -41,6 +41,7 @@ export interface SpawnPlan {
   readonly cwd: string;
   readonly env?: Readonly<Record<string, string>>;
   readonly files?: readonly { readonly path: string; readonly content: string }[];
+  readonly prepare?: readonly (readonly string[])[];
 }
 
 /**
@@ -83,6 +84,8 @@ interface Requirements {
    * rather than in argv. `files` alone proves a path was written, not that it still says no.
    */
   readonly fileContains?: Readonly<Record<string, readonly string[]>>;
+  /** The only set-up commands the plan may run before its turn, each exactly as written here. */
+  readonly prepare?: readonly (readonly string[])[];
 }
 
 interface Containment {
@@ -307,11 +310,15 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
       required: ['--trust'],
       pairs: [['--sandbox', 'enabled']],
       files: ['.cursor/mcp.json', '.cursor/cli.json', '.cursor/sandbox.json', 'AGENTS.md'],
-      // The deny rules are the containment, so the file has to still carry them at spawn.
+      // The deny rules are the containment, so the file has to still carry them at spawn. Every
+      // plugin's MCP server loads in every run, so those are denied as one pattern.
       fileContains: {
-        '.cursor/cli.json': ['"Shell(*)"', '"Write(**)"', '"Read(**)"', '"Mcp(browsentic:*)"'],
+        '.cursor/cli.json': ['"Shell(*)"', '"Write(**)"', '"Read(**)"', '"Mcp(browsentic:*)"', '"Mcp(plugin-*:*)"'],
         '.cursor/sandbox.json': ['"workspace_readonly"'],
       },
+      // A project's MCP server loads only once approved, and only this one is: not every server
+      // the user has, which is what `--approve-mcps` would do.
+      prepare: [['mcp', 'enable', 'browsentic']],
     },
     task: {
       required: ['--trust'],
@@ -458,6 +465,13 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     if (content === undefined) continue;
     const missing = needles.filter((needle) => !content.includes(needle));
     if (missing.length) problems.push(`${label} writes a ${path} missing ${missing.join(', ')}.`);
+  }
+
+  for (const command of plan.prepare ?? []) {
+    const allowed = (rules.prepare ?? []).some(
+      (expected) => expected.length === command.length && expected.every((arg, i) => arg === command[i]),
+    );
+    if (!allowed) problems.push(`${label} would run "${command.join(' ')}" before its turn, which is not a set-up step it is allowed.`);
   }
 
   const banned = [...FORBIDDEN, ...(CONTAINMENT[kind].forbidden ?? [])];

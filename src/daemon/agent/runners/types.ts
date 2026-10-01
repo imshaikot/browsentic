@@ -26,6 +26,19 @@ export interface Plan {
   files?: WorkspaceFile[];
   /** Written to the CLI's stdin, which is then closed: what is too long, or too page-made, for argv. */
   input?: string;
+  /**
+   * Commands of the same CLI run in `cwd` once its files are written and before the turn starts,
+   * for set-up no flag can say. Each one is vetted like the turn's own argv.
+   */
+  prepare?: string[][];
+}
+
+/** What a CLI does to every tool call, which the daemon has to work inside of. */
+export interface CallLimits {
+  /** The CLI abandons a call that takes longer than this, whatever it is waiting on. */
+  callMs?: number;
+  /** The CLI keeps a call's text from the model when it is longer than this many UTF-8 bytes. */
+  resultBytes?: number;
 }
 
 export interface StreamContext {
@@ -129,6 +142,8 @@ export interface Runner {
    * passes, so what changed since has to reach it in the turn's own message.
    */
   keepsFirstPrompt?: boolean;
+  /** Limits this CLI puts on a browser tool call; unset where it waits and takes whatever comes. */
+  limits?: CallLimits;
   json(context: JsonContext): Plan;
   /** What a one-shot of this CLI is known to open when handed a file. Text alone when unsaid. */
   opens?: readonly FileKind[];

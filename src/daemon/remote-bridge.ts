@@ -37,12 +37,14 @@ export class RemoteBridge implements Bridge {
     return reply && 'tools' in reply ? { tools: reply.tools, reserved: reply.reserved, withheld: reply.withheld } : { tools: [] };
   }
 
-  async invoke(action: string, input?: unknown): Promise<ActionResult> {
+  async invoke(action: string, input?: unknown, signal?: AbortSignal): Promise<ActionResult> {
     const reply = await this.request(
       { id: randomUUID(), op: 'invoke', action, input, runId: this.runId, keepAlive: true },
       invokeTimeoutFor(action, input),
+      signal,
     );
     if (reply && 'result' in reply) return reply.result;
+    if (signal?.aborted) return failure('CANCELLED', 'The caller stopped waiting for this call.');
     return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not respond');
   }
 
@@ -84,12 +86,17 @@ export class RemoteBridge implements Bridge {
     this.socket.close(1000, 'client exiting');
   }
 
-  private request(request: ControlRequest, timeoutMs = REQUEST_TIMEOUT_MS): Promise<ControlMessage | null> {
-    if (this.socket.readyState !== WebSocket.OPEN) return Promise.resolve(null);
+  private request(request: ControlRequest, timeoutMs = REQUEST_TIMEOUT_MS, signal?: AbortSignal): Promise<ControlMessage | null> {
+    if (this.socket.readyState !== WebSocket.OPEN || signal?.aborted) return Promise.resolve(null);
     return new Promise((resolve) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
+      const cancel = () => {
+        if (this.socket.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ id: request.id, op: 'cancel' }));
+        finish(null);
+      };
       const finish = (message: ControlMessage | null) => {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
         this.pending.delete(request.id);
         resolve(message);
       };
@@ -99,6 +106,7 @@ export class RemoteBridge implements Bridge {
       };
       wait();
       this.pending.set(request.id, (message) => ('op' in message && message.op === 'working' ? wait() : finish(message)));
+      signal?.addEventListener('abort', cancel, { once: true });
       this.socket.send(JSON.stringify(request));
     });
   }
