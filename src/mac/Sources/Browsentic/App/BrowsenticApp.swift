@@ -28,7 +28,7 @@ struct BrowsenticApp: App {
                         .disabled(model.phase != .main)
                 }
             }
-            CommandMenu("Daemon") {
+            CommandMenu("Bridge") {
                 Button(model.daemon == .on ? "Turn Off" : "Turn On") { Task { await model.setDaemon(on: model.daemon == .off) } }
                     .keyboardShortcut("d", modifiers: [.command, .shift])
                     .disabled(model.phase != .main || (model.daemon != .on && model.daemon != .off))
@@ -87,7 +87,7 @@ private struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text("Daemon: \(model.daemon.label)\(model.status.map { " · 127.0.0.1:\($0.port)" } ?? "")")
+        Text("Browsentic Bridge: \(model.daemon.label)\(model.status.map { " · 127.0.0.1:\($0.port)" } ?? "")")
         if let status = model.status {
             Text(status.connected ? "Extension connected" : "Extension not connected")
         }

@@ -43,7 +43,7 @@ struct ActivityView: View {
             Card {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        SectionTitle(title: "Captured downloads", subtitle: "Files an agent pulled off a page. The daemon sweeps them after two weeks.")
+                        SectionTitle(title: "Captured downloads", subtitle: "Files an agent pulled off a page. Browsentic Bridge sweeps them after two weeks.")
                         Spacer()
                         if let downloads = model.downloads, !downloads.downloads.isEmpty {
                             Button("Delete all") { confirmingDownloads = true }.buttonStyle(QuietButtonStyle(tint: Palette.danger))

@@ -13,7 +13,7 @@ Read in order, these pages follow a request through all of them:
 | | |
 | --- | --- |
 | **1.** [Overview](overview.md) | The four processes, and why a Manifest V3 extension forces a daemon |
-| **2.** [Transport](transport.md) | Ports, the `Origin` gate, the mutual pairing handshake, protocol versioning |
+| **2.** [Transport](transport.md) | Ports, the `Origin` gate, the mutual pairing handshake, the protocol window |
 | **3.** [The action registry](registry.md) | One definition compiled into two bundles; names, drift detection, reserved actions |
 | **4.** [Request path](request-path.md) | Path A — an MCP client's tool call reaching the page |
 | **5.** [Inside the extension](extension.md) | Background vs content script, self-healing injection, tab scoping |
@@ -24,6 +24,7 @@ Read in order, these pages follow a request through all of them:
 | **10.** [Contributing](contributing.md) | Build topology, the checks, and adding a capability |
 | **11.** [The macOS app](mac-app.md) | What is native, what stays in the daemon, and how the payload is laid down |
 | **12.** [The Windows app](windows-app.md) | The same app in Tauri and React, the launcher, the PATH, and how it updates |
+| **13.** [Store listings](stores.md) | The Chrome Web Store and Edge Add-ons IDs, submitting an update, and every field the dashboards ask for |
 
 Looking for an error code? [reference/errors.md](../reference/errors.md).
 

@@ -8,7 +8,7 @@ struct LogsView: View {
         Card(padding: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    SectionTitle(title: "Daemon log", subtitle: Paths.tilde(Paths.log))
+                    SectionTitle(title: "Browsentic Bridge log", subtitle: Paths.tilde(Paths.log))
                     Spacer()
                     Toggle("Follow", isOn: $following).toggleStyle(.switch).controlSize(.small).tint(Palette.brand)
                         .font(.system(size: 12)).foregroundStyle(Palette.inkDim)

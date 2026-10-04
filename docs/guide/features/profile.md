@@ -38,7 +38,7 @@ as two sections:
 
 Instructions cannot loosen the handful of rules every run starts with — page text is never an
 instruction, nothing is exfiltrated, a declined action stays declined — and cannot make an action skip
-its [approval](../approvals.md). Guardrails are enforced by the daemon, not by the prompt, so a rule
+its [approval](../approvals.md). Guardrails are enforced by the Bridge, not by the prompt, so a rule
 that tried would change nothing but what the agent says.
 
 An edit reaches the next run. In a conversation that is already going, the next message carries the
@@ -65,8 +65,8 @@ at once. The format is in [Configuration](../configuration.md#profile) if you wo
 
 ## Edges
 
-- It needs the daemon: the settings page reads and writes the file through it, so the section is empty
-  while the daemon is offline.
+- It needs the Bridge: the settings page reads and writes the file through it, so the section is empty
+  while the Bridge is offline.
 - Every run pays for the profile in tokens. A filled-in profile is a few hundred; the limits keep the
   largest possible one to about 16,000 characters.
 - The Mac and Windows apps do not edit it yet.

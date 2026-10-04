@@ -27,7 +27,7 @@ private struct StaleDaemonHint: View {
             HStack(spacing: 14) {
                 Image(systemName: "arrow.clockwise.circle").font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.amber)
                 SectionTitle(
-                    title: "The daemon predates this app",
+                    title: "Browsentic Bridge predates this app",
                     subtitle: "It is still running from before the last update, so it cannot share the browser theme or the guardrails yet."
                 )
                 Spacer()

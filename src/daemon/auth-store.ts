@@ -8,6 +8,8 @@ const authPath = join(stateDir, 'auth.json');
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTWXYZ23456789';
 const CODE_LENGTH = 8;
 const PAIRING_TTL_MS = 10 * 60 * 1000;
+/** The app, a terminal and a second terminal can each be showing one; a new code must not void theirs. */
+const LIVE_PAIRINGS = 3;
 
 export interface Session {
   key: string;
@@ -51,8 +53,10 @@ export function createPairing(): { code: string; expiresAt: number } {
     { length: CODE_LENGTH },
     () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)],
   ).join('');
-  const expiresAt = Date.now() + PAIRING_TTL_MS;
-  write({ ...auth, pairings: [{ code, expiresAt }] });
+  const now = Date.now();
+  const expiresAt = now + PAIRING_TTL_MS;
+  const live = auth.pairings.filter((pairing) => pairing.expiresAt > now).slice(1 - LIVE_PAIRINGS);
+  write({ ...auth, pairings: [...live, { code, expiresAt }] });
   return { code, expiresAt };
 }
 

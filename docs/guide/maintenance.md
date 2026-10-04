@@ -4,15 +4,25 @@
 
 ## Updating
 
+Each half updates on its own, and they don't have to be the same version. Browsentic Bridge 0.8
+works with the extension from 0.7.14 on, older or newer than itself, so a store copy that updates
+first, or last, keeps working.
+
+| What | How |
+| --- | --- |
+| The extension from the Chrome Web Store | Updates itself when the browser checks, every few hours. **Update** at `chrome://extensions`, with Developer mode on, checks now |
+| The Firefox add-on | Updates itself: every release publishes a signed `.xpi` and an `updates.json` beside it, Firefox polls that file about once a day, and **Check for Updates** in `about:addons` polls it now |
+| Browsentic Bridge, from the Mac or Windows app | The app's **Update now** card ([macOS](mac-app.md#updating), [Windows](windows-app.md#updating)) |
+| Browsentic Bridge, from `npx` or `npm` | `browsentic update`, below |
+| An unpacked copy | `browsentic update` rewrites the folder, then press ↻ on its card |
+
 ```sh
 browsentic update
 ```
 
-That refreshes two things, in order: **the command itself**, then the extension it carries.
-
-The Firefox add-on is not carried by the package. It updates itself: every release publishes a
-signed `.xpi` and an `updates.json` beside it, Firefox polls that file about once a day, and
-**Check for Updates** in `about:addons` polls it now. `browsentic update` still refreshes the daemon.
+That refreshes, in order: **the command itself**, restarting the Bridge on it, then the unpacked
+extension folder if you load one. A store copy is not in the package; `update` says it updates
+itself.
 
 The first half matters more than it sounds. `npx browsentic setup` does not put anything on your
 `PATH` — it runs the package out of npm's own throwaway cache, and npm names that directory after
@@ -20,7 +30,7 @@ the spec it was asked for, records the version it resolved *the first time*, and
 without asking the registry again. So a machine set up with `npx` keeps running whatever version it
 first saw, and since the extension ships inside the package, `update` had nothing newer to install
 and reported "already current" every time. It now checks the registry, replaces the stale cache, and
-re-runs itself under the new version.
+re-runs itself under the new version. `npx browsentic@latest` asks the registry every time.
 
 `--no-self-update` skips the check, and a pinned `npx browsentic@<version>` is never upgraded past —
 a pin is a decision, not a stale cache.
@@ -32,17 +42,17 @@ git pull
 yarn setup
 ```
 
-Either way the last step is yours: **nothing reloads itself.** Chrome does not auto-reload an
-unpacked extension, so press ↻ on the Browsentic card at `chrome://extensions`. `browsentic update`
-has already replaced the daemon; from a clone, `browsentic restart` is that half, because a running
-daemon keeps the old build in memory until it is swapped out.
+An unpacked copy is the one thing that never reloads itself: press ↻ on its card at
+`chrome://extensions`. `browsentic update` has already replaced the Bridge; from a clone,
+`browsentic restart` is that half, because a running Bridge keeps the old build in memory until it
+is swapped out. `browsentic status` names each browser's version, and says which unpacked copy to
+reload.
 
-`browsentic status` names both versions when they disagree, and says which one to reload.
-
-**Rebuild both halves together.** If only one side is rebuilt, `browsentic status` reports
-`manifest: DRIFTED`. The daemon then falls back to the tools the browser actually has and tells
-your MCP clients the list changed — it degrades loudly rather than into tool calls that fail at the
-far end — but you should fix the drift rather than run on it.
+**When the two halves list different tools.** A store copy a version ahead of the Bridge, or behind
+it, can carry a different set of tools. The Bridge then serves the tools the browser actually has
+and tells your MCP clients the list changed, and `browsentic status` reports `tools: the
+extension's own list`. That is normal while one side waits on its update. From a clone, rebuild both
+halves together.
 
 Your pairing survives updates. `yarn daemon:link` only needs re-running if the link is broken.
 
@@ -58,7 +68,7 @@ Nothing is lost by it — accepting reconnects the pairing you already had.
 
 ### Why `yarn daemon:build` alone changes nothing
 
-The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
+The Bridge has no start command: the first CLI or MCP client that needs it spawns it, and it lives
 until `browsentic stop` or 30 idle minutes with nothing attached. A rebuild does not touch the
 process already running.
 
@@ -73,16 +83,16 @@ the fresh build.
 browsentic uninstall
 ```
 
-On Firefox, remove the add-on from `about:addons` as well — it was installed from a file, not from
-the directory this command removes.
+Remove the extension from each browser as well (right-click its toolbar icon → **Remove**, or
+`about:addons` in Firefox): a store copy was never in the directories this command removes.
 
 It prints exactly what it is about to remove and asks before removing any of it:
 
 | | |
 | --- | --- |
-| daemon | Whatever is *answering* on 8765–8767, not what the lockfile claims. Sessions are revoked through it first, so a connected browser is told it is unpaired rather than left to discover it |
+| Bridge | Whatever is *answering* on 8765–8767, not what the lockfile claims. Sessions are revoked through it first, so a connected browser is told it is unpaired rather than left to discover it |
 | state | `~/.browsentic` — pairing keys, config, approvals, logs |
-| files | `~/browsentic` — the unpacked extension, skills, site maps, screenshots, captured downloads |
+| files | `~/browsentic` — the unpacked extension if you used one, skills, site maps, screenshots, captured downloads |
 | npx cache | Every `~/.npm/_npx/*` directory holding a copy of the package |
 
 | Flag | Does |
@@ -91,9 +101,10 @@ It prints exactly what it is about to remove and asks before removing any of it:
 | `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal, since there is nobody to ask |
 | `--keep-skills` | Leave `skills/` behind. Nothing else has a copy of your site maps |
 
-**Remove the card at `chrome://extensions` first.** That is the one step no command can do for you,
-and doing it afterwards leaves the browser holding a folder that is no longer there. It is also what
-clears recordings and held secrets, which live in extension storage rather than on disk.
+**Remove the extension from your browsers first.** That is the one step no command can do for you.
+It is also what clears recordings and held secrets, which live in extension storage rather than on
+disk, and for an unpacked copy, doing it afterwards leaves the browser holding a folder that is no
+longer there.
 
 Two things it names but will not touch: the command itself (`npm rm -g browsentic`, or
 `yarn daemon:unlink` from a clone) and the entry in your MCP client
@@ -114,8 +125,8 @@ never notices — it holds its port for as long as the machine is up, and nothin
 lockfile, so it finds that one too.
 
 If you would rather do it by hand, the order is: `browsentic revoke`, `browsentic stop`, remove the
-card at `chrome://extensions`, `rm -rf ~/.browsentic ~/browsentic`, then delete every
-`~/.npm/_npx/*` directory containing `node_modules/browsentic`. `revoke` needs the daemon, so it
+extension from each browser, `rm -rf ~/.browsentic ~/browsentic`, then delete every
+`~/.npm/_npx/*` directory containing `node_modules/browsentic`. `revoke` needs the Bridge, so it
 comes before `stop`; the cache is the step people miss.
 
 What those directories held is listed in [internals/state.md](../internals/state.md) — worth a look
@@ -131,7 +142,7 @@ yarn dev              # build, launch a throwaway Chrome profile, hot reload
 yarn dev:firefox
 yarn build            # production build
 yarn zip              # store-ready archive
-yarn daemon:dev          # rebuild the daemon on change
+yarn daemon:dev          # rebuild the Bridge on change
 yarn daemon:restart      # rebuild, then swap the running daemon for the fresh build
 yarn daemon:manifest     # print the tool manifest, no browser needed
 yarn check            # both type checks plus both fixture suites

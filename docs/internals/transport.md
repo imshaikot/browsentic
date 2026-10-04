@@ -68,7 +68,7 @@ The extension connects to nothing until you pair it.
    three ports, and sends `hello` — which names *which* secret it holds and a fresh nonce, never the
    secret itself.
 3. The daemon answers `challenge` with a nonce of its own. Both sides now share a transcript:
-   protocol version, extension version, manifest hash, and the two nonces. The manifest hash
+   the protocol version the `hello` claimed, extension version, manifest hash, and the two nonces. The manifest hash
    names the tool list this build offers — a Chromium build's or a Firefox build's, which leaves
    off the nine tools that need Chrome's debugger. The daemon knows both lists and serves the one
    the hash names; an unknown hash is a drifted build, which is asked for its list and served
@@ -82,7 +82,8 @@ The extension connects to nothing until you pair it.
    distinct, so an impostor cannot reflect the extension's own proof back at it.
 6. On pairing, the daemon mints a **session key** (32 random bytes) bound to the **install id**
    the `hello` carried — a UUID the extension mints once per browser profile. The origin cannot
-   name a browser: every Chromium browser loading the same unpacked folder presents the same one.
+   name a browser: every browser installing from the same store, or loading the same unpacked
+   folder, presents the same one.
    A session paired before install ids existed is found by its origin and claimed by whichever
    browser proves its key. The daemon returns the key XORed with a keystream derived from the same secret, so the long-lived credential
    never crosses the wire in the clear. It survives browser and daemon restarts and dies only when
@@ -111,8 +112,25 @@ dialling — but it never deletes the stored key. Only pairing again or `disconn
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **21**). A mismatch closes the socket
-with an explicit reason instead of letting two incompatible frame vocabularies talk past each other.
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **22**). They used to have to match
+exactly. A store copy updates when its browser decides to, not when the daemon does, so the
+extension and the daemon are now routinely a version apart, and the daemon takes a **window**:
+
+- It lets in any extension whose `hello` claims `MIN_EXTENSION_PROTOCOL` (22) or more, newer than
+  itself included, and builds the transcript from the number the `hello` claimed, so the proofs
+  verify across versions. Older ones are refused with `protocol version mismatch: …`, the words an
+  extension before 0.8 already reads as a refusal not worth retrying.
+- A `hello` may carry `minDaemonProtocol`, the oldest daemon that extension works with. A daemon
+  below it refuses with `daemon too old: …`.
+- `welcome` carries the daemon's own `protocolVersion`, so a newer extension knows what not to
+  send. A `welcome` without one comes from a daemon before 0.8, which speaks 22 or less.
+
+**The rule for changing it.** A change a peer can do without — a new frame, a new optional field —
+bumps `SOCKET_PROTOCOL_VERSION`, and the new frame is sent only to a peer whose `hello` (or
+`welcome`) says it speaks that number. Anything the daemon does not know, it leaves unanswered. Only
+a change neither side can do without raises a minimum. A refusal must never strand a browser: the
+v0.8.0 store build unpairs on any refusal and does not retry, so no daemon may refuse protocol 22
+until a store build that retries has replaced it.
 
 ---
 

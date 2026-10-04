@@ -20,7 +20,7 @@ struct BrowsersView: View {
                             }
                         }
                         if model.sessions.isEmpty {
-                            EmptyState(icon: "globe", title: "No browser is paired", detail: "Get a pairing code above and paste it into the Browsentic popup.")
+                            EmptyState(icon: "globe", title: "No browser is paired", detail: "Add the extension from the Overview tab, or get a code above and enter it in the Browsentic popup.")
                         } else {
                             ForEach(model.sessions) { SessionRow(session: $0) }
                         }
@@ -46,7 +46,7 @@ private struct SessionRow: View {
                     Text(browser).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.ink)
                 }
                 Text(session.extensionId).font(.code(12)).foregroundStyle(session.browser == nil ? Palette.ink : Palette.inkDim).textSelection(.enabled)
-                Text("Extension v\(session.extensionVersion) · paired \(Timestamp.ago(session.pairedAt)) · seen \(Timestamp.ago(session.lastSeenAt))")
+                Text("\(SourceLabel.of(session.source)) · v\(session.extensionVersion) · paired \(Timestamp.ago(session.pairedAt)) · seen \(Timestamp.ago(session.lastSeenAt))")
                     .font(.system(size: 11.5))
                     .foregroundStyle(Palette.inkDim)
             }

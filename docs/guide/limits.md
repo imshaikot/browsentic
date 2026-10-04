@@ -97,7 +97,7 @@ yet, so the popup, the docs and the release notes say *beta*. What that means in
 
 ## Windows is experimental
 
-The daemon runs on Windows and its tests run there on every change. On a Windows 11 desktop it has
+The Bridge runs on Windows and its tests run there on every change. On a Windows 11 desktop it has
 been set up, paired and driven from the side panel by Claude Code; a cancelled run, the other agents
 and the [Windows app](windows-app.md) have not been taken through one yet. Until they have:
 
@@ -153,7 +153,7 @@ a partial image.
 `page_trustedClick`, the two captcha tools, the four [diagnostics](features/diagnostics.md) tools
 and the two [page-code](features/page-actions.md) tools are built on the Chrome DevTools Protocol,
 which Firefox does not expose. A Firefox build leaves them off the list it offers, so an agent
-running there never sees them and the daemon reports the shorter list as in sync. A stale skill or
+running there never sees them and the Bridge reports the shorter list as in sync. A stale skill or
 recording that still names one gets `UNSUPPORTED`, with a hint. There is no fallback for the
 diagnostics ones — a page's console and network activity are not reachable any other way.
 
@@ -175,13 +175,23 @@ was. See [Theming](features/theming.md).
 
 ## Loopback ports
 
-The daemon binds the first free port of 8765, 8766, 8767. If all three are taken it will not start.
+Browsentic Bridge binds the first free port of 8765, 8766, 8767. If all three are taken it will not
+start.
+
+## The Bridge's wake-up helper
+
+So a browser can start Browsentic Bridge when it is down, setup registers a native messaging host
+with each browser it finds. Only Browsentic's own extensions may launch it — the Chrome Web Store and
+Edge Add-ons copies by their IDs, the unpacked folder, and the signed Firefox add-on — and it does
+nothing but start the Bridge. The trust boundary is unchanged: your user account. Opera, and Vivaldi
+and Arc on Windows, are not registered yet, so there the Bridge starts with the app, a command or an
+MCP client instead.
 
 ## Unpacked extension
 
-Installing from source means Chrome will not auto-update it, and will not auto-reload it after a
-rebuild — press ↻ at `chrome://extensions`. Chrome may also prompt about developer-mode extensions
-on each launch.
+An unpacked copy — `setup --unpacked`, or a source build — is not updated by any store, and the
+browser will not reload it after a rebuild or an update: press ↻ at `chrome://extensions`. Chrome may
+also prompt about developer-mode extensions on each launch. The store copies have neither problem.
 
 ---
 

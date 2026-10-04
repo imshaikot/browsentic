@@ -23,6 +23,8 @@ struct BrowserSession: Decodable, Identifiable, Equatable {
     let sessionId: String?
     let browser: String?
     let origin: String
+    /// Where its extension came from; absent from a daemon before 0.8, which knew only the unpacked copy.
+    let source: String?
     let extensionVersion: String
     let pairedAt: String
     let lastSeenAt: String
@@ -30,7 +32,7 @@ struct BrowserSession: Decodable, Identifiable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "id"
-        case browser, origin, extensionVersion, pairedAt, lastSeenAt, connected
+        case browser, origin, source, extensionVersion, pairedAt, lastSeenAt, connected
     }
 
     var id: String { sessionId ?? origin }
@@ -213,11 +215,52 @@ struct DownloadListing: Decodable, Equatable {
 
 struct SetupResult: Decodable {
     struct Daemon: Decodable { let port: Int; let pid: Int }
+    struct Chosen: Decodable { let id: String; let opened: Bool; let connected: Bool }
     let version: String
-    let extensionDir: String
+    /// Set only when the unpacked folder was written or was already there.
+    let extensionDir: String?
     let daemon: Daemon
     let alreadyPaired: Bool
+    let chosen: Chosen?
     let pairingCode: String?
+    let expiresAt: Double?
+}
+
+/// One browser as `browsentic browsers --json` describes it: where it gets the extension, and the copies it runs.
+struct BrowserRow: Decodable, Identifiable, Equatable {
+    struct Copy: Decodable, Equatable {
+        let id: String
+        let source: String?
+        let extensionVersion: String
+        let connected: Bool
+    }
+
+    let id: String
+    let label: String
+    let installed: Bool
+    let source: String
+    let store: String
+    let storeUrl: String
+    let steps: [String]
+    let extensionsPage: String
+    let connected: Bool
+    let sessions: [Copy]
+
+    var copy: Copy? { sessions.first(where: \.connected) ?? sessions.first }
+    var addTitle: String { id == "firefox" ? "Get the Firefox add-on" : "Add to \(label)" }
+}
+
+struct BrowserListing: Decodable { let browsers: [BrowserRow] }
+
+enum SourceLabel {
+    static func of(_ source: String?) -> String {
+        switch source {
+        case "chrome-web-store": "Chrome Web Store"
+        case "edge-add-ons": "Edge Add-ons"
+        case "firefox": "Firefox add-on"
+        default: "unpacked"
+        }
+    }
 }
 
 struct InstallStamp: Decodable, Equatable {

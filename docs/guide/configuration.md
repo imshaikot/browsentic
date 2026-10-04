@@ -2,7 +2,7 @@
 
 Everything is optional. Browsentic works with no config file at all.
 
-Settings live in `~/.browsentic/config.json`. The daemon re-reads it before every run, so an edit
+Settings live in `~/.browsentic/config.json`. The Bridge re-reads it before every run, so an edit
 applies to the next thing you ask — no restart. It also watches the file, so the extension's settings
 page and the Mac app show a hand edit the moment you save it.
 
@@ -95,9 +95,9 @@ Every rule id and what it does, plus the three that the panel shows but will not
 | --- | --- | --- |
 | `screenshotDir` | `~/browsentic/screenshot` | Where captures taken with `save: true` are written, mode `0600` |
 | `downloadDir` | `~/browsentic/download` | Where files captured with `page_captureDownload` are written, mode `0600` |
-| `downloadTtlDays` | `14` | How long a captured download is kept before the daemon sweeps it. Fractions allowed — `0.5` is twelve hours |
+| `downloadTtlDays` | `14` | How long a captured download is kept before the Bridge sweeps it. Fractions allowed — `0.5` is twelve hours |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live |
-| `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup` installed the unpacked extension. Written for you by `setup --dir`, and read back by `update` so it refreshes the copy the browser actually loaded. Changing it by hand means loading the new folder in the browser again, because the extension ID follows the path |
+| `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup --unpacked` writes the unpacked extension. Written for you by `--dir`, and read back by `update` so it refreshes the copy the browser actually loaded. Changing it by hand means loading the new folder in the browser again, because the extension ID follows the path |
 
 ## Site mapping
 
@@ -128,7 +128,7 @@ offers, so the preview is the thing itself.
 
 One theme serves every paired browser: picking one anywhere repaints the panel, the popup and the
 settings page in all of them. A browser that has never been paired keeps its choice to itself and
-hands it to the daemon when it first connects; one picked while the daemon is unreachable is handed
+hands it to the Bridge when it first connects; one picked while the Bridge is unreachable is handed
 over at the next connect. The Mac app's own window keeps its separate System / Light / Dark setting.
 
 ### The Extension section
@@ -174,7 +174,7 @@ and every field in it is optional:
 | `instructions` | 4,000 characters | Kept on every task |
 
 An entry that breaks a limit, or a key the page does not know, is left out rather than cut short —
-the daemon logs that it did. What the agent is told, and what is refused, is in
+the Bridge logs that it did. What the agent is told, and what is refused, is in
 [Profile](features/profile.md).
 
 ---

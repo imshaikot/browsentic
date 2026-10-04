@@ -2,13 +2,26 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
-import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type ModelList } from '@/lib/agents/catalog';
+import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type AgentState, type ModelList } from '@/lib/agents/catalog';
+import { SOURCE_LABEL } from '@/lib/stores';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { formatWhen } from '@/lib/format-when';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { agentSkills } from './agent/agent-skills';
+import {
+  BROWSER_IDS,
+  BROWSERS,
+  browserOf,
+  browserRows,
+  isBrowserId,
+  locateBrowsers,
+  openPage,
+  type BrowserId,
+  type BrowserRow,
+} from './browsers';
+import type { SessionSummary } from './control';
 import { forgetGrants, listGrants } from './agent/approvals';
 import { describeMoment, describeRule } from '@/lib/schedules/rule';
 import { findTask, readSchedules, setEnabled, setPaused, updateSchedules } from './schedules/store';
@@ -22,21 +35,24 @@ import { log } from './log';
 import { installKind } from './npx';
 import { installNativeHost, registeredBrowsers, removeNativeHost, serveNativeHost } from './native-host';
 import { extensionDir } from './paths';
-import { RELEASES_PAGE, signedAddonAttached, signedAddonUrl } from './firefox-addon';
+import { RELEASES_PAGE, signedAddonAttached } from './firefox-addon';
 import { RemoteBridge } from './remote-bridge';
 import { upgradeCli } from './self-update';
 import { createMcpServer } from './server';
 import { planUninstall, purgeNpxCache, removeAll } from './uninstall';
 import pkg from './package.json';
 
-const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent you already run
+const USAGE = `browsentic ${pkg.version} — Browsentic Bridge, the half of Browsentic that runs on your computer
 
-  browsentic setup            install the extension, start the daemon, print a pairing code
-                              --browser firefox: link the signed add-on instead of installing a folder
-  browsentic update           pull the newest build — the command itself, then the extension
-  browsentic uninstall        stop the daemon and remove everything Browsentic wrote
+  browsentic setup            start the Bridge, then add the extension to a browser and pair the two
+                              --browser chrome|edge|brave|arc|vivaldi|opera|chromium|firefox skips the question
+                              --unpacked loads it from a folder instead of a store
+                              --no-open, --no-wait: print the store link, and do not wait for the browser
+  browsentic update           update the Bridge, and the unpacked folder if you load one; store copies update themselves
+  browsentic uninstall        stop the Bridge and remove everything Browsentic wrote
+  browsentic browsers         the browsers on this computer, where each gets the extension, and which are connected
   browsentic pair             issue a one-time code to type into the extension
-  browsentic status           daemon, extension and agent state
+  browsentic status           the Bridge, each paired browser, and the agent
   browsentic sessions         list paired browsers
   browsentic revoke [id]      unpair one browser by the id "sessions" prints, or all of them
 
@@ -55,13 +71,13 @@ const USAGE = `browsentic ${pkg.version} — hand your real browser to the agent
   browsentic downloads        list the files captured from pages, and where they were saved
   browsentic downloads clear  delete all of them
   browsentic tools            print the bundled tool manifest (no browser needed)
-  browsentic logs             print the daemon log
-  browsentic start            bring the background daemon up, if it is not already
-  browsentic stop             stop the background daemon
-  browsentic restart          stop the daemon and bring up a fresh one
+  browsentic logs             print the Bridge's log
+  browsentic start            bring the Bridge up in the background, if it is not already
+  browsentic stop             stop the Bridge
+  browsentic restart          stop the Bridge and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
 
-  agent, skills, approvals, tasks and downloads take --json, which is what the desktop app reads.
+  setup, browsers, agent, skills, approvals, tasks and downloads take --json, which is what the apps read.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -70,6 +86,19 @@ For MCP clients
   browsentic mcp              serve MCP over stdio — what a client runs, not what you type
       claude mcp add browsentic -- browsentic mcp
 `;
+
+// Above the switch, like USAGE: it runs the command before execution reaches the bottom of this
+// file, and the bundle hoists a constant declared down there as an undefined var.
+const AGENTS_GUIDE = 'https://browsentic.com/docs/guide/agents/';
+const WAIT_MS = 5 * 60_000;
+const SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+/** Offered when no browser is found, since detection can miss one installed somewhere unusual. */
+const USUAL_BROWSERS: BrowserId[] = ['chrome', 'edge', 'brave', 'firefox'];
+
+const APP_REMOVAL = {
+  darwin: 'drag Browsentic.app from Applications to the Trash',
+  win32: 'uninstall Browsentic in Settings › Apps › Installed apps',
+} as const;
 
 // `browsentic mcp` is the MCP server. The legacy `browsentic-mcp` bin keeps serving on bare
 // invocation, because an MCP client config is literally {"command": "browsentic-mcp"} with no
@@ -107,6 +136,9 @@ switch (command) {
     break;
   case 'sessions':
     await showSessions();
+    break;
+  case 'browsers':
+    await showBrowsers();
     break;
   case 'revoke':
     await revoke(process.argv[3]);
@@ -245,70 +277,110 @@ async function showStatus(): Promise<void> {
       ? 'not registered — run "browsentic setup"'
       : wakeHeld()
         ? `held since "browsentic stop" — "browsentic start" lets ${waking.join(', ')} start it again`
-        : `${waking.join(', ')} can start the daemon`
+        : `${waking.join(', ')} can start the Bridge`
   }`;
   if (!lock) {
-    console.log('daemon:    not running');
+    console.log('bridge:    not running');
     console.log(wake);
-    console.log('extension: unknown (start an MCP client, or run a tool, to launch the daemon)');
+    console.log('browsers:  unknown until it runs ("browsentic start", or open a browser that can start it)');
     return;
   }
   const bridge = await RemoteBridge.connect(lock.port, lock.token);
   const status = await bridge.status();
+  const sessions = await bridge.sessions();
   const agents = await bridge.agent();
   await bridge.close();
   const active = agents.runners.find((runner) => runner.kind === agents.active);
-  console.log(`daemon:    running on 127.0.0.1:${status.port} (pid ${lock.pid}, v${status.daemonVersion})`);
+  console.log(`bridge:    running on 127.0.0.1:${status.port} (pid ${lock.pid}, v${status.daemonVersion})`);
   console.log(wake);
-
-  // "Updated the CLI, never reloaded the extension" is the failure this reports. Without it
-  // the only symptom is a drifted manifest, which names no cause the user can act on.
-  const installedIn = extensionDir(readAgentConfig().extensionDir);
-  const stamp = readStamp(installedIn);
-  if (stamp) {
-    const stale = status.connected && status.extensionVersion !== stamp.version;
-    console.log(
-      `installed: v${stamp.version} at ${installedIn}` +
-        (stale ? ', press ↻ at chrome://extensions to load it' : ''),
-    );
-  }
-  console.log(`extension: ${status.connected ? `connected (v${status.extensionVersion})` : 'not connected'}`);
   console.log(
     `agent:     ${AGENTS[agents.active].label} — ${active?.ready ? active.version ?? 'ready' : active?.problem?.message ?? 'unavailable'}`,
   );
-  console.log(`manifest:  ${status.manifestInSync ? 'in sync' : 'DRIFTED — extension and CLI were built from different registries'}`);
+
+  // An unpacked copy is the one thing an update cannot reach: "updated, never pressed ↻" is the
+  // failure the reload hint names. A store copy updates when its browser says, so it gets none.
+  const stamp = readStamp(extensionDir(readAgentConfig().extensionDir));
+  if (!sessions.length) {
+    console.log('browsers:  none paired — "browsentic setup" adds the extension to one');
+  } else {
+    console.log('browsers:');
+    for (const session of sessions) {
+      const page = BROWSERS[browserOf(session.browser) ?? 'chrome'].extensionsPage;
+      const stale = session.source === 'unpacked' && stamp && session.extensionVersion !== stamp.version;
+      console.log(
+        `  ${session.connected ? '●' : '○'} ${(session.browser ?? session.origin).padEnd(16)} v${session.extensionVersion.padEnd(8)} ` +
+          `${SOURCE_LABEL[session.source ?? 'unpacked'].padEnd(17)} ${session.connected ? 'connected' : 'not connected'}` +
+          (stale ? `, ↻ at ${page} loads v${stamp.version}` : ''),
+      );
+    }
+    for (const label of doubledBrowsers(sessions)) {
+      console.log(`  ! Two copies of Browsentic answer in ${label}. Remove the unpacked one from its extensions page.`);
+    }
+  }
   console.log(
-    `paired:    ${status.pairedBrowsers || 'none'}${status.pairingPending ? ' (a pairing code is outstanding)' : ''}`,
+    `tools:     ${status.manifestInSync ? 'in sync' : `the extension's own list (extension v${status.extensionVersion}, Bridge v${status.daemonVersion})`}`,
   );
-  if (!status.pairedBrowsers) console.log('\nRun "browsentic setup" to install the extension, or "browsentic pair" if it is already loaded.');
+  if (status.pairingPending) console.log('pairing:   a code is waiting to be entered');
+}
+
+/** A browser where a store copy and an unpacked one are both connected: both inject, both answer. */
+function doubledBrowsers(sessions: SessionSummary[]): string[] {
+  const connected = sessions.filter((session) => session.connected && session.browser);
+  return [...new Set(connected.map((session) => session.browser!))].filter(
+    (browser) => new Set(connected.filter((session) => session.browser === browser).map((session) => session.source)).size > 1,
+  );
+}
+
+async function showBrowsers(): Promise<void> {
+  const lock = await probeExisting();
+  let sessions: SessionSummary[] = [];
+  if (lock) {
+    const bridge = await RemoteBridge.connect(lock.port, lock.token);
+    sessions = await bridge.sessions();
+    await bridge.close();
+  }
+  const rows = browserRows(sessions, locateBrowsers(), pkg.version);
+  if (wantsJson) {
+    const dir = extensionDir(readAgentConfig().extensionDir);
+    console.log(JSON.stringify({ running: !!lock, browsers: rows, unpacked: { dir, version: readStamp(dir)?.version ?? null } }, null, 2));
+    return;
+  }
+  const shown = rows.filter((row) => row.installed || row.sessions.length);
+  if (!shown.length) console.log('No supported browser found. Chrome, Edge, Brave, Arc, Vivaldi, Opera and Firefox all work.');
+  for (const row of shown) {
+    const state = row.connected ? 'connected' : row.sessions.length ? 'paired, not connected' : 'not added';
+    console.log(`${row.connected ? '●' : '○'} ${row.label.padEnd(9)} ${row.store.padEnd(17)} ${state}`);
+  }
+  if (!lock) console.log('\nThe Bridge is not running, so which are connected is unknown.');
+  console.log('\nAdd the extension to one with "browsentic setup --browser <name>".');
 }
 
 // Stops what is *answering*, not what the lockfile claims. A daemon outlives a deleted
 // ~/.browsentic and goes on holding its port, and that orphan is the one people hit.
 async function stop(): Promise<void> {
   const { stopped, stubborn } = await stopDaemons();
-  for (const daemon of stopped) console.log(`Stopped daemon (pid ${daemon.pid}) on 127.0.0.1:${daemon.port}.`);
+  for (const daemon of stopped) console.log(`Stopped the Bridge (pid ${daemon.pid}) on 127.0.0.1:${daemon.port}.`);
   for (const daemon of stubborn) {
-    console.error(`Daemon (pid ${daemon.pid}) on 127.0.0.1:${daemon.port} would not exit — kill it by hand.`);
+    console.error(`The Bridge (pid ${daemon.pid}) on 127.0.0.1:${daemon.port} would not exit — kill it by hand.`);
   }
-  if (!stopped.length && !stubborn.length) console.log('No daemon is answering; nothing to stop.');
+  if (!stopped.length && !stubborn.length) console.log('The Bridge is not answering; nothing to stop.');
   console.log('A paired browser leaves it stopped until "browsentic start", or an MCP client, starts it again.');
   if (stubborn.length) process.exitCode = 1;
 }
 
 async function start(): Promise<void> {
   const lock = await ensureDaemon();
-  console.log(`Daemon running on 127.0.0.1:${lock.port} (pid ${lock.pid}, v${lock.daemonVersion}).`);
+  console.log(`Browsentic Bridge running on 127.0.0.1:${lock.port} (pid ${lock.pid}, v${lock.daemonVersion}).`);
 }
 
 async function restart(): Promise<void> {
   const { stubborn } = await stopDaemons();
   if (stubborn.length) {
-    console.error(`Daemon (pid ${stubborn[0].pid}) is still exiting — try again in a moment.`);
+    console.error(`The Bridge (pid ${stubborn[0].pid}) is still exiting — try again in a moment.`);
     process.exit(1);
   }
   const fresh = await ensureDaemon();
-  console.log(`Daemon running on 127.0.0.1:${fresh.port} (pid ${fresh.pid}, v${fresh.daemonVersion}).`);
+  console.log(`Browsentic Bridge running on 127.0.0.1:${fresh.port} (pid ${fresh.pid}, v${fresh.daemonVersion}).`);
 }
 
 function showLogs(): void {
@@ -321,7 +393,7 @@ function showLogs(): void {
 
 function printToken(): void {
   const lock = readLockfile();
-  if (!lock) return console.error('No daemon lockfile yet — start the daemon first.');
+  if (!lock) return console.error('No lockfile yet — start the Bridge first ("browsentic start").');
   console.log(lock.token);
 }
 
@@ -345,15 +417,18 @@ function groupCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-function wakeLine(browsers: string[]): string {
-  return browsers.length
-    ? `✓ Wake-up    ${browsers.join(', ')} can start the daemon when it is down`
-    : '· Wake-up    no supported browser found, so start the daemon yourself after a reboot';
+/** What setup was asked to put where. No browser at all means print the plan and stop. */
+interface Choice {
+  /** Absent for "another browser", which is only ever loaded unpacked. */
+  browser?: BrowserId;
+  unpacked: boolean;
 }
 
 /**
- * Install the extension, bring up the daemon, and hand back a pairing code. The two steps
- * left after this happen inside the browser, so only the user can do them.
+ * Brings Browsentic Bridge up, then gets the extension into a browser and pairs the two. On a
+ * terminal it asks which browser and waits for it to connect; told the browser, it skips the
+ * question; with neither it prints the plan, so a script, the release's smoke test or an app
+ * never sits on a question nobody can answer.
  */
 async function setup(argv: string[]): Promise<void> {
   const flag = (name: string) => argv.includes(`--${name}`);
@@ -362,181 +437,270 @@ async function setup(argv: string[]): Promise<void> {
     return at === -1 ? undefined : argv[at + 1];
   };
 
-  // A stale command installs a stale extension, silently, and under npx it will keep doing so
-  // for as long as the cache lives — which is what makes `update` look like it does nothing.
-  // Replace the command first and let the fresh one do the install.
+  // A stale command installs a stale Bridge, silently, and under npx it will keep doing so for as
+  // long as the cache lives — which is what makes `update` look like it does nothing. Replace the
+  // command first and let the fresh one do the rest.
   if (!flag('no-self-update')) {
     const code = await upgradeCli(pkg.version, process.argv.slice(2));
     if (code !== null) process.exit(code);
   }
 
-  const browser = valueOf('browser') ?? 'chrome';
-  if (browser !== 'chrome' && browser !== 'firefox') {
-    console.error(`Unknown browser "${browser}". Supported: chrome, firefox`);
+  const named = valueOf('browser');
+  if (named !== undefined && !isBrowserId(named)) {
+    console.error(`Unknown browser "${named}". Pick one of: ${BROWSER_IDS.join(', ')}`);
     process.exit(1);
   }
   const json = flag('json');
-  if (browser === 'firefox') return setupFirefox({ json, restart: flag('restart'), pair: !flag('no-pair') });
+  const interactive = !json && !named && !flag('unpacked') && !flag('no-pair') && !!process.stdin.isTTY && !!process.stdout.isTTY;
 
-  // An explicit --dir is remembered, so `update` lands in the same place rather than laying
-  // down a second copy at the default path and leaving the browser pointed at the first.
-  const chosen = valueOf('dir');
-  const dir = extensionDir(chosen ?? readAgentConfig().extensionDir);
-  if (chosen) rememberExtensionDir(chosen);
+  // An explicit --dir is remembered, so `update` lands in the same place rather than laying down a
+  // second copy at the default path and leaving the browser pointed at the first.
+  const chosenDir = valueOf('dir');
+  if (chosenDir) rememberExtensionDir(chosenDir);
+  const dir = extensionDir(chosenDir ?? readAgentConfig().extensionDir);
 
-  let result;
-  try {
-    result = install(dir, flag('force'));
-  } catch (error) {
-    if (error instanceof InstallError) {
-      console.error(`\n  ${error.message}`);
-      if (error.hint) console.error(`  ${error.hint}`);
-      console.error();
-      process.exit(1);
-    }
-    throw error;
-  }
-
-  // Restart first, then read the lockfile. A daemon that keeps running holds the previous
-  // build's action registry in memory, which surfaces later as an unexplained manifest drift.
-  // Reading the lock before the restart would also report the pid that just went away.
+  // Restart first, then read the lockfile. A daemon that keeps running holds the previous build's
+  // action registry in memory, and reading the lock before the restart reports a pid that is gone.
   if (flag('restart')) await restart();
   const lock = await ensureDaemon();
   const wake = installNativeHost(fileURLToPath(import.meta.url));
-
-  // --no-pair means mint no code, not learn nothing: `update` still has to know whether this
-  // browser is paired, because that decides whether what is left to do is "load unpacked" or
-  // the one step an update actually needs, which is pressing ↻.
   const bridge = await RemoteBridge.connect(lock.port, lock.token);
-  const sessions = await bridge.sessions();
-  const alreadyPaired = sessions.some((session) => session.origin.startsWith('chrome-extension://'));
-  const code = alreadyPaired || flag('no-pair') ? undefined : (await bridge.pair()).code;
-  await bridge.close();
+  try {
+    const since = new Date().toISOString();
+    const located = locateBrowsers();
+    const sessions = await bridge.sessions();
+    const rows = browserRows(sessions, located, pkg.version);
 
-  if (json) {
-    console.log(
-      JSON.stringify(
-        {
-          version: result.version,
-          extensionDir: dir,
-          daemon: { port: lock.port, pid: lock.pid },
-          nativeHost: wake,
-          alreadyPaired,
-          pairingCode: code,
-        },
-        null,
-        2,
-      ),
-    );
-    return;
+    if (!json) {
+      console.log(`\n  Browsentic ${pkg.version} — your browser's superpower\n`);
+      console.log(`  ✓ Browsentic Bridge  running on 127.0.0.1:${lock.port} (pid ${lock.pid})`);
+      console.log(`  ${wakeLine(wake.browsers)}`);
+      for (const line of agentLines(await bridge.agent())) console.log(`  ${line}`);
+      console.log();
+    }
+
+    const choice: Choice | null = flag('unpacked')
+      ? { browser: named, unpacked: true }
+      : named
+        ? { browser: named, unpacked: false }
+        : interactive
+          ? await ask(rows)
+          : null;
+
+    // Written for whoever loads it unpacked, and kept current for whoever already does.
+    const folder = choice?.unpacked || readStamp(dir) ? writeExtension(dir, flag('force')) : null;
+
+    const row = choice?.browser ? rows.find((candidate) => candidate.id === choice.browser) : undefined;
+    const settled = row?.sessions.find((session) => session.connected && (session.source === 'unpacked') === choice!.unpacked);
+    const code = flag('no-pair') || settled ? undefined : await bridge.pair();
+    const found = row && located.find((candidate) => candidate.id === row.id);
+    const opened = !!(row && found && !choice!.unpacked && !settled && !flag('no-open'));
+    if (opened) openPage(row!.storeUrl, found);
+
+    if (json) {
+      console.log(
+        JSON.stringify(
+          {
+            version: pkg.version,
+            daemon: { port: lock.port, pid: lock.pid },
+            nativeHost: wake,
+            extensionDir: folder ? dir : null,
+            unpacked: folder && { version: folder.version, changed: folder.changed, alreadyCurrent: folder.alreadyCurrent },
+            alreadyPaired: sessions.length > 0,
+            chosen: row ? { id: row.id, unpacked: choice!.unpacked, opened, connected: !!settled } : null,
+            pairingCode: code?.code,
+            expiresAt: code?.expiresAt,
+            browsers: rows,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    if (folder) {
+      const state = folder.alreadyCurrent ? 'already current' : `${folder.changed} file(s) written`;
+      console.log(`  ✓ Unpacked copy      ${dir}, ${state}\n`);
+    }
+
+    if (!choice) return printPlan(rows, sessions, folder?.version, code);
+    if (settled) {
+      console.log(`  ${row!.label} is already connected: Browsentic ${settled.extensionVersion} from the ${SOURCE_LABEL[settled.source ?? 'unpacked']}.`);
+      console.log(choice.unpacked ? `  Press ↻ on its card at ${row!.extensionsPage} to load this build.\n` : '  Nothing to do.\n');
+      return;
+    }
+
+    if (choice.unpacked) printUnpackedSteps(dir, row, code);
+    else await printStoreSteps(row!, opened, code);
+    if (!code || flag('no-wait')) return;
+
+    const joined = await waitForBrowser(bridge, since, row?.label ?? 'your browser');
+    if (joined) {
+      const panel = browserOf(joined.browser) === 'firefox' ? 'sidebar' : 'side panel';
+      console.log(`  ✓ ${joined.browser ?? 'Your browser'} is connected: Browsentic ${joined.extensionVersion} from the ${SOURCE_LABEL[joined.source ?? 'unpacked']}.`);
+      console.log(`    Open the ${panel} from the toolbar and tell it what to do.\n`);
+    } else {
+      const until = new Date(code.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      console.log(`  · Not connected yet. Once Browsentic is in ${row?.label ?? 'your browser'}, click it in the toolbar and`);
+      console.log(`    enter the code (it works until ${until}), or get a new one with "browsentic pair".\n`);
+    }
+  } finally {
+    await bridge.close();
   }
+}
 
-  const state = result.alreadyCurrent ? 'already current' : `${result.changed} file(s) written`;
-  console.log(`\n  Browsentic ${result.version}\n`);
-  console.log(`  ✓ Extension  ${dir}`);
-  console.log(`               ${state}`);
-  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})`);
-  console.log(`  ${wakeLine(wake.browsers)}\n`);
+function wakeLine(browsers: string[]): string {
+  return browsers.length
+    ? `✓ Wake-up            ${browsers.join(', ')} can start the Bridge when it is down`
+    : '· Wake-up            no supported browser found, so start the Bridge yourself after a reboot';
+}
 
-  if (alreadyPaired) {
-    console.log(`  This browser is already paired. Press ↻ on the Browsentic card at`);
-    console.log(`  chrome://extensions to pick up this build, and you are done.\n`);
-    console.log(`  Adding another browser? Load the same folder there, then run "browsentic pair".\n`);
-    return;
+function agentLines(state: AgentState): string[] {
+  const ready = state.runners.filter((runner) => runner.ready).map((runner) => runner.kind);
+  const active = AGENTS[state.active].label;
+  if (ready.includes(state.active)) {
+    const others = ready.filter((kind) => kind !== state.active).map((kind) => AGENTS[kind].label);
+    return [`✓ Agent              ${active}${others.length ? ` · also ready: ${others.join(', ')}` : ''}`];
   }
+  if (ready.length) {
+    return [
+      `· Agent              the side panel is set to ${active}, which is not ready. ${AGENTS[ready[0]].label} is:`,
+      `                     switch with "browsentic agent ${ready[0]}"`,
+    ];
+  }
+  return [
+    '· Agent              none ready yet. The side panel runs an agent CLI you are signed in to:',
+    `                       ${AGENTS.claude.install.padEnd(38)} then run "claude" once to sign in`,
+    `                       ${AGENTS.codex.install.padEnd(38)} then run "codex" once to sign in`,
+    `                     Every agent it works with: ${AGENTS_GUIDE}`,
+  ];
+}
 
-  console.log(`  Two steps are left. Both happen inside the browser, so only you can do them.\n`);
-  console.log(`  1. Open  chrome://extensions`);
-  console.log(`     Turn on Developer mode, press "Load unpacked", and choose:\n`);
+async function ask(rows: BrowserRow[]): Promise<Choice | null> {
+  const offered = rows.filter((row) => row.installed || row.sessions.length);
+  const listed = offered.length ? offered : rows.filter((row) => USUAL_BROWSERS.includes(row.id));
+  console.log('  Which browser should get the extension?\n');
+  listed.forEach((row, index) => {
+    const where = row.source === 'firefox' ? 'signed add-on' : row.store;
+    const state = row.connected ? 'connected' : row.installed ? '' : 'not found';
+    console.log(`    ${String(index + 1).padStart(2)}  ${row.label.padEnd(9)} ${where.padEnd(17)} ${state}`.trimEnd());
+  });
+  const another = listed.length + 1;
+  console.log(`    ${String(another).padStart(2)}  Another browser: load it unpacked\n`);
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    for (;;) {
+      const answer = (await rl.question('  › ')).trim().toLowerCase();
+      const picked = Number(answer || '1');
+      if (picked === another || answer === 'unpacked') return { unpacked: true };
+      const row = listed[picked - 1] ?? rows.find((candidate) => candidate.id === answer);
+      if (row) return { browser: row.id, unpacked: false };
+      console.log(`  Type a number from 1 to ${another}.`);
+    }
+  } finally {
+    rl.close();
+    console.log();
+  }
+}
+
+function writeExtension(dir: string, force: boolean) {
+  try {
+    return install(dir, force);
+  } catch (error) {
+    if (!(error instanceof InstallError)) throw error;
+    console.error(`\n  ${error.message}`);
+    if (error.hint) console.error(`  ${error.hint}`);
+    console.error();
+    process.exit(1);
+  }
+}
+
+function codeLines(code: { code: string } | undefined): string[] {
+  return code
+    ? [`enter this code:  ${groupCode(code.code)}`, 'It works once and expires in 10 minutes. Need another? "browsentic pair"']
+    : ['enter a code from "browsentic pair".'];
+}
+
+async function printStoreSteps(row: BrowserRow, opened: boolean, code?: { code: string }): Promise<void> {
+  console.log(opened ? `  Opening the ${row.store} in ${row.label}:` : `  Open this page in ${row.label}:`);
+  console.log(`    ${row.storeUrl}\n`);
+  if (row.id === 'firefox' && (await signedAddonAttached(pkg.version)) === false) {
+    console.log(`  That file is not attached to the ${pkg.version} release yet: Mozilla may still be signing it.`);
+    console.log(`  Give it a few minutes, or take the newest one from ${RELEASES_PAGE}\n`);
+  }
+  if (row.sessions.some((session) => session.connected && session.source === 'unpacked')) {
+    console.log(`  ${row.label} already runs an unpacked copy. Remove it at ${row.extensionsPage} first, or both will answer.\n`);
+  }
+  const [enter, ...rest] = codeLines(code);
+  const steps = [...row.steps, `Click Browsentic in the toolbar (the puzzle piece lists it; pin it there) and ${enter}`];
+  steps.forEach((step, index) => console.log(`    ${index + 1}. ${step}`));
+  for (const line of rest) console.log(`       ${line}`);
+  console.log();
+}
+
+function printUnpackedSteps(dir: string, row: BrowserRow | undefined, code?: { code: string }): void {
+  const [enter, ...rest] = codeLines(code);
+  console.log(`  Load it unpacked in ${row?.label ?? 'your browser'}:\n`);
+  console.log(`    1. Open ${row?.extensionsPage ?? 'its extensions page (chrome://extensions)'} and turn on Developer mode.`);
+  console.log(`    2. Press “Load unpacked” and choose:\n`);
   console.log(`         ${dir}\n`);
-  // Chrome refuses chrome:// URLs given on the command line, so there is no opening this for
+  // Browsers refuse their own pages given on the command line, so there is no opening this for
   // them. The folder picker shortcut is the next best thing, and it is where people stall.
-  if (process.platform === 'darwin') console.log(`     In the folder picker press ⇧⌘G and paste that path.\n`);
-  if (code) {
-    console.log(`  2. Open the Browsentic popup and paste this code:\n`);
-    console.log(`         ${groupCode(code)}\n`);
-    console.log(`     Single use, expires in 10 minutes. Need another? "browsentic pair"\n`);
-  } else {
-    console.log(`  2. Run "browsentic pair" and paste the code into the Browsentic popup.\n`);
-  }
-  console.log(`  Then open the side panel and say what you want.\n`);
+  if (process.platform === 'darwin') console.log(`       In the folder picker press ⇧⌘G and paste that path.`);
+  console.log(`    3. Click Browsentic in the toolbar and ${enter}`);
+  for (const line of rest) console.log(`       ${line}`);
+  console.log();
 }
 
 /**
- * Firefox installs only what addons.mozilla.org has signed, so there is no folder to write.
- * The signed add-on hangs under the GitHub release of this same version, and once installed
- * Firefox keeps it current on its own — which is why `update` lands here with nothing to
- * refresh but the daemon. What is left is the daemon and the pairing.
+ * Nobody to ask. Someone already set up hears what an update leaves them to do; anyone else, where
+ * each browser gets the extension, with the choosing left to them.
  */
-async function setupFirefox({ json, restart: fresh, pair }: { json: boolean; restart: boolean; pair: boolean }): Promise<void> {
-  if (fresh) await restart();
-  const lock = await ensureDaemon();
-  const wake = installNativeHost(fileURLToPath(import.meta.url));
-  const bridge = await RemoteBridge.connect(lock.port, lock.token);
-  const sessions = await bridge.sessions();
-  const alreadyPaired = sessions.some((session) => session.origin.startsWith('moz-extension://'));
-  const code = alreadyPaired || !pair ? undefined : (await bridge.pair()).code;
-  await bridge.close();
-
-  const addon = signedAddonUrl(pkg.version);
-  const attached = await signedAddonAttached(pkg.version);
-
-  if (json) {
-    console.log(
-      JSON.stringify(
-        {
-          version: pkg.version,
-          firefoxAddon: addon,
-          attached,
-          daemon: { port: lock.port, pid: lock.pid },
-          nativeHost: wake,
-          alreadyPaired,
-          pairingCode: code,
-        },
-        null,
-        2,
-      ),
-    );
+function printPlan(rows: BrowserRow[], sessions: SessionSummary[], folderVersion?: string, code?: { code: string }): void {
+  if (sessions.length) {
+    const stale = sessions.filter((session) => session.source === 'unpacked' && folderVersion && session.extensionVersion !== folderVersion);
+    const pages = new Set(stale.map((session) => BROWSERS[browserOf(session.browser) ?? 'chrome'].extensionsPage));
+    if (sessions.some((session) => session.source !== 'unpacked')) console.log('  Store copies update themselves.');
+    for (const page of pages) console.log(`  Press ↻ on the unpacked Browsentic card at ${page} to load this build.`);
+    console.log(`  Adding another browser? "browsentic setup --browser <name>"\n`);
     return;
   }
-
-  console.log(`\n  Browsentic ${pkg.version}\n`);
-  console.log(`  ✓ Daemon     127.0.0.1:${lock.port} (pid ${lock.pid})`);
-  console.log(`  ${wakeLine(wake.browsers)}\n`);
-
-  if (alreadyPaired) {
-    console.log(`  This Firefox is already paired, and it picks up each new build on its own —`);
-    console.log(`  about:addons → the gear → "Check for Updates" does it right now.\n`);
-    console.log(`  Adding another browser? Install the add-on there too, then run "browsentic pair".\n`);
-    return;
-  }
-
-  console.log(`  Firefox installs only what addons.mozilla.org has signed, so there is no folder to load.`);
-  console.log(`  Two steps are left. Both happen inside the browser, so only you can do them.\n`);
-  console.log(`  1. Open this link in Firefox:\n`);
-  console.log(`         ${addon}\n`);
-  console.log(`     It asks whether to let github.com install software, then whether to add`);
-  console.log(`     Browsentic — say yes to both. Or download it and use about:addons → the gear →`);
-  console.log(`     "Install Add-on From File…". Once installed, Firefox keeps it current on its own.\n`);
-  if (attached === false) {
-    console.log(`     That file is not attached to the ${pkg.version} release yet — Mozilla may still be`);
-    console.log(`     signing it. Give it a few minutes, or take the newest one from\n`);
-    console.log(`         ${RELEASES_PAGE}\n`);
-  }
-  if (code) {
-    console.log(`  2. Open the Browsentic popup and paste this code:\n`);
-    console.log(`         ${groupCode(code)}\n`);
-    console.log(`     Single use, expires in 10 minutes. Need another? "browsentic pair"\n`);
-  } else {
-    console.log(`  2. Run "browsentic pair" and paste the code into the Browsentic popup.\n`);
-  }
-  console.log(`  Then open the sidebar and say what you want.\n`);
+  console.log('  Next, add the extension to your browser:\n');
+  const chromeWebStore = rows.filter((row) => row.source === 'chrome-web-store' && row.id !== 'edge').map((row) => row.label);
+  const store = (id: BrowserId) => rows.find((row) => row.id === id)!;
+  console.log(`    ${chromeWebStore.join(', ')}`);
+  console.log(`      ${store('chrome').storeUrl}`);
+  console.log(`    Edge`);
+  console.log(`      ${store('edge').source === 'edge-add-ons' ? store('edge').storeUrl : 'the same page, after “Allow extensions from other stores” at the top'}`);
+  console.log(`    Firefox`);
+  console.log(`      ${store('firefox').storeUrl}\n`);
+  const [enter, ...rest] = codeLines(code);
+  console.log(`  Then click Browsentic in the toolbar and ${enter}`);
+  for (const line of rest) console.log(`  ${line}`);
+  console.log(`  On a terminal, "browsentic setup" asks which browser and walks you through it.\n`);
 }
 
-const APP_REMOVAL = {
-  darwin: 'drag Browsentic.app from Applications to the Trash',
-  win32: 'uninstall Browsentic in Settings › Apps › Installed apps',
-} as const;
+async function waitForBrowser(bridge: RemoteBridge, since: string, label: string): Promise<SessionSummary | null> {
+  const line = `Waiting for ${label} to connect…  (Ctrl-C stops waiting; nothing is undone)`;
+  const spin = !!process.stdout.isTTY;
+  if (!spin) console.log(`  ${line}`);
+  const deadline = Date.now() + WAIT_MS;
+  for (let tick = 0; Date.now() < deadline; tick++) {
+    if (tick % 8 === 0) {
+      const joined = (await bridge.sessions()).find((session) => session.connected && session.pairedAt >= since);
+      if (joined) {
+        if (spin) process.stdout.write('\r\x1b[2K');
+        return joined;
+      }
+    }
+    if (spin) process.stdout.write(`\r  ${SPINNER[tick % SPINNER.length]} ${line}`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  if (spin) process.stdout.write('\r\x1b[2K');
+  return null;
+}
 
 /**
  * Remove Browsentic in one command.
@@ -559,7 +723,7 @@ async function uninstall(argv: string[]): Promise<void> {
   }
 
   console.log('  This removes:\n');
-  for (const daemon of daemons) console.log(`    daemon      127.0.0.1:${daemon.port}, pid ${daemon.pid}`);
+  for (const daemon of daemons) console.log(`    Bridge      127.0.0.1:${daemon.port}, pid ${daemon.pid}`);
   const waking = registeredBrowsers();
   if (waking.length) console.log(`    wake-up     the native host registered with ${waking.join(', ')}`);
   for (const removal of plan.removals) {
@@ -578,10 +742,10 @@ async function uninstall(argv: string[]): Promise<void> {
   }
 
   console.log('\n  You will have to remove these yourself:\n');
-  console.log('    the Browsentic card at chrome://extensions. Do that first — remove the');
-  console.log('    directory while the card is loaded and the browser is left holding a');
-  console.log('    broken one. It is also what clears recordings and held secrets, which');
-  console.log('    live in extension storage rather than on disk.');
+  console.log('    Browsentic in each browser: right-click its toolbar icon and choose Remove.');
+  console.log('    That is also what clears recordings and held secrets, which live in the');
+  console.log('    extension’s storage rather than on disk. Remove an unpacked copy first:');
+  console.log('    take its folder away while it is loaded and the browser holds a broken one.');
   if (kind === 'global') console.log('\n    the command itself:  npm rm -g browsentic');
   if (kind === 'repo') console.log('\n    the global link:     yarn daemon:unlink');
   if (kind === 'app') console.log(`\n    the app itself:      ${APP_REMOVAL[process.platform === 'win32' ? 'win32' : 'darwin']}`);
@@ -616,7 +780,7 @@ async function uninstall(argv: string[]): Promise<void> {
       await bridge.close();
       if (revoked) console.log(`  ✓ Unpaired   ${revoked} browser${revoked === 1 ? '' : 's'}`);
     } catch {
-      console.log('  · Unpair     skipped, the daemon did not answer');
+      console.log('  · Unpair     skipped, the Bridge did not answer');
     }
   }
 
@@ -625,8 +789,8 @@ async function uninstall(argv: string[]): Promise<void> {
   if (unregistered.length) console.log(`  ✓ Wake-up    unregistered from ${unregistered.length} place${unregistered.length === 1 ? '' : 's'}`);
 
   const { stopped, stubborn } = await stopDaemons();
-  if (stopped.length) console.log(`  ✓ Daemon     stopped (pid ${stopped.map((daemon) => daemon.pid).join(', ')})`);
-  for (const daemon of stubborn) console.log(`  ✗ Daemon     pid ${daemon.pid} would not exit — kill it by hand`);
+  if (stopped.length) console.log(`  ✓ Bridge     stopped (pid ${stopped.map((daemon) => daemon.pid).join(', ')})`);
+  for (const daemon of stubborn) console.log(`  ✗ Bridge     pid ${daemon.pid} would not exit — kill it by hand`);
 
   for (const outcome of removeAll(plan.removals)) {
     if (!outcome.removed) console.log(`  ✗ ${outcome.removal.path} — ${outcome.error}`);
@@ -640,7 +804,7 @@ async function uninstall(argv: string[]): Promise<void> {
     else console.log(`  ✗ ${purge.entry.dir} — ${purge.error}`);
   }
 
-  console.log('\n  Done. Remove the card at chrome://extensions if you have not.\n');
+  console.log('\n  Done. Remove Browsentic from your browsers if you have not.\n');
   if (stubborn.length) process.exitCode = 1;
 }
 
@@ -653,7 +817,9 @@ async function showSessions(): Promise<void> {
   }
   for (const session of sessions) {
     console.log(`${session.connected ? '●' : '○'} ${session.browser ?? session.origin}  ${session.id}`);
-    console.log(`    ${session.origin}, extension v${session.extensionVersion}, paired ${session.pairedAt}, last seen ${session.lastSeenAt}`);
+    console.log(
+      `    ${SOURCE_LABEL[session.source ?? 'unpacked']} (${session.origin}), extension v${session.extensionVersion}, paired ${session.pairedAt}, last seen ${session.lastSeenAt}`,
+    );
   }
 }
 

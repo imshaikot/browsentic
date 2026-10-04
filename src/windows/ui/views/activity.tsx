@@ -54,7 +54,7 @@ export function ActivityView({ model, state }: { model: Model; state: State }) {
         <div className="space-y-3">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <SectionTitle title="Captured downloads" subtitle="Files an agent pulled off a page. The daemon sweeps them after two weeks." />
+              <SectionTitle title="Captured downloads" subtitle="Files an agent pulled off a page. Browsentic Bridge sweeps them after two weeks." />
             </div>
             {downloads.length > 0 && (
               <QuietButton tint="danger" onClick={() => setConfirming('downloads')}>

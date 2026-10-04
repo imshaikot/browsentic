@@ -4,6 +4,7 @@ import { AGENT_LIST, type AgentDescriptor, type AgentKind } from '@/lib/agents/c
 import type { GuardrailValue } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
 import type { ThemeId } from '@/lib/settings/theme';
+import type { BrowserRow } from '@/daemon/browsers';
 import type {
   AgentListing,
   AppInfo,
@@ -29,10 +30,13 @@ export type DaemonPhase = 'off' | 'starting' | 'on' | 'stopping';
 export type Tab = 'overview' | 'browsers' | 'agents' | 'skills' | 'activity' | 'logs' | 'settings' | 'about';
 export const TABS: Tab[] = ['overview', 'browsers', 'agents', 'skills', 'activity', 'logs', 'settings', 'about'];
 
-export type CheckId = 'system' | 'node' | 'command' | 'extensionFiles' | 'browser' | 'agent';
-export const CHECKS: CheckId[] = ['system', 'node', 'command', 'extensionFiles', 'browser', 'agent'];
-/** What "Set up everything" installs on its own. A browser and an agent are the user's pick. */
-export const INSTALLS_AUTOMATICALLY: CheckId[] = ['node', 'command', 'extensionFiles'];
+export type CheckId = 'system' | 'node' | 'command' | 'browser' | 'agent';
+export const CHECKS: CheckId[] = ['system', 'node', 'command', 'browser', 'agent'];
+/** What "Set up everything" installs on its own. A browser, the extension and an agent are the user's pick. */
+export const INSTALLS_AUTOMATICALLY: CheckId[] = ['node', 'command'];
+
+/** Asked of the command whenever it has to run setup with nobody to answer it. */
+const QUIET_SETUP = ['setup', '--no-pair', '--no-open', '--no-wait', '--no-self-update', '--json'];
 
 export type CheckState =
   | { kind: 'waiting' }
@@ -77,6 +81,8 @@ export interface State {
   downloads?: DownloadListing;
   stamp?: InstallStamp | null;
   browsers: Browser[];
+  /** Every browser `browsentic browsers` knows, where it gets the extension, and the copies it runs. */
+  browserRows: BrowserRow[];
   logText: string;
   commandLink?: CommandLink;
   update?: Release;
@@ -151,6 +157,7 @@ export const initialState = (): State => ({
   preferencesUnsupported: false,
   grants: [],
   browsers: [],
+  browserRows: [],
   logText: '',
   updatePhase: { kind: 'idle' },
   busy: [],
@@ -207,9 +214,17 @@ export class Model {
     return INSTALLS_AUTOMATICALLY.some((id) => !isPassed(this.state.checks[id]));
   }
 
+  /** Only an unpacked copy waits for ↻: a store copy updates when its browser says. */
   get extensionNeedsReload() {
-    const { stamp, status } = this.state;
-    return !!stamp && !!status?.connected && !!status.extensionVersion && status.extensionVersion !== stamp.version;
+    const { stamp, sessions } = this.state;
+    return !!stamp && sessions.some((session) => session.connected && session.source === 'unpacked' && session.extensionVersion !== stamp.version);
+  }
+
+  /** The browsers worth a row: found on this computer or already paired, else the usual few to try. */
+  get offeredBrowsers() {
+    const rows = this.state.browserRows;
+    const found = rows.filter((row) => row.installed || row.sessions.length > 0);
+    return found.length ? found : rows.filter((row) => ['chrome', 'edge', 'brave', 'firefox'].includes(row.id));
   }
 
   // Preflight
@@ -251,7 +266,7 @@ export class Model {
           const node = await this.backend.locateNode();
           this.set({ node });
           if (!node) {
-            return { kind: 'missing', text: `Version ${MINIMUM_NODE} or newer runs the daemon. A private copy goes in ${this.short(`${this.state.info?.paths.state}${this.sep}runtime`)}.` };
+            return { kind: 'missing', text: `Version ${MINIMUM_NODE} or newer runs Browsentic Bridge. A private copy goes in ${this.short(`${this.state.info?.paths.state}${this.sep}runtime`)}.` };
           }
           return { kind: 'passed', text: `${node.version} · ${node.isPrivate ? 'private copy' : this.short(node.path)}` };
         }
@@ -263,24 +278,14 @@ export class Model {
           if (!bundled) return { kind: 'failed', text: 'This copy of Browsentic carries no CLI payload. Download a fresh one from browsentic.com.' };
           if (current) return { kind: 'passed', text: `v${bundled} in ${cli}` };
           if (installed && installed !== bundled) return { kind: 'missing', text: `v${installed} is installed; this app carries v${bundled}.` };
-          return { kind: 'missing', text: `Installs the CLI and daemon into ${cli}.` };
-        }
-        case 'extensionFiles': {
-          const stamp = await this.backend.extensionStamp();
-          this.set({ stamp });
-          const bundled = this.state.info?.payload.bundled;
-          const dir = this.short(this.state.info?.paths.extensionDir ?? '');
-          if (!bundled) return { kind: 'failed', text: 'This copy of Browsentic carries no CLI payload. Download a fresh one from browsentic.com.' };
-          if (!stamp) return { kind: 'missing', text: `Unpacks to ${dir}, where the browser loads it from.` };
-          if (stamp.version !== bundled) return { kind: 'missing', text: `v${stamp.version} is unpacked; this app carries v${bundled}.` };
-          return { kind: 'passed', text: `v${stamp.version} in ${dir}` };
+          return { kind: 'missing', text: `Installs the command and what runs in the background into ${cli}.` };
         }
         case 'browser': {
           const browsers = await this.backend.browsers();
           this.set({ browsers });
           return browsers.length
             ? { kind: 'passed', text: browsers.map((browser) => browser.name).join(', ') }
-            : { kind: 'advisory', text: 'None found. Chrome, Edge, Brave, Vivaldi or Opera all work.' };
+            : { kind: 'advisory', text: 'None found. Chrome, Edge, Brave, Vivaldi, Opera or Firefox all work.' };
         }
         case 'agent': {
           const found = await this.backend.agentsOnPath(AGENT_LIST.map((agent) => agent.bin));
@@ -299,7 +304,7 @@ export class Model {
   private finishingUpdate() {
     const asked = stored(FINISH_UPDATE) === 'true';
     store(FINISH_UPDATE, null);
-    return asked && (!isPassed(this.state.checks.command) || !isPassed(this.state.checks.extensionFiles)) && isPassed(this.state.checks.node);
+    return asked && !isPassed(this.state.checks.command) && isPassed(this.state.checks.node);
   }
 
   async setUpEverything() {
@@ -328,21 +333,19 @@ export class Model {
         }
         case 'command': {
           this.requireNode();
-          this.check(id, { kind: 'working', text: `Copying the CLI into ${this.short(`${this.state.info?.paths.state}${this.sep}cli`)}` });
+          this.check(id, { kind: 'working', text: `Copying Browsentic Bridge into ${this.short(`${this.state.info?.paths.state}${this.sep}cli`)}` });
           const wasRunning = !!(await this.backend.readLock()) && !!this.state.info?.payload.installed;
           if (wasRunning) await this.backend.cli(['stop']);
           await this.backend.installPayload();
           if (wasRunning) {
-            this.check(id, { kind: 'working', text: 'Restarting the daemon on the new build' });
+            this.check(id, { kind: 'working', text: 'Restarting Browsentic Bridge on the new build' });
             await this.run(['start']);
           }
+          // Registers it with every browser, store copies included, so a browser can start it.
+          this.check(id, { kind: 'working', text: 'Letting your browsers start it' });
+          parseJson(await this.backend.cli(QUIET_SETUP, 120), 'setup');
           break;
         }
-        case 'extensionFiles':
-          this.requireNode();
-          this.check(id, { kind: 'working', text: 'Unpacking the extension' });
-          parseJson(await this.backend.cli(['setup', '--no-pair', '--no-self-update', '--json'], 120), 'setup');
-          break;
         case 'agent': {
           this.requireNode();
           this.check(id, { kind: 'working', text: `npm install --global ${CLAUDE_CODE}` });
@@ -369,6 +372,7 @@ export class Model {
     this.set({ phase: 'main' });
     this.startPolling();
     void this.refreshCommandLink();
+    void this.loadBrowsers();
     if (this.state.startDaemonOnLaunch && this.state.daemon === 'off') void this.setDaemon(true);
     this.watchForUpdates();
   }
@@ -415,6 +419,7 @@ export class Model {
       const status = (await this.control({ op: 'status' })).status as BridgeStatus;
       const sessions = (await this.control({ op: 'sessions' })).sessions as SessionSummary[];
       const stamp = await this.backend.extensionStamp();
+      const changed = linkOf(sessions) !== linkOf(this.state.sessions);
       this.set((state) => ({
         lock,
         status,
@@ -424,6 +429,7 @@ export class Model {
         pairing: state.pairing && status.pairingPending && state.pairing.expiresAt > Date.now() ? state.pairing : undefined,
       }));
       if (!this.state.agents) await this.loadAgents();
+      if (changed) void this.loadBrowsers();
     } catch {
       await this.backend.controlClose();
       this.markOff();
@@ -581,9 +587,31 @@ export class Model {
     });
   }
 
+  async loadBrowsers() {
+    if (!this.state.node) return;
+    try {
+      this.set({ browserRows: parseJson<{ browsers: BrowserRow[] }>(await this.backend.cli(['browsers', '--json']), 'browsers').browsers });
+    } catch {
+      /* The card falls back to the usual browsers until the command answers. */
+    }
+  }
+
+  /**
+   * Opens the browser's store page in that browser and hands out the code its popup asks for. The
+   * command opens it where it found the browser; anywhere else, the default browser gets the page.
+   */
+  addExtension(row: BrowserRow) {
+    return this.perform(`add:${row.id}`, async () => {
+      const result = parseJson<SetupResult>(await this.backend.cli(['setup', '--browser', row.id, '--no-wait', '--no-self-update', '--json'], 120), 'setup');
+      if (!result.chosen?.opened) await this.backend.openUrl(row.storeUrl);
+      if (result.pairingCode && result.expiresAt) this.set({ pairing: { code: result.pairingCode, expiresAt: result.expiresAt } });
+      this.say(`${row.steps[0]} Then click Browsentic in ${row.label}’s toolbar and enter the code below.`);
+    });
+  }
+
   reinstallExtension() {
     return this.perform('extension', async () => {
-      const result = parseJson<{ version: string }>(await this.backend.cli(['setup', '--no-pair', '--no-self-update', '--force', '--json'], 120), 'setup');
+      const result = parseJson<SetupResult>(await this.backend.cli(['setup', '--unpacked', '--no-pair', '--no-open', '--no-wait', '--no-self-update', '--force', '--json'], 120), 'setup');
       this.set({ stamp: await this.backend.extensionStamp() });
       this.say(`Extension v${result.version} written. Press ↻ on its card at chrome://extensions.`);
     });
@@ -705,7 +733,7 @@ export class Model {
 
   private async control(frame: Record<string, unknown>, timeoutMs?: number) {
     const reply = await this.backend.controlRequest(frame, timeoutMs);
-    if (typeof reply.error === 'object' && reply.error) throw new Error(String((reply.error as { message?: unknown }).message ?? 'The daemon refused that.'));
+    if (typeof reply.error === 'object' && reply.error) throw new Error(String((reply.error as { message?: unknown }).message ?? 'Browsentic Bridge refused that.'));
     return reply;
   }
 
@@ -756,7 +784,7 @@ export class Model {
     const link = status ? ` · extension ${status.connected ? 'connected' : 'not connected'}` : '';
     await this.backend
       .trayStatus({
-        summary: `Daemon: ${label}${status ? ` · 127.0.0.1:${status.port}` : ''}${link}`,
+        summary: `Browsentic Bridge: ${label}${status ? ` · 127.0.0.1:${status.port}` : ''}${link}`,
         toggle: daemon === 'on' ? 'Turn Off' : 'Turn On',
         canToggle: phase === 'main' && (daemon === 'on' || daemon === 'off'),
         canRestart: daemon === 'on',
@@ -765,10 +793,21 @@ export class Model {
   }
 }
 
+/** What `setup --json` reports that the app acts on. */
+interface SetupResult {
+  version: string;
+  chosen: { id: string; opened: boolean; connected: boolean } | null;
+  pairingCode?: string;
+  expiresAt?: number;
+}
+
+/** Which copies are connected, as one string: a change is what makes the browser rows worth reading again. */
+const linkOf = (sessions: SessionSummary[]) => sessions.map((session) => `${session.id}:${session.connected}`).join(',');
+
 export function outcome<T>(result: unknown): T {
   const answer = result as { ok?: boolean; data?: T; error?: { message?: string } } | undefined;
   if (answer?.ok && answer.data !== undefined) return answer.data;
-  throw new Error(answer?.error?.message ?? 'The daemon answered with something this app cannot read. Update the app.');
+  throw new Error(answer?.error?.message ?? 'Browsentic Bridge answered with something this app cannot read. Update the app.');
 }
 
 export function messageOf(error: unknown): string {

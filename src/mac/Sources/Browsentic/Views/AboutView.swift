@@ -10,7 +10,7 @@ struct AboutView: View {
         let rows: [About.Row?] = [
             About.Row(label: "App", value: model.appVersion),
             About.Row(label: "Command", value: Payload.installedVersion ?? "not installed"),
-            About.Row(label: "Daemon", value: daemonVersion.map { [$0, status.map { "port \($0.port)" }].compactMap { $0 }.joined(separator: " · ") } ?? "off"),
+            About.Row(label: "Bridge", value: daemonVersion.map { [$0, status.map { "port \($0.port)" }].compactMap { $0 }.joined(separator: " · ") } ?? "off"),
             status.map { About.Row(label: "Protocol", value: String($0.protocolVersion)) },
             About.Row(label: "Extension", value: [model.stamp.map { "\($0.version) unpacked" }, loaded ?? "not connected"].compactMap { $0 }.joined(separator: " · ")),
             About.agent(model.agents).map { About.Row(label: "Agent", value: $0) },

@@ -16,7 +16,7 @@ work elsewhere**. It tracks percent, extrapolates an ETA from the sample history
 progress has stalled, and notifies you on completion.
 
 The watch runs in the extension. It needs no further tool calls, and it keeps running even if the
-agent finishes, the MCP client disconnects, or the daemon goes away.
+agent finishes, the MCP client disconnects, or the Bridge goes away.
 
 ---
 

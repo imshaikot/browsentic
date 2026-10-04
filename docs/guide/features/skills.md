@@ -100,12 +100,12 @@ The `/` picker also lists the skills the active agent CLI keeps for itself:
 | Qwen Code | `~/.qwen/skills/`, `~/.agents/skills/` |
 | OpenCode | `~/.config/opencode/skills/` (and `skill/`), `~/.opencode/skills/`, `~/.agents/skills/`, `~/.claude/skills/` |
 
-Picking one attaches it to that message: the daemon reads the file at spawn time and
+Picking one attaches it to that message: the Bridge reads the file at spawn time and
 appends it to the system prompt, clearly marked, with a note that browser tools are all the run
 has.
 
 These never go through routing — they ride alongside whatever base skill was picked. Only the
-skill's **title crosses to the extension**; the panel holds an opaque id, and the daemon refuses
+skill's **title crosses to the extension**; the panel holds an opaque id, and the Bridge refuses
 any id it did not mint itself, so the file's path and content stay on your machine's daemon side.
 Files past 48 KB are left out of the picker. Switching agents swaps the list.
 

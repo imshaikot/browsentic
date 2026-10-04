@@ -62,13 +62,7 @@ describe('the preflight', () => {
     const model = start(mockBackend({ instant: true, fresh: true }));
     await model.runPreflight();
     const { checks, phase } = model.snapshot();
-    expect([checks.node.kind, checks.command.kind, checks.extensionFiles.kind, checks.browser.kind, checks.agent.kind]).toEqual([
-      'missing',
-      'missing',
-      'missing',
-      'passed',
-      'advisory',
-    ]);
+    expect([checks.node.kind, checks.command.kind, checks.browser.kind, checks.agent.kind]).toEqual(['missing', 'missing', 'passed', 'advisory']);
     expect(phase).toBe('preflight');
     expect(model.needsSetup).toBe(true);
   });
@@ -79,7 +73,7 @@ describe('the preflight', () => {
     await model.setUpEverything();
     await until(model, (state) => state.daemon === 'on');
     const { checks, phase, status } = model.snapshot();
-    expect([checks.node.kind, checks.command.kind, checks.extensionFiles.kind]).toEqual(['passed', 'passed', 'passed']);
+    expect([checks.node.kind, checks.command.kind]).toEqual(['passed', 'passed']);
     expect(phase).toBe('main');
     expect(status?.port).toBe(8765);
   });
@@ -118,6 +112,32 @@ describe('the running app', () => {
     await until(model, (state) => state.daemon === 'on' && !!state.preferences);
     return model;
   }
+
+  it('offers the browsers on this computer, each with the store it gets the extension from', async () => {
+    const model = await running();
+    await until(model, (state) => state.browserRows.length > 0);
+    expect(model.offeredBrowsers.map((row) => [row.id, row.store, row.connected])).toEqual([
+      ['chrome', 'Chrome Web Store', true],
+      ['edge', 'Chrome Web Store', false],
+      ['brave', 'Chrome Web Store', true],
+      ['firefox', 'Firefox add-on', false],
+    ]);
+  });
+
+  it('adds the extension to a browser by opening its store page and handing out the code to enter', async () => {
+    const model = await running();
+    await until(model, (state) => state.browserRows.length > 0);
+    await model.addExtension(model.offeredBrowsers.find((row) => row.id === 'edge')!);
+    expect([model.snapshot().pairing?.code, model.snapshot().notice?.text]).toEqual([
+      'R4TW7KXE',
+      expect.stringContaining('Allow extensions from other stores'),
+    ]);
+  });
+
+  it('asks for a reload only where an unpacked copy runs an older build', async () => {
+    const model = await running();
+    expect(model.extensionNeedsReload).toBe(true);
+  });
 
   it('hands out a pairing code and unpairs a browser, saying how many', async () => {
     const model = await running();

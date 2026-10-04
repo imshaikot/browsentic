@@ -305,11 +305,11 @@ describe('the status tool', () => {
     ]);
   });
 
-  test('an extension older than the daemon, and a tab it cannot read, are both explained', async () => {
+  test('an extension and a Bridge of different versions, and a tab it cannot read, are both explained', async () => {
     const status = await statusOf({ 'page.getPageInfo': failure('TAB_UNREACHABLE', 'chrome:// page') }, { manifestInSync: false });
-    expect({ activeTab: status.activeTab, stale: String(status.hint).includes('older build'), unreadable: String(status.hint).includes('Cannot read the active tab (TAB_UNREACHABLE)') }).toEqual({
+    expect({ activeTab: status.activeTab, drifted: String(status.hint).includes('different versions'), unreadable: String(status.hint).includes('Cannot read the active tab (TAB_UNREACHABLE)') }).toEqual({
       activeTab: null,
-      stale: true,
+      drifted: true,
       unreadable: true,
     });
   });

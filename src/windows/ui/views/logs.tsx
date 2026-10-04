@@ -42,7 +42,7 @@ export function LogsView({ model, state }: { model: Model; state: State }) {
     <Card padded={false}>
       <div className="flex items-center gap-2 p-4">
         <div className="min-w-0 flex-1">
-          <SectionTitle title="Daemon log" subtitle={short(log, state.info)} />
+          <SectionTitle title="Browsentic Bridge log" subtitle={short(log, state.info)} />
         </div>
         <label className="flex items-center gap-2 text-xs text-ink-dim">
           Follow

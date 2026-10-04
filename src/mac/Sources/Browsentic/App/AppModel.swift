@@ -63,6 +63,8 @@ final class AppModel: ObservableObject {
     @Published var downloads: DownloadListing?
     @Published var stamp: InstallStamp?
     @Published var browsers: [Browser] = []
+    /// Every browser `browsentic browsers` knows, where it gets the extension, and the copies it runs.
+    @Published var browserRows: [BrowserRow] = []
     @Published var logText = ""
     @Published var commandDir: String?
     @Published var foreignCommand: String?
@@ -80,9 +82,16 @@ final class AppModel: ObservableObject {
 
     var cli: CLI? { node.map(CLI.init) }
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? Payload.bundledVersion ?? "dev" }
+    /// Only an unpacked copy waits for ↻: a store copy updates when its browser says.
     var extensionNeedsReload: Bool {
-        guard let stamp, let loaded = status?.extensionVersion, status?.connected == true else { return false }
-        return loaded != stamp.version
+        guard let stamp else { return false }
+        return sessions.contains { $0.connected && $0.source == "unpacked" && $0.extensionVersion != stamp.version }
+    }
+
+    /// The browsers worth a row: found on this Mac or already paired, else the usual few to try.
+    var offeredBrowsers: [BrowserRow] {
+        let found = browserRows.filter { $0.installed || !$0.sessions.isEmpty }
+        return found.isEmpty ? browserRows.filter { ["chrome", "edge", "brave", "firefox"].contains($0.id) } : found
     }
 
     // MARK: Preflight
@@ -119,7 +128,7 @@ final class AppModel: ObservableObject {
             return .passed(About.system)
         case .node:
             node = await NodeRuntime.locate()
-            guard let node else { return .missing("Version \(NodeRuntime.minimumMajor) or newer runs the daemon. A private copy goes in \(Paths.tilde(Paths.runtime)).") }
+            guard let node else { return .missing("Version \(NodeRuntime.minimumMajor) or newer runs Browsentic Bridge. A private copy goes in \(Paths.tilde(Paths.runtime)).") }
             return .passed("\(node.version) · \(node.isPrivate ? "private copy" : Paths.tilde(URL(fileURLWithPath: node.path)))")
         case .command:
             guard let bundled = Payload.bundledVersion else { return .failed(PayloadError.missing.localizedDescription) }
@@ -127,17 +136,11 @@ final class AppModel: ObservableObject {
             if let installed = Payload.installedVersion, installed != bundled {
                 return .missing("v\(installed) is installed; this app carries v\(bundled).")
             }
-            return .missing("Installs the CLI and daemon into \(Paths.tilde(Paths.cli)).")
-        case .extensionFiles:
-            stamp = ExtensionFiles.stamp()
-            guard let bundled = Payload.bundledVersion else { return .failed(PayloadError.missing.localizedDescription) }
-            guard let stamp else { return .missing("Unpacks to \(Paths.tilde(Paths.extensionDir())), where the browser loads it from.") }
-            if stamp.version != bundled { return .missing("v\(stamp.version) is unpacked; this app carries v\(bundled).") }
-            return .passed("v\(stamp.version) in \(Paths.tilde(Paths.extensionDir()))")
+            return .missing("Installs the command and what runs in the background into \(Paths.tilde(Paths.cli)).")
         case .browser:
             browsers = Browser.installed()
             return browsers.isEmpty
-                ? .advisory("None found. Chrome, Brave, Edge, Arc, Vivaldi or Opera all work.")
+                ? .advisory("None found. Chrome, Brave, Edge, Arc, Vivaldi, Opera or Firefox all work.")
                 : .passed(browsers.map(\.name).joined(separator: ", "))
         case .agent:
             let found = AgentProbe.installed()
@@ -153,7 +156,7 @@ final class AppModel: ObservableObject {
         let defaults = UserDefaults.standard
         guard defaults.bool(forKey: AppUpdater.finishKey) else { return false }
         defaults.removeObject(forKey: AppUpdater.finishKey)
-        return [CheckID.command, .extensionFiles].contains { checks[$0]?.isPassed != true } && checks[.node]?.isPassed == true
+        return checks[.command]?.isPassed != true && checks[.node]?.isPassed == true
     }
 
     func setUpEverything() async {
@@ -179,17 +182,15 @@ final class AppModel: ObservableObject {
                 }
             case .command:
                 guard let node else { throw CLIError.failed("Node.js has to be installed first.") }
-                checks[id] = .working(nil, "Copying the CLI into \(Paths.tilde(Paths.cli))")
+                checks[id] = .working(nil, "Copying Browsentic Bridge into \(Paths.tilde(Paths.cli))")
                 let wasRunning = FileManager.default.fileExists(atPath: Paths.lockfile.path)
                 try await Task.detached { try Payload.install(node: node) }.value
                 if wasRunning {
-                    checks[id] = .working(nil, "Restarting the daemon on the new build")
+                    checks[id] = .working(nil, "Restarting Browsentic Bridge on the new build")
                     try await CLI(node: node).restart()
                 }
-            case .extensionFiles:
-                guard let cli else { throw CLIError.failed("Node.js has to be installed first.") }
-                checks[id] = .working(nil, "Unpacking the extension")
-                _ = try await cli.installExtension()
+                checks[id] = .working(nil, "Letting your browsers start it")
+                _ = try await CLI(node: node).registerBridge()
             case .agent:
                 guard let node else { throw CLIError.failed("Node.js has to be installed first.") }
                 checks[id] = .working(nil, "npm i -g @anthropic-ai/claude-code")
@@ -216,6 +217,7 @@ final class AppModel: ObservableObject {
         Task {
             refreshCommandLink()
             if UserDefaults.standard.object(forKey: "startDaemonOnLaunch") as? Bool ?? true, daemon == .off { await setDaemon(on: true) }
+            await loadBrowsers()
         }
         watchForUpdates()
     }
@@ -247,6 +249,7 @@ final class AppModel: ObservableObject {
         do {
             let status = try await control.status()
             let sessions = try await control.sessions()
+            let changed = sessions.map { "\($0.id):\($0.connected)" } != self.sessions.map { "\($0.id):\($0.connected)" }
             self.lock = lock
             self.status = status
             self.sessions = sessions
@@ -254,6 +257,7 @@ final class AppModel: ObservableObject {
             if pairing != nil, !status.pairingPending || (pairing?.expiry ?? .distantPast) < Date() { pairing = nil }
             if agents == nil { await loadAgents() }
             stamp = ExtensionFiles.stamp()
+            if changed { Task { await loadBrowsers() } }
         } catch {
             await control.close()
             markOff()
@@ -393,6 +397,30 @@ final class AppModel: ObservableObject {
         await perform("downloads") { cli, _ in
             try await cli.clearDownloads()
             self.downloads = try await cli.downloads()
+        }
+    }
+
+    func loadBrowsers() async {
+        guard let cli, let rows = try? await cli.browsers() else { return }
+        browserRows = rows
+    }
+
+    /// Opens the browser's store page in that browser and hands out the code its popup asks for. The
+    /// command opens it where it found the browser; anywhere else, the app opens it itself.
+    func addExtension(_ row: BrowserRow) async {
+        await perform("add:\(row.id)") { cli, _ in
+            let result = try await cli.addExtension(to: row.id)
+            if result.chosen?.opened != true, let url = URL(string: row.storeUrl) { self.open(url, in: row) }
+            if let code = result.pairingCode, let expiresAt = result.expiresAt { self.pairing = PairingCode(code: code, expiresAt: expiresAt) }
+            self.say("\(row.steps.first ?? "") Then click Browsentic in \(row.label)’s toolbar and enter the code below.")
+        }
+    }
+
+    private func open(_ url: URL, in row: BrowserRow) {
+        if let app = browsers.first(where: { $0.name.localizedCaseInsensitiveContains(row.label) }) {
+            NSWorkspace.shared.open([url], withApplicationAt: app.url, configuration: NSWorkspace.OpenConfiguration())
+        } else {
+            NSWorkspace.shared.open(url)
         }
     }
 

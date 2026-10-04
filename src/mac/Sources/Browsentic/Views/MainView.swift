@@ -101,8 +101,8 @@ struct OfflineHint: View {
             HStack(spacing: 14) {
                 Image(systemName: "power").font(.system(size: 18, weight: .semibold)).foregroundStyle(Palette.amber)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("The daemon is off").font(.display(14)).foregroundStyle(Palette.ink)
-                    Text("\(what) come from the running daemon.").font(.system(size: 12)).foregroundStyle(Palette.inkDim)
+                    Text("Browsentic Bridge is off").font(.display(14)).foregroundStyle(Palette.ink)
+                    Text("\(what) come from Browsentic Bridge while it runs.").font(.system(size: 12)).foregroundStyle(Palette.inkDim)
                 }
                 Spacer()
                 Button("Turn it on") { Task { await model.setDaemon(on: true) } }

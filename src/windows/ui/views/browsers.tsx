@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Globe } from 'lucide-react';
 
 import { formatWhen } from '@/lib/format-when';
+import { SOURCE_LABEL } from '@/lib/stores';
 import { Card, ConfirmDialog, EmptyState, GlowDot, OfflineHint, Pill, QuietButton, SectionTitle } from '../components';
 import type { Model, State } from '../model';
 import type { SessionSummary } from '../backend';
@@ -30,7 +31,7 @@ export function BrowsersView({ model, state }: { model: Model; state: State }) {
             )}
           </div>
           {state.sessions.length === 0 ? (
-            <EmptyState icon={Globe} title="No browser is paired" detail="Get a pairing code above and paste it into the Browsentic popup." />
+            <EmptyState icon={Globe} title="No browser is paired" detail="Add the extension from the Overview tab, or get a code above and enter it in the Browsentic popup." />
           ) : (
             state.sessions.map((session) => <SessionRow key={session.id} session={session} model={model} busy={state.busy.includes('revoke')} />)
           )}
@@ -62,7 +63,7 @@ function SessionRow({ session, model, busy }: { session: SessionSummary; model: 
           {extensionId(session.origin)}
         </p>
         <p className="text-[11.5px] text-ink-dim">
-          Extension v{session.extensionVersion} · paired {ago(session.pairedAt)} · seen {ago(session.lastSeenAt)}
+          {SOURCE_LABEL[session.source ?? 'unpacked']} · v{session.extensionVersion} · paired {ago(session.pairedAt)} · seen {ago(session.lastSeenAt)}
         </p>
       </div>
       <Pill text={session.connected ? 'Connected' : 'Away'} tint={session.connected ? 'lime' : 'dim'} />

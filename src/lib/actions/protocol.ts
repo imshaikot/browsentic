@@ -14,6 +14,14 @@ export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
 export const SOCKET_PROTOCOL_VERSION = 22;
 
+/**
+ * The oldest extension the daemon lets in. A store copy updates when its browser decides to, so it
+ * and the daemon are routinely a version apart: a change a peer can do without bumps
+ * SOCKET_PROTOCOL_VERSION and is sent only to a peer that speaks it, and only a change neither side
+ * can do without raises this.
+ */
+export const MIN_EXTENSION_PROTOCOL = 22;
+
 export const EXTERNAL_RUN_ID = 'external';
 
 export const DAEMON_PORTS = [8765, 8766, 8767] as const;
@@ -188,6 +196,8 @@ export type SocketFrame =
   | {
       t: 'hello';
       protocolVersion: number;
+      /** The oldest daemon this extension works with. Absent from an extension that predates the window. */
+      minDaemonProtocol?: number;
       extensionVersion: string;
       manifestHash: string;
       auth: SocketAuth;
@@ -204,6 +214,8 @@ export type SocketFrame =
   | {
       t: 'welcome';
       daemonVersion: string;
+      /** What the daemon speaks, so a newer extension sends it nothing past that. Absent before 0.8. */
+      protocolVersion?: number;
       manifestHash: string;
       manifestInSync: boolean;
       /** Proves the daemon holds the same secret, so a port squatter cannot pose as one. */

@@ -34,7 +34,7 @@ The other four have no such command, so the select offers a short list Browsenti
 Code those are its aliases — `fable`, `opus`, `sonnet`, `haiku` — which it resolves to the newest
 model of each family.
 
-The daemon reads a list in the background and never holds the popup up for one. A list it has read
+The Bridge reads a list in the background and never holds the popup up for one. A list it has read
 is kept for six hours, and read again at once when the CLI is updated; *Recheck* reads it again now.
 When a read fails — the CLI is signed out, times out, or prints something Browsentic cannot parse —
 the last list that read cleanly stays, or the shipped one when there is none, and the line under the
@@ -68,7 +68,7 @@ agents cannot resume each other's sessions, so the next instruction starts a fre
 | Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, no MCP server but the browser's, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist — its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
 
 All eight get the same system prompt, the same browser tools — over a `browsentic` MCP server pointed
-back at the daemon, or for Codex handed to it directly — and the same [approval gate](approvals.md).
+back at the Bridge, or for Codex handed to it directly — and the same [approval gate](approvals.md).
 What differs is how well each one can be fenced off from the rest of your machine — see
 [internals/guardrails.md § Spawn containment](../internals/guardrails.md#spawn-containment) for
 exactly what each flag buys.
@@ -89,7 +89,7 @@ for the site you have moved to — would otherwise never reach it.
 So Browsentic carries what changed in the message itself: a short *instructions for this message*
 section ahead of your words, holding only the parts that differ from what the conversation already
 has, and naming any that no longer apply. A message that changes nothing carries nothing extra. After
-the daemon restarts it cannot know what a conversation holds, so the first follow-up restates the
+the Bridge restarts it cannot know what a conversation holds, so the first follow-up restates the
 whole prompt once. The agent's prompt cache is untouched either way, because nothing that came before
 changes.
 
@@ -99,11 +99,11 @@ Codex runs through its **app-server** — the interface its own editor extension
 the length of a turn. Browsentic hands it the browser tools directly, so they are in the model's
 list from the first request, rather than as an MCP server whose tools Codex would defer until the
 model searched for them. Its replies stream in as they are written, and the context card shows how
-full its window is. Each tool call it makes comes back to the daemon and goes through the same gate,
+full its window is. Each tool call it makes comes back to the Bridge and goes through the same gate,
 approvals and timeline as a Claude Code run's.
 
 The app-server interface is marked experimental. If a Codex build refuses it, the same turn runs
-through `codex exec` instead and later turns go straight there until the daemon restarts; the two
+through `codex exec` instead and later turns go straight there until the Bridge restarts; the two
 resume each other's conversations. `"transport": "exec"` under `agents.codex` in `config.json`
 chooses exec outright.
 
@@ -325,7 +325,7 @@ In `~/.browsentic/config.json`:
 | Key | Default | Effect |
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on. The agent picker writes this. |
-| `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the daemon's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. On Windows it may name the `.cmd` npm installed, or the `.exe` itself. |
+| `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the Bridge's `PATH` differs from your shell's — the usual cause of `AGENT_MISSING`. On Windows it may name the `.cmd` npm installed, or the `.exe` itself. |
 | `agents.<name>.model` | `sonnet` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. A value that starts with a dash or holds a space is ignored, so a typo cannot pass the CLI a flag. |
 | `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
@@ -340,16 +340,16 @@ Claude runner's settings.
 
 | Symptom | Fix |
 | --- | --- |
-| `AGENT_MISSING` | The daemon's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
+| `AGENT_MISSING` | The Bridge's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
 | `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode is signed in to no provider: run `opencode auth login`. |
-| Codex: "not logged in" | The daemon inherits no session. Run `codex login`, then retry. |
+| Codex: "not logged in" | The Bridge inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
 | "does not understand the flags Browsentic uses" | The CLI is too old. Update it. |
 | Antigravity answers but never touches the page | Its permission rule was removed. `browsentic agent` reports *needs setup* again. |
 | Antigravity: a follow-up turn searches the web, or ends with no answer, instead of reading the page | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Antigravity keeps re-reading the first turn's, so every browser call in a later turn was refused as *no longer active*. A conversation begun before the update stays broken. |
 | Grok Build sits silent for minutes, then *xAI did not answer* | The Grok account is rate-limited — a free one usually is. Wait, or upgrade the account. |
-| Cursor CLI: *Authentication required* | The daemon inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
+| Cursor CLI: *Authentication required* | The Bridge inherits no session. Run `cursor-agent login`, or set `CURSOR_API_KEY`, then retry. |
 | Cursor CLI on Windows | Cursor's sandbox has no Windows backend, so only the deny rules apply there. The browser still works; the machine is less fenced off than on macOS or Linux. |
 | Windows: `AGENT_UNUSABLE`, *a batch file Browsentic cannot see through* | The agent's command is a batch file that is not an npm or pnpm shim. Set `agents.<name>.bin` to the `.exe` it runs. |
 | Windows: *This turn is too long for Windows to start* | Codex's `exec` fallback, Qwen Code and Grok Build pass the prompt as an argument, which Windows caps at 32,767 characters. Start a new conversation, or leave out long site notes and attachments. See [Limits](limits.md#windows-is-experimental). |

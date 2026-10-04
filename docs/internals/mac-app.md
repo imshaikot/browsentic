@@ -38,10 +38,14 @@ package’s layout — `dist/cli.js`, `dist/daemon-main.js`, `skills/`, `extensi
 [Payload.swift](../../src/mac/Sources/Browsentic/Core/Payload.swift) copies that to
 `~/.browsentic/cli` with a directory swap and writes `.browsentic-app.json` beside it.
 `installKind()` in [npx.ts](../../src/daemon/npx.ts) reads that marker and answers `app`, which
-makes `upgradeCli()` step aside: an app install is only ever replaced by a newer app. The
-**extension** is still installed by `browsentic setup`, file by file, for the reasons
-[install.ts](../../src/daemon/install.ts) gives — and to the same path, for the reasons
-[paths.ts](../../src/daemon/paths.ts) gives.
+makes `upgradeCli()` step aside: an app install is only ever replaced by a newer app. After the
+copy, the app runs `browsentic setup --no-pair --no-open --no-wait --json`, which registers the
+native host with every browser and asks nothing. The extension comes from each browser's store:
+the Overview rows read `browsentic browsers --json` and their buttons run
+`setup --browser <id> --no-wait --json`, which opens the store page in that browser and returns the
+pairing code. An unpacked **extension**, when someone asks for one, is written by
+`setup --unpacked`, file by file, for the reasons [install.ts](../../src/daemon/install.ts) gives —
+and to the same path, for the reasons [paths.ts](../../src/daemon/paths.ts) gives.
 
 ## PATH
 

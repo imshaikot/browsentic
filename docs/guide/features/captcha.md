@@ -63,7 +63,7 @@ Chrome only. It shows the debugger bar while it runs.
 
 ## Image challenges
 
-The extension photographs the challenge and hands it to the daemon, which starts a one-shot
+The extension photographs the challenge and hands it to the Bridge, which starts a one-shot
 session of your configured agent to look at that single picture. The session answers and is
 stopped at once; nothing carries over to the next round. The extension then clicks the answer
 with real pointer movement, presses the challenge's own button, and photographs whatever comes

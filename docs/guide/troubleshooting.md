@@ -7,12 +7,12 @@ Symptom, cause, fix. For what an error *code* means, see [reference/errors.md](.
 ## Start here
 
 ```sh
-browsentic status      # daemon, extension, manifest sync, pairings
+browsentic status      # the Bridge, each paired browser and its store, the agent
 browsentic agent       # which agents are installed, which one runs the side panel
 browsentic logs        # run starts, routed skills, every tool call and its outcome
 ```
 
-Those three answer most questions. The daemon log also lives at `~/.browsentic/daemon.log`.
+Those three answer most questions. Browsentic Bridge's log also lives at `~/.browsentic/daemon.log`.
 
 ---
 
@@ -20,9 +20,15 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
+| The popup says `protocol version mismatch: daemon speaks v20` (any number below 22) | Browsentic Bridge is older than the extension: anything before 0.7.14 | Update the Bridge: **Update now** in the app, or `npx browsentic@latest update`. Then enter a new pairing code in the popup, because this version of the extension waits for one after a refusal |
+| The popup says `protocol version mismatch: Browsentic Bridge speaks v22 and takes extensions from v22 on` | The extension is older than 0.7.14: an unpacked copy nobody updated | Remove it and add Browsentic from the store, or `browsentic update` and press ↻ on its card |
+| The store copy is a version behind the Bridge | The browser has not checked for updates yet | Nothing breaks meanwhile: the two work across versions. **Update** at `chrome://extensions`, with Developer mode on, checks now |
+| `browsentic status` says two copies of Browsentic answer in one browser | An unpacked copy and a store copy are both installed, and both inject into every page | Remove the unpacked card at the browser's extensions page |
+| Edge will not install from the Chrome Web Store | Edge installs from other stores only once you allow it | Press **Allow extensions from other stores** in the bar at the top of the store page, confirm, then **Add to Chrome** |
+| `browsentic setup` keeps waiting for the browser | The extension is in, but not paired yet | Click Browsentic in the toolbar and enter the code `setup` printed. Ctrl-C stops the wait without undoing anything |
 | Popup shows `Expected {op:…}` | Stale service worker after a rebuild | `chrome://extensions` → ↻ reload Browsentic |
 | "That pairing code is wrong or expired" | Codes are single-use and last 10 minutes | `browsentic pair` for a fresh one. A failed attempt does not burn the outstanding code |
-| "No Browsentic daemon is running" | Nothing on 8765–8767 | `browsentic status`; check `browsentic logs` |
+| "No Browsentic daemon is running" | Browsentic Bridge is not installed, or not running on 8765–8767 | Install it ([Install](install.md#2-install-browsentic-bridge)), or open the app, or `browsentic start`. Then `browsentic status`; check `browsentic logs` |
 | `browsentic: command not found` | The global npm prefix is not on `PATH` | `npm prefix -g`, then add its `bin` directory |
 | "Browsentic has not been given the microphone yet" | A browser cannot show its microphone prompt inside a side panel or a popup, so a fresh install has never been asked | Press **Allow microphone** and choose **Allow** in the tab that opens |
 | "Microphone access is blocked" | The microphone was refused for the extension | Press **Allow microphone**, then click the icon at the left of that tab's address bar and set **Microphone** to **Allow** |
@@ -33,12 +39,12 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | The hands-free mic turns amber and says another page took the microphone | Chrome runs one speech recognizer at a time, and another page or the panel started one | Press the mic to take it back |
 | Holding Control does nothing | Hold to talk is off; the key went to a frame embedded in the page (some editors); another key or a click joined it; or the mic is muted | Turn **Hold to talk** on from the mic's menu, click the page outside the embedded editor, and hold left Control on its own |
 | `EXTENSION_OFFLINE` | Browser closed, or not paired | Open the browser; `browsentic sessions` to check pairing |
-| After a reboot the panel stays offline until you run a command | The browser has no helper registered to start the daemon | Run `browsentic setup` once. `browsentic status` then lists the browsers under `wake-up:` |
+| After a reboot the panel stays offline until you run a command | The browser has no helper registered to start the Bridge, or one a Bridge before 0.8 registered, which lets in only the unpacked copy | Run `browsentic setup` once, or start Browsentic Bridge 0.8 once, which rewrites the registration. `browsentic status` then lists the browsers under `wake-up:` |
 | The panel stays offline after `browsentic stop` | A stop holds the browser's wake-up, so the daemon stays down as asked | `browsentic start`. `browsentic status` says `held` while it lasts |
 | A scheduled task shows **Missed** | The browser was closed, the computer asleep, or no daemon was running at that time | Nothing to fix — it runs once when things are back unless the task says **Skip it**. `browsentic status` shows whether the browser can start the daemon itself |
-| "Load unpacked" cannot see `~/browsentic` | A Flatpak or Snap browser, sandboxed away from your home directory. Snap Chromium is the Ubuntu default | Grant it: `flatpak override --user --filesystem=~/browsentic com.google.Chrome`. Or install somewhere the sandbox can read: `browsentic setup --dir ~/snap/chromium/common/browsentic-extension` |
+| "Load unpacked" cannot see `~/browsentic` | A Flatpak or Snap browser, sandboxed away from your home directory. Snap Chromium is the Ubuntu default | Add Browsentic from the Chrome Web Store instead, which needs no folder. Or grant it: `flatpak override --user --filesystem=~/browsentic com.google.Chrome`, or install somewhere the sandbox can read: `browsentic setup --unpacked --dir ~/snap/chromium/common/browsentic-extension` |
 | The folder picker does not show `~/browsentic` | It is there; some pickers open elsewhere by default | macOS: press ⇧⌘G and paste the path. Linux: Ctrl+L. Windows: paste `%USERPROFILE%\browsentic\extension\chrome-mv3` into the picker's address bar |
-| Updated with `npx`, but the browser still runs the old build | Chrome never auto-reloads an unpacked extension | `browsentic status` names both versions. Press ↻ on the Browsentic card |
+| Updated, but an unpacked copy still runs the old build | A browser never reloads an unpacked extension by itself | `browsentic status` names both versions. Press ↻ on the Browsentic card. A store copy updates itself |
 | `browsentic update` says "already current" forever, and reinstalling still lands on an old build | npm's `npx` cache serves the version it first resolved and never asks the registry again | `browsentic update` now replaces the cached command before installing. To clear it by hand, delete every `~/.npm/_npx/*` directory containing `node_modules/browsentic` |
 | Deleted `~/.browsentic`, but a daemon is still holding port 8765 | The lockfile went with it; the process did not notice | `browsentic stop` probes the ports rather than the lockfile, so it finds that one. `browsentic uninstall` does it as part of the sweep |
 
@@ -52,7 +58,7 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 | `page_readNetwork` with `includeBodies` is denied | `network-body-read` is denied by default | Read status, timing and `includeHeaders` instead, or set `{"guardrails":{"rules":{"network-body-read":"allow"}}}` |
 | `page_readConsole` comes back empty | Nothing was attached when the error happened | `page_startDiagnostics` **first**, then reproduce. `reload: true` catches load-time errors |
 | `DEBUGGER_UNAVAILABLE` on `page_startDiagnostics` | DevTools is open on that tab — Chrome allows one debugger per tab | Close DevTools and retry |
-| `manifest: DRIFTED` | Extension and CLI built from different registries | `yarn build && yarn daemon:restart`, then reload the extension |
+| `tools: the extension's own list` | The extension and Browsentic Bridge are different versions, so their tool lists differ | Normal while one of them waits on an update; the tools come from the extension, which runs them. From a clone: `yarn build && yarn daemon:restart`, then reload the extension |
 
 ## Agents
 
@@ -99,7 +105,7 @@ Those three answer most questions. The daemon log also lives at `~/.browsentic/d
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `TAB_UNREACHABLE` on a normal site | The extension needs reloading | ↻ at `chrome://extensions`; ordinary sites otherwise self-heal |
+| `TAB_UNREACHABLE` on a normal site | The extension needs reloading | Turn Browsentic off and on at `chrome://extensions` (↻ on an unpacked copy); ordinary sites otherwise self-heal |
 | `TAB_UNREACHABLE` on `chrome://`, the Web Store, the new-tab page | Those pages cannot host a content script | `page_navigate` to an http(s) page — it still works there |
 | `TARGET_NOT_FOUND` for something clearly on screen | The page changed since the snapshot, or it is inside a captcha widget's shadow root | Re-snapshot with `page_getPageInfo`; for a captcha use [`page_solveCaptcha`](features/captcha.md) |
 | A captcha keeps setting new image challenges | The vendor distrusts the browser, however well each round is answered — common with automated or headless browsers | Solve one round yourself in the page; a person's answer usually clears the distrust. See [Captchas](features/captcha.md#image-challenges) |

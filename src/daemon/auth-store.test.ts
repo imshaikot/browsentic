@@ -49,10 +49,9 @@ describe('pairing codes', () => {
     expect([/^[ABCDEFGHJKMNPQRSTWXYZ23456789]{8}$/.test(code), expiresAt - Date.now()]).toEqual([true, 10 * 60_000]);
   });
 
-  test('a new code replaces the one before it', () => {
-    createPairing();
-    const { code } = createPairing();
-    expect(pendingPairings()).toEqual([code]);
+  test('a new code leaves the two before it working, and retires the oldest of four', () => {
+    const codes = [createPairing(), createPairing(), createPairing(), createPairing()].map(({ code }) => code);
+    expect(pendingPairings()).toEqual(codes.slice(1));
   });
 
   test('a code stops being pending once it expires', () => {

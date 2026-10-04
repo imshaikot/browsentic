@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 enum CheckID: String, CaseIterable, Identifiable {
-    case system, node, command, extensionFiles, browser, agent
+    case system, node, command, browser, agent
 
     var id: String { rawValue }
 
@@ -10,9 +10,8 @@ enum CheckID: String, CaseIterable, Identifiable {
         switch self {
         case .system: "This Mac"
         case .node: "Node.js runtime"
-        case .command: "Browsentic command"
-        case .extensionFiles: "Browser extension"
-        case .browser: "A Chromium browser"
+        case .command: "Browsentic Bridge"
+        case .browser: "A browser"
         case .agent: "An AI agent"
         }
     }
@@ -22,14 +21,13 @@ enum CheckID: String, CaseIterable, Identifiable {
         case .system: "laptopcomputer"
         case .node: "hexagon"
         case .command: "terminal"
-        case .extensionFiles: "puzzlepiece.extension"
         case .browser: "globe"
         case .agent: "sparkles"
         }
     }
 
-    /// What "Set up everything" installs on its own. A browser and an agent are the user's pick.
-    var installsAutomatically: Bool { self == .node || self == .command || self == .extensionFiles }
+    /// What "Set up everything" installs on its own. A browser, the extension and an agent are the user's pick.
+    var installsAutomatically: Bool { self == .node || self == .command }
     var blocksEntry: Bool { installsAutomatically }
 }
 
@@ -66,7 +64,11 @@ struct Browser: Identifiable, Equatable {
         ("Vivaldi", "com.vivaldi.Vivaldi"),
         ("Opera", "com.operasoftware.Opera"),
         ("Chromium", "org.chromium.Chromium"),
+        ("Firefox", "org.mozilla.firefox"),
     ]
+
+    /// Firefox has no chrome://extensions page and cannot load an unpacked Chromium build.
+    var isChromium: Bool { bundleId != "org.mozilla.firefox" }
 
     static func installed() -> [Browser] {
         known.compactMap { name, bundleId in

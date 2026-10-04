@@ -12,7 +12,7 @@ export function versionsOf(state: State): VersionRow[] {
   return [
     { label: 'App', value: info?.version ?? 'unknown' },
     { label: 'Command', value: info?.payload.installed ?? 'not installed' },
-    { label: 'Daemon', value: daemonVersion ? [daemonVersion, status && `port ${status.port}`].filter(Boolean).join(' · ') : 'off' },
+    { label: 'Bridge', value: daemonVersion ? [daemonVersion, status && `port ${status.port}`].filter(Boolean).join(' · ') : 'off' },
     status && { label: 'Protocol', value: String(status.protocolVersion) },
     {
       label: 'Extension',

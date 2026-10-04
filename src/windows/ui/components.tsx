@@ -175,8 +175,8 @@ export function OfflineHint({ what, model, daemonOff }: { what: string; model: M
       <div className="flex items-center gap-3.5">
         <Power className="size-5 shrink-0 text-amber" strokeWidth={2.5} />
         <div className="min-w-0 flex-1 space-y-0.75">
-          <p className="font-display text-sm font-semibold text-ink">The daemon is off</p>
-          <p className="text-xs text-ink-dim">{what} come from the running daemon.</p>
+          <p className="font-display text-sm font-semibold text-ink">Browsentic Bridge is off</p>
+          <p className="text-xs text-ink-dim">{what} come from Browsentic Bridge while it runs.</p>
         </div>
         <PrimaryButton disabled={!daemonOff} onClick={() => void model.setDaemon(true)}>
           Turn it on

@@ -58,7 +58,7 @@ The crawl is **read-only and locked to one host**. It cannot click, fill or subm
 the site; and it is pinned to the tab it started in, so switching tabs stops it rather than
 following you. Off-host, every read is blocked until it navigates back.
 
-Limits are enforced by the daemon, and [config](../configuration.md) can narrow them but never widen
+Limits are enforced by the Bridge, and [config](../configuration.md) can narrow them but never widen
 them:
 
 | Setting | Default | Ceiling |

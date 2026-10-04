@@ -33,6 +33,6 @@
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 Shahriar. Apache License 2.0.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Browsentic opens chrome://extensions in your browser so you can load the extension. Browsers refuse that address any other way.</string>
+    <string>Browsentic opens chrome://extensions in your browser when you load the extension unpacked. Browsers refuse that address any other way.</string>
 </dict>
 </plist>

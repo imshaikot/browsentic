@@ -22,6 +22,9 @@ export interface Profile {
   target?: BrowserTarget;
   /** What a drifted build reports instead of the registry's list. */
   tools?: ToolDescriptor[];
+  /** The protocol its hello claims and proves; this checkout's own unless a test says otherwise. */
+  protocolVersion?: number;
+  minDaemonProtocol?: number;
 }
 
 export type Credential = { kind: 'pair'; code: string } | { kind: 'session'; key: string };
@@ -65,12 +68,15 @@ export class FakeBrowser {
   static async connect(port: number, profile: Profile, credential: Credential): Promise<FakeBrowser> {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/extension`, { headers: { origin: profile.origin } });
     const inbox = frames(socket);
+    const refused = new Promise<string>((resolve) => socket.once('close', (_code, reason) => resolve(String(reason))));
     await new Promise((resolve, reject) => socket.once('open', resolve).once('error', reject));
 
+    const protocolVersion = profile.protocolVersion ?? SOCKET_PROTOCOL_VERSION;
     const hello = { extensionVersion: EXTENSION_VERSION, manifestHash: hashManifest(toolsOf(profile)), nonce: newNonce() };
     send(socket, {
       t: 'hello',
-      protocolVersion: SOCKET_PROTOCOL_VERSION,
+      protocolVersion,
+      minDaemonProtocol: profile.minDaemonProtocol,
       auth: { kind: credential.kind },
       installId: profile.installId,
       browser: profile.browser,
@@ -78,9 +84,10 @@ export class FakeBrowser {
     });
 
     const challenge = await inbox.next();
-    if (challenge?.t !== 'challenge') throw new Error(`expected a challenge, got ${challenge?.t}`);
+    if (!challenge) throw new Error(await refused);
+    if (challenge.t !== 'challenge') throw new Error(`expected a challenge, got ${challenge.t}`);
     const transcript: Transcript = {
-      protocolVersion: SOCKET_PROTOCOL_VERSION,
+      protocolVersion,
       extensionVersion: hello.extensionVersion,
       manifestHash: hello.manifestHash,
       clientNonce: hello.nonce,

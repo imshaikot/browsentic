@@ -15,7 +15,7 @@ Start here if you want to run Browsentic on your own machine.
 
 | | |
 | --- | --- |
-| [Install](guide/install.md) | One command, then load the extension |
+| [Install](guide/install.md) | The extension from your browser's store, and Browsentic Bridge on your computer |
 | [Pair](guide/pair.md) | Connect your browser with a single-use code |
 | [First run](guide/first-run.md) | A tour of the side panel and your first instruction |
 | [Features](guide/features/) | One page per capability — what it does and when to reach for it |
@@ -45,6 +45,7 @@ How the pieces actually work, for contributors and for anyone integrating.
 | [Subsystems](internals/subsystems.md) | Monitors, recordings, site maps, files, screenshots |
 | [State on disk](internals/state.md) | What is written where, and at what mode |
 | [Contributing](internals/contributing.md) | Build topology, checks, adding a capability |
+| [Store listings](internals/stores.md) | Store IDs, submitting an update, what the dashboards ask for |
 
 ## Looking something up
 
