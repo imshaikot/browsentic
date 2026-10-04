@@ -1,7 +1,7 @@
 # Driving Browsentic from an MCP client
 
 **Optional.** The side panel is the product and needs none of this. But pairing connects your
-*browser* to the daemon, and registering an MCP client lets **that client** drive the same browser
+*browser* to the Bridge, and registering an MCP client lets **that client** drive the same browser
 too — Claude Code, Codex, Cursor, Zed, Gemini CLI, Claude Desktop, anything that speaks MCP.
 
 This direction is fully agent-agnostic. Nothing here depends on which CLI you picked in
@@ -58,7 +58,7 @@ Tools missing from a session you registered mid-flight is the single most common
 | `browsentic://page/text` | You only need the rendered prose |
 
 The tool list is generated from the same registry the extension ships, so it cannot describe
-something the browser cannot do. If the two halves *are* built from different registries, the daemon
+something the browser cannot do. If the two halves *are* built from different registries, the Bridge
 adopts the browser's list and tells your client the tools changed.
 
 ---
@@ -70,7 +70,7 @@ changes is everything around the tool call.
 
 | | Side panel | MCP client |
 | --- | --- | --- |
-| Agent | The CLI you picked, spawned by the daemon | Whatever you registered |
+| Agent | The CLI you picked, spawned by the Bridge | Whatever you registered |
 | Consequential actions | Prompt you in the panel | **Refused** — see below |
 | Host confinement | Scoped to the sites the run is about | Unconfined |
 | Timeline | Every action, live | Actions appear tagged `external` |

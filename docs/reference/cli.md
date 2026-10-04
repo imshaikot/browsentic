@@ -4,9 +4,10 @@
 browsentic <command>
 ```
 
-With no command it prints usage. Most commands start the daemon if one is not already running;
-`status`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals`, `downloads` and `uninstall` do
-not — an uninstall that started a daemon would be absurd.
+With no command it prints usage. `browsentic` is Browsentic Bridge's command: the half of
+Browsentic that runs on your computer. Most commands start the Bridge if it is not already running;
+`status`, `browsers`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals`, `downloads` and
+`uninstall` do not — an uninstall that started one would be absurd.
 
 ---
 
@@ -14,32 +15,44 @@ not — an uninstall that started a daemon would be absurd.
 
 | Command | Does |
 | --- | --- |
-| `browsentic setup` | Install the extension, start the daemon, print a pairing code |
-| `browsentic update` | Pull the newest build: the command itself first, then the extension, then restart the daemon |
-| `browsentic uninstall` | Stop the daemon and remove everything Browsentic wrote |
+| `browsentic setup` | Start the Bridge, then add the extension to a browser and pair the two |
+| `browsentic update` | Pull the newest Bridge, restart it, and refresh the unpacked folder if you load one |
+| `browsentic browsers` | List the browsers on this computer, where each gets the extension, and which are connected |
+| `browsentic uninstall` | Stop the Bridge and remove everything Browsentic wrote |
 
-`setup` writes the extension to `~/browsentic/extension/chrome-mv3` and leaves you two steps: load
-that folder at `chrome://extensions` with Developer mode on, and paste the code into the popup.
+On a terminal, `setup` checks your agent and asks which browser should get the extension. It opens
+that browser's store page in it — the Chrome Web Store for Chrome, Brave, Arc, Vivaldi, Opera,
+Chromium and, until its own listing is published, Edge; the signed add-on for Firefox — prints a
+pairing code, and waits up to five minutes for the browser to connect. Ctrl-C stops the wait and
+undoes nothing. With no terminal and no `--browser`, it asks nothing: it prints where each browser
+gets the extension and a code, so a script or an app never hangs on it.
 
-The install path never carries a version, deliberately. Chrome derives an unpacked extension's ID
-from the absolute path of its directory, and the browser keeps the extension's storage — the
-install id and the session key with it — under that ID, so a versioned path would unpair the browser
-on every update.
+Every run also registers the Bridge with each browser it finds, so the browser can start it when it
+is down (`wake-up:` in `status`).
 
 | Flag | Does |
 | --- | --- |
-| `--dir <path>` | Install somewhere else. Needed for Flatpak or Snap browsers, which cannot read `~/browsentic` without a filesystem grant |
-| `--no-pair` | Install and start the daemon, mint no code |
-| `--force` | Rewrite every file even when the installed build already matches |
-| `--browser <name>` | `chrome` (the default) or `firefox`. Firefox has no folder to load: the command starts the daemon, prints the link to the signed add-on for this same version — and says so if Mozilla has not attached it to the release yet — then the pairing code. `update --browser firefox` only restarts the daemon, because Firefox updates the add-on on its own |
-| `--no-self-update` | Install what this copy carries, without asking the registry whether a newer one exists |
-| `--json` | Machine-readable result. Progress goes to stderr, so stdout stays parseable |
+| `--browser <name>` | `chrome`, `edge`, `brave`, `arc`, `vivaldi`, `opera`, `chromium` or `firefox`: skip the question. For Firefox it also says when Mozilla has not attached the signed add-on to this version's release yet |
+| `--unpacked` | Write the extension to `~/browsentic/extension/chrome-mv3` and print the steps to load it at the browser's extensions page, for a browser that cannot reach a store or for an unreleased build |
+| `--dir <path>` | With `--unpacked`, write it somewhere else. Needed for Flatpak or Snap browsers, which cannot read `~/browsentic` without a filesystem grant. Remembered, so `update` refreshes the same copy |
+| `--no-open` | Print the store link instead of opening it |
+| `--no-wait` | Print the code and return, instead of waiting for the browser |
+| `--no-pair` | Mint no code. `update` passes it |
+| `--force` | Rewrite every file of the unpacked folder even when it already matches |
+| `--no-self-update` | Run what this copy carries, without asking the registry whether a newer one exists |
+| `--json` | Machine-readable result, with every browser's row, as the apps read it. Never asks, never waits |
+
+The unpacked folder is written only when you ask for it, and kept current once it exists: `setup`
+and `update` refresh it in place. Its path never carries a version, deliberately. Chrome derives an
+unpacked extension's ID from the absolute path of its directory, and the browser keeps the
+extension's storage — the install id and the session key with it — under that ID, so a versioned
+path would unpair the browser on every update.
 
 `setup` and `update` both replace the command itself when the registry has something newer, because
-the extension ships *inside* the package — a stale CLI installs a stale extension and says
-"already current". Under `npx` that lasts as long as the cache does, which is what made `update`
-look like it did nothing. A pinned `npx browsentic@<version>` is never upgraded past, and a source
-checkout is told rather than touched.
+a stale command runs a stale Bridge and lays down a stale unpacked folder, and says "already
+current". Under `npx` that lasts as long as the cache does, which is what made `update` look like it
+did nothing; `npx browsentic@latest` asks every time. A pinned `npx browsentic@<version>` is never
+upgraded past, and a source checkout is told rather than touched.
 
 ### Uninstall
 
@@ -49,10 +62,9 @@ checkout is told rather than touched.
 | `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal |
 | `--keep-skills` | Leave `skills/` behind — site maps and hand-written notes have no other copy |
 
-It removes the daemon (found by probing 8765–8767, so an orphan whose lockfile was deleted is still
+It removes the Bridge (found by probing 8765–8767, so an orphan whose lockfile was deleted is still
 caught), `~/.browsentic`, `~/browsentic`, and every `~/.npm/_npx/*` directory holding a copy of the
-package. It names, but will not touch, the extension card at `chrome://extensions`, the command
-itself, your MCP client's entry, and any directory you moved with `screenshotDir`, `downloadDir` or
+package. It names, but will not touch, the extension in each browser, the command itself, your MCP client's entry, and any directory you moved with `screenshotDir`, `downloadDir` or
 `skillsDir`.
 
 See [guide/install.md](../guide/install.md) and [guide/maintenance.md](../guide/maintenance.md).
@@ -95,8 +107,8 @@ configurations written against the older name keep working.
 
 | Command | Does |
 | --- | --- |
-| `browsentic status` | Daemon and extension state, the installed build, manifest sync, pairing count |
-| `browsentic logs` | Print the daemon log (`~/.browsentic/daemon.log`) |
+| `browsentic status` | The Bridge, which browsers can start it, the agent, and one row per paired browser with its extension version, its store and whether it is connected; flags an unpacked copy that needs ↻ and two copies answering in one browser |
+| `browsentic logs` | Print the Bridge's log (`~/.browsentic/daemon.log`) |
 | `browsentic tools` | Print the bundled tool manifest as JSON. **No browser needed** |
 | `browsentic skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
 | `browsentic approvals` | The "always on this site" grants |
@@ -115,9 +127,9 @@ configurations written against the older name keep working.
 
 | Command | Does |
 | --- | --- |
-| `browsentic start` | Bring the background daemon up, if it is not already |
-| `browsentic stop` | Stop the background daemon, whichever of 8765–8767 is answering. A paired browser leaves it stopped until `browsentic start`, or an MCP client, starts it |
-| `browsentic restart` | Stop the daemon and bring up a fresh one |
+| `browsentic start` | Bring the Bridge up in the background, if it is not already |
+| `browsentic stop` | Stop the Bridge, whichever of 8765–8767 is answering. A paired browser leaves it stopped until `browsentic start`, or an MCP client, starts it |
+| `browsentic restart` | Stop the Bridge and bring up a fresh one |
 | `browsentic --version` / `-v` | Print the version |
 | `browsentic help` / `--help` / `-h` | Usage |
 

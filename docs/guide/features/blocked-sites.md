@@ -50,13 +50,13 @@ shows a banner while the active tab is blocked; the agent can still work in othe
 
 ## Why nothing can override it
 
-The list lives in this browser's extension storage and nowhere else. No message from the daemon can
+The list lives in this browser's extension storage and nowhere else. No message from the Bridge can
 read or write it, and the extension checks it before every page action, inside the browser — so neither
 the agent, an MCP client, nor anything that edits `~/.browsentic/config.json` can loosen it. The
 content script in the page checks it a second time, and the agent cannot steer a tab onto the settings
 page to edit it: page actions refuse anything that is not an http(s) page.
 
-That makes it different from [approvals](../approvals.md), which the daemon applies and you can tune
+That makes it different from [approvals](../approvals.md), which the Bridge applies and you can tune
 per run: a blocked site is not a question the agent can ask.
 
 ## Edges

@@ -118,9 +118,9 @@ block "search for X" on an empty tab.
 
 ### Sites that are never in scope
 
-Scope is a question the daemon answers per run, and config.json can widen it. For a site the agent
+Scope is a question the Bridge answers per run, and config.json can widen it. For a site the agent
 must never touch at all, use [Blocked sites](features/blocked-sites.md) instead: the extension enforces
-that list itself, before any of these rules run, and nothing on the daemon's side can read or change
+that list itself, before any of these rules run, and nothing on the Bridge's side can read or change
 it. A run started from a blocked tab does not send its address, so it begins unconfined, as from a
 blank tab — and every action on the blocked site is refused all the same.
 
@@ -149,8 +149,8 @@ be asking about something already answered. What holds it in place is not a prom
 itself, which pins the origin and the path segment it was approved on and re-checks both before it
 installs anything.
 
-The daemon is not in that loop. The code lives in extension storage, the run goes from the side
-panel straight to the tab, and the daemon holds only a markdown note that the tool exists. There
+The Bridge is not in that loop. The code lives in extension storage, the run goes from the side
+panel straight to the tab, and the Bridge holds only a markdown note that the tool exists. There
 is no action for it, so no MCP client can reach it, with or without `unattended`.
 
 It does not waive a `deny`. That is why the two live-tool rules deny rather than confirm: a
@@ -214,7 +214,7 @@ accident. Hand-editing config.json still works if you genuinely mean it.
 Credential sealing appears in the list with no switch at all, because there is nothing to turn off:
 it is what keeps a plaintext password off the socket in the first place.
 
-An agent run cannot use either screen's route to loosen its own rules: the daemon refuses a
+An agent run cannot use either screen's route to loosen its own rules: the Bridge refuses a
 settings change from a connection that has acted for a run, with `BLOCKED`.
 
 ---

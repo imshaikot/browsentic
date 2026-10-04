@@ -5,6 +5,8 @@ https://github.com/user-attachments/assets/e9f146d3-cb14-416e-b8d7-68c4e81cbd0d
 # Browsentic – a completely integrated agentic browser extension
 
 <p>
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/chrome-web-store/v/npmocgldfflonjjmdadmdefpnfagnjmp?logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store" alt="Chrome Web Store version"></a>
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/chrome-web-store/users/npmocgldfflonjjmdadmdefpnfagnjmp?logo=googlechrome&logoColor=white&label=users" alt="Chrome Web Store users"></a>
   <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/v/browsentic?logo=npm" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/dm/browsentic?logo=npm" alt="npm downloads"></a>
   <a href="https://github.com/imshaikot/browsentic/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white" alt="CI"></a>
@@ -25,11 +27,11 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
 
 <p>
   <strong>Works in</strong><br>
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/chrome.svg" width="40" height="40" alt="Chrome" title="Chrome"></a>&emsp;
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/chrome.svg" width="40" height="40" alt="Chrome" title="Chrome"></a>&emsp;
   <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="40" height="40" alt="Firefox" title="Firefox"></a>&emsp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/brave.svg" width="40" height="40" alt="Brave" title="Brave"></a>&emsp;
-  <a href="docs/guide/install.md"><img src="https://browsentic.com/icons/arc.svg" width="40" height="40" alt="Arc" title="Arc"></a>
+  <a href="docs/guide/install.md#1-add-the-extension"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/brave.svg" width="40" height="40" alt="Brave" title="Brave"></a>&emsp;
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/arc.svg" width="40" height="40" alt="Arc" title="Arc"></a>
 </p>
 <p>
   <strong>Runs on</strong><br>
@@ -47,25 +49,42 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
 
 ## Quick Start
 
-**Any platform** — with [Node.js](https://nodejs.org) 20 or newer (Windows is [experimental](docs/guide/limits.md#windows-is-experimental)):
+Browsentic is your browser's superpower, free and open source. It is two pieces plus the AI you already use:
 
-```sh
-npx browsentic setup
-```
+**1. The extension**, in your browser: from the Chrome Web Store for Chrome, Edge, Brave, Arc, Vivaldi and Opera, or the signed add-on for Firefox.
 
-**macOS** — one line installs [Browsentic.app](docs/guide/mac-app.md), which brings Node and everything else:
+<p>
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-Add%20to%20Chrome-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Add to Chrome from the Chrome Web Store"></a>
+  <a href="https://browsentic.com/download/firefox"><img src="https://img.shields.io/badge/Firefox-Get%20the%20add--on-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Get the Firefox add-on"></a>
+</p>
+
+**2. Browsentic Bridge**, on your computer. It runs your agent and keeps everything local.
+
+**macOS** — one line installs [the app](docs/guide/mac-app.md), which brings Node and everything else:
 
 ```sh
 curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
-**Windows** — one line in PowerShell installs [the Windows app](docs/guide/windows-app.md), which brings Node and everything else ([experimental](docs/guide/limits.md#windows-is-experimental)):
+**Windows** — one line in PowerShell installs [the Windows app](docs/guide/windows-app.md) ([experimental](docs/guide/limits.md#windows-is-experimental)):
 
 ```powershell
 irm https://browsentic.com/install.ps1 | iex
 ```
 
-Full install and setup guide, Firefox included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
+**Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
+
+```sh
+npx browsentic@latest setup
+```
+
+It asks which browser should get the extension, opens its store page there, and prints a pairing code. The apps do the same from a window.
+
+**3. An agent CLI you're signed in to:** [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [another supported one](docs/guide/agents.md). You probably have one already.
+
+Install 1 and 2 in either order, then click Browsentic in the toolbar and enter the pairing code, once. No API key, no account, no subscription.
+
+Full guide, Firefox and unpacked installs included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
 
 ## Key Capabilities
 
@@ -105,16 +124,16 @@ Full install and setup guide, Firefox included: **[browsentic.com/docs/guide/ins
 <summary>The same flow, as text</summary>
 
 ```
-You ──speak or type──> Extension ──local WebSocket──> Daemon ──spawns──> your agent CLI
-                            ▲                              (claude │ codex │ agy │ vibe │ grok)
-                            └──────────────── page actions ─────────────────────┘
+You ──speak or type──> Extension ──local WebSocket──> Browsentic Bridge ──spawns──> your agent CLI
+                            ▲                                        (claude │ codex │ agy │ …)
+                            └──────────────────── page actions ──────────────────────┘
 
-Any MCP client ──stdio──> browsentic mcp ──> the same daemon ──> the same browser
+Any MCP client ──stdio──> browsentic mcp ──> the same Bridge ──> the same browser
 ```
 
 </details>
 
-The extension dials out to the daemon, because a Manifest V3 service worker cannot listen for connections. One daemon owns the browser link, so several MCP clients can share one browser. Everything binds to `127.0.0.1`.
+The extension dials out to Browsentic Bridge, because a Manifest V3 service worker cannot listen for connections. One Bridge owns the browser link, so several MCP clients can share one browser. Everything binds to `127.0.0.1`.
 
 ## Resources
 

@@ -1,9 +1,10 @@
 # Browsentic for Windows
 
-An app that installs Browsentic and runs it from a window, the Windows counterpart of the
-[macOS app](mac-app.md). It is the same command and the same daemon as
-[`npx browsentic setup`](install.md): the app carries them inside itself, lays them down in
-`%USERPROFILE%\.browsentic`, and then drives them, so nothing here needs a terminal.
+Browsentic Bridge, the half of Browsentic that runs on your computer, as an app: the Windows
+counterpart of the [macOS app](mac-app.md). It is the same command and the same background process
+as [`npx browsentic@latest setup`](install.md): the app carries them inside itself, lays them down in
+`%USERPROFILE%\.browsentic`, and then drives them, so nothing here needs a terminal. It also adds the
+other half, the extension, to your browsers from their stores.
 
 Requires Windows 10 or 11, on x64 or ARM64. Windows is still [experimental](limits.md#windows-is-experimental).
 
@@ -36,19 +37,18 @@ missing).
 
 ## The first screen: what your computer already has
 
-The app opens on six checks and runs them on its own:
+The app opens on five checks and runs them on its own:
 
 | Check | Passes when | If it does not |
 | --- | --- | --- |
 | **This computer** | always | — |
 | **Node.js runtime** | `node` 20 or newer is on your `PATH` | **Install** downloads the current LTS from nodejs.org into `%USERPROFILE%\.browsentic\runtime\node`, verified against its published SHA-256. No administrator |
-| **Browsentic command** | `%USERPROFILE%\.browsentic\cli` holds the version this app carries | **Install** copies it there and writes the `browsentic.exe` launcher to `%USERPROFILE%\.browsentic\bin` |
-| **Browser extension** | the same version is unpacked at `%USERPROFILE%\browsentic\extension\chrome-mv3` | **Install** unpacks it |
-| **A Chromium browser** | Chrome, Edge, Brave, Vivaldi, Opera or Chromium is installed | **Get Chrome** opens the download page. Advisory: it does not block you |
+| **Browsentic Bridge** | `%USERPROFILE%\.browsentic\cli` holds the version this app carries | **Install** copies it there, writes the `browsentic.exe` launcher to `%USERPROFILE%\.browsentic\bin`, and registers it with your browsers so they can start it |
+| **A browser** | Chrome, Edge, Brave, Vivaldi, Opera, Chromium or Firefox is installed | **Get Chrome** opens the download page. Advisory: it does not block you |
 | **An AI agent** | One of `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent`, `qwen` or `opencode` is on your `PATH` | **Install Claude Code** runs `npm install --global @anthropic-ai/claude-code`. Advisory |
 
-**Set up everything** installs the first three in one click. A browser and an agent are yours to
-choose, so each has a button of its own. When everything required is in place the app moves on by
+**Set up everything** installs Node and the Bridge in one click. A browser, the extension and an
+agent are yours to choose, so each has a button of its own. When everything required is in place the app moves on by
 itself.
 
 Claude Code on Windows also needs [Git for Windows](https://git-scm.com/downloads/win), which it
@@ -56,33 +56,42 @@ runs its shell commands through.
 
 ## The window
 
-The tabs float at the top; Ctrl+1 to Ctrl+8 switch between them. Ctrl+Shift+D turns the daemon
+The tabs float at the top; Ctrl+1 to Ctrl+8 switch between them. Ctrl+Shift+D turns the Bridge
 on or off, Ctrl+Shift+R restarts it, and Ctrl+Shift+P gets a new pairing code.
 
 | Tab | What you do there |
 | --- | --- |
-| **Overview** | Turn the daemon on and off with the power button, restart it, see its address, version and whether the extension is connected and in sync. Copy the extension's folder, or open `chrome://extensions` in your browser with the folder already on the clipboard |
-| **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser, unpair one or all |
+| **Overview** | Turn Browsentic Bridge on and off with the power button, restart it, see its address and version. One row per browser: where its extension comes from, whether it is connected, and a button that adds it from the store. The unpacked folder sits behind **Load it unpacked instead** |
+| **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser and the store its extension came from, unpair one or all |
 | **Agents** | See which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `%USERPROFILE%\.browsentic\daemon.log`, followed live |
-| **Settings** | Light, dark or system appearance for this window; whether the daemon starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
+| **Settings** | Light, dark or system appearance for this window; whether the Bridge starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
 | **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in — nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
 
-The Browsentic icon in the notification area shows the daemon's state and has the same on, off and
+The Browsentic icon in the notification area shows the Bridge's state and has the same on, off and
 restart, and a left click opens the window.
 
 **Closing the window does not stop anything.** The app stays in the notification area, and the
-daemon is a background process of its own, so the side panel and any MCP client keep working with
+Bridge is a background process of its own, so the side panel and any MCP client keep working with
 the app closed or quit.
 
-## Loading the extension
+## Adding the extension
 
-Browsers load an unpacked extension only by hand. **Extensions in Google Chrome** (or Edge, or
-Brave) on the Overview tab opens `chrome://extensions` with the extension's folder on the
-clipboard. Turn on **Developer mode**, press **Load unpacked**, click the folder picker's address
-bar, paste, and press Enter. Then open the Browsentic popup and paste a pairing code.
+**Overview** lists the browsers on your computer, one row each, with where the extension comes from
+and whether it is connected. A browser without it has a button — **Add to Chrome**, **Add to Edge**,
+**Get the Firefox add-on** — that opens its store page in that browser and shows a pairing code.
+Press the store's button, click Browsentic in the toolbar, enter the code, and the row turns
+**Connected**. Edge installs from the Chrome Web Store until its own listing is published; the app
+tells you to press **Allow extensions from other stores** first.
+
+**Load it unpacked instead**, under the rows, is for a browser that cannot reach a store or for an
+unreleased build. It writes the extension to `%USERPROFILE%\browsentic\extension\chrome-mv3`, and
+**Extensions in Google Chrome** (or Edge, or Brave) opens `chrome://extensions` with that folder on
+the clipboard. Turn on **Developer mode**, press **Load unpacked**, click the folder picker's address
+bar, paste, and press Enter. **Reload needed** shows on that row when the folder holds a newer build
+than the browser has loaded.
 
 ## `browsentic` in your terminal
 
@@ -105,9 +114,9 @@ one command, not two that can drift apart. The Settings tab says so when it find
 The app asks GitHub for a newer release when it opens and every few hours after. When one is out,
 a card appears at the top of **Overview** (and in Settings) with **Update now**: it downloads the new
 installer, checks it carries a signature from Browsentic's release key, runs it, and reopens the app,
-which replaces the command and the extension and restarts the daemon. Then press ↻ on the Browsentic
-card at `chrome://extensions`, which is the one step no installer can do for you. **Check for
-updates** on the same card asks again on the spot.
+which replaces the Bridge and restarts it. The extension updates itself from its store; only an
+unpacked copy needs ↻ on its card at `chrome://extensions`, and the app says so. The two don't have
+to be the same version. **Check for updates** on the same card asks again on the spot.
 
 If an update fails nothing is changed, and the card hands you the PowerShell line, which installs
 the same release.
@@ -117,11 +126,11 @@ the same release.
 ## Uninstall
 
 **Settings → Uninstall…** runs [`browsentic uninstall`](../reference/cli.md#uninstall): it unpairs
-every browser, stops the daemon and removes `%USERPROFILE%\.browsentic` and `%USERPROFILE%\browsentic`,
-optionally keeping your skills. Remove the Browsentic card at `chrome://extensions` first. Then
-uninstall the app itself in **Settings › Apps › Installed apps**.
+every browser, stops the Bridge and removes `%USERPROFILE%\.browsentic` and `%USERPROFILE%\browsentic`,
+optionally keeping your skills. Remove Browsentic from each browser first (right-click its toolbar
+icon → **Remove**). Then uninstall the app itself in **Settings › Apps › Installed apps**.
 
-Uninstalling only the app, from Installed apps, stops the daemon and takes `browsentic` off your
+Uninstalling only the app, from Installed apps, stops the Bridge and takes `browsentic` off your
 `PATH`, and leaves your pairing, settings and skills where they are, as dragging the macOS app to
 the Trash does.
 

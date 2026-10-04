@@ -22,7 +22,7 @@ Nothing lives in the repository.
 └── runtime/node/              desktop apps only, and only when the computer had no Node 20+: a private copy from nodejs.org
 
 ~/browsentic/                  (paths configurable)
-├── extension/chrome-mv3/      the unpacked extension `browsentic setup` installs
+├── extension/chrome-mv3/      the unpacked extension `browsentic setup --unpacked` writes, when asked for
 ├── skills/                    panel uploads + activated site maps
 │   ├── acme-com/SKILL.md
 │   └── .staging/              maps awaiting review — unreadable to the loader
@@ -38,7 +38,7 @@ Nothing lives in the repository.
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
-| `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw. Each browser gets a manifest in its own `NativeMessagingHosts` folder (a registry key on Windows) naming the extension origins allowed to use it; pairing adds the new one. `browsentic uninstall` removes both |
+| `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw. Each browser gets a manifest in its own `NativeMessagingHosts` folder (a registry key on Windows) naming the extension origins allowed to use it: both store listings always, the unpacked folder, and each paired browser. Pairing adds the new one, and the Bridge rewrites them every time it starts. `browsentic uninstall` removes both |
 | `stopped` | `browsentic stop` and `restart` | While it exists the helper starts no daemon, so a paired browser cannot undo a stop. The next daemon to start removes it |
 | `cli/`, `bin/`, `runtime/` | The [macOS](../guide/mac-app.md) or [Windows](../guide/windows-app.md) app | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
@@ -89,7 +89,7 @@ timers — none of what a page reported about itself outlives the browser that r
 ## Relocating
 
 `BROWSENTIC_HOME` moves `~/.browsentic` wholesale. `screenshotDir` and `skillsDir` in config move
-those two `~/browsentic` subdirectories independently, and `browsentic setup --dir` installs the
+those two `~/browsentic` subdirectories independently, and `browsentic setup --unpacked --dir` installs the
 extension somewhere else.
 
 ---

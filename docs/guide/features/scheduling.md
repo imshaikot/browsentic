@@ -41,16 +41,17 @@ runs never fill up the History tab.
 The editor shows the next three runs before you save, and for an instruction how many agent runs a
 week the schedule adds up to — each one spends tokens.
 
-The daemon keeps the schedule, in `~/.browsentic/schedules.json`, so one list covers every browser
+The Bridge keeps the schedule, in `~/.browsentic/schedules.json`, so one list covers every browser
 paired with it. `browsentic tasks` lists the tasks from a terminal, and pauses, resumes or deletes one.
 
 ### What has to be running
 
-A run needs the browser open and the daemon up. The daemon starts itself when the browser needs it:
-`browsentic setup` registers a small helper that Chrome, Edge, Brave and Firefox can launch, and
+A run needs the browser open and Browsentic Bridge up. The Bridge starts itself when the browser
+needs it: `browsentic setup`, or installing the app, registers a small helper that Chrome, Edge,
+Brave and Firefox can launch, whether the extension came from a store or a folder, and
 `browsentic status` says which browsers have it.
 
-After `browsentic stop` the browser leaves the daemon down until `browsentic start`, or an MCP
+After `browsentic stop` the browser leaves the Bridge down until `browsentic start`, or an MCP
 client, brings it back.
 
 A run that falls due while the browser is closed or the computer is asleep is **missed**. By default

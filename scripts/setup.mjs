@@ -49,7 +49,7 @@ STEPS.forEach(([label, args], i) => {
 
 console.log(`
 \x1b[32m✓ Extension built\x1b[0m  dist/chrome-mv3 — load it unpacked at chrome://extensions, Developer mode on
-\x1b[32m✓ Daemon built\x1b[0m     src/daemon/dist
+\x1b[32m✓ Bridge built\x1b[0m     src/daemon/dist — the daemon, the CLI and the MCP server
 
 Two steps are left. Both reach outside this directory, so they stay separate:
 
