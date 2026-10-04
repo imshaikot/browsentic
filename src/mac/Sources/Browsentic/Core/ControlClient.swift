@@ -7,9 +7,9 @@ enum ControlError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .offline: "The daemon is not running — turn it on from the Overview tab."
-        case .timeout: "The daemon did not answer in time — restart it from the Overview tab."
-        case .malformed: "The daemon answered with something this app cannot read — update the app."
+        case .offline: "Browsentic Bridge is not running — turn it on from the Overview tab."
+        case .timeout: "Browsentic Bridge did not answer in time — restart it from the Overview tab."
+        case .malformed: "Browsentic Bridge answered with something this app cannot read — update the app."
         }
     }
 }

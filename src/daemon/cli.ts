@@ -3,7 +3,7 @@ import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
 import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type AgentState, type ModelList } from '@/lib/agents/catalog';
-import { SOURCE_LABEL, type Source } from '@/lib/stores';
+import { SOURCE_LABEL } from '@/lib/stores';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { formatWhen } from '@/lib/format-when';
@@ -14,14 +14,12 @@ import {
   BROWSER_IDS,
   BROWSERS,
   browserOf,
+  browserRows,
   isBrowserId,
   locateBrowsers,
   openPage,
-  sourceFor,
-  storeSteps,
-  storeUrl,
   type BrowserId,
-  type Located,
+  type BrowserRow,
 } from './browsers';
 import type { SessionSummary } from './control';
 import { forgetGrants, listGrants } from './agent/approvals';
@@ -341,7 +339,7 @@ async function showBrowsers(): Promise<void> {
     sessions = await bridge.sessions();
     await bridge.close();
   }
-  const rows = browserRows(sessions, locateBrowsers());
+  const rows = browserRows(sessions, locateBrowsers(), pkg.version);
   if (wantsJson) {
     const dir = extensionDir(readAgentConfig().extensionDir);
     console.log(JSON.stringify({ running: !!lock, browsers: rows, unpacked: { dir, version: readStamp(dir)?.version ?? null } }, null, 2));
@@ -419,37 +417,6 @@ function groupCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-interface BrowserRow {
-  id: BrowserId;
-  label: string;
-  installed: boolean;
-  source: Source;
-  store: string;
-  storeUrl: string;
-  steps: string[];
-  extensionsPage: string;
-  connected: boolean;
-  sessions: Pick<SessionSummary, 'id' | 'source' | 'extensionVersion' | 'connected'>[];
-}
-
-function browserRows(sessions: SessionSummary[], located: Located[]): BrowserRow[] {
-  return BROWSER_IDS.map((id) => {
-    const own = sessions.filter((session) => browserOf(session.browser) === id);
-    return {
-      id,
-      label: BROWSERS[id].label,
-      installed: located.some((found) => found.id === id),
-      source: sourceFor(id),
-      store: SOURCE_LABEL[sourceFor(id)],
-      storeUrl: storeUrl(id, pkg.version),
-      steps: storeSteps(id),
-      extensionsPage: BROWSERS[id].extensionsPage,
-      connected: own.some((session) => session.connected),
-      sessions: own.map(({ id, source, extensionVersion, connected }) => ({ id, source, extensionVersion, connected })),
-    };
-  });
-}
-
 /** What setup was asked to put where. No browser at all means print the plan and stop. */
 interface Choice {
   /** Absent for "another browser", which is only ever loaded unpacked. */
@@ -502,7 +469,7 @@ async function setup(argv: string[]): Promise<void> {
     const since = new Date().toISOString();
     const located = locateBrowsers();
     const sessions = await bridge.sessions();
-    const rows = browserRows(sessions, located);
+    const rows = browserRows(sessions, located, pkg.version);
 
     if (!json) {
       console.log(`\n  Browsentic ${pkg.version} — your browser's superpower\n`);

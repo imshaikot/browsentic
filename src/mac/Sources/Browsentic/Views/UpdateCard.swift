@@ -82,15 +82,15 @@ struct UpdateCard: View {
 
     private var subtitle: String {
         switch model.updatePhase {
-        case .downloading, .verifying: return "The daemon keeps running while this happens."
-        case .relaunching: return "The app closes for a moment, then replaces the command, the daemon and the extension."
+        case .downloading, .verifying: return "Browsentic Bridge keeps running while this happens."
+        case .relaunching: return "The app closes for a moment, then replaces Browsentic Bridge."
         case .failed(let reason): return "\(reason) Nothing was changed. The terminal line installs the same release."
         case .idle, .checking:
             guard let update = model.update else {
                 return model.lastUpdateCheck.map { "Checked GitHub and npm \(Timestamp.ago($0))." } ?? "Checks GitHub and npm when it opens and every few hours after."
             }
             return update.hasMacBuild
-                ? "You have \(model.appVersion). One press replaces the app, then the command, the daemon and the extension, and reopens it."
+                ? "You have \(model.appVersion). One press replaces the app, then Browsentic Bridge, and reopens it."
                 : "You have \(model.appVersion). The release is published, but its Mac build is still being attached — usually a few minutes."
         }
     }

@@ -46,6 +46,26 @@ import Testing
         #expect(state.catalog?[1].installsWithNpm == false)
     }
 
+    @Test func browserRowsSayWhereEachBrowserGetsTheExtensionAndWhichCopyItRuns() throws {
+        let listing = #"""
+        {"running":true,"browsers":[
+        {"id":"chrome","label":"Chrome","installed":true,"source":"chrome-web-store","store":"Chrome Web Store","storeUrl":"https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp","steps":["Press “Add to Chrome”."],"extensionsPage":"chrome://extensions","connected":true,
+         "sessions":[{"id":"s1","source":"chrome-web-store","extensionVersion":"0.8.0","connected":true}]},
+        {"id":"firefox","label":"Firefox","installed":true,"source":"firefox","store":"Firefox add-on","storeUrl":"https://x/browsentic-0.8.0-firefox.xpi","steps":["Say yes to both."],"extensionsPage":"about:addons","connected":false,"sessions":[]}],
+        "unpacked":{"dir":"/Users/me/browsentic/extension/chrome-mv3","version":null}}
+        """#
+        let rows = try JSONDecoder().decode(BrowserListing.self, from: Data(listing.utf8)).browsers
+        #expect(rows.map { "\($0.label): \($0.copy.map { SourceLabel.of($0.source) } ?? $0.addTitle)" } == ["Chrome: Chrome Web Store", "Firefox: Get the Firefox add-on"])
+    }
+
+    @Test func setupWithNoUnpackedFolderStillDecodes() throws {
+        let result = #"{"version":"0.8.0","daemon":{"port":8765,"pid":1},"extensionDir":null,"alreadyPaired":false,"chosen":{"id":"edge","unpacked":false,"opened":true,"connected":false},"pairingCode":"K7QM3XPT","expiresAt":1790000000000}"#
+        let setup = try JSONDecoder().decode(SetupResult.self, from: Data(result.utf8))
+        #expect(setup.extensionDir == nil)
+        #expect(setup.chosen?.opened == true)
+        #expect(setup.pairingCode == "K7QM3XPT")
+    }
+
     @Test func sessionShowsTheExtensionIdAlone() throws {
         let row = #"{"origin":"chrome-extension://abcdef","extensionVersion":"0.5.0","pairedAt":"2026-09-01T10:00:00.000Z","lastSeenAt":"2026-09-01T10:00:00.000Z","connected":true}"#
         let session = try JSONDecoder().decode(BrowserSession.self, from: Data(row.utf8))

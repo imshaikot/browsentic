@@ -36,9 +36,21 @@ struct CLI {
     func stop() async throws { try await run(["stop"]) }
     func restart() async throws { try await run(["restart"]) }
 
-    func installExtension(force: Bool = false) async throws -> SetupResult {
-        try await json(["setup", "--no-pair", "--no-self-update"] + (force ? ["--force"] : []), as: SetupResult.self)
+    /// Registers the Bridge with every browser, store copies included, and starts it. Asks nothing.
+    func registerBridge() async throws -> SetupResult {
+        try await json(["setup", "--no-pair", "--no-open", "--no-wait", "--no-self-update"], as: SetupResult.self)
     }
+
+    func installExtension(force: Bool = false) async throws -> SetupResult {
+        try await json(["setup", "--unpacked", "--no-pair", "--no-open", "--no-wait", "--no-self-update"] + (force ? ["--force"] : []), as: SetupResult.self)
+    }
+
+    /// Opens that browser's store page in it, when the command can find it, and mints the code to enter.
+    func addExtension(to browser: String) async throws -> SetupResult {
+        try await json(["setup", "--browser", browser, "--no-wait", "--no-self-update"], as: SetupResult.self, timeout: 120)
+    }
+
+    func browsers() async throws -> [BrowserRow] { try await json(["browsers"], as: BrowserListing.self).browsers }
 
     func agents() async throws -> AgentState { try await json(["agent"], as: AgentState.self) }
     func setModel(_ model: String?, for kind: String) async throws { try await run(["agent", "model", kind] + (model.map { [$0] } ?? [])) }

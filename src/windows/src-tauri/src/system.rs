@@ -10,15 +10,16 @@ pub struct Browser {
     pub path: PathBuf,
 }
 
-/// Chromium browsers on Windows: the name shown, the program App Paths registers, and where each
-/// installs itself when it does not register one, under Program Files or the user's AppData.
-const BROWSERS: [(&str, &str, &str); 6] = [
+/// Browsers on Windows: the name shown, the program App Paths registers, and where each installs
+/// itself when it does not register one, under Program Files or the user's AppData.
+const BROWSERS: [(&str, &str, &str); 7] = [
     ("Google Chrome", "chrome.exe", r"Google\Chrome\Application\chrome.exe"),
     ("Microsoft Edge", "msedge.exe", r"Microsoft\Edge\Application\msedge.exe"),
     ("Brave", "brave.exe", r"BraveSoftware\Brave-Browser\Application\brave.exe"),
     ("Vivaldi", "vivaldi.exe", r"Vivaldi\Application\vivaldi.exe"),
     ("Opera", "opera.exe", r"Programs\Opera\opera.exe"),
     ("Chromium", "chromium.exe", r"Chromium\Application\chrome.exe"),
+    ("Firefox", "firefox.exe", r"Mozilla Firefox\firefox.exe"),
 ];
 
 pub fn browsers() -> Vec<Browser> {

@@ -34,7 +34,7 @@ export function SettingsView({ model, state }: { model: Model; state: State }) {
           />
           <div className="border-t border-line" />
           <SwitchRow
-            title="Turn the daemon on when the app opens"
+            title="Turn Browsentic Bridge on when the app opens"
             subtitle="It keeps running after the window closes, so the side panel and MCP clients still work."
             checked={state.startDaemonOnLaunch}
             onChange={(on) => model.setStartDaemonOnLaunch(on)}
@@ -92,7 +92,7 @@ export function SettingsView({ model, state }: { model: Model; state: State }) {
           <div className="min-w-0 flex-1">
             <SectionTitle
               title="Uninstall"
-              subtitle="Stops the daemon, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs."
+              subtitle="Stops Browsentic Bridge, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs."
             />
           </div>
           <QuietButton tint="danger" onClick={() => setConfirming(true)}>
@@ -105,7 +105,7 @@ export function SettingsView({ model, state }: { model: Model; state: State }) {
         <ConfirmDialog
           title="Uninstall Browsentic?"
           message={
-            'This stops the daemon, unpairs every browser, and removes %USERPROFILE%\\.browsentic and %USERPROFILE%\\browsentic: the command, the unpacked extension, keys, approvals and logs.\n\nRemove the Browsentic card at chrome://extensions first. Afterwards, uninstall the app itself in Settings › Apps › Installed apps.'
+            'This stops Browsentic Bridge, unpairs every browser, and removes %USERPROFILE%\\.browsentic and %USERPROFILE%\\browsentic: the command, the unpacked extension, keys, approvals and logs.\n\nRemove Browsentic from each browser first: right-click its toolbar icon and choose Remove. Afterwards, uninstall the app itself in Settings › Apps › Installed apps.'
           }
           action="Uninstall"
           onCancel={() => setConfirming(false)}
@@ -145,7 +145,7 @@ function BrowserSettings({ model, state }: { model: Model; state: State }) {
           <RefreshCw className="size-5 shrink-0 text-amber" strokeWidth={2.5} />
           <div className="min-w-0 flex-1">
             <SectionTitle
-              title="The daemon predates this app"
+              title="Browsentic Bridge predates this app"
               subtitle="It is still running from before the last update, so it cannot share the browser theme or the guardrails yet."
             />
           </div>

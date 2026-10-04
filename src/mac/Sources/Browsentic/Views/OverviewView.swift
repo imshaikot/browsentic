@@ -37,23 +37,23 @@ struct OverviewView: View {
             if let status = model.status, let lock = model.lock {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                     Stat(label: "Address", value: "127.0.0.1:\(status.port)", icon: "network")
-                    Stat(label: "Daemon", value: "v\(status.daemonVersion)", detail: "pid \(lock.pid)", icon: "cpu")
+                    Stat(label: "Bridge", value: "v\(status.daemonVersion)", detail: "pid \(lock.pid)", icon: "cpu")
                     Stat(
                         label: "Extension", value: status.connected ? "Connected" : "Not connected",
                         detail: status.extensionVersion.map { "v\($0)" }, icon: "puzzlepiece.extension",
                         tint: status.connected ? Palette.lime : Palette.amber
                     )
                     Stat(
-                        label: "Tools", value: status.manifestInSync ? "In sync" : "Drifted",
-                        detail: status.manifestInSync ? nil : "reload the extension", icon: "wrench.and.screwdriver",
-                        tint: status.manifestInSync ? Palette.lime : Palette.amber
+                        label: "Tools", value: status.manifestInSync ? "In sync" : "The extension’s",
+                        detail: status.manifestInSync ? nil : "versions differ, which is fine", icon: "wrench.and.screwdriver",
+                        tint: status.manifestInSync ? Palette.lime : Palette.brand
                     )
                 }
                 .transition(.opacity)
             }
 
-            if model.daemon == .on, model.status?.pairedBrowsers == 0 || model.pairing != nil { ConnectCard() }
             ExtensionCard()
+            if model.daemon == .on, model.status?.pairedBrowsers == 0 || model.pairing != nil { ConnectCard() }
             if model.update == nil { UpdateCard() }
         }
         .animation(.spring(duration: 0.45), value: model.daemon)
@@ -73,7 +73,7 @@ struct OverviewView: View {
         switch model.daemon {
         case .on: model.status?.connected == true ? "Your browser is in the loop" : "Waiting for your browser"
         case .off: "Browsentic is off"
-        case .starting: "Bringing the daemon up"
+        case .starting: "Starting Browsentic Bridge"
         case .stopping: "Shutting down"
         }
     }
@@ -82,8 +82,8 @@ struct OverviewView: View {
         switch model.daemon {
         case .on:
             model.status?.connected == true
-                ? "Open the side panel in your browser and say what you want. This window can close — the daemon keeps running."
-                : "The daemon is listening. Load the extension and pair it, and the side panel comes alive."
+                ? "Open the side panel in your browser and say what you want. This window can close — Browsentic Bridge keeps running."
+                : "Browsentic Bridge is running. Add the extension to your browser below and pair it once, and the side panel comes alive."
         case .off: "Turn it on and the side panel in your browser can reach the agent you already run."
         case .starting, .stopping: "One moment."
         }
@@ -141,8 +141,8 @@ private struct PowerOrb: View {
             withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { spin = true }
             withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { breathe = true }
         }
-        .help(on ? "Turn the daemon off" : "Turn the daemon on")
-        .accessibilityLabel(on ? "Turn the daemon off" : "Turn the daemon on")
+        .help(on ? "Turn Browsentic Bridge off" : "Turn Browsentic Bridge on")
+        .accessibilityLabel(on ? "Turn Browsentic Bridge off" : "Turn Browsentic Bridge on")
     }
 }
 
@@ -177,7 +177,7 @@ struct ConnectCard: View {
             VStack(alignment: .leading, spacing: 16) {
                 SectionTitle(
                     title: "Pair a browser",
-                    subtitle: "Open the Browsentic popup in your browser, paste the code, and press Connect. It works once and expires in ten minutes."
+                    subtitle: "Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes."
                 )
                 if let pairing = model.pairing {
                     PairingCodeView(pairing: pairing)
@@ -229,47 +229,105 @@ struct PairingCodeView: View {
 
 struct ExtensionCard: View {
     @EnvironmentObject private var model: AppModel
+    @State private var showUnpacked: Bool?
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    SectionTitle(title: "The extension", subtitle: subtitle)
-                    Spacer()
-                    if let stamp = model.stamp { Pill(text: "v\(stamp.version) unpacked", tint: Palette.brand) }
-                    if model.extensionNeedsReload { Pill(text: "Reload needed", tint: Palette.amber, icon: "arrow.clockwise") }
+                SectionTitle(title: "The extension", subtitle: subtitle)
+                VStack(spacing: 8) {
+                    ForEach(model.offeredBrowsers) { BrowserExtensionRow(row: $0) }
                 }
-                PathRow(url: Paths.extensionDir())
-                if model.status?.connected != true {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Step(number: 1, text: "Open chrome://extensions and turn on Developer mode.")
-                        Step(number: 2, text: "Press “Load unpacked”, then ⇧⌘G, and paste the path above.")
-                        Step(number: 3, text: "Open the Browsentic popup and paste a pairing code.")
-                    }
+                Button { showUnpacked = !unpacked } label: {
+                    Label("Load it unpacked instead", systemImage: unpacked ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Palette.inkDim)
                 }
-                HStack(spacing: 8) {
-                    ForEach(model.browsers.prefix(3)) { browser in
-                        Button { model.openExtensionsPage(in: browser) } label: {
-                            Label("Extensions in \(browser.name)", systemImage: "arrow.up.forward.app")
-                        }
-                        .buttonStyle(QuietButtonStyle())
-                    }
-                    Spacer()
-                    Button { Task { await model.reinstallExtension() } } label: { Label("Write it again", systemImage: "arrow.down.doc") }
-                        .buttonStyle(QuietButtonStyle())
-                        .disabled(model.busy.contains("extension"))
-                }
+                .buttonStyle(.plain)
+                if unpacked { UnpackedSteps() }
             }
         }
     }
 
+    /// Open from the start for someone who already loads the unpacked folder.
+    private var unpacked: Bool { showUnpacked ?? (model.stamp != nil) }
+
     private var subtitle: String {
-        if model.extensionNeedsReload {
-            return "A newer build is unpacked than the one your browser has loaded. Press ↻ on the Browsentic card at chrome://extensions."
+        model.sessions.contains(where: \.connected)
+            ? "In your browser and talking to Browsentic Bridge. Store copies update themselves."
+            : "Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once."
+    }
+}
+
+private struct BrowserExtensionRow: View {
+    @EnvironmentObject private var model: AppModel
+    let row: BrowserRow
+
+    var body: some View {
+        HStack(spacing: 12) {
+            GlowDot(color: row.copy?.connected == true ? Palette.lime : Palette.inkFaint, pulsing: row.copy?.connected == true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.label).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.ink)
+                Text(detail).font(.system(size: 11.5)).foregroundStyle(Palette.inkDim).lineLimit(1)
+            }
+            Spacer()
+            if stale { Pill(text: "Reload needed", tint: Palette.amber, icon: "arrow.clockwise") }
+            if let copy = row.copy {
+                Pill(text: copy.connected ? "Connected" : "Not connected", tint: copy.connected ? Palette.lime : Palette.inkDim)
+            } else {
+                Button { Task { await model.addExtension(row) } } label: { Label(row.addTitle, systemImage: "puzzlepiece.extension") }
+                    .buttonStyle(QuietButtonStyle(tint: Palette.brand))
+                    .disabled(model.busy.contains("add:\(row.id)"))
+            }
         }
-        return model.status?.connected == true
-            ? "Loaded and talking to the daemon. The folder below has to stay where it is — the browser's pairing is tied to the path."
-            : "Browsers only load an unpacked extension by hand, so these three steps are yours."
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Palette.ground2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var detail: String {
+        if let copy = row.copy { return "\(SourceLabel.of(copy.source)) · v\(copy.extensionVersion)" }
+        return row.installed ? row.store : "\(row.store) · not found on this Mac"
+    }
+
+    private var stale: Bool {
+        guard let copy = row.copy, copy.source == "unpacked", let stamp = model.stamp else { return false }
+        return copy.extensionVersion != stamp.version
+    }
+}
+
+private struct UnpackedSteps: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("For a browser that cannot reach a store, such as ungoogled Chromium or a managed profile, or to try a build the stores do not have yet.")
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.inkDim)
+                .fixedSize(horizontal: false, vertical: true)
+            PathRow(url: Paths.extensionDir())
+            VStack(alignment: .leading, spacing: 8) {
+                Step(number: 1, text: "Open chrome://extensions and turn on Developer mode.")
+                Step(number: 2, text: "Press “Load unpacked”, then ⇧⌘G, and paste the path above.")
+                Step(number: 3, text: "Click Browsentic in the toolbar and enter a pairing code.")
+            }
+            HStack(spacing: 8) {
+                ForEach(model.browsers.filter(\.isChromium).prefix(3)) { browser in
+                    Button { model.openExtensionsPage(in: browser) } label: {
+                        Label("Extensions in \(browser.name)", systemImage: "arrow.up.forward.app")
+                    }
+                    .buttonStyle(QuietButtonStyle())
+                }
+                Spacer()
+                Button { Task { await model.reinstallExtension() } } label: {
+                    Label(model.stamp == nil ? "Write it" : "Write it again", systemImage: "arrow.down.doc")
+                }
+                .buttonStyle(QuietButtonStyle())
+                .disabled(model.busy.contains("extension"))
+            }
+        }
+        .padding(.leading, 14)
+        .overlay(alignment: .leading) { Rectangle().fill(Palette.line).frame(width: 1) }
     }
 }
 

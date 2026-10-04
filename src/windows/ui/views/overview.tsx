@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Cpu, FileDown, KeyRound, Network, Power, Puzzle, RefreshCw, SquareArrowOutUpRight, Wrench, type LucideIcon } from 'lucide-react';
+import { ChevronRight, Cpu, FileDown, KeyRound, Network, Power, Puzzle, RefreshCw, SquareArrowOutUpRight, Wrench, type LucideIcon } from 'lucide-react';
 
+import type { BrowserRow } from '@/daemon/browsers';
+import { SOURCE_LABEL } from '@/lib/stores';
 import { cn } from '@/lib/utils';
 import { Card, CopyButton, GlowDot, PathRow, Pill, PrimaryButton, QuietButton, SectionTitle, Step, type Tint } from '../components';
 import type { DaemonPhase, Model, State } from '../model';
@@ -16,13 +18,13 @@ export function OverviewView({ model, state }: { model: Model; state: State }) {
   const title = {
     on: connected ? 'Your browser is in the loop' : 'Waiting for your browser',
     off: 'Browsentic is off',
-    starting: 'Bringing the daemon up',
+    starting: 'Starting Browsentic Bridge',
     stopping: 'Shutting down',
   }[daemon];
   const subtitle = {
     on: connected
-      ? 'Open the side panel in your browser and say what you want. This window can close: the daemon keeps running.'
-      : 'The daemon is listening. Load the extension and pair it, and the side panel comes alive.',
+      ? 'Open the side panel in your browser and say what you want. This window can close: Browsentic Bridge keeps running.'
+      : 'Browsentic Bridge is running. Add the extension to your browser below and pair it once, and the side panel comes alive.',
     off: 'Turn it on and the side panel in your browser can reach the agent you already run.',
     starting: 'One moment.',
     stopping: 'One moment.',
@@ -54,7 +56,7 @@ export function OverviewView({ model, state }: { model: Model; state: State }) {
       {status && lock && (
         <div className="grid grid-cols-4 gap-3">
           <Stat label="Address" value={`127.0.0.1:${status.port}`} icon={Network} />
-          <Stat label="Daemon" value={`v${status.daemonVersion}`} detail={`pid ${lock.pid}`} icon={Cpu} />
+          <Stat label="Bridge" value={`v${status.daemonVersion}`} detail={`pid ${lock.pid}`} icon={Cpu} />
           <Stat
             label="Extension"
             value={connected ? 'Connected' : 'Not connected'}
@@ -64,16 +66,16 @@ export function OverviewView({ model, state }: { model: Model; state: State }) {
           />
           <Stat
             label="Tools"
-            value={status.manifestInSync ? 'In sync' : 'Drifted'}
-            detail={status.manifestInSync ? undefined : 'reload the extension'}
+            value={status.manifestInSync ? 'In sync' : 'The extension’s'}
+            detail={status.manifestInSync ? undefined : 'versions differ, which is fine'}
             icon={Wrench}
-            tint={status.manifestInSync ? 'lime' : 'amber'}
+            tint={status.manifestInSync ? 'lime' : 'brand'}
           />
         </div>
       )}
 
-      {daemon === 'on' && (status?.pairedBrowsers === 0 || state.pairing) && <ConnectCard model={model} state={state} />}
       <ExtensionCard model={model} state={state} />
+      {daemon === 'on' && (status?.pairedBrowsers === 0 || state.pairing) && <ConnectCard model={model} state={state} />}
       {!state.update && <UpdateCard model={model} state={state} />}
     </div>
   );
@@ -98,8 +100,8 @@ function PowerOrb({ phase, onToggle }: { phase: DaemonPhase; onToggle: () => voi
       type="button"
       onClick={onToggle}
       disabled={moving}
-      title={on ? 'Turn the daemon off' : 'Turn the daemon on'}
-      aria-label={on ? 'Turn the daemon off' : 'Turn the daemon on'}
+      title={on ? 'Turn Browsentic Bridge off' : 'Turn Browsentic Bridge on'}
+      aria-label={on ? 'Turn Browsentic Bridge off' : 'Turn Browsentic Bridge on'}
       className="relative size-[148px] shrink-0 rounded-full transition-transform duration-300 hover:scale-103"
     >
       {on && <span className="breathe absolute inset-0 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--brand)_calc(var(--glow)*0.55),transparent)_45%,transparent)]" />}
@@ -141,7 +143,7 @@ export function ConnectCard({ model, state }: { model: Model; state: State }) {
       <div className="space-y-4">
         <SectionTitle
           title="Pair a browser"
-          subtitle="Open the Browsentic popup in your browser, paste the code, and press Connect. It works once and expires in ten minutes."
+          subtitle="Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes."
         />
         {state.pairing ? (
           <PairingCodeView pairing={state.pairing} model={model} />
@@ -196,44 +198,86 @@ function PairingCodeView({ pairing, model }: { pairing: PairingCode; model: Mode
 }
 
 function ExtensionCard({ model, state }: { model: Model; state: State }) {
-  const connected = state.status?.connected === true;
-  const reload = model.extensionNeedsReload;
-  const subtitle = reload
-    ? 'A newer build is unpacked than the one your browser has loaded. Press ↻ on the Browsentic card at chrome://extensions.'
-    : connected
-      ? 'Loaded and talking to the daemon. The folder below has to stay where it is: the browser’s pairing is tied to the path.'
-      : 'Browsers only load an unpacked extension by hand, so these three steps are yours.';
+  const [shown, setShown] = useState<boolean>();
+  // Open from the start for someone who already loads the unpacked folder.
+  const unpacked = shown ?? !!state.stamp;
+  const subtitle = state.sessions.some((session) => session.connected)
+    ? 'In your browser and talking to Browsentic Bridge. Store copies update themselves.'
+    : 'Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once.';
 
   return (
     <Card>
       <div className="space-y-3.5">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <SectionTitle title="The extension" subtitle={subtitle} />
-          </div>
-          {state.stamp && <Pill text={`v${state.stamp.version} unpacked`} tint="brand" />}
-          {reload && <Pill text="Reload needed" tint="amber" icon={RefreshCw} />}
+        <SectionTitle title="The extension" subtitle={subtitle} />
+        <div className="space-y-2">
+          {model.offeredBrowsers.map((row) => (
+            <BrowserExtensionRow key={row.id} row={row} model={model} state={state} />
+          ))}
         </div>
-        {state.info && <PathRow path={state.info.paths.extensionDir} model={model} info={state.info} />}
-        {!connected && (
-          <div className="space-y-2">
-            <Step number={1}>Open chrome://extensions and turn on Developer mode.</Step>
-            <Step number={2}>Press “Load unpacked”, then paste the folder above into the picker’s address bar.</Step>
-            <Step number={3}>Open the Browsentic popup and paste a pairing code.</Step>
+        <button
+          type="button"
+          onClick={() => setShown(!unpacked)}
+          className="flex items-center gap-1.5 text-xs font-medium text-ink-dim transition hover:text-ink"
+        >
+          <ChevronRight className={cn('size-3.5 transition-transform', unpacked && 'rotate-90')} />
+          Load it unpacked instead
+        </button>
+        {unpacked && (
+          <div className="space-y-3 border-l border-line pl-4">
+            <p className="text-[12px] text-ink-dim">
+              For a browser that cannot reach a store, such as ungoogled Chromium or a managed profile, or to try a build the stores do not have yet.
+            </p>
+            {state.info && <PathRow path={state.info.paths.extensionDir} model={model} info={state.info} />}
+            <div className="space-y-2">
+              <Step number={1}>Open chrome://extensions and turn on Developer mode.</Step>
+              <Step number={2}>Press “Load unpacked”, then paste the folder above into the picker’s address bar.</Step>
+              <Step number={3}>Click Browsentic in the toolbar and enter a pairing code.</Step>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {state.browsers
+                .filter((browser) => !/firefox/i.test(browser.name))
+                .slice(0, 3)
+                .map((browser) => (
+                  <QuietButton key={browser.path} icon={SquareArrowOutUpRight} onClick={() => void model.openExtensionsPage(browser)}>
+                    Extensions in {browser.name}
+                  </QuietButton>
+                ))}
+              <div className="flex-1" />
+              <QuietButton icon={FileDown} disabled={state.busy.includes('extension')} onClick={() => void model.reinstallExtension()}>
+                {state.stamp ? 'Write it again' : 'Write it'}
+              </QuietButton>
+            </div>
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          {state.browsers.slice(0, 3).map((browser) => (
-            <QuietButton key={browser.path} icon={SquareArrowOutUpRight} onClick={() => void model.openExtensionsPage(browser)}>
-              Extensions in {browser.name}
-            </QuietButton>
-          ))}
-          <div className="flex-1" />
-          <QuietButton icon={FileDown} disabled={state.busy.includes('extension')} onClick={() => void model.reinstallExtension()}>
-            Write it again
-          </QuietButton>
-        </div>
       </div>
     </Card>
+  );
+}
+
+function BrowserExtensionRow({ row, model, state }: { row: BrowserRow; model: Model; state: State }) {
+  const copy = row.sessions.find((session) => session.connected) ?? row.sessions[0];
+  const stale = copy?.source === 'unpacked' && !!state.stamp && copy.extensionVersion !== state.stamp.version;
+  const where = copy
+    ? `${SOURCE_LABEL[copy.source ?? 'unpacked']} · v${copy.extensionVersion}`
+    : row.installed
+      ? row.store
+      : `${row.store} · not found on this computer`;
+
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-ground-2 px-3 py-2.5">
+      <GlowDot tint={copy?.connected ? 'lime' : 'faint'} pulsing={!!copy?.connected} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium text-ink">{row.label}</p>
+        <p className="truncate text-[11.5px] text-ink-dim">{where}</p>
+      </div>
+      {stale && <Pill text="Reload needed" tint="amber" icon={RefreshCw} />}
+      {copy ? (
+        <Pill text={copy.connected ? 'Connected' : 'Not connected'} tint={copy.connected ? 'lime' : 'dim'} />
+      ) : (
+        <QuietButton icon={Puzzle} tint="brand" disabled={state.busy.includes(`add:${row.id}`)} onClick={() => void model.addExtension(row)}>
+          {row.id === 'firefox' ? 'Get the Firefox add-on' : `Add to ${row.label}`}
+        </QuietButton>
+      )}
+    </div>
   );
 }

@@ -8,7 +8,8 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { posix } from 'node:path';
-import { CHROME_WEB_STORE, EDGE_ADD_ONS, type Source } from '@/lib/stores';
+import { CHROME_WEB_STORE, EDGE_ADD_ONS, SOURCE_LABEL, type Source } from '@/lib/stores';
+import type { SessionSummary } from './control';
 import { signedAddonUrl } from './firefox-addon';
 
 export const BROWSER_IDS = ['chrome', 'edge', 'brave', 'arc', 'vivaldi', 'opera', 'chromium', 'firefox'] as const;
@@ -126,6 +127,38 @@ export function storeSteps(id: BrowserId): string[] {
     return ['Opera first offers its “Install Chrome Extensions” helper: add it, then press “Add to Opera”.'];
   }
   return [`Press “${BROWSERS[id].button}”.`];
+}
+
+/** One browser as setup, `browsentic browsers` and the apps show it. */
+export interface BrowserRow {
+  id: BrowserId;
+  label: string;
+  installed: boolean;
+  source: Source;
+  store: string;
+  storeUrl: string;
+  steps: string[];
+  extensionsPage: string;
+  connected: boolean;
+  sessions: Pick<SessionSummary, 'id' | 'source' | 'extensionVersion' | 'connected'>[];
+}
+
+export function browserRows(sessions: SessionSummary[], located: Located[], version: string): BrowserRow[] {
+  return BROWSER_IDS.map((id) => {
+    const own = sessions.filter((session) => browserOf(session.browser) === id);
+    return {
+      id,
+      label: BROWSERS[id].label,
+      installed: located.some((found) => found.id === id),
+      source: sourceFor(id),
+      store: SOURCE_LABEL[sourceFor(id)],
+      storeUrl: storeUrl(id, version),
+      steps: storeSteps(id),
+      extensionsPage: BROWSERS[id].extensionsPage,
+      connected: own.some((session) => session.connected),
+      sessions: own.map(({ id, source, extensionVersion, connected }) => ({ id, source, extensionVersion, connected })),
+    };
+  });
 }
 
 /** Which browser a connected extension is in, from the brand it reported. */

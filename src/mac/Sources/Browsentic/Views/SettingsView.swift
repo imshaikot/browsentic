@@ -24,7 +24,7 @@ struct SettingsView: View {
                     .fixedSize()
                     Divider().overlay(Palette.line)
                     SwitchRow(
-                        title: "Turn the daemon on when the app opens",
+                        title: "Turn Browsentic Bridge on when the app opens",
                         subtitle: "It keeps running after the window closes, so the side panel and MCP clients still work.",
                         isOn: $startOnLaunch
                     )
@@ -75,7 +75,7 @@ struct SettingsView: View {
 
             Card {
                 HStack(spacing: 16) {
-                    SectionTitle(title: "Uninstall", subtitle: "Stops the daemon, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs.")
+                    SectionTitle(title: "Uninstall", subtitle: "Stops Browsentic Bridge, unpairs every browser, and removes the command, the unpacked extension, keys, approvals and logs.")
                     Spacer(minLength: 0)
                     Button("Uninstall…") { confirmingUninstall = true }.buttonStyle(QuietButtonStyle(tint: Palette.danger))
                 }
@@ -85,7 +85,7 @@ struct SettingsView: View {
         .sheet(isPresented: $confirmingUninstall) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Uninstall Browsentic?").font(.display(18)).foregroundStyle(Palette.ink)
-                Text("This stops the daemon, unpairs every browser, and removes ~/.browsentic and ~/browsentic — the command, the unpacked extension, keys, approvals and logs.\n\nRemove the Browsentic card at chrome://extensions first, then drag this app to the Trash afterwards.")
+                Text("This stops Browsentic Bridge, unpairs every browser, and removes ~/.browsentic and ~/browsentic — the command, the unpacked extension, keys, approvals and logs.\n\nRemove Browsentic from each browser first: right-click its toolbar icon and choose Remove. Then drag this app to the Trash.")
                     .font(.system(size: 12.5)).foregroundStyle(Palette.inkDim).fixedSize(horizontal: false, vertical: true)
                 Toggle("Keep my skills and site maps", isOn: $keepSkills).toggleStyle(.checkbox)
                 HStack {
