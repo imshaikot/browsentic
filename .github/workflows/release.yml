@@ -157,7 +157,12 @@ jobs:
 
           export HOME=/tmp/smoke-home BROWSENTIC_HOME=/tmp/smoke-home/.browsentic
           mkdir -p "$HOME"
-          npx browsentic setup --no-pair --json
+          # With no terminal and no --browser, setup prints the plan and never asks: the apps and
+          # scripts run it this way. The unpacked folder is opt-in, so none may appear.
+          npx browsentic setup --no-pair --json </dev/null \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s.slice(s.indexOf("{")));if(!Array.isArray(r.browsers)||r.extensionDir!==null)throw new Error("setup plan looks wrong")})'
+          test ! -e "$HOME/browsentic/extension" || { echo "::error::setup wrote the unpacked folder without --unpacked"; exit 1; }
+          npx browsentic setup --unpacked --no-pair --no-wait --json </dev/null
           node -p "require('$HOME/browsentic/extension/chrome-mv3/manifest.json').version" | grep -qx "$VERSION"
 
           # The MCP handshake, on both entry points. Bare invocation of the legacy bin must
