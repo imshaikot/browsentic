@@ -2,11 +2,10 @@ https://github.com/user-attachments/assets/e9f146d3-cb14-416e-b8d7-68c4e81cbd0d
 
 <div align="center">
 
-# Browsentic – a completely integrated agentic browser extension
+# Browsentic - a completely integrated agentic browser harness
 
 <p>
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/chrome-web-store/v/npmocgldfflonjjmdadmdefpnfagnjmp?logo=googlechrome&logoColor=white&label=Chrome%20Web%20Store" alt="Chrome Web Store version"></a>
-  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/chrome-web-store/users/npmocgldfflonjjmdadmdefpnfagnjmp?logo=googlechrome&logoColor=white&label=users" alt="Chrome Web Store users"></a>
   <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/v/browsentic?logo=npm" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/browsentic"><img src="https://img.shields.io/npm/dm/browsentic?logo=npm" alt="npm downloads"></a>
   <a href="https://github.com/imshaikot/browsentic/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/imshaikot/browsentic/ci.yml?branch=main&label=CI&logo=githubactions&logoColor=white" alt="CI"></a>
