@@ -43,6 +43,15 @@ describe('allowedOrigins', () => {
       expect(allowedOrigins(platform)).toContain(unpackedExtensionOrigin(extensionDir(), platform));
     }
   });
+
+  it('lets both store copies start the daemon before they have ever paired', () => {
+    expect(allowedOrigins('darwin')).toEqual(
+      expect.arrayContaining([
+        'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/',
+        'chrome-extension://cbkjhkgjcpihokphhdkbahilpcjojpdc/',
+      ]),
+    );
+  });
 });
 
 describe('hostTargets', () => {
@@ -136,14 +145,18 @@ describe('registering the host', () => {
     mkdirSync(chromeHome, { recursive: true });
   });
 
-  it('registers with the browsers that are installed, letting in the unpacked extension', () => {
+  it('registers with the browsers that are installed, letting in both store copies and the unpacked one', () => {
     const installed = installNativeHost('/opt/browsentic/dist/cli.js', 'linux');
 
     expect(installed.browsers).toEqual(['Chrome']);
     expect(modeOf(installed.launcher)).toBe(bits(0o755));
     expect(JSON.parse(readFileSync(manifest, 'utf8'))).toMatchObject({
       path: installed.launcher,
-      allowed_origins: [unpackedExtensionOrigin(extensionDir(), 'linux')],
+      allowed_origins: [
+        'chrome-extension://cbkjhkgjcpihokphhdkbahilpcjojpdc/',
+        unpackedExtensionOrigin(extensionDir(), 'linux'),
+        'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/',
+      ].sort(),
     });
     expect(registeredBrowsers('linux')).toEqual(['Chrome']);
   });

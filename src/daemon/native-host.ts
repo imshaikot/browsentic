@@ -2,11 +2,13 @@
  * Lets the browser start the daemon. Chrome, Edge, Brave and Firefox each launch a program
  * registered as a native messaging host when the extension asks for it; ours only makes sure
  * a daemon is running and exits. The registration lists the exact extension origins allowed
- * to launch it, recomputed on every setup and every pairing.
+ * to launch it: both store listings always, plus the unpacked folder and whatever has paired,
+ * recomputed on every setup and every pairing.
  */
 
 import { execFileSync } from 'node:child_process';
 import { NATIVE_HOST_NAME } from '@/lib/actions/protocol';
+import { FIREFOX_ADDON_ID, STORE_EXTENSION_IDS } from '@/lib/stores';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -18,7 +20,6 @@ import { log } from './log';
 import { extensionDir } from './paths';
 
 export { NATIVE_HOST_NAME };
-export const FIREFOX_ADDON_ID = 'browsentic@browsentic.com';
 
 type Family = 'chromium' | 'firefox';
 
@@ -107,7 +108,8 @@ export function allowedOrigins(platform: NodeJS.Platform = process.platform): st
     .map((session) => session.origin)
     .filter((origin) => origin.startsWith('chrome-extension://'));
   const unpacked = unpackedExtensionOrigin(extensionDir(readAgentConfig().extensionDir), platform);
-  return [...new Set([unpacked, ...paired].map(asOrigin))].sort();
+  const stores = STORE_EXTENSION_IDS.map((id) => `chrome-extension://${id}/`);
+  return [...new Set([...stores, unpacked, ...paired].map(asOrigin))].sort();
 }
 
 export function hostManifest(family: Family, launcher: string, origins: readonly string[]): Record<string, unknown> {

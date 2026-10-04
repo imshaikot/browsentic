@@ -5,6 +5,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
   EXTERNAL_RUN_ID,
+  MIN_EXTENSION_PROTOCOL,
   SOCKET_PROTOCOL_VERSION,
   failure,
   isInstallId,
@@ -21,6 +22,7 @@ import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
+import { sourceOf } from '@/lib/stores';
 import { saveScreenshot } from './screenshots';
 import { adoptDownload, listDownloads, resolveAttachment, sweepDownloads, type CapturedItem } from './downloads';
 import {
@@ -104,6 +106,23 @@ interface Binding {
 function browserLabel(claimed: unknown): string | undefined {
   if (typeof claimed !== 'string') return undefined;
   return claimed.replace(/[^\x20-\x7E]/g, '').trim().slice(0, BROWSER_LABEL_MAX) || undefined;
+}
+
+/**
+ * Why this extension cannot be let in, or null. An extension newer than the daemon is let in: it
+ * says how old a daemon it can live with, and anything it sends that the daemon does not know is
+ * left unanswered. Before 0.8 an extension read only "protocol version mismatch" as a refusal not
+ * worth retrying, so a too-old one is told in those words.
+ */
+export function protocolRefusal(hello: { protocolVersion: unknown; minDaemonProtocol?: unknown }): string | null {
+  const { protocolVersion, minDaemonProtocol } = hello;
+  if (typeof protocolVersion !== 'number' || protocolVersion < MIN_EXTENSION_PROTOCOL) {
+    return `protocol version mismatch: Browsentic Bridge speaks v${SOCKET_PROTOCOL_VERSION} and takes extensions from v${MIN_EXTENSION_PROTOCOL} on`;
+  }
+  if (typeof minDaemonProtocol === 'number' && minDaemonProtocol > SOCKET_PROTOCOL_VERSION) {
+    return `daemon too old: Browsentic Bridge speaks v${SOCKET_PROTOCOL_VERSION}, this extension needs v${minDaemonProtocol}`;
+  }
+  return null;
 }
 
 export interface DaemonOptions {
@@ -228,6 +247,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   lock.port = port;
   writeLockfile(lock);
   releaseWake();
+  // A registration an older daemon wrote lets in only what it knew, which leaves the store copies out.
+  refreshNativeHost();
   log(`daemon ${version} listening on 127.0.0.1:${port} (pid ${process.pid})`);
   scheduleIdleExit();
 
@@ -279,9 +300,10 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       ws.close(1002, 'expected hello');
       return;
     }
-    if (hello.protocolVersion !== SOCKET_PROTOCOL_VERSION) {
-      log(`extension protocol v${hello.protocolVersion} != daemon v${SOCKET_PROTOCOL_VERSION}; closing`);
-      ws.close(1002, `protocol version mismatch: daemon speaks v${SOCKET_PROTOCOL_VERSION}`);
+    const refusal = protocolRefusal(hello);
+    if (refusal) {
+      log(`extension protocol v${hello.protocolVersion} refused: ${refusal}; closing`);
+      ws.close(1002, refusal);
       return;
     }
     if (!isNonce(hello.nonce)) {
@@ -301,8 +323,9 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       browser: browserLabel(hello.browser),
     };
 
+    // At the extension's number, not ours: it proves what it said, and it said its own version.
     const transcript: Transcript = {
-      protocolVersion: SOCKET_PROTOCOL_VERSION,
+      protocolVersion: hello.protocolVersion,
       extensionVersion: hello.extensionVersion,
       manifestHash: hello.manifestHash,
       clientNonce: hello.nonce,
@@ -322,7 +345,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (hello.auth?.kind === 'pair') {
       const matched = await matchPairing(proven.proof, transcript);
       if (!matched) {
-        return reject('That pairing code is wrong or expired. Run "browsentic-mcp pair" for a new one.', true);
+        return reject('That pairing code is wrong or expired. Run "browsentic pair" for a new one.', true);
       }
       consumePairing(matched.code);
       secret = matched.secret;
@@ -333,7 +356,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     } else if (hello.auth?.kind === 'session') {
       const session = await matchSession(proven.proof, transcript, install);
       if (!session) {
-        return reject('This browser is no longer paired. Run "browsentic-mcp pair" to pair again.', false);
+        return reject('This browser is no longer paired. Run "browsentic pair" to pair again.', false);
       }
       claimSession(session.key, install);
       secret = session.key;
@@ -490,7 +513,12 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       manifestInSync,
       sealedSessionKey,
     };
-    accepted.send({ t: 'welcome', ...welcome, proof: await serverProof(secret, transcript, welcome) });
+    accepted.send({
+      t: 'welcome',
+      ...welcome,
+      protocolVersion: SOCKET_PROTOCOL_VERSION,
+      proof: await serverProof(secret, transcript, welcome),
+    });
     scheduleIdleExit();
     void pushAgentState(accepted);
     watchModels();
@@ -837,7 +865,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   function sessionSummaries(): SessionSummary[] {
     return listSessions().map(({ key: _key, installId: _installId, ...session }) => {
       const id = sessionId({ installId: _installId, origin: session.origin });
-      return { id, ...session, connected: links.get(id)?.isOpen === true };
+      return { id, ...session, source: sourceOf(session.origin), connected: links.get(id)?.isOpen === true };
     });
   }
 

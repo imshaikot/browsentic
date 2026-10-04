@@ -224,7 +224,7 @@ async function status(bridge: Bridge): Promise<ActionResult> {
   const hints = [
     base.manifestInSync
       ? ''
-      : 'The extension is running an older build than the daemon, so your tool list came from the extension and is stale — capabilities that exist in this repository may be missing entirely. You cannot fix this yourself: tell the user to run `yarn build && yarn daemon:build` and then press Reload on Browsentic at chrome://extensions. Do not improvise around a tool you think should exist.',
+      : 'The extension and Browsentic Bridge are different versions, which is normal while one of them waits on an update. Your tool list came from the extension, which is what runs the tools, so it is the right one. Use the tools you were given and do not improvise around one you think should exist.',
     page.ok ? '' : `Cannot read the active tab (${page.error.code}). Use page_navigate to open an http(s) page first.`,
   ].filter(Boolean);
 

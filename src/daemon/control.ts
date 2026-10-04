@@ -2,6 +2,7 @@ import type { ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { Preferences } from '@/lib/settings/preferences';
+import type { Source } from '@/lib/stores';
 
 export interface BridgeStatus {
   connected: boolean;
@@ -21,6 +22,8 @@ export interface SessionSummary {
   id: string;
   browser?: string;
   origin: string;
+  /** Absent from a daemon before 0.8, which knew only the unpacked copy. */
+  source?: Source;
   extensionVersion: string;
   pairedAt: string;
   lastSeenAt: string;
