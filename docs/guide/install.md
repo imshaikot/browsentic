@@ -4,15 +4,17 @@ Browsentic is your browser's superpower: a side panel that drives your real, log
 the AI agent you already use. It is free and open source, with no API key, no account and no cloud
 service of its own.
 
-**Browsentic is two pieces plus the AI you already use.**
+**One install sets it up, the extension included.** The Mac app, the Windows app or
+`npx browsentic@latest setup` installs Browsentic Bridge, the half that runs on your computer, then
+asks which browser you use and opens the extension's store page in it. Press **Add**, enter the
+code it shows, and that's it. The side panel runs on an agent CLI you're signed in to, such as
+Claude Code or Codex; you probably have one already.
 
-1. **The extension**, in your browser: from the Chrome Web Store, or the signed add-on for Firefox.
-2. **Browsentic Bridge**, on your computer: the Mac app, the Windows app, or
-   `npx browsentic@latest setup`. It runs your agent and keeps everything local.
-3. **An agent CLI you're signed in to**: Claude Code, Codex, or another supported one. You probably
-   have one already.
-
-Install 1 and 2 in either order, then pair them once with a code.
+The extension is on the
+[Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
+for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an
+[add-on signed by Mozilla](https://browsentic.com/download/firefox). You never have to find either
+page yourself.
 
 ---
 
@@ -36,22 +38,10 @@ Two things worth knowing before you start:
 
 ---
 
-## 1. Add the extension
+## 1. Install Browsentic
 
-| Browser | Get it from | What to press |
-| --- | --- | --- |
-| Chrome, Brave, Arc, Vivaldi | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Add to Chrome** (in Brave, **Add to Brave**) |
-| Edge | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Allow extensions from other stores** in the bar at the top, then **Add to Chrome**. The Edge Add-ons listing is in review. |
-| Opera | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | Opera first offers its **Install Chrome Extensions** helper: add it, then **Add to Opera** |
-| Firefox 140 or newer | [The signed add-on](https://browsentic.com/download/firefox) | Accept both prompts: one lets github.com install software, one adds Browsentic. See [Firefox](#firefox) |
-| Ungoogled Chromium, a profile that blocks stores, an unreleased build | A folder on your computer | See [Load unpacked](#load-unpacked-advanced) |
-
-Pin Browsentic to the toolbar from the puzzle-piece menu, so the popup is one click away.
-
-You don't have to find the page yourself: the apps and `setup` open the right one in the browser you
-pick.
-
-## 2. Install Browsentic Bridge
+This installs Browsentic Bridge, which starts your agent and keeps everything local, and then walks
+you through the browser half.
 
 On macOS, the [app](mac-app.md) does it from a window, Node included:
 
@@ -101,6 +91,24 @@ To install the command permanently rather than through `npx`:
 ```sh
 npm i -g browsentic
 ```
+
+## 2. Add the extension
+
+Setup, or the app's button for that browser, has opened Browsentic's page in it. What to press there:
+
+| Browser | The page it opens | What to press |
+| --- | --- | --- |
+| Chrome, Brave, Arc, Vivaldi | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Add to Chrome** (in Brave, **Add to Brave**) |
+| Edge | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Allow extensions from other stores** in the bar at the top, then **Add to Chrome**. The Edge Add-ons listing is in review. |
+| Opera | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | Opera first offers its **Install Chrome Extensions** helper: add it, then **Add to Opera** |
+| Firefox 140 or newer | [The signed add-on](https://browsentic.com/download/firefox) | Accept both prompts: one lets github.com install software, one adds Browsentic. See [Firefox](#firefox) |
+| Ungoogled Chromium, a profile that blocks stores, an unreleased build | None: `setup --unpacked` writes a folder | See [Load unpacked](#load-unpacked-advanced) |
+
+Pin Browsentic to the toolbar from the puzzle-piece menu, so the popup is one click away. It updates
+itself from its store from then on.
+
+Added it from the store before running setup? That works too: pick the same browser, and enter the
+code setup shows.
 
 ## 3. Pair them, once
 
