@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight, Cpu, FileDown, KeyRound, Network, Power, Puzzle, RefreshCw, SquareArrowOutUpRight, Wrench, type LucideIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight, Cpu, FileDown, KeyRound, Network, Power, Puzzle, RefreshCw, SquareArrowOutUpRight, Wrench, type LucideIcon } from 'lucide-react';
 
 import type { BrowserRow } from '@/daemon/browsers';
 import { SOURCE_LABEL } from '@/lib/stores';
@@ -219,12 +219,12 @@ function ExtensionCard({ model, state }: { model: Model; state: State }) {
           onClick={() => setShown(!unpacked)}
           className="flex items-center gap-1.5 text-xs font-medium text-ink-dim transition hover:text-ink"
         >
-          <ChevronRight className={cn('size-3.5 transition-transform', unpacked && 'rotate-90')} />
+          {unpacked ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
           Load it unpacked instead
         </button>
         {unpacked && (
-          <div className="space-y-3 border-l border-line pl-4">
-            <p className="text-[12px] text-ink-dim">
+          <div className="space-y-3 border-l border-line pl-5">
+            <p className="text-xs text-ink-dim">
               For a browser that cannot reach a store, such as ungoogled Chromium or a managed profile, or to try a build the stores do not have yet.
             </p>
             {state.info && <PathRow path={state.info.paths.extensionDir} model={model} info={state.info} />}
