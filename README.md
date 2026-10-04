@@ -28,7 +28,7 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
   <strong>Works in</strong><br>
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/chrome.svg" width="40" height="40" alt="Chrome" title="Chrome"></a>&emsp;
   <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="40" height="40" alt="Firefox" title="Firefox"></a>&emsp;
-  <a href="docs/guide/install.md#1-add-the-extension"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
+  <a href="docs/guide/install.md#2-add-the-extension"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/brave.svg" width="40" height="40" alt="Brave" title="Brave"></a>&emsp;
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/arc.svg" width="40" height="40" alt="Arc" title="Arc"></a>
 </p>
@@ -48,16 +48,7 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
 
 ## Quick Start
 
-Browsentic is your browser's superpower, free and open source. It is two pieces plus the AI you already use:
-
-**1. The extension**, in your browser: from the Chrome Web Store for Chrome, Edge, Brave, Arc, Vivaldi and Opera, or the signed add-on for Firefox.
-
-<p>
-  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/badge/Chrome%20Web%20Store-Add%20to%20Chrome-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Add to Chrome from the Chrome Web Store"></a>
-  <a href="https://browsentic.com/download/firefox"><img src="https://img.shields.io/badge/Firefox-Get%20the%20add--on-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Get the Firefox add-on"></a>
-</p>
-
-**2. Browsentic Bridge**, on your computer. It runs your agent and keeps everything local.
+Browsentic is your browser's superpower, free and open source. One install sets up everything, the extension included.
 
 **macOS** — one line installs [the app](docs/guide/mac-app.md), which brings Node and everything else:
 
@@ -77,11 +68,18 @@ irm https://browsentic.com/install.ps1 | iex
 npx browsentic@latest setup
 ```
 
-It asks which browser should get the extension, opens its store page there, and prints a pairing code. The apps do the same from a window.
+Setup asks which browser you use and opens Browsentic's store page in it. Press **Add to Chrome** (or **Add** in Firefox), then click Browsentic in the toolbar and enter the code setup shows. That's the whole install, and the extension updates itself from its store from then on. The apps do the same from their Overview tab.
 
-**3. An agent CLI you're signed in to:** [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [another supported one](docs/guide/agents.md). You probably have one already.
+The extension is on the Chrome Web Store, for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an add-on signed by Mozilla:
 
-Install 1 and 2 in either order, then click Browsentic in the toolbar and enter the pairing code, once. No API key, no account, no subscription.
+<p>
+  <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/badge/Available%20in%20the-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Available in the Chrome Web Store"></a>
+  <a href="https://browsentic.com/download/firefox"><img src="https://img.shields.io/badge/Signed%20add--on%20for-Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Signed add-on for Firefox"></a>
+</p>
+
+Added it from the store already? Run the same line and enter the code it shows.
+
+The side panel runs on an agent CLI you're signed in to: [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [another supported one](docs/guide/agents.md). You probably have one already. No API key, no account, no subscription.
 
 Full guide, Firefox and unpacked installs included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
 

@@ -10,25 +10,24 @@ are already signed in to.
 
 ## Install
 
-Browsentic is two pieces plus the AI you already use:
+One command sets everything up, the extension included:
 
-1. **The extension**, in your browser: from the
-   [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
-   for Chrome, Edge, Brave, Arc, Vivaldi and Opera, or the
-   [signed add-on](https://browsentic.com/download/firefox) for Firefox.
-2. **Browsentic Bridge**, this package:
+```sh
+npx browsentic@latest setup
+```
 
-   ```sh
-   npx browsentic@latest setup
-   ```
+It starts Browsentic Bridge, asks which browser you use, opens the extension's store page there,
+prints a pairing code and waits for the browser to connect. Press **Add to Chrome** (or **Add** in
+Firefox), click Browsentic in the toolbar and enter the code, once. On macOS and Windows an app does
+the same from a window: see [browsentic.com/install](https://browsentic.com/install/).
 
-   It starts the Bridge, asks which browser should get the extension, opens its store page there,
-   prints a pairing code and waits for the browser to connect. On macOS and Windows an app does the
-   same from a window: see [browsentic.com/install](https://browsentic.com/install/).
-3. **An agent CLI you're signed in to**: Claude Code, Codex, or another supported one.
+The extension is on the
+[Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
+for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an
+[add-on signed by Mozilla](https://browsentic.com/download/firefox). The side panel runs on an agent
+CLI you're signed in to: Claude Code, Codex, or another supported one.
 
-Click Browsentic in the toolbar, enter the pairing code once, then open the side panel and say what
-you want.
+Then open the side panel and say what you want.
 
 To update later:
 

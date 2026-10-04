@@ -28,7 +28,7 @@ Those three answer most questions. Browsentic Bridge's log also lives at `~/.bro
 | `browsentic setup` keeps waiting for the browser | The extension is in, but not paired yet | Click Browsentic in the toolbar and enter the code `setup` printed. Ctrl-C stops the wait without undoing anything |
 | Popup shows `Expected {op:…}` | Stale service worker after a rebuild | `chrome://extensions` → ↻ reload Browsentic |
 | "That pairing code is wrong or expired" | Codes are single-use and last 10 minutes | `browsentic pair` for a fresh one. A failed attempt does not burn the outstanding code |
-| "No Browsentic daemon is running" | Browsentic Bridge is not installed, or not running on 8765–8767 | Install it ([Install](install.md#2-install-browsentic-bridge)), or open the app, or `browsentic start`. Then `browsentic status`; check `browsentic logs` |
+| "No Browsentic daemon is running" | Browsentic Bridge is not installed, or not running on 8765–8767 | Install it ([Install](install.md#1-install-browsentic)), or open the app, or `browsentic start`. Then `browsentic status`; check `browsentic logs` |
 | `browsentic: command not found` | The global npm prefix is not on `PATH` | `npm prefix -g`, then add its `bin` directory |
 | "Browsentic has not been given the microphone yet" | A browser cannot show its microphone prompt inside a side panel or a popup, so a fresh install has never been asked | Press **Allow microphone** and choose **Allow** in the tab that opens |
 | "Microphone access is blocked" | The microphone was refused for the extension | Press **Allow microphone**, then click the icon at the left of that tab's address bar and set **Microphone** to **Allow** |
