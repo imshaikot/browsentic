@@ -7,6 +7,7 @@ import {
   Clapperboard,
   Code2,
   Compass,
+  Copy,
   CornerDownLeft,
   ExternalLink,
   Eye,
@@ -98,19 +99,50 @@ function UserBubble({ text, focus, onSchedule }: { text: string; focus?: string;
           <CalendarClock className="size-2.5" /> Repeat this…
         </button>
       )}
+      <CopyAction value={text} label="Copy prompt" />
     </div>
   );
 }
 
 function Reply({ text, streaming }: { text: string; streaming: boolean }) {
   return (
-    <div className="enters min-w-0">
+    <div className="enters group flex min-w-0 flex-col gap-1">
       <Markdown
         text={text}
         streaming={streaming}
         className="panel-card rounded-2xl rounded-tl-md px-3 py-2.5 text-sm leading-relaxed text-ink"
       />
+      <CopyAction value={text} label="Copy reply" className="self-start" />
     </div>
+  );
+}
+
+/** Hover-reveal icon button copying a message's raw text, check for 2s on success. */
+function CopyAction({ value, label, className }: { value: string; label: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      title={label}
+      aria-label={label}
+      className={cn(
+        'flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-brand focus-visible:opacity-100',
+        className,
+      )}
+    >
+      {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
   );
 }
 
