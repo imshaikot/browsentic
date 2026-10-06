@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   Braces,
   CalendarClock,
@@ -95,14 +95,14 @@ function UserBubble({ text, focus, onSchedule }: { text: string; focus?: string;
           <button
             type="button"
             onClick={onSchedule}
-            title="Repeat this…"
             aria-label="Repeat this prompt"
-            className="rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90"
+            className="group/tip relative rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90"
           >
             <CalendarClock className="size-3" />
+            <ActionTip side="left">Repeat this…</ActionTip>
           </button>
         )}
-        <CopyAction value={text} label="Copy prompt" />
+        <CopyAction value={text} label="Copy prompt" side="left" />
       </div>
     </div>
   );
@@ -116,13 +116,24 @@ function Reply({ text, streaming }: { text: string; streaming: boolean }) {
         streaming={streaming}
         className="panel-card rounded-2xl rounded-tl-md px-3 py-2.5 text-sm leading-relaxed text-ink"
       />
-      <CopyAction value={text} label="Copy reply" className="self-start" />
+      <CopyAction value={text} label="Copy reply" side="right" className="self-start" />
     </div>
   );
 }
 
 /** Hover-reveal icon button copying a message's raw text, check for 2s on success. */
-function CopyAction({ value, label, className }: { value: string; label: string; className?: string }) {
+function CopyAction({
+  value,
+  label,
+  className,
+  side = 'left',
+}: {
+  value: string;
+  label: string;
+  className?: string;
+  /** Which way the tooltip opens — inward, so it never leaves the panel. */
+  side?: 'left' | 'right';
+}) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
@@ -137,15 +148,30 @@ function CopyAction({ value, label, className }: { value: string; label: string;
     <button
       type="button"
       onClick={() => void copy()}
-      title={copied ? 'Copied' : label}
       aria-label={label}
       className={cn(
-        'rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90',
+        'group/tip relative rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90',
         className,
       )}
     >
       {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      <ActionTip side={side}>{copied ? 'Copied' : label}</ActionTip>
     </button>
+  );
+}
+
+/** Inward-opening tooltip: native `title` can't be aimed and spills off the panel edge. */
+function ActionTip({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
+  return (
+    <span
+      role="tooltip"
+      className={cn(
+        'pointer-events-none absolute top-1/2 -translate-y-1/2 rounded-md border border-line bg-surface px-1.5 py-0.5 font-sans text-[10px] whitespace-nowrap text-ink opacity-0 shadow-lg transition-opacity group-hover/tip:opacity-100 group-focus-visible/tip:opacity-100',
+        side === 'left' ? 'right-full mr-1' : 'left-full ml-1',
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
