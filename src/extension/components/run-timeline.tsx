@@ -90,16 +90,20 @@ function UserBubble({ text, focus, onSchedule }: { text: string; focus?: string;
           <span className="truncate">{focus}</span>
         </span>
       )}
-      {onSchedule && (
-        <button
-          type="button"
-          onClick={onSchedule}
-          className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-brand focus-visible:opacity-100"
-        >
-          <CalendarClock className="size-2.5" /> Repeat this…
-        </button>
-      )}
-      <CopyAction value={text} label="Copy prompt" />
+      <div className="flex items-center gap-0.5">
+        {onSchedule && (
+          <button
+            type="button"
+            onClick={onSchedule}
+            title="Repeat this…"
+            aria-label="Repeat this prompt"
+            className="rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90"
+          >
+            <CalendarClock className="size-3" />
+          </button>
+        )}
+        <CopyAction value={text} label="Copy prompt" />
+      </div>
     </div>
   );
 }
@@ -133,15 +137,14 @@ function CopyAction({ value, label, className }: { value: string; label: string;
     <button
       type="button"
       onClick={() => void copy()}
-      title={label}
+      title={copied ? 'Copied' : label}
       aria-label={label}
       className={cn(
-        'flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-brand focus-visible:opacity-100',
+        'rounded-full p-1 text-ink-faint opacity-0 transition-all group-hover:opacity-100 hover:text-brand focus-visible:opacity-100 active:scale-90',
         className,
       )}
     >
-      {copied ? <Check className="size-2.5" /> : <Copy className="size-2.5" />}
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
     </button>
   );
 }
