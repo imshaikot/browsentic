@@ -83,8 +83,7 @@ the app closed or quit.
 and whether it is connected. A browser without it has a button — **Add to Chrome**, **Add to Edge**,
 **Get the Firefox add-on** — that opens its store page in that browser and shows a pairing code.
 Press the store's button, click Browsentic in the toolbar, enter the code, and the row turns
-**Connected**. Edge installs from the Chrome Web Store until its own listing is published; the app
-tells you to press **Allow extensions from other stores** first.
+**Connected**.
 
 **Load it unpacked instead**, under the rows, is for a browser that cannot reach a store or for an
 unreleased build. It writes the extension to `%USERPROFILE%\browsentic\extension\chrome-mv3`, and

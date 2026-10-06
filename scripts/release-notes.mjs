@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 
 const REPO = 'imshaikot/browsentic';
 const CHROME_WEB_STORE = 'https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp';
+const EDGE_ADD_ONS = 'https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc';
 
 const SECTIONS = [
   ['feat', 'Features'],
@@ -118,13 +119,13 @@ function renderNotes(version, commits, prevTag) {
     `npx browsentic@${version} setup`,
     '```',
     '',
-    'Press **Add to Chrome** (or **Add** in Firefox) on the page it opens, then click Browsentic in the toolbar and enter',
-    'the pairing code. The apps do the same from their Overview tab. The side panel runs on an agent CLI you are signed',
-    'in to: Claude Code, Codex, or another supported one.',
+    'Press **Add to Chrome** (**Get** in Edge, **Add** in Firefox) on the page it opens, then click Browsentic in the toolbar',
+    'and enter the pairing code. The apps do the same from their Overview tab. The side panel runs on an agent CLI you are',
+    'signed in to: Claude Code, Codex, or another supported one.',
     '',
-    `The extension is on the [Chrome Web Store](${CHROME_WEB_STORE}) for Chrome, Edge, Brave, Arc, Vivaldi and Opera (in Edge,`,
-    `press **Allow extensions from other stores** first), and \`browsentic-${version}-firefox.xpi\` below is the Firefox`,
-    'add-on, signed by Mozilla. Both update themselves.',
+    `The extension is on the [Chrome Web Store](${CHROME_WEB_STORE}) for Chrome, Brave, Arc, Vivaldi and Opera, on`,
+    `[Edge Add-ons](${EDGE_ADD_ONS}) for Edge, and \`browsentic-${version}-firefox.xpi\` below is the Firefox add-on,`,
+    'signed by Mozilla. All three update themselves.',
     '',
     'Already running an older version? The Mac and Windows apps offer the update on their Overview tab, and',
     '`npx browsentic@latest update` updates the Bridge from a terminal. Your browser stays paired, and the',

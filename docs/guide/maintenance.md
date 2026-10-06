@@ -10,7 +10,7 @@ first, or last, keeps working.
 
 | What | How |
 | --- | --- |
-| The extension from the Chrome Web Store | Updates itself when the browser checks, every few hours. **Update** at `chrome://extensions`, with Developer mode on, checks now |
+| The extension from the Chrome Web Store or Edge Add-ons | Updates itself when the browser checks, every few hours. **Update** at `chrome://extensions` (`edge://extensions` in Edge), with Developer mode on, checks now |
 | The Firefox add-on | Updates itself: every release publishes a signed `.xpi` and an `updates.json` beside it, Firefox polls that file about once a day, and **Check for Updates** in `about:addons` polls it now |
 | Browsentic Bridge, from the Mac or Windows app | The app's **Update now** card ([macOS](mac-app.md#updating), [Windows](windows-app.md#updating)) |
 | Browsentic Bridge, from `npx` or `npm` | `browsentic update`, below |

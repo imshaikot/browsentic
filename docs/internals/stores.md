@@ -1,6 +1,6 @@
 # Store listings
 
-The extension is published on the Chrome Web Store and submitted to Edge Add-ons; Firefox gets a
+The extension is published on the Chrome Web Store and Edge Add-ons; Firefox gets a
 signed `.xpi` on every GitHub release instead (see the [Firefox section of the install
 guide](../guide/install.md#firefox)). This page is everything a store submission asks for, in the
 order the dashboards ask for it, so an update is a matter of pasting.
@@ -12,13 +12,13 @@ order the dashboards ask for it, so an update is a matter of pasting.
 | Store | Identity | Address |
 | --- | --- | --- |
 | Chrome Web Store | `npmocgldfflonjjmdadmdefpnfagnjmp` | [chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) — published at 0.8.0 on 4 October 2026 |
-| Edge Add-ons | CRX ID `cbkjhkgjcpihokphhdkbahilpcjojpdc` (Partner Center Store ID `0RDCKBB847NN`) | None until Microsoft publishes it; certification of 0.8.0 is under way |
+| Edge Add-ons | CRX ID `cbkjhkgjcpihokphhdkbahilpcjojpdc` (Partner Center Store ID `0RDCKBB847NN`) | [microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc) — published at 0.8.0 in October 2026 |
 | Firefox | `browsentic@browsentic.com` | `browsentic-<version>-firefox.xpi` on each release, signed on the unlisted channel |
 
 The IDs are fixed for good, and three places depend on them:
 
 - [`src/lib/stores.ts`](../../src/lib/stores.ts) names them, and says where each browser gets the
-  extension. Until `EDGE_ADD_ONS.url` is set, Edge is sent to the Chrome Web Store.
+  extension: Edge from Edge Add-ons, every other Chromium browser from the Chrome Web Store.
 - The native messaging host lets both store IDs start Browsentic Bridge whether or not they have
   paired yet ([native-host.ts](../../src/daemon/native-host.ts)).
 - The Bridge names each session's source from its origin: a store ID, a `moz-extension://` origin,

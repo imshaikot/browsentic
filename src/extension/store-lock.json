@@ -1,6 +1,6 @@
 {
   "version": "0.8.0",
-  "why": "The Chrome Web Store and Edge Add-ons are reviewing this build of v0.8.0. Until they publish it, a change that alters the built extension waits for the next store submission; the Bridge, the CLI and the apps can change freely.",
+  "why": "This is the v0.8.0 build the Chrome Web Store and Edge Add-ons were given. A change that alters the built extension waits for the next store submission; the Bridge, the CLI and the apps can change freely.",
   "files": {
     "assets/globals-BuqLaoYV.css": "9a62e993456d0db956fc214998faea4c9101c49b4eefff2c65010b75a20a00f7",
     "background.js": "3cadf223caf1d897799891490189c1ada61e8b256cfc08012d16d900461287ea",

@@ -5,15 +5,10 @@ export const CHROME_WEB_STORE = {
   url: 'https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp',
 } as const;
 
-/**
- * Microsoft gives the listing its address only once it is published. Until then Edge is sent to the
- * Chrome Web Store, which it installs from once "Allow extensions from other stores" is on, and the
- * copy it installs carries the Chrome Web Store's ID.
- */
-export const EDGE_ADD_ONS: { id: string; url: string | null } = {
+export const EDGE_ADD_ONS = {
   id: 'cbkjhkgjcpihokphhdkbahilpcjojpdc',
-  url: null,
-};
+  url: 'https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc',
+} as const;
 
 /** Signed by addons.mozilla.org for every release and installed from the GitHub release. */
 export const FIREFOX_ADDON_ID = 'browsentic@browsentic.com';

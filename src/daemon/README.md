@@ -17,15 +17,17 @@ npx browsentic@latest setup
 ```
 
 It starts Browsentic Bridge, asks which browser you use, opens the extension's store page there,
-prints a pairing code and waits for the browser to connect. Press **Add to Chrome** (or **Add** in
-Firefox), click Browsentic in the toolbar and enter the code, once. On macOS and Windows an app does
+prints a pairing code and waits for the browser to connect. Press **Add to Chrome** (**Get** in
+Edge, **Add** in Firefox), click Browsentic in the toolbar and enter the code, once. On macOS and Windows an app does
 the same from a window: see [browsentic.com/install](https://browsentic.com/install/).
 
 The extension is on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
-for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an
-[add-on signed by Mozilla](https://browsentic.com/download/firefox). The side panel runs on an agent
-CLI you're signed in to: Claude Code, Codex, or another supported one.
+for Chrome, Brave, Arc, Vivaldi and Opera, on
+[Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc)
+for Edge, and Firefox gets an [add-on signed by Mozilla](https://browsentic.com/download/firefox).
+The side panel runs on an agent CLI you're signed in to: Claude Code, Codex, or another supported
+one.
 
 Then open the side panel and say what you want.
 

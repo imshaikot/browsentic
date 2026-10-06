@@ -28,7 +28,7 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
   <strong>Works in</strong><br>
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/chrome.svg" width="40" height="40" alt="Chrome" title="Chrome"></a>&emsp;
   <a href="docs/guide/install.md#firefox"><img src="https://browsentic.com/icons/firefox.svg" width="40" height="40" alt="Firefox" title="Firefox"></a>&emsp;
-  <a href="docs/guide/install.md#2-add-the-extension"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
+  <a href="https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc"><img src="https://browsentic.com/icons/edge.svg" width="40" height="40" alt="Edge" title="Edge"></a>&emsp;
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/brave.svg" width="40" height="40" alt="Brave" title="Brave"></a>&emsp;
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://browsentic.com/icons/arc.svg" width="40" height="40" alt="Arc" title="Arc"></a>
 </p>
@@ -68,12 +68,13 @@ irm https://browsentic.com/install.ps1 | iex
 npx browsentic@latest setup
 ```
 
-Setup asks which browser you use and opens Browsentic's store page in it. Press **Add to Chrome** (or **Add** in Firefox), then click Browsentic in the toolbar and enter the code setup shows. That's the whole install, and the extension updates itself from its store from then on. The apps do the same from their Overview tab.
+Setup asks which browser you use and opens Browsentic's store page in it. Press **Add to Chrome** (**Get** in Edge, **Add** in Firefox), then click Browsentic in the toolbar and enter the code setup shows. That's the whole install, and the extension updates itself from its store from then on. The apps do the same from their Overview tab.
 
-The extension is on the Chrome Web Store, for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an add-on signed by Mozilla:
+The extension is on the Chrome Web Store for Chrome, Brave, Arc, Vivaldi and Opera, on Edge Add-ons for Edge, and Firefox gets an add-on signed by Mozilla:
 
 <p>
   <a href="https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp"><img src="https://img.shields.io/badge/Available%20in%20the-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Available in the Chrome Web Store"></a>
+  <a href="https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc"><img src="https://img.shields.io/badge/Get%20it%20from-Edge%20Add--ons-0078D4?style=for-the-badge" alt="Get it from Edge Add-ons"></a>
   <a href="https://browsentic.com/download/firefox"><img src="https://img.shields.io/badge/Signed%20add--on%20for-Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Signed add-on for Firefox"></a>
 </p>
 
