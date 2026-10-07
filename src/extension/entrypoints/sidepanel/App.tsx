@@ -24,6 +24,7 @@ import { SessionList } from '@/extension/components/session-list';
 import { SessionRail } from '@/extension/components/session-rail';
 import { SiteMapReview } from '@/extension/components/site-map-review';
 import { SkillsPanel } from '@/extension/components/skills-panel';
+import { StarBadge } from '@/extension/components/star-badge';
 import { TaskPanel } from '@/extension/components/task-panel';
 import type { TaskSeed } from '@/extension/components/task-editor';
 import { StatusPill, describeStatus } from '@/extension/components/status-pill';
@@ -41,6 +42,7 @@ import { closeSidePanel } from '@/lib/bridge/side-panel';
 import { startHandsFree } from '@/lib/bridge/panel-view';
 import { usePanelCollapsed, usePanelTab } from '@/lib/bridge/use-panel-view';
 import { useRun } from '@/lib/bridge/use-run';
+import { useStarNudge } from '@/lib/bridge/use-star-nudge';
 import { useStoredFiles } from '@/lib/bridge/use-stored-files';
 import { useStoredRecordings } from '@/lib/bridge/use-stored-recordings';
 import { useStoredSessions } from '@/lib/bridge/use-stored-sessions';
@@ -60,6 +62,7 @@ const DETACH_STUCK_MS = 1_500;
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
+  const star = useStarNudge(run.completed, run.sessionId, run.running);
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const [actionCues, setActionCues] = useActionCues();
   const handsFree = useHandsFreeSupported();
@@ -115,6 +118,7 @@ export default function App() {
   });
 
   const status = describeStatus(daemon, { running: run.running, listening: voice.listening });
+  const starShown = star.raised && tab === 'chat' && !run.running;
 
   useEffect(() => {
     if (!connected || daemon?.skillCatalog) return;
@@ -143,7 +147,7 @@ export default function App() {
     if (!pinned || tab !== 'chat') return;
     const element = viewport.current;
     if (element) element.scrollTop = element.scrollHeight;
-  }, [run.items, run.running, pinned, tab]);
+  }, [run.items, run.running, pinned, tab, starShown]);
 
   function goToLatest() {
     const element = viewport.current;
@@ -438,19 +442,21 @@ export default function App() {
               onRemove={(id) => void removeRecording(id)}
             />
           )}
-          <div className="h-3" />
+          <div className={starShown ? 'h-14' : 'h-3'} />
         </ScrollArea>
 
         {tab === 'chat' && !pinned && run.items.length > 0 && (
           <Button
             size="sm"
             variant="outline"
-            className="enters absolute bottom-3 left-1/2 -translate-x-1/2 backdrop-blur"
+            className={cn('enters absolute left-1/2 -translate-x-1/2 backdrop-blur', starShown ? 'bottom-14' : 'bottom-3')}
             onClick={goToLatest}
           >
             <ArrowDown className="size-3" /> Latest
           </Button>
         )}
+
+        {starShown && <StarBadge onStar={star.star} onClose={star.close} />}
       </div>
 
       {showTools && (

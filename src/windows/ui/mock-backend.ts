@@ -153,24 +153,27 @@ const SESSIONS = [
   { id: 's2', browser: 'Brave', origin: 'chrome-extension://pplbfkdfiimmogofmehpibbmldcefgpc/', source: 'unpacked' as const, extensionVersion: '0.7.15', pairedAgo: 9 * 86400, connected: true },
 ];
 
+const STORES = {
+  'chrome-web-store': { store: 'Chrome Web Store', storeUrl: 'https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp' },
+  'edge-add-ons': { store: 'Edge Add-ons', storeUrl: 'https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc' },
+  firefox: { store: 'Firefox add-on', storeUrl: 'https://github.com/imshaikot/browsentic/releases/download/v0.8.0/browsentic-0.8.0-firefox.xpi' },
+};
+
 function rows(): BrowserRow[] {
-  const store = 'https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp';
   const row = (id: BrowserRow['id'], label: string, brand: string, installed: boolean): BrowserRow => {
     const sessions = SESSIONS.filter((session) => session.browser === brand).map(({ id, source, extensionVersion, connected }) => ({ id, source, extensionVersion, connected }));
     const firefox = id === 'firefox';
+    const source = firefox ? 'firefox' : id === 'edge' ? 'edge-add-ons' : 'chrome-web-store';
     return {
       id,
       label,
       installed,
-      source: firefox ? 'firefox' : 'chrome-web-store',
-      store: firefox ? 'Firefox add-on' : 'Chrome Web Store',
-      storeUrl: firefox ? 'https://github.com/imshaikot/browsentic/releases/download/v0.8.0/browsentic-0.8.0-firefox.xpi' : store,
+      source,
+      ...STORES[source],
       steps: [
-        id === 'edge'
-          ? 'Press “Allow extensions from other stores” in the bar at the top and confirm, then “Add to Chrome”.'
-          : firefox
-            ? 'Firefox asks whether to let github.com install software, then whether to add Browsentic. Say yes to both.'
-            : `Press “Add to ${label === 'Brave' ? 'Brave' : 'Chrome'}”.`,
+        firefox
+          ? 'Firefox asks whether to let github.com install software, then whether to add Browsentic. Say yes to both.'
+          : `Press “${id === 'edge' ? 'Get' : label === 'Brave' ? 'Add to Brave' : 'Add to Chrome'}”.`,
       ],
       extensionsPage: firefox ? 'about:addons' : `${id === 'edge' ? 'edge' : id === 'brave' ? 'brave' : 'chrome'}://extensions`,
       connected: sessions.some((session) => session.connected),

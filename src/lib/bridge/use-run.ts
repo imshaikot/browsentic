@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
-import type { FocusedElement } from '@/lib/actions/protocol';
+import type { FocusedElement, RunEvent } from '@/lib/actions/protocol';
 import type { MonitorState } from '@/lib/monitor/events';
 import type { RecordingState } from '@/lib/recordings/events';
 import { SITE_MAPPER_SKILL, type SiteMapDraft } from '@/lib/skills/site-map';
@@ -27,11 +27,20 @@ export interface SendOptions {
   liveTools?: boolean;
 }
 
+export interface CompletedTurn {
+  sessionId: string;
+  runId: string;
+}
+
+const finishedCleanly = (event: RunEvent): boolean => event.kind === 'done' && event.stopReason === 'end_turn';
+
 export interface Run {
   items: RunItem[];
   running: boolean;
   sessionId: string | null;
   sessions: TabSession[];
+  /** The latest turn an agent saw through to the end, in any conversation, as it happened — never from a replay. */
+  completed: CompletedTurn | null;
   send: (text: string, opts?: SendOptions) => void;
   cancel: () => void;
   decide: (toolId: string, allow: boolean, remember?: boolean) => void;
@@ -72,6 +81,7 @@ export function useRun(): Run {
   const [tools, setTools] = useState<SavedToolMeta[]>([]);
   const [autoRunReady, setAutoRunReady] = useState(false);
   const [bySession, setBySession] = useState<Record<string, RunItem[]>>({});
+  const [completed, setCompleted] = useState<CompletedTurn | null>(null);
   const port = useRef<Browser.runtime.Port | null>(null);
 
   const tab = useActiveTab();
@@ -143,7 +153,9 @@ export function useRun(): Run {
         } else if (runMessage.op === 'close') {
           window.close();
         } else {
-          write(runMessage.sessionId ?? EXTERNAL_VIEW, (items) => reduce(items, runMessage.event));
+          const { sessionId: owner, runId, event } = runMessage;
+          if (owner && finishedCleanly(event)) setCompleted({ sessionId: owner, runId });
+          write(owner ?? EXTERNAL_VIEW, (items) => reduce(items, event));
         }
       });
 
@@ -238,6 +250,7 @@ export function useRun(): Run {
     running: displayed?.runId != null,
     sessionId,
     sessions,
+    completed,
     send,
     draft,
     mapSite: useCallback(() => send(`@${SITE_MAPPER_SKILL} map this site`), [send]),

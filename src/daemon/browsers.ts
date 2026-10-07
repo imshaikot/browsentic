@@ -103,25 +103,21 @@ export const BROWSERS: Record<BrowserId, BrowserEntry> = {
   },
 };
 
-/** Where this browser gets the extension today. Edge borrows the Chrome Web Store until its own listing is published. */
 export function sourceFor(id: BrowserId): Source {
   if (id === 'firefox') return 'firefox';
-  return id === 'edge' && EDGE_ADD_ONS.url ? 'edge-add-ons' : 'chrome-web-store';
+  return id === 'edge' ? 'edge-add-ons' : 'chrome-web-store';
 }
 
 export function storeUrl(id: BrowserId, version: string): string {
   const source = sourceFor(id);
   if (source === 'firefox') return signedAddonUrl(version);
-  return source === 'edge-add-ons' ? EDGE_ADD_ONS.url! : CHROME_WEB_STORE.url;
+  return source === 'edge-add-ons' ? EDGE_ADD_ONS.url : CHROME_WEB_STORE.url;
 }
 
 /** What to press once the page is open, in that browser's own words. */
 export function storeSteps(id: BrowserId): string[] {
   if (id === 'firefox') {
     return ['Firefox asks whether to let github.com install software, then whether to add Browsentic. Say yes to both.'];
-  }
-  if (id === 'edge' && sourceFor(id) === 'chrome-web-store') {
-    return ['Press “Allow extensions from other stores” in the bar at the top and confirm, then “Add to Chrome”.'];
   }
   if (id === 'opera') {
     return ['Opera first offers its “Install Chrome Extensions” helper: add it, then press “Add to Opera”.'];

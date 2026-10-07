@@ -118,7 +118,7 @@ describe('the running app', () => {
     await until(model, (state) => state.browserRows.length > 0);
     expect(model.offeredBrowsers.map((row) => [row.id, row.store, row.connected])).toEqual([
       ['chrome', 'Chrome Web Store', true],
-      ['edge', 'Chrome Web Store', false],
+      ['edge', 'Edge Add-ons', false],
       ['brave', 'Chrome Web Store', true],
       ['firefox', 'Firefox add-on', false],
     ]);
@@ -130,7 +130,7 @@ describe('the running app', () => {
     await model.addExtension(model.offeredBrowsers.find((row) => row.id === 'edge')!);
     expect([model.snapshot().pairing?.code, model.snapshot().notice?.text]).toEqual([
       'R4TW7KXE',
-      expect.stringContaining('Allow extensions from other stores'),
+      'Press “Get”. Then click Browsentic in Edge’s toolbar and enter the code below.',
     ]);
   });
 
