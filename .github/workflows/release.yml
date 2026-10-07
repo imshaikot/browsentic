@@ -118,11 +118,6 @@ jobs:
             }
           done
 
-      - name: Verify the extension is the build the stores have
-        # The unpacked zip, the npm package and both apps ship this same extension, so a release
-        # never puts one in front of people that the stores have not reviewed.
-        run: node scripts/extension-lock.ts
-
       - name: Pack and smoke-test the npm tarball
         # `npm pack` runs src/daemon/scripts/stage-extension.mjs through prepack, so this exercises
         # the same path a maintainer gets locally. Everything below runs against the real

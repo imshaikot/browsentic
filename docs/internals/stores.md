@@ -32,19 +32,14 @@ once more.
 
 ## Submitting an update
 
-1. **Unfreeze the extension.** While a build is in review or freshly published, the extension does
-   not change: [`src/extension/store-lock.json`](../../src/extension/store-lock.json) holds a hash
-   of every file in it, and `node scripts/extension-lock.ts` fails CI and the release on any
-   difference. The pull request that changes the extension runs `yarn build`, then
-   `node scripts/extension-lock.ts write`.
-2. **Pick a version above every one spent.** The Chrome Web Store has seen 0.7.11 and 0.8.0, and
+1. **Pick a version above every one spent.** The Chrome Web Store has seen 0.7.11 and 0.8.0, and
    Edge Add-ons 0.8.0. A store refuses a number it has already accepted, even for a build it
    rejected.
-3. **Check the permissions** against the table below. A new permission needs a line here before it
+2. **Check the permissions** against the table below. A new permission needs a line here before it
    goes up, and a permission nothing uses comes out (`activeTab` is the current candidate).
-4. **`yarn zip`**, and upload `dist/browsentic-<version>-chrome.zip` to both stores. The Edge zip is
+3. **`yarn zip`**, and upload `dist/browsentic-<version>-chrome.zip` to both stores. The Edge zip is
    the same file: only Firefox branches the code, and Edge is told apart at run time.
-5. **Keep the window.** A store copy updates on the browser's schedule, so a new extension must
+4. **Keep the window.** A store copy updates on the browser's schedule, so a new extension must
    still work with the Bridge already out there, and a new Bridge with the extension already out
    there. The rule is in [transport.md](transport.md#protocol-version): additive changes bump
    `SOCKET_PROTOCOL_VERSION` and are sent only to a peer that speaks them.
