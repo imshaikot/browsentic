@@ -46,11 +46,6 @@ jobs:
           node "$YARN" build
           node "$YARN" daemon:build
 
-      - name: Keep the extension the stores have
-        # Store copies update on the stores' schedule, so the extension changes only with a new
-        # store submission: src/extension/store-lock.json lists every file of that build.
-        run: node scripts/extension-lock.ts
-
   # The daemon on Windows, where an npm-installed agent is a .cmd shim, a path has backslashes, a
   # kill takes nothing with it and a file has no POSIX mode. The extension's tests do not reach
   # the platform, so only the daemon project runs here.
