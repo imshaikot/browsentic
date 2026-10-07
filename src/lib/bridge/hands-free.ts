@@ -20,6 +20,7 @@ import {
 import { pickFocusIn } from './aeye';
 import { putBytes } from './file-store';
 import { openMicPermissionPage } from './mic-permission';
+import { ACTION_CUES_KEY, readActionCues } from './action-cues';
 import { HANDS_FREE_KEY, PUSH_TO_TALK_KEY, endHandsFree, readHandsFree, writeHandsFree, type HandsFreeState } from './panel-view';
 import { attachFile, closePanels, onPanelPresence, onTurnSettled, runCommand } from './run-port';
 import { openSidePanel } from './side-panel';
@@ -72,6 +73,7 @@ export interface OrbWorld {
   state: HandsFreeState;
   phase: DictationPhase | null;
   pushToTalk: boolean;
+  cues: boolean;
   listeningTab: number | null;
 }
 
@@ -85,6 +87,7 @@ export function describeOrb(world: OrbWorld, tabId: number, session: TabSession 
     run: pending ? 'approval' : session?.runId ? 'working' : 'idle',
     voice: world.state.muted ? 'muted' : tabId === world.listeningTab ? (world.phase ?? 'starting') : 'paused',
     pushToTalk: world.pushToTalk,
+    cues: world.cues,
     ...(pending && { approval: approvalOf(pending) }),
   };
 }
@@ -151,13 +154,14 @@ async function paint(): Promise<void> {
   }
   showing = true;
 
-  const [daemon, sessions, theme, position, phase, pushToTalk, front, tabs] = await Promise.all([
+  const [daemon, sessions, theme, position, phase, pushToTalk, cues, front, tabs] = await Promise.all([
     readDaemon(),
     readTabSessions(),
     readTheme(),
     readPosition(),
     readPhase(),
     readPushToTalk(),
+    readActionCues(),
     frontTab(),
     browser.tabs.query({}),
   ]);
@@ -171,7 +175,7 @@ async function paint(): Promise<void> {
   /* The tab in front is told afresh until it shows an orb, and healed if the extension was reloaded under it. */
   if (frontId != null && !orbTabs.has(frontId)) sent.delete(frontId);
 
-  const world: OrbWorld = { theme, position, link, state, phase, pushToTalk, listeningTab: target };
+  const world: OrbWorld = { theme, position, link, state, phase, pushToTalk, cues, listeningTab: target };
   await Promise.all(
     tabs.map(async (tab) => {
       if (tab.id == null || tab.discarded) return;
@@ -441,6 +445,10 @@ function answer(request: OrbRequest, tab: Browser.tabs.Tab & { id: number }, res
       void browser.storage.local.set({ [PUSH_TO_TALK_KEY]: request.on === true });
       respond({ ok: true });
       return false;
+    case 'cues':
+      void browser.storage.local.set({ [ACTION_CUES_KEY]: request.on === true });
+      respond({ ok: true });
+      return false;
     case 'talk':
       /* Letting go always reaches the page: the key can come up in a tab the mic has already left. */
       if (!request.on || tab.id === listeningTab) {
@@ -530,7 +538,8 @@ export function serveHandsFree(): void {
     }
   });
   browser.storage.local.onChanged.addListener((changes) => {
-    if (THEME_KEY in changes || ORB_POSITION_KEY in changes || SPEECH_SERVICE_KEY in changes || PUSH_TO_TALK_KEY in changes) {
+    const repaints = [THEME_KEY, ORB_POSITION_KEY, SPEECH_SERVICE_KEY, PUSH_TO_TALK_KEY, ACTION_CUES_KEY];
+    if (repaints.some((key) => key in changes)) {
       void syncHandsFree();
     }
   });

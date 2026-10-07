@@ -138,6 +138,7 @@ Below the theme, the same section holds what belongs to one browser alone. None 
 
 | Block | What it sets |
 | --- | --- |
+| **On the page** | **Show what the agent does** — the [action cues](features/action-cues.md) ring on each element an agent acts on. Off until you switch it on; the composer's button and the mic's menu switch the same setting |
 | **Right-click menu** | Whether a right-click on a page offers **Open Browsentic** (the side panel) and **Open Browsentic (Hands Free)**. Both are on until you switch one off. With both on, the browser gathers them under a **Browsentic** entry |
 | **Keyboard shortcuts** | Shows the keys for **Open the popup**, **Open or close the side panel** and **Start or stop hands-free**. The browser owns these: it gives the side panel **Alt+Shift+B** and hands-free **Alt+Shift+H** (**⌥⇧B**, **⌥⇧H** on a Mac) at install unless something else already has them, and **Change shortcuts** opens its own shortcuts page. Firefox has the popup and the sidebar only |
 | **Hands-free** | **Hold to talk** — the same switch as the mic's own menu |

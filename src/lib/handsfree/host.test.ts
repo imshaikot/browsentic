@@ -16,6 +16,7 @@ const view = (patch: Partial<OrbView> = {}): OrbView => ({
   run: 'idle',
   voice: 'listening',
   pushToTalk: false,
+  cues: true,
   ...patch,
 });
 
@@ -220,6 +221,17 @@ describe('the hands-free orb', () => {
     expect($('.wrap').classList.contains('open')).toBe(true);
     const slots = [...root!.querySelectorAll<HTMLElement>('.item')].map((item) => Number.parseFloat(item.style.getPropertyValue('--x')));
     expect(slots).toEqual([...slots].sort((a, b) => a - b));
+  });
+
+  it('switches action cues from the menu and shows which way they are set', async () => {
+    await show();
+    const item = $('[data-item="cues"]');
+    expect(item.classList.contains('on')).toBe(true);
+    item.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(requests('cues')).toEqual([expect.objectContaining({ on: false })]);
+    await show({ cues: false });
+    expect(item.classList.contains('on')).toBe(false);
+    expect(item.querySelector('.tip')?.textContent).toBe('Show what the agent does');
   });
 
   it('rides live code and an A-Eye pick along with the next instruction, then lets them go', async () => {

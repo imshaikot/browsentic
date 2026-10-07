@@ -76,7 +76,8 @@ state under `browsentic/dictation`, and the approvals it has already announced u
 Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
 (`browsentic/pushToTalk`) and whether this browser's speech service has ever worked
 (`browsentic/speechService`) are kept in `storage.local`, along with which right-click items this
-browser shows (`browsentic/contextMenu`, both on when absent).
+browser shows (`browsentic/contextMenu`, both on when absent) and whether agent actions are ringed on
+the page (`browsentic/actionCues`, off when absent).
 
 **Blocked sites** are `browsentic/blockedSites` in `storage.local` — a list of patterns, up to 500, that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.

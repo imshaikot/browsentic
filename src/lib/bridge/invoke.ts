@@ -56,6 +56,9 @@ import { awaitMonitorDone, monitorStatusFor, startTabMonitor, stopTabMonitor } f
 import { startJobTimer, stopJobTimer, timerStatusFor } from '@/lib/bridge/timer';
 import { listRecordings as listStoredMeta, readRecordingBody, recordedOnBlockedSite } from '@/lib/bridge/recording-store';
 import { pickInTab } from '@/lib/bridge/pick';
+import { cued } from '@/lib/bridge/action-cues';
+import { cueFor } from '@/lib/cues/plan';
+import type { CuePlan } from '@/lib/cues/events';
 import { screenshotTab } from '@/lib/bridge/screenshot';
 import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
@@ -82,7 +85,7 @@ export async function invokeForHarness(
   if (release.refused.length) return failure('SECRET_NOT_RELEASABLE', REFUSED_MESSAGE);
   if (release.unresolved.length) return failure('SECRET_EXPIRED', EXPIRED_MESSAGE);
 
-  const result = await dispatch(action, release.input, tabId, runId);
+  const result = await dispatch(action, release.input, tabId, runId, cueFor(action, input));
   const landed = await guardLanding(action, result, tabId, runId);
   if (landed) return landed;
   const { value } = await sealForPage(result, await targetOrigin(tabId, runId));
@@ -203,8 +206,9 @@ function hostOf(url: string): string | undefined {
 async function dispatch(
   action: string,
   input: unknown,
-  tabId?: number,
-  runId?: string,
+  tabId: number | undefined,
+  runId: string | undefined,
+  cue: CuePlan,
 ): Promise<ActionResult> {
   if (action === listFiles.name) return listStoredFiles(input);
   if (action === listRecordings.name) return listStoredRecordings(input);
@@ -233,6 +237,17 @@ async function dispatch(
       ? failure('NO_ACTIVE_TAB', 'No active tab to control')
       : failure('MAPPING_TAB_CHANGED', 'The tab this run started in has been closed.');
   }
+  const { id, windowId, url } = tab;
+  return cued(id, cue, () => routeInTab({ id, windowId, url }, action, input, runId, owner));
+}
+
+async function routeInTab(
+  tab: { id: number; windowId?: number; url?: string },
+  action: string,
+  input: unknown,
+  runId: string | undefined,
+  owner: TabSession | null,
+): Promise<ActionResult> {
   if (action === navigate.name) return navigateTab(tab.id, input);
   if (action === searchSite.name) return searchTab(tab.id, input);
   if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { BLOCKED_SITES_KEY, blockedBy, compileBlockedSites } from '@/lib/settings/blocked-sites';
 import { shortcutsOf, shortcutsPageFor, type Shortcut } from '@/lib/settings/shortcuts';
+import { ACTION_CUES_KEY, actionCuesOn } from './action-cues';
 import { CONTEXT_MENU_KEY, asContextMenuChoice, type ContextMenuChoice } from './context-menu';
 import { brandFrom } from './identity';
 import { PUSH_TO_TALK_KEY } from './panel-view';
@@ -41,6 +42,8 @@ export const useContextMenuChoice = (): [ContextMenuChoice, (next: ContextMenuCh
   useLocalSetting(CONTEXT_MENU_KEY, asContextMenuChoice);
 
 export const usePushToTalk = (): [boolean, (on: boolean) => void] => useLocalSetting(PUSH_TO_TALK_KEY, isOn);
+
+export const useActionCues = (): [boolean, (on: boolean) => void] => useLocalSetting(ACTION_CUES_KEY, actionCuesOn);
 
 const asPatterns = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
