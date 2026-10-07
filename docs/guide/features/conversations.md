@@ -135,6 +135,15 @@ Every action appears as it happens, with what it targeted and what came back.
 | `external` | Came from an [MCP client](../mcp-clients.md), not from this panel |
 | An approval card | The run is paused, waiting on you — see [Approvals](../approvals.md) |
 
+### The star request
+
+When an agent finishes a turn cleanly, a small **Star us on GitHub** pill can float above the
+composer. **Star** opens the repository in a tab beside the one you are on, and the pill never comes
+back. **×** puts it away in that conversation for good; it asks again in the next one, and after
+a second close it waits out two conversations, then three after every close from there on. A
+stopped, failed or instant-command turn never raises it, and neither does a run in a tab you are not
+looking at.
+
 ---
 
 ## See also
