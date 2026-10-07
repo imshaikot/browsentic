@@ -8,13 +8,15 @@ const CONVERSATIONS_SKIPPED_BY_CLOSES = [0, 0, 2, 3];
 export interface StarNudge {
   starred: boolean;
   closes: number;
-  closedIn?: string;
+  closedIn: string[];
   finishedIn: string[];
 }
 
-export const UNASKED: StarNudge = { starred: false, closes: 0, finishedIn: [] };
+export const UNASKED: StarNudge = { starred: false, closes: 0, closedIn: [], finishedIn: [] };
 
 const isText = (value: unknown): value is string => typeof value === 'string';
+
+const texts = (value: unknown): string[] => (Array.isArray(value) ? value.filter(isText) : []);
 
 export function asStarNudge(value: unknown): StarNudge {
   if (typeof value !== 'object' || value === null) return UNASKED;
@@ -22,8 +24,8 @@ export function asStarNudge(value: unknown): StarNudge {
   return {
     starred: held.starred === true,
     closes: typeof held.closes === 'number' && held.closes > 0 ? Math.floor(held.closes) : 0,
-    closedIn: isText(held.closedIn) ? held.closedIn : undefined,
-    finishedIn: Array.isArray(held.finishedIn) ? held.finishedIn.filter(isText) : [],
+    closedIn: texts(held.closedIn),
+    finishedIn: texts(held.finishedIn),
   };
 }
 
@@ -33,20 +35,26 @@ export const conversationsSkipped = (closes: number): number =>
 const waitedOut = (nudge: StarNudge): boolean => nudge.finishedIn.length > conversationsSkipped(nudge.closes);
 
 export const isDue = (nudge: StarNudge, sessionId: string): boolean =>
-  !nudge.starred && sessionId !== nudge.closedIn && waitedOut(nudge);
+  !nudge.starred && !nudge.closedIn.includes(sessionId) && waitedOut(nudge);
 
 export function withFinishedTurn(nudge: StarNudge, sessionId: string): StarNudge {
   const uncounted =
-    !nudge.starred && sessionId !== nudge.closedIn && !nudge.finishedIn.includes(sessionId) && !waitedOut(nudge);
+    !nudge.starred &&
+    !nudge.closedIn.includes(sessionId) &&
+    !nudge.finishedIn.includes(sessionId) &&
+    !waitedOut(nudge);
   return uncounted ? { ...nudge, finishedIn: [...nudge.finishedIn, sessionId] } : nudge;
 }
 
-export const withClose = (nudge: StarNudge, sessionId: string): StarNudge => ({
-  starred: false,
-  closes: nudge.closes + 1,
-  closedIn: sessionId,
-  finishedIn: [],
-});
+export function withClose(nudge: StarNudge, sessionId: string): StarNudge {
+  if (nudge.closedIn.includes(sessionId)) return nudge;
+  return {
+    starred: nudge.starred,
+    closes: nudge.closes + 1,
+    closedIn: [...nudge.closedIn, sessionId],
+    finishedIn: [],
+  };
+}
 
 export const withStar = (nudge: StarNudge): StarNudge => ({ ...nudge, starred: true });
 

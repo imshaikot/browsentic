@@ -62,7 +62,7 @@ const DETACH_STUCK_MS = 1_500;
 export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
-  const star = useStarNudge(run.completed, run.sessionId);
+  const star = useStarNudge(run.completed, run.sessionId, run.running);
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const handsFree = useHandsFreeSupported();
   const storedFiles = useStoredFiles();

@@ -82,8 +82,8 @@ browser shows (`browsentic/contextMenu`, both on when absent).
 the daemon never receives. Removing the extension removes it; each browser keeps its own.
 
 **The star request** is `browsentic/starNudge` in `storage.local`: whether its star was clicked, how
-many times it was closed and in which conversation, and up to four conversation ids counted since.
-It never leaves the browser.
+many times it was closed and the conversations it was closed in, and up to four conversation ids
+counted since the last close. It never leaves the browser.
 
 **The theme** is config.json's `theme`, mirrored into `storage.local` under `browsentic/theme` so a
 page paints before any socket is up. `browsentic/theme.unsynced` marks a pick the daemon has not heard

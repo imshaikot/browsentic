@@ -9,10 +9,19 @@ export interface StarNudgeView {
   close: () => void;
 }
 
-/** Raised by a turn that finished cleanly in the conversation on screen, and only there. */
-export function useStarNudge(completed: CompletedTurn | null, onScreen: string | null): StarNudgeView {
+interface Raise {
+  sessionId: string;
+  closes: number;
+}
+
+/**
+ * Raised by a turn that finished cleanly in the conversation on screen, and only there. The next run
+ * there takes it down, so a turn that fails or is stopped never brings it back, and a close in any
+ * other panel retires it.
+ */
+export function useStarNudge(completed: CompletedTurn | null, onScreen: string | null, running: boolean): StarNudgeView {
   const [nudge] = useLocalSetting(STAR_NUDGE_KEY, asStarNudge);
-  const [raisedIn, setRaisedIn] = useState<string | null>(null);
+  const [raise, setRaise] = useState<Raise | null>(null);
   const watching = useRef(onScreen);
 
   useEffect(() => {
@@ -20,24 +29,27 @@ export function useStarNudge(completed: CompletedTurn | null, onScreen: string |
   }, [onScreen]);
 
   useEffect(() => {
+    if (running) setRaise(null);
+  }, [running]);
+
+  useEffect(() => {
     if (!completed || completed.sessionId !== watching.current) return;
-    let live = true;
     void noteFinishedTurn(completed.sessionId).then((next) => {
-      if (live && isDue(next, completed.sessionId)) setRaisedIn(completed.sessionId);
+      if (isDue(next, completed.sessionId)) setRaise({ sessionId: completed.sessionId, closes: next.closes });
     });
-    return () => {
-      live = false;
-    };
   }, [completed]);
 
   return {
-    raised: raisedIn !== null && raisedIn === onScreen && isDue(nudge, raisedIn),
+    raised: raise !== null && raise.sessionId === onScreen && raise.closes === nudge.closes && isDue(nudge, raise.sessionId),
     star: () => {
+      setRaise(null);
       void openRepositoryBeside();
       void noteStarred();
     },
     close: () => {
-      if (raisedIn) void noteClosed(raisedIn);
+      if (!raise) return;
+      setRaise(null);
+      void noteClosed(raise.sessionId);
     },
   };
 }
