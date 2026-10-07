@@ -6,7 +6,7 @@ import { CONTEXT_MENU_KEY, asContextMenuChoice, type ContextMenuChoice } from '.
 import { brandFrom } from './identity';
 import { PUSH_TO_TALK_KEY } from './panel-view';
 
-function useLocalSetting<T>(key: string, parse: (value: unknown) => T): [T, (next: T) => void] {
+export function useLocalSetting<T>(key: string, parse: (value: unknown) => T): [T, (next: T) => void] {
   const [value, setValue] = useState(() => parse(undefined));
 
   useEffect(() => {
