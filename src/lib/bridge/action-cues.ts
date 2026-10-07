@@ -10,7 +10,9 @@ export const CUE_LEAD_MS = 120;
 
 const QUENCH_WAIT_MS = 300;
 
-const LIT_FOR_MS = CUE_LINGER_MS + CUE_FADE_MS + 200;
+const THROTTLED_TIMER_SLACK_MS = 5_000;
+
+const LIT_FOR_MS = CUE_LINGER_MS + CUE_FADE_MS + THROTTLED_TIMER_SLACK_MS;
 
 type Unsent<T> = T extends unknown ? Omit<T, 'channel'> : never;
 

@@ -4,6 +4,7 @@ import { dragElement } from '@/lib/actions/page/drag-element';
 import { APPROACH_STEPS, pathBetween, type Point } from '@/lib/actions/page/pointer';
 import { trustedClick } from '@/lib/actions/page/trusted-click';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import { CUE_HOST_ID } from '@/lib/cues/events';
 import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { send, settle, withDebugger, type DebuggerSession } from './cdp';
 import { FRAME_GONE_HINT, frameOffset } from './frame-focus';
@@ -92,10 +93,10 @@ async function markOverlaysInert(tabId: number, inert: boolean): Promise<void> {
   await browser.scripting
     .executeScript({
       target: { tabId },
-      func: (attribute: string, on: boolean) => {
-        for (const host of document.querySelectorAll(`[${attribute}]`)) host.toggleAttribute('inert', on);
+      func: (attribute: string, untouched: string, on: boolean) => {
+        for (const host of document.querySelectorAll(`[${attribute}]:not(#${untouched})`)) host.toggleAttribute('inert', on);
       },
-      args: [OVERLAY_ATTRIBUTE, inert],
+      args: [OVERLAY_ATTRIBUTE, CUE_HOST_ID, inert],
     })
     .catch(() => undefined);
 }

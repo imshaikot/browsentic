@@ -29,6 +29,7 @@ export const HOST_STYLE = [
 
 export const STYLES = `
   :host { all: initial; }
+  :host::backdrop { display: none !important; }
   * { box-sizing: border-box; margin: 0; padding: 0; pointer-events: none; }
   .layer {
     position: fixed;
@@ -74,7 +75,9 @@ export const STYLES = `
     border-radius: 999px;
     background: var(--ground2);
     color: var(--ink);
-    font: 600 11px/1.3 inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.3;
     letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;

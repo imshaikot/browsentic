@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { fakeBrowser } from 'wxt/testing';
 import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { CUE_CHANNEL, CUE_FADE_MS, CUE_LINGER_MS, type CueCommand, type CuePlan } from './events';
@@ -115,7 +115,11 @@ describe('action cues on the page', () => {
     laidOut(onPage('<button id="go">Sign in</button>'));
     const focus = vi.spyOn(HTMLElement.prototype, 'focus');
     const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = original;
+    });
 
     await show('a', click('#go'));
     await vi.advanceTimersByTimeAsync(500);
@@ -136,6 +140,17 @@ describe('action cues on the page', () => {
     expect(chip()).toBe('Type · Message');
     expect(root!.textContent).not.toContain('secret');
     expect(root!.textContent).not.toContain('hunter2');
+  });
+
+  it('names a field inside its label by the label alone, and a wrapper by its text outside the editor', async () => {
+    laidOut(onPage('<label>Notes <textarea id="notes">my private note</textarea></label>').querySelector('textarea')!);
+    await show('a', { kind: 'element', verb: 'Fill', anchors: [{ target: { selector: '#notes', nth: 0 } }] });
+    expect(chip()).toBe('Fill · Notes');
+
+    laidOut(onPage('<div id="editor">Draft <div contenteditable="true">my private draft</div></div>'));
+    await show('b', click('#editor'));
+    expect(chip()).toBe('Click · Draft');
+    expect(root!.textContent).not.toContain('private');
   });
 
   it('glows around the page when there is no element, or the element is not there', async () => {

@@ -401,18 +401,23 @@ refused by `guardTarget` before `dispatch` runs, so they are never ringed. The s
 top-frame return in `content.ts`), and the first cue in a document mounts `#browsentic-cues` on
 `documentElement` with its attributes already set — one childList mutation for the page's
 observers, and none after it, because every ring, caption and fade is inside a closed shadow root.
-Nothing in it takes a pointer, and it never focuses, scrolls or listens to the page. While a cue is
-on screen a requestAnimationFrame loop follows the element's box; a target that has not appeared
-yet (`waitForElement`) is looked for again every 250 ms.
+Nothing in it takes a pointer, so a trusted click's inert pass (`markOverlaysInert`) leaves it out,
+and it never focuses or scrolls. Its one listener is `pageshow`, to clear a ring a back/forward
+restore brings back. While a cue is on screen a requestAnimationFrame loop follows the element's
+box; a target that has not appeared yet (`waitForElement`) is looked for again every 250 ms.
 
 **It rides in the top layer.** The host is a `popover="manual"`, shown while a cue is up and hidden
 when none is, and raised again when a modal dialog, another popover or a fullscreen element has
-appeared — so a ring on a cookie banner's button sits above the banner.
+appeared — so a ring on a cookie banner's button sits above the banner. Showing and hiding it fires
+the popover's `toggle` events on the host, which a page listening in the capture phase can hear, and
+its `::backdrop` is switched off from inside the shadow root so a page's own `::backdrop` rule never
+dims the screen.
 
 **A capture quenches first.** `screenshot`, `findCaptcha`, `solveCaptcha` and `pickElement` carry
 `quench` in the table, so `cued()` clears every frame still lit on that tab — the background keeps
-which ones, for as long as a cue lingers — and the host answers after two frames, once the page has
-repainted without it. A tab with nothing lit is not messaged at all.
+which ones until a few seconds after the cue settles, longer than a hidden tab's throttled timers
+take to fade it — and the host answers after two frames, once the page has repainted without it, or
+at once in a hidden tab. A tab with nothing lit is not messaged at all.
 
 ## Tab scoping
 

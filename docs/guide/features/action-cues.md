@@ -36,9 +36,10 @@ It is off until you switch it on, in any of three places — they are one settin
 - **It never shows what is typed.** The caption names a field by its label — **Fill · Password** —
   never by its contents, and the agent's input never reaches the page's layer at all: only where
   an action lands does.
-- **It is never in a screenshot.** Before the agent takes a screenshot, or the captcha solver
-  photographs a challenge, every ring on the tab is taken off first, so the agent never sees its
-  own cue.
+- **It stays out of screenshots.** Before the agent takes a screenshot, or the captcha solver
+  photographs a challenge, every ring on the tab is taken off first and the page is given a moment
+  to repaint, so the agent does not see its own cue. A page too busy to repaint in that moment is
+  the one exception.
 - **It is never drawn on a [blocked site](blocked-sites.md)** — the action is refused before
   anything reaches the page.
 

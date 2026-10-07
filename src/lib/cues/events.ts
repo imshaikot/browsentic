@@ -2,6 +2,8 @@ import type { ThemeId } from '@/lib/settings/theme';
 
 export const CUE_CHANNEL = 'browsentic/cue';
 
+export const CUE_HOST_ID = 'browsentic-cues';
+
 export const CUE_LINGER_MS = 700;
 
 export const CUE_FADE_MS = 220;

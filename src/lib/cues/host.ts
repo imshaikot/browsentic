@@ -3,18 +3,16 @@ import { resolveTarget } from '@/lib/actions/page/dom';
 import { OVERLAY_ATTRIBUTE } from '@/lib/overlay';
 import { RAIL_PALETTES, RAIL_TONES } from '@/lib/rail/events';
 import type { ThemeId } from '@/lib/settings/theme';
-import { CUE_FADE_MS, CUE_LINGER_MS, isCueCommand, type CueAnchor, type CuePlan } from './events';
+import { CUE_FADE_MS, CUE_HOST_ID, CUE_LINGER_MS, isCueCommand, type CueAnchor, type CuePlan } from './events';
 import { cueLabel } from './label';
 import { CUE_GLOW, HOST_STYLE, STYLES } from './styles';
 
-export { CUE_CHANNEL } from './events';
-
-export const CUE_HOST_ID = 'browsentic-cues';
+export { CUE_CHANNEL, CUE_HOST_ID } from './events';
 
 const RING_PAD = 4;
 const POINT_SIZE = 28;
 const CHIP_GAP = 6;
-const CHIP_HEIGHT = 22;
+const CHIP_HEIGHT = 24;
 const EDGE_CHIP_TOP = 12;
 const VIEW_MARGIN = 8;
 const RESOLVE_EVERY_MS = 250;
@@ -56,8 +54,7 @@ interface Layer {
 /**
  * Where the agent is acting, drawn into the frame it acts in. The page gets one element on
  * its first cue and never another change: every ring, caption and fade lives in a closed
- * shadow root, nothing in it takes a pointer, and nothing here focuses, scrolls or listens
- * to the page.
+ * shadow root, nothing in it takes a pointer, and nothing here focuses or scrolls the page.
  */
 export function exposeCues(): void {
   let layer: Layer | null = null;
@@ -84,6 +81,7 @@ export function exposeCues(): void {
 }
 
 function painted(): Promise<void> {
+  if (document.visibilityState === 'hidden') return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(resolve, PAINT_WAIT_MS);
     requestAnimationFrame(() =>
