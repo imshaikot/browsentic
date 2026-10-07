@@ -668,12 +668,12 @@ function printPlan(rows: BrowserRow[], sessions: SessionSummary[], folderVersion
     return;
   }
   console.log('  Next, add the extension to your browser:\n');
-  const chromeWebStore = rows.filter((row) => row.source === 'chrome-web-store' && row.id !== 'edge').map((row) => row.label);
+  const chromeWebStore = rows.filter((row) => row.source === 'chrome-web-store').map((row) => row.label);
   const store = (id: BrowserId) => rows.find((row) => row.id === id)!;
   console.log(`    ${chromeWebStore.join(', ')}`);
   console.log(`      ${store('chrome').storeUrl}`);
   console.log(`    Edge`);
-  console.log(`      ${store('edge').source === 'edge-add-ons' ? store('edge').storeUrl : 'the same page, after “Allow extensions from other stores” at the top'}`);
+  console.log(`      ${store('edge').storeUrl}`);
   console.log(`    Firefox`);
   console.log(`      ${store('firefox').storeUrl}\n`);
   const [enter, ...rest] = codeLines(code);

@@ -12,9 +12,10 @@ Claude Code or Codex; you probably have one already.
 
 The extension is on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
-for Chrome, Edge, Brave, Arc, Vivaldi and Opera, and Firefox gets an
-[add-on signed by Mozilla](https://browsentic.com/download/firefox). You never have to find either
-page yourself.
+for Chrome, Brave, Arc, Vivaldi and Opera, on
+[Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc)
+for Edge, and Firefox gets an [add-on signed by Mozilla](https://browsentic.com/download/firefox).
+You never have to find any of these pages yourself.
 
 ---
 
@@ -74,7 +75,7 @@ extension:
   Which browser should get the extension?
 
      1  Chrome    Chrome Web Store
-     2  Edge      Chrome Web Store
+     2  Edge      Edge Add-ons
      3  Firefox   signed add-on
      4  Another browser: load it unpacked
 
@@ -99,7 +100,7 @@ Setup, or the app's button for that browser, has opened Browsentic's page in it.
 | Browser | The page it opens | What to press |
 | --- | --- | --- |
 | Chrome, Brave, Arc, Vivaldi | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Add to Chrome** (in Brave, **Add to Brave**) |
-| Edge | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | **Allow extensions from other stores** in the bar at the top, then **Add to Chrome**. The Edge Add-ons listing is in review. |
+| Edge | [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc) | **Get** |
 | Opera | [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) | Opera first offers its **Install Chrome Extensions** helper: add it, then **Add to Opera** |
 | Firefox 140 or newer | [The signed add-on](https://browsentic.com/download/firefox) | Accept both prompts: one lets github.com install software, one adds Browsentic. See [Firefox](#firefox) |
 | Ungoogled Chromium, a profile that blocks stores, an unreleased build | None: `setup --unpacked` writes a folder | See [Load unpacked](#load-unpacked-advanced) |
@@ -123,7 +124,7 @@ issues another. The browser keeps the pairing from then on, so this is the only 
 
 | What | How it updates |
 | --- | --- |
-| The extension from the Chrome Web Store | On its own, when the browser checks (every few hours). **Update** at `chrome://extensions`, with Developer mode on, checks now |
+| The extension from the Chrome Web Store or Edge Add-ons | On its own, when the browser checks (every few hours). **Update** at `chrome://extensions` (`edge://extensions` in Edge), with Developer mode on, checks now |
 | The Firefox add-on | On its own, about once a day. `about:addons` → the gear → **Check for Updates** checks now |
 | Browsentic Bridge, from an app | The app offers each release on its Overview tab; one press updates the app and the Bridge |
 | Browsentic Bridge, from `npx` | `npx browsentic@latest update` |
