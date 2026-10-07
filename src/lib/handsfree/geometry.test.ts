@@ -12,7 +12,7 @@ import {
 } from './geometry';
 
 const viewport = { width: 1440, height: 900 };
-const ITEMS = 5;
+const ITEMS = 6;
 const half = ORB_SIZE / 2 + ORB_INSET;
 
 describe('placeOrb', () => {

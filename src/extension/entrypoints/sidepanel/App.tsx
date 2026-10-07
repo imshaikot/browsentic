@@ -34,7 +34,7 @@ import { putBytes } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
-import { useBlockedPattern } from '@/lib/bridge/use-extension-settings';
+import { useActionCues, useBlockedPattern } from '@/lib/bridge/use-extension-settings';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
@@ -61,6 +61,7 @@ export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
+  const [actionCues, setActionCues] = useActionCues();
   const handsFree = useHandsFreeSupported();
   const storedFiles = useStoredFiles();
   const sessions = useStoredSessions();
@@ -489,6 +490,8 @@ export default function App() {
             onToggleLiveTools={() => setLiveTools((on) => !on)}
             scheduling={scheduling}
             onToggleScheduling={() => setScheduling((on) => !on)}
+            actionCues={actionCues}
+            onToggleActionCues={() => setActionCues(!actionCues)}
             onAttachSkill={setAttachedSkill}
             handsFree={handsFree}
             onCommand={(command) => {

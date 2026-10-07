@@ -1,4 +1,5 @@
 import { exposeActions } from '@/lib/actions/host';
+import { exposeCues } from '@/lib/cues/host';
 import { exposeFrameProbe } from '@/lib/frames/host';
 import { exposeHandsFree } from '@/lib/handsfree/host';
 import { exposeIndicator } from '@/lib/indicator/host';
@@ -15,6 +16,7 @@ export default defineContentScript({
     world.__browsenticActions = true;
     exposeActions();
     exposeFrameProbe();
+    exposeCues();
     if (window !== window.top) return;
     exposeRecorder();
     exposeMonitor();

@@ -4,7 +4,13 @@ import { ExternalLink } from 'lucide-react';
 import { Button } from '@/extension/components/ui/button';
 import { Switch } from '@/extension/components/ui/switch';
 import { HANDS_FREE_SHORTCUT } from '@/lib/settings/shortcuts';
-import { openShortcutSettings, useContextMenuChoice, usePushToTalk, useShortcuts } from '@/lib/bridge/use-extension-settings';
+import {
+  openShortcutSettings,
+  useActionCues,
+  useContextMenuChoice,
+  usePushToTalk,
+  useShortcuts,
+} from '@/lib/bridge/use-extension-settings';
 import { useHandsFreeSupported } from '@/lib/bridge/use-speech';
 import { cn } from '@/lib/utils';
 
@@ -12,10 +18,28 @@ export function ExtensionSettings() {
   const handsFree = useHandsFreeSupported();
   return (
     <>
+      <ActionCues />
       <ContextMenuItems handsFree={handsFree} />
       <KeyboardShortcuts handsFree={handsFree} />
       {handsFree && <HandsFree />}
     </>
+  );
+}
+
+function ActionCues() {
+  const [on, setOn] = useActionCues();
+  return (
+    <SettingsGroup
+      title="On the page"
+      note="What the page shows while an agent works in it. The composer and the mic’s menu switch the same setting."
+    >
+      <Row
+        title="Show what the agent does"
+        note="A glowing ring marks each element the agent clicks, types into or reads, with a short caption. It never takes a click, and screenshots leave it out."
+      >
+        <Switch checked={on} label="Show what the agent does" onChange={setOn} />
+      </Row>
+    </SettingsGroup>
   );
 }
 

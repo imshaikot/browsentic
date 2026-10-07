@@ -66,6 +66,8 @@ export interface OrbView {
   voice: OrbVoice;
   /** The mic stays off until the hold key is held, and letting go sends. */
   pushToTalk: boolean;
+  /** A ring marks each element the agent acts on. */
+  cues: boolean;
   approval?: OrbApproval;
 }
 
@@ -98,6 +100,7 @@ export type OrbRequest =
   | { channel: typeof HANDS_FREE_CHANNEL; op: 'detach'; fileId: string }
   | { channel: typeof HANDS_FREE_CHANNEL; op: 'move'; position: OrbPosition }
   | { channel: typeof HANDS_FREE_CHANNEL; op: 'pushToTalk'; on: boolean }
+  | { channel: typeof HANDS_FREE_CHANNEL; op: 'cues'; on: boolean }
   | { channel: typeof HANDS_FREE_CHANNEL; op: 'talk'; on: boolean };
 
 export type DictationReport =
@@ -110,7 +113,7 @@ export type DictationCommand = { channel: typeof DICTATION_CHANNEL; op: 'talk'; 
 const ORB_COMMANDS = new Set(['show', 'hide', 'heard', 'say']);
 const ORB_REQUESTS = new Set([
   'sync', 'submit', 'cancel', 'decide', 'openPanel', 'listen', 'grantMic', 'pick', 'attach', 'detach', 'move',
-  'pushToTalk', 'talk',
+  'pushToTalk', 'cues', 'talk',
 ]);
 const DICTATION_REPORTS = new Set(['phase', 'heard']);
 const DICTATION_COMMANDS = new Set(['talk']);
@@ -157,6 +160,18 @@ export const ORB_ICONS = {
     'm15 15-3-3-3 3',
   ],
   code: ['m18 16 4-4-4-4', 'm6 8-4 4 4 4', 'm14.5 4-5 16'],
+  cues: [
+    'M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z',
+    'M5 3a2 2 0 0 0-2 2',
+    'M19 3a2 2 0 0 1 2 2',
+    'M5 21a2 2 0 0 1-2-2',
+    'M9 3h1',
+    'M9 21h2',
+    'M14 3h1',
+    'M3 9v1',
+    'M21 9v2',
+    'M3 14v1',
+  ],
   focus: [
     'M3 7V5a2 2 0 0 1 2-2h2',
     'M17 3h2a2 2 0 0 1 2 2v2',

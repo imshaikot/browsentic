@@ -376,6 +376,44 @@ State: `browsentic/handsFree` in `storage.session` (on while present, with `mute
 `browsentic/pushToTalk` and `browsentic/orbPosition` — the orb's centre as viewport fractions, so one drag places it on every tab. Hands-free is session state
 on purpose: a restarted browser comes back with the panel, not a live microphone.
 
+## Action cues: a ring in whichever frame the agent acts in
+
+Every agent action is ringed on the page — see [Action cues](../guide/features/action-cues.md). The
+background drives it, because `invokeForHarness` is the one place that sees each action together
+with its tab: the content script's dispatch knows no run, and hears internal sub-calls (a
+screenshot is a plan plus a scroll per tile) that are not the agent's actions.
+
+**One table decides what an action looks like.** `cueFor()` in `src/lib/cues/plan.ts` maps each
+registry action to an element cue (a target, a point, or the focused element), a page cue (the
+viewport's edge) or none, and a test fails if a registry action has no entry — a new action has to
+choose. It is built from the **sealed** input, before `releaseForAction`, and copies only the
+target fields, points, a named key and a navigation's host — never a value, a text or a query.
+
+**`cued()` wraps the tab-bound half of `dispatch`** (`src/lib/bridge/action-cues.ts`). It sends
+`show` to the focused frame for an element cue or the top frame for a page cue, waits at most
+`CUE_LEAD_MS` so the ring is painted before the action fires, runs the action, then sends `settle`
+with its outcome. A frame that does not answer — frozen, alerting, or without a content script —
+costs the action that wait and nothing else, and a cue never fails an action. Blocked sites are
+refused by `guardTarget` before `dispatch` runs, so they are never ringed. The switch is
+`browsentic/actionCues` in `storage.local`, off unless it is `true`.
+
+**The page gets one element and nothing more.** `exposeCues()` runs in every frame (before the
+top-frame return in `content.ts`), and the first cue in a document mounts `#browsentic-cues` on
+`documentElement` with its attributes already set — one childList mutation for the page's
+observers, and none after it, because every ring, caption and fade is inside a closed shadow root.
+Nothing in it takes a pointer, and it never focuses, scrolls or listens to the page. While a cue is
+on screen a requestAnimationFrame loop follows the element's box; a target that has not appeared
+yet (`waitForElement`) is looked for again every 250 ms.
+
+**It rides in the top layer.** The host is a `popover="manual"`, shown while a cue is up and hidden
+when none is, and raised again when a modal dialog, another popover or a fullscreen element has
+appeared — so a ring on a cookie banner's button sits above the banner.
+
+**A capture quenches first.** `screenshot`, `findCaptcha`, `solveCaptcha` and `pickElement` carry
+`quench` in the table, so `cued()` clears every frame still lit on that tab — the background keeps
+which ones, for as long as a cue lingers — and the host answers after two frames, once the page has
+repainted without it. A tab with nothing lit is not messaged at all.
+
 ## Tab scoping
 
 A panel conversation is **bound to the tab it started in**.

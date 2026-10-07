@@ -9,6 +9,7 @@ const world: OrbWorld = {
   state: { muted: false, since: 1 },
   phase: 'listening',
   pushToTalk: false,
+  cues: true,
   listeningTab: 7,
 };
 
@@ -27,6 +28,11 @@ const session = (patch: Partial<TabSession>): TabSession => ({
 });
 
 describe('describeOrb', () => {
+  it('carries the action-cues switch to every tab', () => {
+    expect(describeOrb(world, 7, null).cues).toBe(true);
+    expect(describeOrb({ ...world, cues: false }, 8, null).cues).toBe(false);
+  });
+
   it('listens only in the tab the microphone is aimed at', () => {
     expect(describeOrb(world, 7, null).voice).toBe('listening');
     expect(describeOrb(world, 8, null).voice).toBe('paused');

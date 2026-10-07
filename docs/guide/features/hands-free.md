@@ -53,13 +53,14 @@ side panel in every window, and opening the panel anywhere ends hands-free.
 
 ## The menu
 
-Rest the pointer on the mic for a second and five buttons fan out around it:
+Rest the pointer on the mic for a second and six buttons fan out around it:
 
 | | |
 | --- | --- |
 | **Attach a file** | Hands a file to this tab's conversation, as dropping it on the panel does — see [Files](files.md) |
 | **Live code** | Lets the agent write a script for this page, as the composer's code toggle does; you approve the code before it runs |
 | **Focus point** | Opens [A-Eye](a-eye.md): point at an element and it rides along with your next instruction |
+| **Show what the agent does** | Switches [action cues](action-cues.md) — the ring on each element the agent acts on — on or off, for every tab |
 | **Hold to talk** | Switches between listening all the time and listening only while you hold a key — see below |
 | **Open the side panel** | Brings the panel back and ends hands-free |
 

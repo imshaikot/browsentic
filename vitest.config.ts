@@ -23,7 +23,12 @@ export default defineConfig({
         test: {
           name: 'lib',
           include: ['src/lib/**/*.test.ts'],
-          exclude: [...configDefaults.exclude, 'src/lib/actions/page/**', 'src/lib/handsfree/host.test.ts'],
+          exclude: [
+            ...configDefaults.exclude,
+            'src/lib/actions/page/**',
+            'src/lib/handsfree/host.test.ts',
+            'src/lib/cues/host.test.ts',
+          ],
         },
       },
       {
@@ -31,7 +36,7 @@ export default defineConfig({
         test: {
           name: 'dom',
           environment: 'happy-dom',
-          include: ['src/lib/actions/page/**/*.test.ts', 'src/lib/handsfree/host.test.ts'],
+          include: ['src/lib/actions/page/**/*.test.ts', 'src/lib/handsfree/host.test.ts', 'src/lib/cues/host.test.ts'],
         },
       },
       {

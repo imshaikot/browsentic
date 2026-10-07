@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { CalendarClock, Code2, FileText, FileUp, Loader2, Mic, MicOff, Paperclip, RotateCw, ScanEye, Send, Sparkles, Square, X } from 'lucide-react';
+import {
+  CalendarClock,
+  Code2,
+  FileText,
+  FileUp,
+  Loader2,
+  Mic,
+  MicOff,
+  Paperclip,
+  RotateCw,
+  ScanEye,
+  Send,
+  Sparkles,
+  Square,
+  SquareDashedMousePointer,
+  X,
+} from 'lucide-react';
 
 import { SkillMenu, skillMenuItems, type SkillMenuItem } from '@/extension/components/skill-menu';
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
@@ -34,6 +50,8 @@ export function Composer({
   onToggleLiveTools,
   scheduling,
   onToggleScheduling,
+  actionCues,
+  onToggleActionCues,
   onAttachSkill,
   onCommand,
   tools,
@@ -65,6 +83,8 @@ export function Composer({
   onToggleLiveTools: () => void;
   scheduling: boolean;
   onToggleScheduling: () => void;
+  actionCues: boolean;
+  onToggleActionCues: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
   onCommand: (command: string) => void;
   tools: SavedToolMeta[];
@@ -292,6 +312,21 @@ export function Composer({
             disabled={!connected}
           >
             <CalendarClock className="size-3.5" />
+          </Button>
+          <Button
+            variant={actionCues ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            role="switch"
+            aria-checked={actionCues}
+            aria-label={actionCues ? 'Hide what the agent does' : 'Show what the agent does'}
+            title={
+              actionCues
+                ? 'Showing what the agent does — a glowing ring marks each element it acts on. Turn it off to hide it.'
+                : 'Show what the agent does — mark each element it acts on with a glowing ring.'
+            }
+            onClick={onToggleActionCues}
+          >
+            <SquareDashedMousePointer className="size-3.5" />
           </Button>
           <Button
             variant={voiceEnabled && !voice.error ? 'subtle' : 'ghost'}

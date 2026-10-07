@@ -48,7 +48,7 @@ const SETTLE_MS = 2500;
 const SPEECH_STAGGER_MS = 45;
 const REPLY_STAGGER_MS = 32;
 
-type MenuId = 'file' | 'code' | 'focus' | 'talk' | 'panel';
+type MenuId = 'file' | 'code' | 'focus' | 'cues' | 'talk' | 'panel';
 type CaptionKind = 'speech' | 'sent' | 'reply' | 'error' | 'ask' | 'hint';
 type Unsent<T> = T extends unknown ? Omit<T, 'channel'> : never;
 
@@ -64,6 +64,7 @@ const MENU: { id: MenuId; icon: OrbIcon; label: string }[] = [
   { id: 'file', icon: 'file', label: 'Attach a file' },
   { id: 'code', icon: 'code', label: 'Live code' },
   { id: 'focus', icon: 'focus', label: 'Focus point (A-Eye)' },
+  { id: 'cues', icon: 'cues', label: 'Show what the agent does' },
   { id: 'talk', icon: 'keyboard', label: `Hold ${HOLD_KEY.name} to talk` },
   { id: 'panel', icon: 'panel', label: 'Open the side panel' },
 ];
@@ -392,6 +393,10 @@ function mountOrb(first: OrbView): Orb | null {
     talkItem?.classList.toggle('on', view.pushToTalk);
     const talkTip = talkItem?.querySelector('.tip');
     if (talkTip) talkTip.textContent = view.pushToTalk ? `Hold to talk is on — ${HOLD_KEY.name}` : `Hold ${HOLD_KEY.name} to talk`;
+    const cuesItem = items.get('cues');
+    cuesItem?.classList.toggle('on', view.cues);
+    const cuesTip = cuesItem?.querySelector('.tip');
+    if (cuesTip) cuesTip.textContent = view.cues ? 'Showing what the agent does' : 'Show what the agent does';
     button.setAttribute('aria-label', pressLabel());
     if (!before) return;
 
@@ -734,6 +739,10 @@ function mountOrb(first: OrbView): Orb | null {
     } else if (id === 'focus') {
       closeMenu();
       void pickFocus();
+    } else if (id === 'cues') {
+      const on = !view.cues;
+      void request({ op: 'cues', on });
+      hint(on ? 'A ring now marks each element the agent acts on.' : 'The agent’s actions are no longer marked on the page.');
     } else if (id === 'talk') {
       const on = !view.pushToTalk;
       void request({ op: 'pushToTalk', on });

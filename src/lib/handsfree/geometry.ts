@@ -15,10 +15,10 @@ export type Side = 'top' | 'bottom' | 'left' | 'right';
 export const ORB_SIZE = 56;
 export const ORB_INSET = 24;
 export const MENU_ITEM = 38;
-export const MENU_RADIUS = 80;
+export const MENU_RADIUS = 88;
 /* A corner leaves a quarter turn, plus the slack of the orb's inset on either side: 110° at
-   96 px keeps five items apart and every one of them on screen. */
-const CORNER_RADIUS = 96;
+   118 px keeps six items apart and every one of them on screen. */
+const CORNER_RADIUS = 118;
 const EDGE_SPAN = 150;
 const CORNER_SPAN = 110;
 const VIEW_MARGIN = 12;
