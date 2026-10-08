@@ -1,24 +1,24 @@
 # The macOS app
 
-`src/mac/` is a SwiftPM package with no dependencies and no Xcode project. It builds
-`Browsentic.app`, a SwiftUI control panel that **installs** the Node half of Browsentic and then
-**drives** it. It holds no intelligence and reimplements nothing: the daemon stays the daemon.
+`Browsentic.app` is a SwiftUI control panel that **installs** the Node half of Browsentic and then
+**drives** it, built from `src/mac/`, a SwiftPM package with no dependencies and no Xcode project. It
+reimplements nothing: the daemon stays the daemon.
 
 ## Why the daemon stays
 
 The daemon is where the extension socket, the handshake, the MCP server, the guardrails and the
-agent runners live, all of it in TypeScript shared with the extension through `src/lib/`. A native
-rewrite would fork the action registry and the wire protocol for no gain — the daemon idles at a
-few megabytes and the expensive thing it does is spawn an agent CLI. What *is* native is everything
-the app does continuously: it speaks the daemon’s `/control` WebSocket itself, so a status refresh
-is one frame on an open socket rather than a `node` process every two seconds.
+agent runners live, all in TypeScript shared with the extension through `src/lib/`. A native rewrite
+would fork the action registry and the wire protocol for no gain: the daemon idles at a few
+megabytes, and the expensive thing it does is spawn an agent CLI. What the app does continuously is
+native: it speaks the daemon’s `/control` WebSocket itself, so a status refresh is one frame on an
+open socket rather than a `node` process every two seconds.
 
 ## Two ways in, by cost
 
 | Path | Used for | Where |
 | --- | --- | --- |
-| **The control socket** — `ws://127.0.0.1:<port>/control`, bearer token from `daemon.json` | `status`, `sessions`, `pair`, `revoke`, `agent` set and grant | [ControlClient.swift](../../src/mac/Sources/Browsentic/Core/ControlClient.swift), the same frames as [remote-bridge.ts](../../src/daemon/remote-bridge.ts) |
-| **The installed command** — `node ~/.browsentic/cli/dist/cli.js …` | `start`, `stop`, `restart`, `setup`, `uninstall`, and the `--json` listings for `agent`, `skills`, `approvals`, `downloads` | [CLI.swift](../../src/mac/Sources/Browsentic/Core/CLI.swift) |
+| **The control socket**: `ws://127.0.0.1:<port>/control`, bearer token from `daemon.json` | `status`, `sessions`, `pair`, `revoke`, `agent` set and grant, `preferences` and `setPreference` | [ControlClient.swift](../../src/mac/Sources/Browsentic/Core/ControlClient.swift), the same frames as [remote-bridge.ts](../../src/daemon/remote-bridge.ts) |
+| **The installed command**: `node ~/.browsentic/cli/dist/cli.js …` | `start`, `stop`, `restart`, `setup`, `uninstall`, and the `--json` listings for `agent`, `skills`, `approvals`, `downloads` | [CLI.swift](../../src/mac/Sources/Browsentic/Core/CLI.swift) |
 
 Anything that reads or writes disk goes through the command, so config overrides (`downloadDir`,
 `skillsDir`, `extensionDir`) are resolved in exactly one place. The open control socket is also
@@ -30,8 +30,8 @@ A `ControlRequest` change in [control.ts](../../src/daemon/control.ts) needs the
 ## The payload
 
 [build-app.sh](../../src/mac/Scripts/build-app.sh) stages `Contents/Resources/payload/` in the npm
-package’s layout — `dist/cli.js`, `dist/daemon-main.js`, `skills/`, `extension/chrome-mv3/`,
-`package.json` — because `cli.js` resolves `../skills` and `../extension` from where it sits. Like
+package’s layout (`dist/cli.js`, `dist/daemon-main.js`, `skills/`, `extension/chrome-mv3/`,
+`package.json`), because `cli.js` resolves `../skills` and `../extension` from where it sits. Like
 `stage-extension.mjs` it validates and never builds: a manifest version that disagrees with
 `src/daemon/package.json` is fatal.
 
@@ -44,7 +44,7 @@ native host with every browser and asks nothing. The extension comes from each b
 the Overview rows read `browsentic browsers --json` and their buttons run
 `setup --browser <id> --no-wait --json`, which opens the store page in that browser and returns the
 pairing code. An unpacked **extension**, when someone asks for one, is written by
-`setup --unpacked`, file by file, for the reasons [install.ts](../../src/daemon/install.ts) gives —
+`setup --unpacked`, file by file, for the reasons [install.ts](../../src/daemon/install.ts) gives,
 and to the same path, for the reasons [paths.ts](../../src/daemon/paths.ts) gives.
 
 ## PATH
@@ -68,13 +68,13 @@ ARCHS=arm64 Scripts/build-app.sh     # quick local bundle; the default is a univ
 too. With none of them the build is ad hoc, which runs where it was built and is blocked by
 Gatekeeper anywhere it was downloaded to.
 
-That is why the install path people are pointed at is `curl -fsSL https://browsentic.com/install.sh | sh`:
-it verifies the signature and then clears `com.apple.quarantine` on the copy it installed. Clearing it
-is not optional: `curl` sets no flag of its own, but a terminal that was itself downloaded passes its
-quarantine to everything its children write, and the app then arrives flagged anyway. The script lives on the
-`website` branch as `public/install.sh`, resolves the newest release from the `releases/latest`
-redirect, verifies the signature, and copies the app into Applications. It depends on the release
-asset being named `Browsentic-<version>.dmg`.
+That is why people are pointed at `curl -fsSL https://browsentic.com/install.sh | sh`. The script,
+`public/install.sh` in the website's own repository, resolves the newest release from the
+`releases/latest` redirect, verifies the signature, copies the app into Applications, and then
+clears `com.apple.quarantine` on the copy it installed. Clearing it is required: `curl` sets no flag
+of its own, but a terminal that was itself downloaded passes its quarantine to everything its
+children write, so the app arrives flagged anyway. The script depends on the release asset being
+named `Browsentic-<version>.dmg`.
 
 The app updates itself along the same path (`Core/Updater.swift`). `UpdateFeed` takes the newer of
 GitHub's `releases/latest` tag and npm's `latest` version, then asks with a `HEAD` whether that
@@ -90,4 +90,4 @@ without waiting for **Set up everything**. It too depends on the asset name.
 CI builds and tests it on `macos-15`; the release workflow’s `mac` job attaches the DMG to the
 GitHub release after the npm publish. Colours in
 [Theme.swift](../../src/mac/Sources/Browsentic/Theme/Theme.swift) are Ember and Daylight from
-`globals.css`, converted from oklch — re-derive them when the extension’s palette changes.
+`globals.css`, converted from oklch; re-derive them when the extension’s palette changes.

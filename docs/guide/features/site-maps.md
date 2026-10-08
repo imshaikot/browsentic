@@ -1,10 +1,8 @@
 # Site maps
 
-Teach it a site once.
-
-An agent that has never seen your site spends its first minutes rediscovering it: where search
-lives, what a button is really called, why the list looks empty until you scroll. A site map does
-that exploration once and keeps the result.
+A site map is a set of notes the agent writes from one exploration of a site. After you activate it,
+every later run on that domain starts out knowing where search lives, what a button is really called
+and why a list looks empty until you scroll, instead of spending its first minutes rediscovering them.
 
 ---
 
@@ -16,8 +14,8 @@ Press **Map this site** in the side panel's **Skills** tab, or say:
 @site-mapper map this site
 ```
 
-Mapping requires the explicit `@site-mapper` prefix or the button. Trigger words alone will not
-start one, because a mapping run takes minutes and commandeers the tab.
+Mapping needs the explicit `@site-mapper` prefix or the button. Trigger words alone will not start
+one, because a mapping run takes minutes and takes over the tab.
 
 Browsentic reads the site's own `robots.txt` and `sitemap.xml`, looks up public background on the
 domain, then walks the site for a few minutes taking screenshots.
@@ -33,19 +31,20 @@ domain, then walks the site for a few minutes taking screenshots.
 └── pages/            longer per-page notes, kept out of the prompt
 ```
 
-From then on, any instruction you give on that domain carries those notes. Elsewhere they are inert.
+From then on, every instruction you give on that domain carries those notes. Elsewhere they have no
+effect.
 
 ---
 
 ## Nothing takes effect until you say so
 
-A map in flight is written to a staging directory the skill loader **cannot read**, so an unreviewed
-map is not merely unused — it is never opened.
+A map in progress is written to a staging directory the skill loader **cannot read**, so an
+unreviewed map is never even opened, let alone used.
 
-The panel shows you the exact markdown as plain text, never rendered, along with the domain it will
-match. **Activate** arms it; **Discard** deletes it. The review appears on the conversation that
-mapped the site — switch back to that tab to decide. If that tab closes first, the review follows
-you so an unsaved map is never lost.
+The panel shows you the exact markdown as plain text, never rendered, with the domain it will match.
+**Activate** turns it on; **Discard** deletes it. The review appears on the conversation that mapped
+the site, so switch back to that tab to decide. If that tab closes first, the review follows you, so
+an unsaved map is never lost.
 
 > A map is written from pages an agent read, so read it before activating, as you would any
 > generated content.
@@ -54,12 +53,12 @@ you so an unsaved map is never lost.
 
 ## What a mapping run may do
 
-The crawl is **read-only and locked to one host**. It cannot click, fill or submit; it cannot leave
-the site; and it is pinned to the tab it started in, so switching tabs stops it rather than
-following you. Off-host, every read is blocked until it navigates back.
+The crawl is **read-only and locked to one host**. It cannot click, fill or submit, and it cannot
+leave the site. It is pinned to the tab it started in, so switching tabs stops it instead of taking
+it with you. Off the host, every read is blocked until it navigates back.
 
-Limits are enforced by the Bridge, and [config](../configuration.md) can narrow them but never widen
-them:
+Browsentic Bridge enforces the limits, and [config](../configuration.md) can narrow them but never
+widen them:
 
 | Setting | Default | Ceiling |
 | --- | --- | --- |
@@ -81,7 +80,7 @@ keep everything inside the browser.
 
 ## Writing notes by hand instead
 
-If you would rather describe a site yourself, upload a markdown file from the **Skills** tab:
+To describe a site yourself, upload a markdown file from the **Skills** tab:
 
 ```markdown
 ---
@@ -95,12 +94,12 @@ Search is `#q` and submits on Enter, not on the button.
 Results lazy load. Click "Load more" until it disappears before counting anything.
 ```
 
-Notes are **overlays**, not replacements: on a matching site they stack on top of whatever
-Browsentic was already doing, so the normal driving and read-only rules still apply. Prefix an
-instruction with `@acme-admin` to pin one regardless of where you are.
+Notes are **overlays**: on a matching site they stack on top of whatever Browsentic was already
+doing, so the normal driving and read-only rules still apply. Prefix an instruction with
+`@acme-admin` to apply one wherever you are.
 
-Notes live outside the repository, are re-read on every run so an edit applies to the next thing you
-ask, and hand-written ones take precedence over generated ones.
+Notes live outside the repository and are re-read on every run, so an edit applies to the next thing
+you ask. Hand-written notes take precedence over generated ones.
 
 ```sh
 browsentic skills    # everything currently in scope, and where it came from
@@ -110,6 +109,6 @@ browsentic skills    # everything currently in scope, and where it came from
 
 ## See also
 
-- [Skills](skills.md) — how overlays and base skills fit together
-- [Recordings](recordings.md) — a site map teaches it what a site *is*; a recording teaches it what *you do* there
-- [internals/subsystems.md](../../internals/subsystems.md) — staging, validation, and the sweep
+- [Skills](skills.md): how overlays and base skills fit together
+- [Recordings](recordings.md): what you do on a site, where a site map describes the site itself
+- [internals/subsystems.md](../../internals/subsystems.md): staging, validation, and the sweep

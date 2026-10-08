@@ -1,13 +1,10 @@
 # Instant commands
 
-Some things should not cost a round trip to a language model.
+Browsentic checks every instruction against a local grammar before it reaches the agent. A confident
+single-step command such as "go back" runs in the browser in **milliseconds** instead of taking
+several seconds through the agent; everything else goes to the agent with your text unchanged.
 
-Sending "go back" out to an agent costs several seconds to arrive at something the extension could
-have done immediately. So every instruction is scored against a local grammar first. Confident
-single-step commands run in the browser in **milliseconds** and stop there. Everything else goes to
-the agent with your text untouched.
-
-Locally-handled commands carry a **⚡** on the timeline.
+Commands handled locally carry a **⚡** on the timeline.
 
 ---
 
@@ -26,18 +23,18 @@ Locally-handled commands carry a **⚡** on the timeline.
 | stop monitoring | "stop watching and tell me what happened" |
 
 Common site names are known, so "open gmail", "open hacker news" and "open stack overflow" resolve
-without you typing a URL.
+without a URL.
 
 ---
 
-## Why the split falls where it does
+## What always goes to the agent
 
-The bias is toward escalating, because the two mistakes are not symmetric:
+The grammar leans toward escalating, because the two possible mistakes do not cost the same:
 
 - Escalating something it could have handled costs a round trip.
 - Acting on something it misread spends a wrong click on your real page.
 
-So five categories escalate unconditionally, regardless of how confident the match looks:
+So five categories always escalate, however confident the match looks:
 
 | | |
 | --- | --- |
@@ -45,29 +42,29 @@ So five categories escalate unconditionally, regardless of how confident the mat
 | Multi-step phrasing | "and then", "after that" |
 | Hedges | "if", "unless", "try to" |
 | Anything starting with `@` | An explicit [skill pin](skills.md) |
-| Consequential-sounding targets | *buy*, *pay*, *delete*, *send*, *submit*, *confirm* and friends |
+| Consequential-sounding targets | *buy*, *pay*, *delete*, *send*, *submit*, *confirm* and similar |
 
-A local command that runs and **fails** also escalates, rather than reporting the failure.
+A local command that runs and **fails** also escalates instead of reporting the failure.
 
 ---
 
-## Two things this explains
+## Logs and routing checks
 
-**Local commands leave no trace in `browsentic logs`.** They never reach the Bridge. That is
-expected, not a bug — the ⚡ is where they show up.
+**Local commands do not appear in `browsentic logs`.** They never reach Browsentic Bridge, so the ⚡
+on the timeline is their only record. This is expected.
 
-**Explaining any single routing decision:**
+To see how a single instruction would be routed:
 
 ```sh
 yarn check:intent "take me to the checkout page"
 ```
 
-That prints how the grammar scored it and where it would go.
+It prints how the grammar scored the text and where it would go.
 
 ---
 
 ## See also
 
-- [Conversations](conversations.md) — the timeline these appear on
-- [Skills](skills.md) — what happens to everything that escalates
-- [internals/agent-runs.md § The intent funnel](../../internals/agent-runs.md#the-intent-funnel) — the scoring
+- [Conversations](conversations.md): the timeline these appear on
+- [Skills](skills.md): what happens to everything that escalates
+- [internals/agent-runs.md § The intent funnel](../../internals/agent-runs.md#the-intent-funnel): the scoring

@@ -1,8 +1,7 @@
 # Contributing to Browsentic
 
-Found a bug, or have an idea for a capability? Both are welcome. This page is the front door:
-what kinds of contribution land well, the one gate every pull request goes through, and where
-the deeper guides live.
+Bug reports, capability ideas and pull requests are welcome. This page covers where each kind of
+contribution goes, the one check every pull request must pass, and where the deeper guides live.
 
 ## Ways in
 
@@ -10,17 +9,17 @@ the deeper guides live.
 | --- | --- |
 | A bug | [Open a bug report](https://github.com/imshaikot/browsentic/issues/new?template=bug_report.yml) with `browsentic status` output |
 | A capability idea | [Open a proposal](https://github.com/imshaikot/browsentic/issues/new?template=capability.yml) before writing code |
-| A security problem | **Not an issue.** [Report it privately](SECURITY.md) — this tool holds live browser sessions |
-| A docs fix | Edit under `docs/` and open a PR straight away — no issue needed |
+| A security problem | **Not an issue.** [Report it privately](SECURITY.md): Browsentic holds live browser sessions |
+| A docs fix | Edit under `docs/` and open a PR straight away; no issue needed |
 | A small code fix | A PR straight away is fine too |
 
-Proposals before code, for anything that adds surface: a capability ships as an MCP tool the
-moment it lands in the registry, so its name, shape and guardrails are API decisions worth two
-paragraphs of discussion before they are a diff.
+Propose before you code anything that adds surface. A capability becomes a page tool, for the
+side panel's agent and for MCP clients alike, the moment it lands in the registry, so its name,
+shape and guardrails are API decisions worth two paragraphs of discussion before they become a diff.
 
 ## Setup
 
-One command builds everything — both projects, both bundles — with nothing on your `PATH` but
+One command builds everything (both projects, both bundles) with nothing on your `PATH` but
 Node 20+:
 
 ```sh
@@ -31,14 +30,14 @@ Then `yarn dev` launches a throwaway Chrome profile with hot reload. The full bu
 the daemon's lifecycle, and every command live in the
 [internals contributing guide](docs/internals/contributing.md).
 
-## The gate
+## The required check
 
 ```sh
 yarn check
 ```
 
-That is both type checks plus the test suite and its coverage floors — the same command CI runs
-on your pull request. Green locally means green in CI.
+It runs both type checks and the test suite with its coverage floors. CI runs the same command on
+your pull request, so green locally means green in CI.
 
 If you touched the action registry, also run `yarn daemon:manifest` and keep
 [docs/reference/tools.md](docs/reference/tools.md) in step with what it prints. The manifest is
@@ -71,8 +70,8 @@ your tests lift an area, and never lower one to get a build through.
 ## Adding a capability
 
 The short version: one action module in `src/lib/actions/page/`, one line in
-[the registry](src/lib/actions/registry.ts), and the daemon publishes it as an MCP tool — the
-extension and the MCP server build from the same registry, so a tool can never describe
+[the registry](src/lib/actions/registry.ts), and the daemon publishes it as a page tool over MCP.
+The extension and the MCP server build from the same registry, so a tool can never describe
 something the browser cannot do. The long version, including the four conventions that are
 load-bearing at runtime, is in the
 [internals guide](docs/internals/contributing.md#adding-a-capability).
@@ -88,7 +87,7 @@ somewhere, or acts on another site's security control should carry a rule in the
   `docs: …`. Look at `git log --oneline` and match it.
 - **Docs travel with the change.** A new capability without its `docs/` page is half a PR.
 - CI runs `yarn check` and both builds on every PR. A red check is yours to fix, but ask if
-  the failure makes no sense — the tests have opinions.
+  the failure makes no sense.
 
 ## Conduct
 

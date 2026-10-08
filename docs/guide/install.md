@@ -1,21 +1,20 @@
 # Install
 
-Browsentic is your browser's superpower: a side panel that drives your real, logged-in browser with
-the AI agent you already use. It is free and open source, with no API key, no account and no cloud
-service of its own.
+One line installs Browsentic Bridge on your computer, then walks you through adding the extension
+from your browser's store and pairing the two. Browsentic is your browser's superpower, free and
+open source, with no API key, no account and no cloud service of its own.
 
-**One install sets it up, the extension included.** The Mac app, the Windows app or
-`npx browsentic@latest setup` installs Browsentic Bridge, the half that runs on your computer, then
-asks which browser you use and opens the extension's store page in it. Press **Add**, enter the
-code it shows, and that's it. The side panel runs on an agent CLI you're signed in to, such as
-Claude Code or Codex; you probably have one already.
+The Mac app, the Windows app or `npx browsentic@latest setup` installs Browsentic Bridge (the part
+that runs on your computer), asks which browser you use and opens the extension's store page in it.
+Press **Add**, then enter the code it shows. The side panel runs on an agent CLI you are signed in
+to, such as Claude Code or Codex.
 
 The extension is on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
 for Chrome, Brave, Arc, Vivaldi and Opera, on
 [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc)
 for Edge, and Firefox gets an [add-on signed by Mozilla](https://browsentic.com/download/firefox).
-You never have to find any of these pages yourself.
+Setup opens the right one for you.
 
 ---
 
@@ -23,26 +22,26 @@ You never have to find any of these pages yourself.
 
 | | Requirement | Check |
 | --- | --- | --- |
-| **Browser** | Chrome, Edge, Brave, Arc, Vivaldi, Opera or another Chromium browser, or Firefox 140 or newer | — |
-| **System** | macOS, Windows 10 or 11 ([experimental](limits.md#windows-is-experimental)), or Linux | — |
+| **Browser** | Chrome, Edge, Brave, Arc, Vivaldi, Opera or another Chromium browser, or Firefox 140 or newer | |
+| **System** | macOS, Windows 10 or 11 ([experimental](limits.md#windows-is-experimental)), or Linux | |
 | **Node** | 20 or newer, only for `npx`: the [Mac app](mac-app.md) and the [Windows app](windows-app.md) bring their own | `node --version` |
 | **Agent** | One of [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli), [Antigravity](https://antigravity.google/docs/cli/install), [Mistral Vibe](https://github.com/mistralai/mistral-vibe) (beta), [Grok Build](https://docs.x.ai/build/overview) (beta), [Cursor CLI](https://cursor.com/docs/cli/overview) (beta), [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/) (beta) or [OpenCode](https://opencode.ai/docs/cli/) (beta) on your `PATH`, logged in | `claude --version`, `codex --version`, `agy --version`, `vibe --version`, `grok --version`, `cursor-agent --version`, `qwen --version`, `opencode --version` |
 
-Two things worth knowing before you start:
+Before you start:
 
-- **The side panel runs on the agent CLI.** It is what Browsentic Bridge starts to reason about an
-  instruction, so it is the one thing to have ready before your first run. See
-  [Choosing an agent](agents.md). The only setup that needs no CLI is driving the browser solely
-  from an [MCP client](mcp-clients.md), which is optional and starts nothing.
-- **Only one of them is needed.** Browsentic checks every one and tells you in the popup which are
-  installed. Switching is a click.
+- **The side panel needs an agent CLI.** Browsentic Bridge starts it to work on each instruction,
+  so have one ready before your first run; see [Choosing an agent](agents.md). Only driving the
+  browser solely from an optional [MCP client](mcp-clients.md) needs no CLI, because that path
+  starts nothing.
+- **One agent CLI is enough.** Browsentic checks for all of them, and the popup shows which are installed.
+  Switching is one click.
 
 ---
 
 ## 1. Install Browsentic
 
-This installs Browsentic Bridge, which starts your agent and keeps everything local, and then walks
-you through the browser half.
+This installs Browsentic Bridge, which starts your agent and keeps everything local, then walks you
+through adding the extension.
 
 On macOS, the [app](mac-app.md) does it from a window, Node included:
 
@@ -50,7 +49,7 @@ On macOS, the [app](mac-app.md) does it from a window, Node included:
 curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
-On Windows there is [one too](windows-app.md). In PowerShell:
+On Windows, the [Windows app](windows-app.md) does the same. In PowerShell:
 
 ```powershell
 irm https://browsentic.com/install.ps1 | iex
@@ -95,7 +94,7 @@ npm i -g browsentic
 
 ## 2. Add the extension
 
-Setup, or the app's button for that browser, has opened Browsentic's page in it. What to press there:
+Setup, or the app's button for that browser, opens Browsentic's store page in it. What to press there:
 
 | Browser | The page it opens | What to press |
 | --- | --- | --- |
@@ -108,15 +107,15 @@ Setup, or the app's button for that browser, has opened Browsentic's page in it.
 Pin Browsentic to the toolbar from the puzzle-piece menu, so the popup is one click away. It updates
 itself from its store from then on.
 
-Added it from the store before running setup? That works too: pick the same browser, and enter the
-code setup shows.
+If you added it from the store before running setup, pick the same browser in setup and enter the
+code it shows.
 
 ## 3. Pair them, once
 
 Click Browsentic in the toolbar, enter the code the app or `setup` shows, and press **Connect**. The
 code works once and lives for ten minutes; `browsentic pair`, or **Get a pairing code** in the app,
-issues another. The browser keeps the pairing from then on, so this is the only time you do it.
-[Pairing](pair.md) has the detail.
+issues another. The browser keeps the pairing, so you do this once. [Pairing](pair.md) has the
+detail.
 
 ---
 
@@ -130,7 +129,7 @@ issues another. The browser keeps the pairing from then on, so this is the only 
 | Browsentic Bridge, from `npx` | `npx browsentic@latest update` |
 | An unpacked copy | `browsentic update` rewrites the folder in place; press ↻ on its card |
 
-The extension and the Bridge don't have to be the same version. A store copy can update before or
+The extension and the Bridge do not have to be the same version. A store copy can update before or
 after the Bridge does, and they go on working: Browsentic Bridge 0.8 works with the extension from
 0.7.14 on. `browsentic update` replaces the command if the registry has something newer and
 restarts the Bridge on it; your browser stays paired.
@@ -141,7 +140,7 @@ restarts the Bridge on it; your browser stays paired.
 npx browsentic uninstall
 ```
 
-One command for the Bridge, its directories and the `npx` cache. It prints the plan and asks first.
+This removes the Bridge, its directories and the `npx` cache, after printing the plan and asking.
 Remove the extension from each browser yourself (right-click its toolbar icon → **Remove**). See
 [Maintenance](maintenance.md).
 
@@ -172,8 +171,8 @@ yet, Mozilla is still signing that version; it appears within minutes, occasiona
 Firefox checks for a newer signed build about once a day and updates itself; there is no ↻ step and
 nothing to reload.
 
-Nine tools that need Chrome's debugger — the trusted click, the captcha, diagnostics and page-code
-tools — do not exist on Firefox, and the agent there is not offered them. [Limits](limits.md) has
+Nine tools that need Chrome's debugger (the trusted click, the captcha, diagnostics and page-code
+tools) do not exist on Firefox, and the agent there is not offered them. [Limits](limits.md) has
 the list.
 
 Developer Edition and Nightly can still load `dist/firefox-mv2` from a source checkout with
@@ -237,4 +236,4 @@ not reload the extension after a rebuild, so press ↻ on its card yourself.
 
 ## Next
 
-**[Your first run →](first-run.md)** — open the side panel and give it something to do.
+**[Your first run →](first-run.md)**: a tour of the side panel and a first instruction to try.

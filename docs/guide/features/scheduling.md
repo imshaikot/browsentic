@@ -1,7 +1,7 @@
-# Scheduled jobs
+# Scheduled tasks and timers
 
-Some work is not waiting for a signal — it is waiting for a clock. A queue that only changes when
-you reload it. A deploy board with no progress bar. A reminder.
+Scheduled tasks and timers run browser work on a clock, for jobs the page gives no signal to watch:
+a queue that only changes when you reload it, a deploy board with no progress bar, a reminder.
 
 ```
 check the deploy queue every five minutes and tell me when something lands
@@ -11,8 +11,8 @@ check the deploy queue every five minutes and tell me when something lands
 in ten minutes, reload this and tell me whether the build passed
 ```
 
-There are two kinds. A **scheduled task** is one you set up and leave running — every weekday, every
-Friday evening, once tomorrow morning. A **timer** is one the agent sets for itself in the middle of a
+There are two kinds. A **scheduled task** is one you set up and leave running: every weekday, every
+Friday evening, once tomorrow morning. A **timer** is one the agent sets for itself during a
 conversation. Tasks come first on this page.
 
 ---
@@ -28,47 +28,48 @@ every weekday at 09:00, open github.com/pulls and summarise what is waiting on m
 ```
 
 Each run opens its own background tab on the task's page, does the job and closes the tab. The result
-arrives as a notice on the page you are looking at, and every run lands in the task's history — when it
-ran, how it went, its one-line result and, for the last three runs, the whole transcript. Scheduled
-runs never fill up the History tab.
+arrives as a notice on the page you are looking at. Every run is added to the task's history (when it
+ran, how it went, its one-line result and, for the last three runs, the whole transcript), never to
+the History tab.
 
 | | |
 | --- | --- |
 | **What it does** | An instruction the agent follows, or a recording replayed step by step. A replay needs no agent and spends no tokens; when a step no longer fits the page, the agent takes over from there |
-| **When** | Once at a set time, on chosen days at chosen times, or every so often — optionally only between two times of day. Five minutes is the shortest interval |
+| **When** | Once at a set time, on chosen days at chosen times, or at an interval, optionally only between two times of day. Five minutes is the shortest interval |
 | **Afterwards** | Tell you every run, only when one fails, or never. Skip a missed run, or run it once when things are back. Stop after some runs, or on a date |
 
-The editor shows the next three runs before you save, and for an instruction how many agent runs a
-week the schedule adds up to — each one spends tokens.
+Before you save, the editor shows the next three runs and, for an instruction, how many agent runs a
+week the schedule adds up to, since each one spends tokens.
 
-The Bridge keeps the schedule, in `~/.browsentic/schedules.json`, so one list covers every browser
-paired with it. `browsentic tasks` lists the tasks from a terminal, and pauses, resumes or deletes one.
+Browsentic Bridge keeps the schedule in `~/.browsentic/schedules.json`, so one list covers every
+browser paired with it. From a terminal, `browsentic tasks` lists the tasks and pauses, resumes or
+deletes one.
 
 ### What has to be running
 
-A run needs the browser open and Browsentic Bridge up. The Bridge starts itself when the browser
-needs it: `browsentic setup`, or installing the app, registers a small helper that Chrome, Edge,
-Brave and Firefox can launch, whether the extension came from a store or a folder, and
+A run needs the browser open and Browsentic Bridge running. The Bridge starts itself when the
+browser needs it: `browsentic setup`, or installing the app, registers a small helper that Chrome,
+Edge, Brave and Firefox can launch, whether the extension came from a store or a folder.
 `browsentic status` says which browsers have it.
 
-After `browsentic stop` the browser leaves the Bridge down until `browsentic start`, or an MCP
-client, brings it back.
+After `browsentic stop`, the browser leaves the Bridge down until `browsentic start` or an MCP
+client brings it back.
 
 A run that falls due while the browser is closed or the computer is asleep is **missed**. By default
-it waits, and runs once as soon as a browser is back, logging how many runs it missed; a task set
-to **Skip it** logs the miss at once and waits for its next time.
+it waits and runs once as soon as a browser is back, logging how many runs it missed. A task set to
+**Skip it** logs the miss at once and waits for its next time.
 
 ### Approvals with nobody watching
 
 A scheduled run follows the same [guardrails](../approvals.md) as one you start yourself. When an
-action needs your OK, a card appears on the page you are looking at, with **Allow** and **Deny**.
-To allow it on that site for good, answer from the task's conversation in the side panel instead.
-With no answer in ten minutes the action is declined and the run says so. The card only takes a
-real click, and none in its first moment on screen, so the page underneath cannot press **Allow**
-for you.
+action needs your approval, a card with **Allow** and **Deny** appears on the page you are looking
+at. To allow it on that site permanently, answer from the task's conversation in the side panel
+instead. With no answer in ten minutes the action is declined and the run says so. The card accepts
+only a real click, and none in its first moment on screen, so the page underneath cannot press
+**Allow** for you.
 
-A scheduled run never gets Live tools, and it is told to end on one line that stands alone, because
-that line is what the notice and the history show.
+A scheduled run never gets Live tools, and it is told to end on a single line that stands alone,
+because that line is what the notice and the history show.
 
 ### Task or timer?
 
@@ -83,27 +84,25 @@ The rest of this page is about timers.
 
 ---
 
-## What happens
+## How a timer runs
 
-Browsentic schedules the job in the extension and the agent's turn ends. Nothing runs in between —
-no polling, no open connection, no tokens.
+Browsentic schedules the job in the extension and the agent's turn ends. Nothing runs in between: no
+polling, no open connection, no tokens.
 
-When the timer is due, the extension **starts a fresh turn in the conversation that set it**,
-carrying the words the agent wrote for itself. The agent picks up with everything it already knew,
-does the work, and stops again until the next fire.
+When the timer is due, Browsentic **starts a fresh turn in the conversation that set it**, carrying
+the words the agent wrote for itself. The agent picks up with everything it already knew, does the
+work, and stops again until the next fire.
 
-The schedule lives in the extension, so it survives the agent finishing, the MCP client
+Because the schedule lives in the extension, it survives the agent finishing, the MCP client
 disconnecting, and the service worker being shut down between fires.
 
 ---
 
 ## Timer or monitor?
 
-They look similar and solve different problems.
-
 | | [Monitoring](monitoring.md) | Scheduling |
 | --- | --- | --- |
-| Fires on | a condition the page shows — a bar reaching 100%, a phrase appearing | a clock |
+| Fires on | a condition the page shows, such as a bar reaching 100% or a phrase appearing | a clock |
 | Best for | uploads, builds, deploys with visible progress | queues, dashboards, inboxes, reminders |
 | Between fires | watches the page continuously | nothing runs |
 | Wakes the agent | once, at the end | every time it fires |
@@ -121,7 +120,7 @@ has to be **re-done** to find out.
 | "every two minutes" | a repeating fire, two minutes apart |
 
 Thirty seconds is the shortest interval a browser can keep, and a day is the longest. Every
-repeating timer carries a `maxRuns` cap — twelve by default — so a forgotten one cannot run all
+repeating timer carries a `maxRuns` cap (twelve by default), so a forgotten one cannot run all
 night. Five timers at most, across everything.
 
 A repeating job usually cancels itself: the agent writes "if the build has finished, tell me and
@@ -132,42 +131,43 @@ answer.
 
 ## Reminders that need no agent
 
-If you only want to be told something at a time, there is nothing for an agent to do:
+If you only want to be told something at a set time, no agent is needed:
 
 ```
 remind me to check the oven in twenty minutes
 ```
 
-That schedules a browser notification carrying the text, and wakes no agent at all. It works with
-the side panel closed.
+That schedules a browser notification with the text and starts no agent. It works with the side
+panel closed.
 
 ---
 
 ## When a fire lands on a busy conversation
 
 A timer that comes due while its conversation is still working on the previous turn **skips that
-beat** rather than queueing behind it. A five-minute job on a two-minute timer simply runs less
-often than asked, instead of piling up a backlog.
+fire** instead of queueing behind it. A five-minute job on a two-minute timer runs less often than
+asked instead of building up a backlog.
 
-Skips do not count against `maxRuns`, and they are reported by `page_timerStatus` alongside the
-fires that did happen. After twenty skipped fires the timer gives up and says why — at that point
-the interval was simply wrong for the job.
+Skips do not count against `maxRuns`, and `page_timerStatus` reports them alongside the fires that
+did happen. After twenty skipped fires the timer gives up and says why: by then the interval is
+clearly wrong for the job.
 
-Timers belong to the conversation that set them. Ending it, or closing its tab, cancels them —
-they never outlive it, and one conversation's timers never reach another's.
+Timers belong to the conversation that set them. Ending it, or closing its tab, cancels them, and one
+conversation's timers never reach another's.
 
 ---
 
 ## From an MCP client
 
-`page_startTimer` needs a side-panel conversation to wake, and an outside MCP client is not one: a
-timer there fails with `NO_CONVERSATION`. Use `deliver: "notify"` for a reminder, or your client's
-own scheduler for work — Claude Code, for instance, has `/loop` and scheduled agents.
+`page_startTimer` needs a side-panel conversation to wake, and a client on the optional MCP endpoint
+is not one: a timer set from there fails with `NO_CONVERSATION`. Use `deliver: "notify"` for a
+reminder, or your client's own scheduler for work (Claude Code, for instance, has `/loop` and
+scheduled agents).
 
 ---
 
 ## See also
 
-- [reference/tools.md § Scheduling](../../reference/tools.md#scheduling) — every parameter
-- [Monitoring](monitoring.md) — the condition-driven half of the same problem
-- [Skills](skills.md) — the `scheduled-jobs` skill routes these requests
+- [reference/tools.md § Scheduling](../../reference/tools.md#scheduling): every parameter
+- [Monitoring](monitoring.md): the condition-driven half of the same problem
+- [Skills](skills.md): the `scheduled-jobs` skill routes these requests

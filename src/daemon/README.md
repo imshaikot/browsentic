@@ -2,11 +2,11 @@
 
 This is **Browsentic Bridge**, the half of Browsentic that runs on your computer.
 
-Browsentic is your browser's superpower: a side panel that drives your real, logged-in browser with
-the AI agent you already use. The extension opens the panel beside whatever tab you are on; the
-Bridge runs on loopback and wakes the agent CLI you already have installed. It is free and open
-source, with no hosted relay, no API key, no account and no headless browser — it drives the tab you
-are already signed in to.
+Browsentic is your browser's superpower: an agentic browser harness that runs the agent CLI you
+already use from a side panel in your real, logged-in browser. The side panel opens beside whatever
+tab you are on; the Bridge runs on loopback and starts your agent CLI when you give it work. It is
+free and open source, with no hosted relay, no API key, no account and no headless browser: the
+agent works in the tabs you are already signed in to.
 
 ## Install
 
@@ -26,10 +26,10 @@ The extension is on the
 for Chrome, Brave, Arc, Vivaldi and Opera, on
 [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc)
 for Edge, and Firefox gets an [add-on signed by Mozilla](https://browsentic.com/download/firefox).
-The side panel runs on an agent CLI you're signed in to: Claude Code, Codex, or another supported
+The side panel runs on an agent CLI you are signed in to: Claude Code, Codex, or another supported
 one.
 
-Then open the side panel and say what you want.
+Then open the side panel and type or speak an instruction.
 
 To update later:
 
@@ -37,7 +37,7 @@ To update later:
 npx browsentic@latest update
 ```
 
-The extension updates itself from its store, and the two don't have to be the same version.
+The extension updates itself from its store, and the two do not have to be the same version.
 
 ## Requirements
 
@@ -66,8 +66,8 @@ a folder this package carries: `browsentic setup --unpacked`.
 
 ## Using it from an MCP client
 
-Optional. The side panel needs none of this — it is for people who would rather drive the browser
-from a terminal.
+Optional, and the side panel needs none of it. Registering Browsentic with an MCP client lets that
+client drive the same browser from a terminal.
 
 ```sh
 npm i -g browsentic

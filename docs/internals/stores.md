@@ -1,9 +1,9 @@
 # Store listings
 
-The extension is published on the Chrome Web Store and Edge Add-ons; Firefox gets a
-signed `.xpi` on every GitHub release instead (see the [Firefox section of the install
-guide](../guide/install.md#firefox)). This page is everything a store submission asks for, in the
-order the dashboards ask for it, so an update is a matter of pasting.
+The submission kit for the extension's Chrome Web Store and Edge Add-ons listings: IDs, the update
+checklist, listing text, privacy answers and reviewer instructions, in the order the dashboards ask
+for them. Firefox has no store listing; every GitHub release carries a signed `.xpi` instead (see the
+[Firefox section of the install guide](../guide/install.md#firefox)).
 
 ---
 
@@ -11,8 +11,8 @@ order the dashboards ask for it, so an update is a matter of pasting.
 
 | Store | Identity | Address |
 | --- | --- | --- |
-| Chrome Web Store | `npmocgldfflonjjmdadmdefpnfagnjmp` | [chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp) — published at 0.8.0 on 4 October 2026 |
-| Edge Add-ons | CRX ID `cbkjhkgjcpihokphhdkbahilpcjojpdc` (Partner Center Store ID `0RDCKBB847NN`) | [microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc) — published at 0.8.0 in October 2026 |
+| Chrome Web Store | `npmocgldfflonjjmdadmdefpnfagnjmp` | [chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp), published at 0.8.0 on 4 October 2026 |
+| Edge Add-ons | CRX ID `cbkjhkgjcpihokphhdkbahilpcjojpdc` (Partner Center Store ID `0RDCKBB847NN`) | [microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc](https://microsoftedge.microsoft.com/addons/detail/browsentic/cbkjhkgjcpihokphhdkbahilpcjojpdc), published at 0.8.0 in October 2026 |
 | Firefox | `browsentic@browsentic.com` | `browsentic-<version>-firefox.xpi` on each release, signed on the unlisted channel |
 
 The IDs are fixed for good, and three places depend on them:
@@ -60,36 +60,36 @@ while the link still installs it.
 The summary under the name is the manifest's `description`. The description field:
 
 ```text
-Browsentic gives your browser a superpower: an AI agent in the side panel that works in the browser you already use, with your tabs, your logins and your sessions. Free, open source, and no API key, no subscription, no account.
+Browsentic gives your browser a superpower. It is a browser harness: it connects the AI agent you already have on your computer, such as Claude Code or Codex, to the browser you already use, with your tabs, logins and sessions. Free, open source, and no API key, no subscription, no account.
 
-Open the side panel, say what you want done, and watch it happen in your own tabs. The thinking is done by the AI agent you already have on your computer, such as Claude Code or Codex, so there is nothing new to sign up for.
+You type or speak a task in the side panel and watch each step happen in your own tabs. The agent on your computer does the reasoning, so there is nothing new to sign up for.
 
 WHAT IT DOES
-• Reads the page as structure, not pixels, then clicks, types, scrolls, fills in forms and moves between tabs the way you would
+• Reads the page's structure rather than its pixels, then clicks, types, scrolls, fills in forms and moves between tabs the way you would
 • Works in your real, logged-in browser, so it reaches the sites you use without you handing over a password
-• Show it a job once and replay it later, or schedule it to run on its own, once or on repeat
-• Hands-free mode: talk to it instead of typing
-• Writes small tools for sites you use often. You read and approve each one, keep it, and can let it run by itself on every visit
-• A Profile for the details forms keep asking for, plus standing instructions for every task, so it fills things in without guessing
+• Records a task while you do it once, then replays it later; schedules a task to run on its own, once or on repeat
+• Hands-free mode: speak tasks instead of typing them
+• Writes small tools for sites you use often. You review and approve each one, keep it, and can let it run on every visit
+• A Profile for the details forms keep asking for, plus standing instructions applied to every task
 • Attach a file and ask about it alongside the page
-• Several tasks in several tabs at once
+• Runs several tasks in several tabs at once
 
-SAFE BY DESIGN
+SAFETY AND PRIVACY
 • Connects to nothing until you pair it with a one-time code
-• Stops and asks you before anything that counts
+• Asks for your approval before consequential actions, such as submitting a form or uploading a file
 • Passwords, keys and tokens are swapped for a sealed placeholder, so the model never sees them
 • Sites you block are off-limits to every agent, enforced in the browser
 • No Browsentic server and no analytics. Page content goes only to the agent you chose and its model provider
 
 WHAT YOU NEED
-Browsentic is two pieces plus the AI you already use: this extension, and Browsentic Bridge on your computer, which starts your agent and keeps everything local.
+Browsentic has two parts, plus the agent you already use: this extension, and Browsentic Bridge on your computer, which starts your agent and keeps everything local.
 • On macOS or Windows: install the Browsentic app from browsentic.com, which sets everything up
 • On Linux, or without the app: Node.js 20 or newer, then run: npx browsentic@latest setup
 • An agent CLI signed in on your computer, such as Claude Code, Codex, or one of the others listed at browsentic.com
 Then click Browsentic in the toolbar, enter the pairing code once, and open the side panel.
 
-OPTIONAL: DRIVE IT FROM A TERMINAL
-The same paired browser can also be driven from an MCP client such as Claude Code, Cursor or Zed. This is optional. The side panel needs none of it.
+OPTIONAL: USE IT FROM AN MCP CLIENT
+An MCP client such as Claude Code, Cursor or Zed can also drive the same paired browser. The side panel does not need this.
 
 OPEN SOURCE
 Apache 2.0. Source, docs and issues: https://github.com/imshaikot/browsentic
@@ -97,9 +97,9 @@ Website and install guide: https://browsentic.com
 Privacy policy: https://browsentic.com/privacy/
 ```
 
-Edge Add-ons wants the description at 250 characters or more (this is well over), a 300×300 logo,
-and reuses the same screenshots. The images — five 1280×800 screenshots, a 440×280 small tile and a
-1400×560 marquee — are rendered outside the repository.
+Edge Add-ons wants the description at 250 characters or more (this is well over) and a 300×300 logo,
+and reuses the same screenshots. The images (five 1280×800 screenshots, a 440×280 small tile and a
+1400×560 marquee) are rendered outside the repository.
 
 ---
 
@@ -107,9 +107,9 @@ and reuses the same screenshots. The images — five 1280×800 screenshots, a 44
 
 **Single purpose**
 
-> Browsentic is an AI agent in the browser's side panel. The user describes a task in words or by
-> voice, and the extension carries it out in their own tabs (reading pages, filling in forms,
-> clicking through flows), powered by an AI agent the user already runs on their own computer.
+> Browsentic is a browser harness for the AI agent the user already runs on their own computer. From
+> the browser's side panel, the user describes a task in words or by voice, and that agent carries it
+> out in their own tabs (reading pages, filling in forms, clicking through flows).
 
 **Permission justifications**
 

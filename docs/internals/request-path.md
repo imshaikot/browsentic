@@ -1,6 +1,7 @@
-# Path A — an MCP client drives the browser
+# Path A: a tool call from an MCP client
 
-The unconditional path. No agent on Browsentic's side, no intent funnel.
+Path A is the optional MCP route: an external client's tool call reaches the page with no agent on
+Browsentic's side and no intent funnel. This page follows one call to the page and back.
 
 ![Path A: an MCP client's tool call reaching the page and the result coming back fenced](../assets/request-path.png)
 
@@ -33,48 +34,48 @@ sequenceDiagram
 
 ## Details worth knowing
 
-**`browsentic mcp` starts the daemon if needed.** `ensureDaemon()` reads the lockfile, checks the
-pid is alive and `/health` answers, and otherwise spawns a detached `daemon-main.js`, polling for up
-to 8 seconds. It never compares versions, so a running daemon keeps serving an old build until
+**`browsentic mcp` starts the daemon if needed.** `ensureDaemon()` reads the lockfile, checks that
+the pid is alive and `/health` answers, and otherwise spawns a detached `daemon-main.js`, polling for
+up to 8 seconds. It never compares versions, so a running daemon keeps serving an old build until
 `browsentic restart`.
 
 **External calls are visible.** The daemon emits a `tool`/`toolResult` pair tagged
-`source: 'external'` on the run channel, so anything an MCP client does appears on the user's
+`source: 'external'` on the run channel, so everything an MCP client does appears on the user's
 timeline.
 
 **External calls are gated, not waived.** The request is evaluated with `caller: 'external'` and
-`scope: ANYWHERE`. Deny rules deny; confirm rules resolve via `policy.unattended`, which is `deny` by
-default because there is nobody to ask. See [Guardrails](guardrails.md).
+`scope: ANYWHERE`. Deny rules deny; confirm rules resolve via `policy.unattended`, which defaults to
+`deny` because there is nobody to ask. See [Guardrails](guardrails.md).
 
-**Results are fenced.** Page-authored text is wrapped with a per-daemon random marker before it
-reaches the model. This happens in the MCP server's renderers, so it covers the external path as
-well as agent runs.
+**Results are fenced.** Page-authored text is wrapped in a per-daemon random marker before it
+reaches the model. The MCP server's renderers do this, so it covers the external path as well as
+agent runs.
 
 **Timeouts are per action, not global.** The control request waits 60 s by default; the extension
 link allows 120 s for a screenshot, the computed typing duration plus 30 s for `page.typeText`, any
 declared `timeoutMs` plus 5 s, and 30 s otherwise.
 
-**A held call is kept alive.** An approval can hold an invoke for as long as the user takes, and a
-scheduled run's for ten minutes. So `RemoteBridge` sends `keepAlive` with every invoke. The daemon
-answers with a `working` frame every 2 s until the result, and the bridge restarts its timeout on
-each one. Only a daemon that goes quiet is reported as `DAEMON_UNREACHABLE`. Without this, the agent
-heard "unreachable" a minute into every approval and asked again. A client that doesn't send
-`keepAlive` is never sent `working`.
+**A held call is kept alive.** An approval can hold an invoke for as long as the user takes, or for
+ten minutes in a scheduled run. So `RemoteBridge` sends `keepAlive` with every invoke, the
+daemon answers with a `working` frame every 2 s until the result, and the bridge restarts its
+timeout on each one. Only a daemon that goes quiet is reported as `DAEMON_UNREACHABLE`. Before
+this, the agent heard "unreachable" a minute into every approval and asked again. A client that
+does not send `keepAlive` is never sent `working`.
 
-**Screenshots are persisted by the daemon**, not the browser, and only on request.
+**The daemon persists screenshots, not the browser, and only on request.**
 `persistScreenshot()` writes nothing unless the call passed `save: true` or a mapping run supplied a
-`saveTo` — so the captures an agent takes to look at a page leave no files behind. It reads `save`
-off the *raw* input rather than the parsed one, because the zod default is applied in the content
-script and never reaches the daemon. When it does write, it decodes the data URL into `screenshotDir`
-at mode `0600` and adds `savedTo` to the result. A failed write becomes `saveError` — the capture
-still succeeds.
+`saveTo`, so the captures an agent takes to look at a page leave no files behind. It reads `save`
+from the *raw* input, not the parsed one, because the zod default is applied in the content script
+and never reaches the daemon. When it writes, it decodes the data URL into `screenshotDir` at mode
+`0600` and adds `savedTo` to the result. A failed write becomes `saveError`, and the capture still
+succeeds.
 
 **Three read-only resources** (`browsentic://page/current`, `/diagram`, `/text`) give a client page
-context without spending a tool call. They *throw* on failure rather than returning an error result,
+context without spending a tool call. They *throw* on failure instead of returning an error result,
 because MCP resources have no error channel.
 
 ---
 
 ## Next
 
-**[Inside the extension →](extension.md)** — what happens after the invoke frame arrives.
+**[Inside the extension →](extension.md)**: what happens after the invoke frame arrives.

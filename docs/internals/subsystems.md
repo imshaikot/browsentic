@@ -1,6 +1,7 @@
 # Subsystems
 
-The things that are more than a single action.
+The features built from more than one action: monitors, diagnostics sessions, recordings, site
+maps, attached files and full-page screenshots.
 
 ![Five of the subsystems, each as its own short pipeline](../assets/subsystems.png)
 
@@ -10,8 +11,8 @@ The things that are more than a single action.
 
 [`src/lib/monitor/`](../../src/lib/monitor/), [`src/lib/bridge/monitor.ts`](../../src/lib/bridge/monitor.ts)
 
-Watch a pinned tab in the background for a completion condition — an element appearing or vanishing,
-text or title matching a regex, a progress bar reaching a threshold.
+A monitor watches a pinned tab in the background for a completion condition: an element appearing
+or vanishing, text or title matching a regex, or a progress bar reaching a threshold.
 
 | | |
 | --- | --- |
@@ -35,10 +36,10 @@ and the daemon going away.
 
 [`src/lib/diagnostics/`](../../src/lib/diagnostics/), [`src/lib/bridge/diagnostics.ts`](../../src/lib/bridge/diagnostics.ts)
 
-The only debugger attach that outlives the action which opened it. `withDebugger` in
-[`cdp.ts`](../../src/lib/bridge/cdp.ts) attaches, runs one action and detaches in a `finally` —
-correct for a click, useless for "what errored?", because `Runtime.consoleAPICalled` and
-`Network.responseReceived` arrive only while attached.
+A diagnostics session is the only debugger attach that outlives the action which opened it.
+`withDebugger` in [`cdp.ts`](../../src/lib/bridge/cdp.ts) attaches, runs one action and detaches in
+a `finally`. That suits a click but cannot answer "what errored?", because
+`Runtime.consoleAPICalled` and `Network.responseReceived` arrive only while attached.
 
 | | |
 | --- | --- |
@@ -57,10 +58,10 @@ Events land in in-memory rings behind a **debounced write** to `storage.session`
 SPA produces thousands of them and the service worker can die between any two. Evictions are counted
 and reported with every read.
 
-Nothing here sanitizes. `invokeForHarness` seals every result on its way out, and a `Cookie` header,
-a bearer token and a token in a query string are ordinary strings in an ordinary result object by
-then. What this subsystem owns is what is ever *returned*: headers only when asked for, bodies only
-when the [`network-body-read`](guardrails.md) rule has let the call through.
+This subsystem does not sanitize. `invokeForHarness` seals every result on its way out, and by then
+a `Cookie` header, a bearer token and a token in a query string are ordinary strings in an ordinary
+result object. What this subsystem controls is what is ever *returned*: headers only when asked for,
+bodies only when the [`network-body-read`](guardrails.md) rule has let the call through.
 
 ---
 
@@ -68,8 +69,8 @@ when the [`network-body-read`](guardrails.md) rule has let the call through.
 
 [`src/lib/recordings/`](../../src/lib/recordings/)
 
-The reverse of a monitor: the content script observes what *you* do in one pinned tab — clicks,
-fills, selects, keys, submits, scrolls, navigations — and batches the events to the background.
+The reverse of a monitor: the content script observes what *you* do in one pinned tab (clicks,
+fills, selects, keys, submits, scrolls, navigations) and batches the events to the background.
 
 | | |
 | --- | --- |
@@ -83,7 +84,7 @@ are dropped whatever the settings. Typed values become `{{placeholders}}` unless
 is on. Captured text, selectors and values are each truncated to a fixed length.
 
 On stop, a one-shot [`task`-mode](guardrails.md#two-spawn-modes) agent call turns the raw trace into
-ordered, named steps. That call cannot reach the browser — `{"mcpServers":{}}` is asserted in its
+ordered, named steps. That call cannot reach the browser: `{"mcpServers":{}}` is asserted in its
 argv.
 
 Recordings live in **extension storage, not on disk**, which is why `browsentic skills` does not
@@ -96,13 +97,12 @@ list them and why `page_listRecordings` / `page_readRecording` exist as tools.
 [`src/lib/skills/site-map.ts`](../../src/lib/skills/site-map.ts),
 [`src/daemon/agent/site-map-store.ts`](../../src/daemon/agent/site-map-store.ts)
 
-Generated skills. A mapping run crawls one host read-only under the
+Site maps are generated skills. A mapping run crawls one host read-only under the
 [mapping gate](guardrails.md#the-mapping-gate) and finishes by calling `browsentic_saveSiteMap`
 exactly once.
 
 The report is validated against per-field size limits, then written to a `.staging/` directory the
-skill loader **deliberately cannot read** — an unreviewed map is not merely unused, it is never
-opened.
+skill loader **deliberately cannot read**, so an unreviewed map is never even opened.
 
 The panel shows the markdown as plain text with the domain it will match. **Activate** commits it;
 **Discard** deletes it. An abandoned run's staging is swept.
@@ -111,8 +111,8 @@ The panel shows the markdown as plain text with the domain it will match. **Acti
 
 ## Files
 
-Attached in the side panel, stored in the extension, and summarised by a one-shot `task`-mode agent
-call at attach time.
+Files are attached in the side panel, stored in the extension, and summarised by a one-shot
+`task`-mode agent call at attach time.
 
 The agent never opens a file. It sees the notes, plus `page_attachFile { fileId, target }` to put one
 into a file input. Upload is `confirm` under the `file-upload` rule.
@@ -124,10 +124,10 @@ into a file input. Upload is `confirm` under the `file-upload` rule.
 Full-page mode stitches `captureVisibleTab` tiles, paced by the browser's two-captures-per-second
 limit.
 
-Capped at **48 tiles and a 16 384 px canvas side**, reporting `truncated: true` when the page was
-taller than the limit rather than silently returning a partial image.
+Capped at **48 tiles and a 16 384 px canvas side**. A page taller than that comes back with
+`truncated: true` rather than a silently partial image.
 
-The daemon, not the browser, writes the file — and only when `save: true` was passed or a mapping run
+The daemon, not the browser, writes the file, and only when `save: true` was passed or a mapping run
 supplied a `saveTo`. See [request-path.md](request-path.md#details-worth-knowing).
 
 ---
