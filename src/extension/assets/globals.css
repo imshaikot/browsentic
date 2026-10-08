@@ -1,6 +1,67 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Geist + Geist Mono, vendored from Fontsource (OFL-1.1) so the extension
+   renders the same offline, under extension CSP, and in Firefox review —
+   no webfont CDN. Weights cover what the UI uses (400–700); italics fall
+   back to synthesized oblique (only one italic spot: composer interim). */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/geist-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/geist-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/geist-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/geist-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/geist-mono-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/geist-mono-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/geist-mono-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/geist-mono-latin-700-normal.woff2") format("woff2");
+}
+
 /* Every theme but Daylight is a dark one, so `dark:` asks that rather than
    tracking a class — a new dark theme needs no edit here. */
 @custom-variant dark (&:not([data-theme='daylight'] *));
@@ -207,11 +268,11 @@
 /* Not inline: these are read back as custom properties further down. */
 @theme {
   --font-display:
-    "Inter Tight", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:
-    "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", "Cascadia Code",
+    "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code",
     Menlo, Consolas, monospace;
 
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
