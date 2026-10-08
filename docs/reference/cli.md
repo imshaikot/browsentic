@@ -1,13 +1,15 @@
 # CLI reference
 
+Every command and flag of `browsentic`, the command for Browsentic Bridge (the part of Browsentic
+that runs on your computer).
+
 ```
 browsentic <command>
 ```
 
-With no command it prints usage. `browsentic` is Browsentic Bridge's command: the half of
-Browsentic that runs on your computer. Most commands start the Bridge if it is not already running;
+With no command it prints usage. Most commands start the Bridge if it is not already running;
 `status`, `browsers`, `stop`, `logs`, `token`, `tools`, `skills`, `approvals`, `downloads` and
-`uninstall` do not — an uninstall that started one would be absurd.
+`uninstall` do not.
 
 ---
 
@@ -21,11 +23,11 @@ Browsentic that runs on your computer. Most commands start the Bridge if it is n
 | `browsentic uninstall` | Stop the Bridge and remove everything Browsentic wrote |
 
 On a terminal, `setup` checks your agent and asks which browser should get the extension. It opens
-that browser's store page in it — the Chrome Web Store for Chrome, Brave, Arc, Vivaldi, Opera and
-Chromium; Edge Add-ons for Edge; the signed add-on for Firefox — prints a
-pairing code, and waits up to five minutes for the browser to connect. Ctrl-C stops the wait and
-undoes nothing. With no terminal and no `--browser`, it asks nothing: it prints where each browser
-gets the extension and a code, so a script or an app never hangs on it.
+that browser's store page in it (the Chrome Web Store for Chrome, Brave, Arc, Vivaldi, Opera and
+Chromium; Edge Add-ons for Edge; the signed add-on for Firefox), prints a pairing code, and waits
+up to five minutes for the browser to connect. Ctrl-C stops the wait and undoes nothing. With no
+terminal and no `--browser`, it asks nothing: it prints where each browser gets the extension and a
+code, so a script or an app never hangs on it.
 
 Every run also registers the Bridge with each browser it finds, so the browser can start it when it
 is down (`wake-up:` in `status`).
@@ -43,16 +45,16 @@ is down (`wake-up:` in `status`).
 | `--json` | Machine-readable result, with every browser's row, as the apps read it. Never asks, never waits |
 
 The unpacked folder is written only when you ask for it, and kept current once it exists: `setup`
-and `update` refresh it in place. Its path never carries a version, deliberately. Chrome derives an
+and `update` refresh it in place. Its path deliberately never carries a version. Chrome derives an
 unpacked extension's ID from the absolute path of its directory, and the browser keeps the
-extension's storage — the install id and the session key with it — under that ID, so a versioned
+extension's storage (including the install id and the session key) under that ID, so a versioned
 path would unpair the browser on every update.
 
-`setup` and `update` both replace the command itself when the registry has something newer, because
-a stale command runs a stale Bridge and lays down a stale unpacked folder, and says "already
-current". Under `npx` that lasts as long as the cache does, which is what made `update` look like it
-did nothing; `npx browsentic@latest` asks every time. A pinned `npx browsentic@<version>` is never
-upgraded past, and a source checkout is told rather than touched.
+`setup` and `update` both replace the command itself when the registry has something newer. A
+stale command runs a stale Bridge, lays down a stale unpacked folder, and reports "already
+current". Under `npx` a stale copy lasts as long as the cache does, which is what made `update` look
+like it did nothing; `npx browsentic@latest` checks every time. A pinned `npx browsentic@<version>`
+is never upgraded, and a source checkout is told rather than touched.
 
 ### Uninstall
 
@@ -60,12 +62,12 @@ upgraded past, and a source checkout is told rather than touched.
 | --- | --- |
 | `--dry-run` | Print the plan and stop |
 | `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal |
-| `--keep-skills` | Leave `skills/` behind — site maps and hand-written notes have no other copy |
+| `--keep-skills` | Leave `skills/` behind. Site maps and hand-written notes have no other copy |
 
 It removes the Bridge (found by probing 8765–8767, so an orphan whose lockfile was deleted is still
 caught), `~/.browsentic`, `~/browsentic`, and every `~/.npm/_npx/*` directory holding a copy of the
-package. It names, but will not touch, the extension in each browser, the command itself, your MCP client's entry, and any directory you moved with `screenshotDir`, `downloadDir` or
-`skillsDir`.
+package. It lists, but does not touch, the extension in each browser, the command itself, your MCP
+client's entry, and any directory you moved with `screenshotDir`, `downloadDir` or `skillsDir`.
 
 See [guide/install.md](../guide/install.md) and [guide/maintenance.md](../guide/maintenance.md).
 
@@ -91,8 +93,8 @@ See [guide/pair.md](../guide/pair.md).
 `agent fix antigravity` appends exactly one entry, `mcp(browsentic/*)`, to `permissions.allow` in
 `~/.gemini/antigravity-cli/settings.json`. See [guide/agents.md](../guide/agents.md).
 
-The verb was `agent setup` before `setup` came to mean installing the extension. The old spelling
-still works and is undocumented.
+`agent fix` was called `agent setup` before `setup` came to mean installing Browsentic. The old
+spelling still works and is undocumented.
 
 ## MCP
 
@@ -133,14 +135,14 @@ configurations written against the older name keep working.
 | `browsentic --version` / `-v` | Print the version |
 | `browsentic help` / `--help` / `-h` | Usage |
 
-**A rebuild does not replace a running daemon.** It keeps the old code in memory until `stop` or
+**A rebuild does not replace a running Bridge.** It keeps the old code in memory until `stop` or
 `restart`. In the repository, `yarn daemon:restart` chains the rebuild with the restart.
 
 ---
 
 ## Repository scripts
 
-Not the CLI, but frequently wanted alongside it:
+Scripts for a source checkout, not part of the CLI:
 
 | Command | Does |
 | --- | --- |

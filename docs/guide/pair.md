@@ -1,14 +1,12 @@
 # Pair your browser
 
-A fresh install connects to nothing. Pairing is what tells Browsentic Bridge that this browser is
-yours, and you do it once per browser.
+Pairing connects the extension in one browser to Browsentic Bridge with a single-use code, once per
+browser. This page covers getting another code, checking the connection, what pairing protects and
+managing several paired browsers.
 
-Assumes you have [added the extension and installed the Bridge](install.md).
-
----
-
-`browsentic setup` and the apps already showed a code, and you may have used it. This page is what
-to do when you need another one, or when you are pairing a second browser.
+It assumes you have [added the extension and installed the Bridge](install.md). `browsentic setup`
+and the apps already show a code during install; use this page when you need another one, or to
+pair a second browser.
 
 ---
 
@@ -37,8 +35,8 @@ Click Browsentic in the toolbar, enter the code, press **Connect**. In the apps,
 code** on the Overview tab does the same. Up to three codes are live at once, so a code the app shows
 keeps working while a terminal mints another.
 
-The Bridge issues a long-lived session key that survives browser and Bridge restarts, and dies only
-when you revoke it. You do not need to pair again after an update, on either side.
+The Bridge then issues a long-lived session key that survives browser and Bridge restarts and lasts
+until you revoke it. Updating either side does not need a new pairing.
 
 ## 2. Verify
 
@@ -56,7 +54,7 @@ browsers:
 tools:     in sync
 ```
 
-Every line matters:
+What each line means:
 
 | Line | What it means |
 | --- | --- |
@@ -68,15 +66,13 @@ Every line matters:
 
 ---
 
-## What pairing actually protects
-
-Worth understanding, because it is easy to assume it does more than it does.
+## What pairing protects, and what it does not
 
 Any web page can open a WebSocket to loopback, so the Bridge classifies every connection by its
-handshake `Origin` — a value browsers set themselves and page JavaScript cannot forge. A web page
-is refused outright. An extension origin must then prove it holds a pairing code or a session key,
+handshake `Origin`, which browsers set themselves and page JavaScript cannot forge. A web page is
+refused outright. An extension origin must then prove it holds a pairing code or a session key,
 and the Bridge proves itself back, so another local process cannot squat the port and pose as your
-daemon. Neither secret ever crosses the wire.
+Bridge. Neither secret ever crosses the wire.
 
 The browser can also start the Bridge when it is down, through a native messaging host that setup
 registers with each browser. Only Browsentic's own extensions may launch it: the Chrome Web Store
@@ -98,22 +94,22 @@ browsentic revoke            # unpair every browser
 browsentic revoke <id>       # unpair one, by the id "sessions" prints
 ```
 
-Several browsers can be paired **and connected at once** — Chrome beside Brave, or two Chrome
+Several browsers can be paired **and connected at once**: Chrome beside Brave, or two Chrome
 profiles. Each pairs with its own code and keeps its own key, and the side panel in each runs on its
 own. Every browser that installs from the same store, or loads the same folder, presents the same
 extension origin, so a browser is known by an install id it mints on first run, never by its origin.
 
 A newer connection supersedes an older one only when both come from the same browser profile.
 
-An MCP client outside the browser reaches the browser you were last in. It stays with that browser
-through a burst of calls — tab ids only mean something in the browser that issued them — and follows
-you again once it has been quiet for two minutes. `browsentic_status` names the browser it reaches.
+An optional MCP client outside the browser reaches the browser you were last in. It stays with that
+browser through a burst of calls, because tab ids only mean something in the browser that issued
+them, and follows you again once it has been quiet for two minutes. `browsentic_status` names the browser it reaches.
 
 ---
 
 ## Next
 
-**[First run →](first-run.md)** — open the side panel and give it something to do.
+**[First run →](first-run.md)**: a tour of the side panel and a first instruction to try.
 
-Want to also drive the browser from Claude Code, Cursor or another MCP client? That is optional,
-and a separate registration step: [MCP clients](mcp-clients.md).
+Driving the same browser from Claude Code, Cursor or another MCP client is optional and takes a
+separate registration step: [MCP clients](mcp-clients.md).

@@ -1,12 +1,15 @@
 # Updating and uninstalling
 
+How the extension and Browsentic Bridge each update, and what `browsentic uninstall` removes,
+including the npx cache and any Bridge process still running.
+
 ---
 
 ## Updating
 
-Each half updates on its own, and they don't have to be the same version. Browsentic Bridge 0.8
-works with the extension from 0.7.14 on, older or newer than itself, so a store copy that updates
-first, or last, keeps working.
+The extension and Browsentic Bridge update separately and do not have to be the same version.
+Bridge 0.8 accepts the extension from 0.7.14 on, older or newer than itself, so a store copy keeps
+working whether it updates first or last.
 
 | What | How |
 | --- | --- |
@@ -20,60 +23,58 @@ first, or last, keeps working.
 browsentic update
 ```
 
-That refreshes, in order: **the command itself**, restarting the Bridge on it, then the unpacked
-extension folder if you load one. A store copy is not in the package; `update` says it updates
+It updates, in order: **the command itself** (restarting the Bridge on it), then the unpacked
+extension folder if you use one. A store copy is not in the package; `update` tells you it updates
 itself.
 
-The first half matters more than it sounds. `npx browsentic setup` does not put anything on your
-`PATH` — it runs the package out of npm's own throwaway cache, and npm names that directory after
-the spec it was asked for, records the version it resolved *the first time*, and reuses it forever
-without asking the registry again. So a machine set up with `npx` keeps running whatever version it
-first saw, and since the extension ships inside the package, `update` had nothing newer to install
-and reported "already current" every time. It now checks the registry, replaces the stale cache, and
-re-runs itself under the new version. `npx browsentic@latest` asks the registry every time.
+Updating the command first matters because of npx. `npx browsentic setup` puts nothing on your
+`PATH`: it runs the package from npm's cache, keyed by the requested spec, which keeps the version
+resolved *the first time* and never asks the registry again. A machine set up with `npx` kept
+running that version, so `update` found nothing newer to install (the unpacked extension ships
+inside the package) and reported "already current" every time. It now checks the registry, replaces
+the stale cache and re-runs itself under the new version. `npx browsentic@latest` asks the registry
+every time.
 
-`--no-self-update` skips the check, and a pinned `npx browsentic@<version>` is never upgraded past —
-a pin is a decision, not a stale cache.
+`--no-self-update` skips the check. A pinned `npx browsentic@<version>` is never upgraded, because a
+pin is deliberate.
 
-From a clone, `update` says so and leaves the checkout alone:
+From a clone, `update` leaves the checkout alone and tells you to run:
 
 ```sh
 git pull
 yarn setup
 ```
 
-An unpacked copy is the one thing that never reloads itself: press ↻ on its card at
-`chrome://extensions`. `browsentic update` has already replaced the Bridge; from a clone,
-`browsentic restart` is that half, because a running Bridge keeps the old build in memory until it
-is swapped out. `browsentic status` names each browser's version, and says which unpacked copy to
-reload.
+An unpacked copy never reloads itself: press ↻ on its card at `chrome://extensions`.
+`browsentic update` has already replaced the Bridge; from a clone, run `browsentic restart`, because
+a running Bridge keeps the old build in memory until it is replaced. `browsentic status` shows each
+browser's version and which unpacked copy to reload.
 
-**When the two halves list different tools.** A store copy a version ahead of the Bridge, or behind
-it, can carry a different set of tools. The Bridge then serves the tools the browser actually has
-and tells your MCP clients the list changed, and `browsentic status` reports `tools: the
-extension's own list`. That is normal while one side waits on its update. From a clone, rebuild both
-halves together.
+**When the extension and the Bridge list different tools.** A store copy a version ahead of or
+behind the Bridge can carry a different set of tools. The Bridge then serves the tools the browser
+actually has and tells any connected MCP clients that the list changed, and `browsentic status`
+reports `tools: the extension's own list`. This is normal while one side waits for its update. From
+a clone, rebuild both together.
 
-Your pairing survives updates. `yarn daemon:link` only needs re-running if the link is broken.
+Pairing survives updates. Re-run `yarn daemon:link` only if the link is broken.
 
 ### When an update adds a permission
 
-An update that widens the extension's permissions — the `downloads` permission that file capture
-needs, for instance — makes Chrome **disable the extension** on reload until you accept the new one. The card at `chrome://extensions`
-says so and offers the prompt; Firefox asks the same question in its own way. Until you accept, the
-browser is unpaired and every page tool answers `EXTENSION_OFFLINE`, and the tool that needed the
-permission answers `DOWNLOADS_UNAVAILABLE` if it is reached first.
+When an update adds a permission to the extension (for instance `downloads`, which file capture
+needs), Chrome **disables the extension** on reload until you accept it. Its card at
+`chrome://extensions` says so and offers the prompt; Firefox asks in its own way. Until you accept,
+the browser is unpaired and every page tool answers `EXTENSION_OFFLINE`, and the tool that needed
+the permission answers `DOWNLOADS_UNAVAILABLE` if it is reached first.
 
-Nothing is lost by it — accepting reconnects the pairing you already had.
+Nothing is lost: accepting reconnects the pairing you already had.
 
 ### Why `yarn daemon:build` alone changes nothing
 
-The Bridge has no start command: the first CLI or MCP client that needs it spawns it, and it lives
-until `browsentic stop` or 30 idle minutes with nothing attached. A rebuild does not touch the
-process already running.
+The Bridge starts on demand: the first CLI command, MCP client or browser that needs it starts it
+(so does `browsentic start`), and it runs until `browsentic stop` or 30 idle minutes with nothing
+attached. A rebuild does not touch the process already running.
 
-`yarn daemon:restart` is the one that does both — it rebuilds, stops the stale daemon, and brings up
-the fresh build.
+`yarn daemon:restart` does both: it rebuilds, stops the stale daemon and starts the fresh build.
 
 ---
 
@@ -83,16 +84,19 @@ the fresh build.
 browsentic uninstall
 ```
 
-Remove the extension from each browser as well (right-click its toolbar icon → **Remove**, or
-`about:addons` in Firefox): a store copy was never in the directories this command removes.
+**Remove the extension from each browser first** (right-click its toolbar icon → **Remove**, or
+`about:addons` in Firefox). No command can do this for you: a store copy was never in the
+directories this command removes, and recordings and held secrets live in extension storage rather
+than on disk. Removing an unpacked copy afterwards leaves the browser pointing at a folder that no
+longer exists.
 
-It prints exactly what it is about to remove and asks before removing any of it:
+The command prints what it will remove and asks before removing anything:
 
 | | |
 | --- | --- |
 | Bridge | Whatever is *answering* on 8765–8767, not what the lockfile claims. Sessions are revoked through it first, so a connected browser is told it is unpaired rather than left to discover it |
-| state | `~/.browsentic` — pairing keys, config, approvals, logs |
-| files | `~/browsentic` — the unpacked extension if you used one, skills, site maps, screenshots, captured downloads |
+| state | `~/.browsentic`: pairing keys, config, approvals, logs |
+| files | `~/browsentic`: the unpacked extension if you used one, skills, site maps, screenshots, captured downloads |
 | npx cache | Every `~/.npm/_npx/*` directory holding a copy of the package |
 
 | Flag | Does |
@@ -101,37 +105,30 @@ It prints exactly what it is about to remove and asks before removing any of it:
 | `--yes` / `-y` | Skip the confirmation. Required when stdin is not a terminal, since there is nobody to ask |
 | `--keep-skills` | Leave `skills/` behind. Nothing else has a copy of your site maps |
 
-**Remove the extension from your browsers first.** That is the one step no command can do for you.
-It is also what clears recordings and held secrets, which live in extension storage rather than on
-disk, and for an unpacked copy, doing it afterwards leaves the browser holding a folder that is no
-longer there.
-
-Two things it names but will not touch: the command itself (`npm rm -g browsentic`, or
-`yarn daemon:unlink` from a clone) and the entry in your MCP client
-(`claude mcp remove browsentic`). It also names, without deleting, any directory you pointed
-somewhere else with `screenshotDir`, `downloadDir` or `skillsDir` — you put those there.
+It names, but does not remove, the command itself (`npm rm -g browsentic`, or `yarn daemon:unlink`
+from a clone), the entry in your MCP client (`claude mcp remove browsentic`), and any directory you
+moved elsewhere with `screenshotDir`, `downloadDir` or `skillsDir`.
 
 ### Why the manual procedure was not enough
 
-It could not reach two of these, and both fail quietly:
+Deleting the folders by hand misses two things, and both fail quietly:
 
-**The npx cache.** Deleting `~/.browsentic` and `~/browsentic` leaves it untouched, so the reinstall
-afterwards runs the same cached CLI and lays down the same old extension. It looks like the installer
-is broken.
+**The npx cache.** Deleting `~/.browsentic` and `~/browsentic` leaves it untouched, so a reinstall
+runs the same cached CLI and lays down the same old extension, which looks like a broken installer.
 
-**An orphaned daemon.** `rm -rf ~/.browsentic` takes the lockfile with it, and the running daemon
-never notices — it holds its port for as long as the machine is up, and nothing that reads
-`~/.browsentic` can see it any more. `browsentic stop` now probes the ports instead of trusting the
-lockfile, so it finds that one too.
+**An orphaned Bridge.** `rm -rf ~/.browsentic` deletes the lockfile, but the running process does
+not notice: it holds its port for as long as the machine is up, and nothing that reads
+`~/.browsentic` can find it. `browsentic stop` now probes the ports instead of trusting the
+lockfile, so it finds that process too.
 
-If you would rather do it by hand, the order is: `browsentic revoke`, `browsentic stop`, remove the
-extension from each browser, `rm -rf ~/.browsentic ~/browsentic`, then delete every
-`~/.npm/_npx/*` directory containing `node_modules/browsentic`. `revoke` needs the Bridge, so it
-comes before `stop`; the cache is the step people miss.
+To do it by hand, in this order: `browsentic revoke`, `browsentic stop`, remove the extension from
+each browser, `rm -rf ~/.browsentic ~/browsentic`, then delete every `~/.npm/_npx/*` directory
+containing `node_modules/browsentic`. `revoke` needs the Bridge, so it comes before `stop`. The
+cache is the step people miss.
 
-What those directories held is listed in [internals/state.md](../internals/state.md) — worth a look
-before deleting, since `~/browsentic/skills/` contains any site maps you generated and any notes you
-wrote by hand, and nothing else has a copy of them.
+[internals/state.md](../internals/state.md) lists what those directories hold. Check it before
+deleting: `~/browsentic/skills/` holds any site maps you generated and any notes you wrote by hand,
+and nothing else has a copy of them.
 
 ---
 

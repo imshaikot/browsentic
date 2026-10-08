@@ -1,19 +1,19 @@
 # The Windows app
 
 `src/windows/` is a [Tauri 2](https://tauri.app) app: a Rust shell in `src-tauri/`, a React window
-in `ui/`, and the `browsentic.exe` launcher in `launcher/`. Like the [macOS app](mac-app.md) it
-**installs** the Node half of Browsentic and then **drives** it, screen for screen the same, and it
-holds no intelligence of its own: the daemon stays the daemon, for the reasons given there.
+in `ui/`, and the `browsentic.exe` launcher in `launcher/`. Like the [macOS app](mac-app.md), it
+**installs** the Node half of Browsentic and then **drives** it, screen for screen the same, and
+reimplements nothing: the daemon stays the daemon, for the reasons given there.
 
 ## Why Tauri and React
 
-The macOS app is SwiftUI, with the extension's palette converted into Swift by hand. On Windows
-the window is the extension's own stack: `ui/app.css` imports
-[globals.css](../../src/extension/assets/globals.css), so Ember and Daylight are the same tokens,
-not a copy of them, and the guardrail rows and the theme picker are the extension's components
+The macOS app is SwiftUI, with the extension's palette converted into Swift by hand. On Windows the
+window uses the extension's own stack: `ui/app.css` imports
+[globals.css](../../src/extension/assets/globals.css), so Ember and Daylight are the same tokens
+rather than a copy, and the guardrail rows and the theme picker are the extension's components
 ([guardrail-policy.tsx](../../src/extension/components/guardrail-policy.tsx),
 [theme-picker.tsx](../../src/extension/components/theme-picker.tsx)), so a rule added to the
-daemon shows up here the moment it shows up in the settings page. The frames it speaks are typed by
+daemon appears here as soon as it appears in the settings page. Its control frames are typed by
 [control.ts](../../src/daemon/control.ts) itself, where the Swift app declares its own.
 
 Tauri renders with WebView2, which Windows 11 ships, so the installer is about 2 MB and carries
@@ -32,9 +32,9 @@ The socket is held in Rust because the daemon authenticates `/control` with an `
 header, and a webview's WebSocket cannot send one. Replies are matched to requests by id, and the
 daemon's unprompted `settings-changed` reaches the window as a Tauri event.
 
-The command starts from the home folder, with no console window (`CREATE_NO_WINDOW`), and a
-daemon it starts inherits that folder, so no install folder is ever held open, which is what lets
-the updater replace the app and the payload swap rename `cli`.
+The command starts from the home folder with no console window (`CREATE_NO_WINDOW`), and a daemon
+it starts inherits that folder. No install folder is ever held open, which lets the updater replace
+the app and the payload swap rename `cli`.
 
 [model.ts](../../src/windows/ui/model.ts) is `AppModel.swift` ported: the same phases, the
 same six checks and their messages, the same two-second poll.

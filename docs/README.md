@@ -1,35 +1,35 @@
 # Browsentic documentation
 
-Browsentic is a browser extension with an AI side panel. It hands your real, logged-in browser to
-the AI agent you already run — by voice, by typing, or by showing it once — and turns that into real
-actions on the tab in front of you. The daemon behind it also answers MCP clients, so a terminal can
-drive the same browser, but nothing about the panel requires one.
+Browsentic is an agentic browser harness: it runs the agent CLI you already use (Claude Code, Codex,
+Cursor and others) from a side panel in your real, logged-in browser, and acts on the tab in front
+of you. You instruct it by typing, by voice or by showing it a task once, and an optional MCP
+endpoint lets other clients drive the same browser.
 
-The docs are split by who is asking.
+The docs are in three parts: the user guide, the internals and the reference.
 
 ## Using it
 
-Start here if you want to run Browsentic on your own machine.
+For running Browsentic on your own machine.
 
 **[The user guide →](guide/)**
 
 | | |
 | --- | --- |
-| [Install](guide/install.md) | The extension from your browser's store, and Browsentic Bridge on your computer |
-| [Pair](guide/pair.md) | Connect your browser with a single-use code |
+| [Install](guide/install.md) | One line sets up Browsentic Bridge, then the extension comes from your browser's store |
+| [Pair](guide/pair.md) | Connecting a browser to Browsentic Bridge with a single-use code |
 | [First run](guide/first-run.md) | A tour of the side panel and your first instruction |
-| [Features](guide/features/) | One page per capability — what it does and when to reach for it |
+| [Features](guide/features/) | One page per capability: what it does and when to use it |
 | [Choosing an agent](guide/agents.md) | The eight agent CLIs the side panel can run on |
 | [MCP clients](guide/mcp-clients.md) | Optional: drive the same browser from Claude Code, Cursor, Zed or Gemini CLI |
 | [Configuration](guide/configuration.md) | Every key in `~/.browsentic/config.json` |
-| [Approvals](guide/approvals.md) | What asks before it acts, and how to change that |
-| [Limits](guide/limits.md) | Where Browsentic does not fit — read before you rely on it |
+| [Approvals](guide/approvals.md) | Which actions wait for your approval, and how to change that |
+| [Limits](guide/limits.md) | Where Browsentic does not fit; read it before you rely on it |
 | [Troubleshooting](guide/troubleshooting.md) | Symptom → cause → fix |
 | [Maintenance](guide/maintenance.md) | Updating and uninstalling |
 
 ## Building on it
 
-How the pieces actually work, for contributors and for anyone integrating.
+How the parts work, for contributors and integrators.
 
 **[Internals →](internals/)**
 
@@ -38,7 +38,7 @@ How the pieces actually work, for contributors and for anyone integrating.
 | [Overview](internals/overview.md) | Four processes, and why there is a daemon at all |
 | [Transport](internals/transport.md) | Ports, the origin gate, the pairing handshake |
 | [The action registry](internals/registry.md) | One definition, two bundles, and drift detection |
-| [Request path](internals/request-path.md) | An MCP tool call, end to end |
+| [Request path](internals/request-path.md) | A tool call from an optional MCP client, end to end |
 | [Inside the extension](internals/extension.md) | Background vs content script, tab scoping |
 | [Agent runs](internals/agent-runs.md) | The intent funnel, runners, prompt assembly |
 | [Guardrails](internals/guardrails.md) | The policy, run scope, fencing, spawn containment |
@@ -59,6 +59,6 @@ How the pieces actually work, for contributors and for anyone integrating.
 
 ---
 
-New here? [Install](guide/install.md) → [Pair](guide/pair.md) → [First run](guide/first-run.md).
+To get started: [Install](guide/install.md) → [Pair](guide/pair.md) → [First run](guide/first-run.md).
 
-The [project README](../README.md) is the two-minute version of all of it.
+The [project README](../README.md) is the short version.

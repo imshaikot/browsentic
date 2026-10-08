@@ -1,18 +1,19 @@
 # Contributing
 
-Build topology, the checks, and how to add a capability.
+How the repository builds (two Yarn projects), the commands and checks a pull request must pass, and
+how to add a page capability or an agent runner.
 
-![One edit, two builds, two reloads — and the checks that gate a pull request](../assets/contributing.png)
+![One edit, two builds, two reloads, and the checks that gate a pull request](../assets/contributing.png)
 
 ---
 
 ## Two Yarn projects
 
-Separate lockfiles.
+Each has its own lockfile.
 
 | | Extension | Daemon + MCP |
 | --- | --- | --- |
-| Root | `/` | `/mcp` |
+| Root | `/` | `/src/daemon` |
 | Bundler | WXT (Vite) | tsup |
 | Output | `dist/chrome-mv3` | `src/daemon/dist` |
 | Stack | React 19, Tailwind v4, shadcn/ui, zod | Node ≥20, `@modelcontextprotocol/sdk`, `ws`, zod |
@@ -21,8 +22,8 @@ Separate lockfiles.
 `src/daemon/` imports `src/lib/` through the `@/` alias, which is how [one registry](registry.md) ends up in two
 bundles.
 
-`node scripts/setup.mjs` (`yarn setup`) runs all four steps — both installs, both builds — using the
-Yarn release vendored in the repository, so a fresh clone needs nothing on `PATH` but Node.
+`node scripts/setup.mjs` (`yarn setup`) runs all four steps (both installs, both builds) with the
+Yarn release vendored in the repository, so a fresh clone needs only Node on `PATH`.
 
 ---
 
@@ -52,12 +53,13 @@ yarn check            # both type checks, then the tests and their coverage floo
 
 ### The daemon keeps the old build in memory
 
-The daemon has no start command: the first CLI or MCP client that needs it spawns it, and it lives
-until `browsentic stop` or 30 idle minutes with nothing attached.
+The daemon starts on demand: the first CLI command or MCP client that needs it spawns it,
+`browsentic start` starts it explicitly, and the extension can ask the native host that
+`browsentic setup` registered to start one. It lives until `browsentic stop` or 30 idle minutes with
+nothing attached.
 
-The flip side is that **a rebuild alone changes nothing while a daemon is running**. That is what
-`yarn daemon:restart` is for: it rebuilds, stops the stale daemon and brings up the fresh build. The
-extension cannot spawn the daemon; it only reconnects to one.
+So **a rebuild alone changes nothing while a daemon is running**. `yarn daemon:restart` rebuilds,
+stops the stale daemon and brings up the fresh build.
 
 ---
 
@@ -91,16 +93,16 @@ which this build does not target. The automated signer accepts all of them.
 ## Adding a capability
 
 Write `src/lib/actions/page/<name>.ts` and add it to the array in `src/lib/actions/registry.ts`. That single
-edit publishes it as an MCP tool, because the daemon bundles the same registry.
+edit publishes it as a page tool, because the daemon bundles the same registry.
 
 Four conventions are load-bearing at runtime rather than at compile time:
 
-1. **Touch `document`/`window` only inside `execute()`** — the module is also imported by the daemon,
+1. **Touch `document`/`window` only inside `execute()`.** The module is also imported by the daemon,
    where there is no DOM.
-2. **No underscores in action names** — they break the [tool-name round trip](registry.md#names).
-3. **`.describe()` every input field** — the text becomes the tool's JSON Schema documentation, and
+2. **No underscores in action names.** They break the [tool-name round trip](registry.md#names).
+3. **`.describe()` every input field.** The text becomes the tool's JSON Schema documentation, and
    it is all the model gets.
-4. **Validate with `ActionError` inside `execute()`**, not zod `.refine()`/`.transform()` — those do
+4. **Validate with `ActionError` inside `execute()`**, not zod `.refine()`/`.transform()`, which do
    not survive JSON Schema conversion.
 
 Then rebuild **both** halves and reload the extension at `chrome://extensions`. Chrome does not
@@ -109,14 +111,14 @@ auto-reload unpacked extensions, and a stale service worker is the usual cause o
 ### If the capability is consequential
 
 Add a rule to [`src/daemon/guardrails/policy.ts`](../../src/daemon/guardrails/policy.ts) rather than a
-check inside the action — the policy is meant to be printable and diffable in one place. If it needs
-a new predicate, add it to `CONDITIONS`; the vocabulary is closed on purpose.
+check inside the action, so the policy stays printable and diffable in one place. If it needs a new
+predicate, add it to `CONDITIONS`; the vocabulary is closed on purpose.
 
 ### If it should be reachable from the side panel without an agent
 
 Add a rule to [`src/lib/intent/grammar.ts`](../../src/lib/intent/grammar.ts) and a case to the table in
-[`route.test.ts`](../../src/lib/intent/route.test.ts). Bias toward escalating — see
-[the intent funnel](agent-runs.md#the-intent-funnel).
+[`route.test.ts`](../../src/lib/intent/route.test.ts). Bias toward escalating (see
+[the intent funnel](agent-runs.md#the-intent-funnel)).
 
 ---
 
@@ -129,14 +131,14 @@ decides what to say and how to read the answer back.
 You must also add a `CONTAINMENT` entry in
 [`src/daemon/guardrails/spawn.ts`](../../src/daemon/guardrails/spawn.ts) declaring which containment mode
 that CLI supports and what its plan must carry. `vetPlan()` refuses to spawn a runner whose plan does
-not match — that is the point, and [`spawn.test.ts`](../../src/daemon/guardrails/spawn.test.ts) asserts it
-without spawning anything. Those tests walk every agent in the catalog, so a new runner is covered the
-moment it exists; add tampering cases for the flags its containment depends on.
+not match, and [`spawn.test.ts`](../../src/daemon/guardrails/spawn.test.ts) asserts that without
+spawning anything. Those tests walk every agent in the catalog, so a new runner is covered the moment
+it exists; add tampering cases for the flags its containment depends on.
 
 ---
 
 ## See also
 
-- [The action registry](registry.md) — why the manifest cannot drift silently
-- [Guardrails](guardrails.md) — where enforcement lives
-- [reference/tools.md](../reference/tools.md) — the page to keep in step
+- [The action registry](registry.md): why the manifest cannot drift silently
+- [Guardrails](guardrails.md): where enforcement lives
+- [reference/tools.md](../reference/tools.md): the page to keep in step

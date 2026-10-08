@@ -1,6 +1,7 @@
 # The action registry
 
-One definition, compiled into two bundles.
+How page actions are defined once and compiled into both the extension and the daemon, how tool
+names are derived from them, and how a build whose two halves disagree is detected.
 
 ![One array compiled into two bundles, and what happens when the two halves drift](../assets/registry.png)
 
@@ -12,7 +13,7 @@ There are **49 page capabilities**. They are defined once, in
 [`src/lib/actions/registry.ts`](../../src/lib/actions/registry.ts), and that array is compiled into **both**
 the extension and the daemon.
 
-Each action is a small module — a name, a description, a zod input schema, and an `execute()`:
+Each action is a small module with a name, a description, a zod input schema and an `execute()`:
 
 ```ts
 export const clickElement = defineAction({
@@ -24,8 +25,8 @@ export const clickElement = defineAction({
 ```
 
 `describeActions()` turns that array into tool descriptors by converting each zod schema to JSON
-Schema. The daemon serves those descriptors to MCP clients, so **an MCP tool cannot describe a
-capability the browser does not have** — they are generated from the same source.
+Schema. The daemon serves those descriptors to MCP clients, so **a tool cannot describe a capability
+the browser does not have**: both are generated from the same source.
 
 ---
 
@@ -36,7 +37,7 @@ Action names are dotted (`page.getPageInfo`); MCP tool names are underscored
 
 `assertToolNamesRoundTrip()` runs on every `tools/list` to prove that every name survives the round
 trip and that no two actions collide. That check is why **action names must not contain
-underscores** — `page.get_info` would come back as `page.get.info`.
+underscores**: `page.get_info` would come back as `page.get.info`.
 
 ---
 
@@ -45,16 +46,16 @@ underscores** — `page.get_info` would come back as `page.get.info`.
 The extension hashes its bundled manifest and sends the hash in `hello`. If it differs from the
 daemon's, the daemon:
 
-1. flags `manifestInSync: false` — visible in `browsentic status` and `browsentic_status`;
-2. asks the extension for its actual descriptor list over a `describe` frame and **adopts it** — the
-   browser is the authority on what the browser can do;
+1. flags `manifestInSync: false`, visible in `browsentic status` and `browsentic_status`;
+2. asks the extension for its actual descriptor list over a `describe` frame and **adopts it**,
+   because the browser is the authority on what the browser can do;
 3. broadcasts `manifest-changed` to control clients, which makes each MCP server emit
    `notifications/tools/list_changed`.
 
 So a half-rebuilt install degrades into "the tools the browser really has", **loudly**, rather than
 into tool calls that fail at the far end.
 
-The fix is always to rebuild both halves — see [guide/maintenance.md](../guide/maintenance.md#updating).
+The fix is always to rebuild both halves (see [guide/maintenance.md](../guide/maintenance.md#updating)).
 
 ---
 
@@ -73,8 +74,8 @@ The daemon's `invoke()` refuses anything starting with that prefix, so they are 
 ordinary MCP client. `browsentic_saveSiteMap` is published as a tool **only** to the MCP server
 spawned inside an agent run.
 
-`browsentic_status` is likewise not in the registry — the MCP server answers it directly by
-combining daemon state with a one-element `page.getPageInfo` and the current monitor list.
+`browsentic_status` is not in the registry either: the MCP server answers it directly by combining
+daemon state with a one-element `page.getPageInfo` and the current monitor list.
 
 ---
 
@@ -91,6 +92,6 @@ the source of truth that [reference/tools.md](../reference/tools.md) is kept in 
 
 ## Next
 
-**[Request path →](request-path.md)** — a tool call reaching the page.
+**[Request path →](request-path.md)**: how a tool call reaches the page.
 
 Adding one: [Contributing § Adding a capability](contributing.md#adding-a-capability).

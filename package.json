@@ -1,7 +1,7 @@
 {
   "name": "browsentic",
   "version": "0.8.0",
-  "description": "Browsentic — agentic browsing driven by the AI agent you already run",
+  "description": "Browsentic: an agentic browser harness for the AI agent you already run",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",

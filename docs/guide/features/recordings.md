@@ -1,41 +1,42 @@
 # Recordings
 
-Show it once, repeat it later.
+A recording captures a job you do yourself in one tab and saves it as named steps, so the agent can
+repeat it later against the live page.
 
-A [site map](site-maps.md) teaches Browsentic what a site **is**. A recording teaches it what **you
-do** there.
+[Site maps](site-maps.md) describe how a site is laid out; recordings describe a task you perform
+on it.
 
 ---
 
 ## Recording
 
-Press **Record** in the side panel's **Recordings** tab, do the job yourself — click through the
-pages, fill the fields, submit the form — and press stop. Or say it:
+Press **Record** in the side panel's **Recordings** tab, do the job yourself (click through the
+pages, fill the fields, submit the form), then press stop. Or say it:
 
 ```
 record my browsing session
 stop recording
 ```
 
-Both of those are [instant commands](instant-commands.md), and recording only ever starts from your
-own click or your own words.
+Both are [instant commands](instant-commands.md). A recording only ever starts from your own click
+or your own words.
 
 Browsentic splits what you did into ordered steps, names them after what you accomplished, and keeps
 them in a renameable list.
 
-A recording **follows the tab it started in and nothing else**. Navigations inside that tab become
-steps, other tabs are ignored, and closing the tab stops and saves. It runs for at most **15
-minutes**, warns you at 13, and stops itself at the limit.
+A recording **follows only the tab it started in**. Navigations inside that tab become steps, other
+tabs are ignored, and closing the tab stops and saves it. It runs for at most **15 minutes**, warns
+you at 13, and stops itself at the limit.
 
 ---
 
 ## What you type is not saved by default
 
-Every field becomes a placeholder — `{{email}}`, `{{invoice_number}}` — and the assistant asks you
-for the value when it replays.
+Every field becomes a placeholder, such as `{{email}}` or `{{invoice_number}}`, and you are asked
+for the value when the recording is replayed.
 
-Tick **Save what I type** to keep literal values instead. Either way, **passwords, hidden fields,
-one-time codes and anything shaped like a card number are dropped unconditionally.**
+Tick **Save what I type** to keep the literal values instead. Either way, **passwords, hidden
+fields, one-time codes and anything shaped like a card number are always dropped.**
 
 ---
 
@@ -45,35 +46,34 @@ one-time codes and anything shaped like a card number are dropped unconditionall
 do it like last time
 ```
 
-This is not blind playback. The steps are a plan, not a script:
+Replay is not blind playback. The agent treats the steps as a plan:
 
-- the agent re-checks each target against the live page before acting;
+- it re-checks each target against the live page before acting;
 - it prefers the **visible text** it recorded over the CSS selector, because selectors are what a
   redesign breaks first;
-- anything consequential still waits for [approval](../approvals.md), even though you performed it
+- anything consequential still waits for [approval](../approvals.md), even though you did it
   yourself while recording;
-- if a step no longer lands, the run **stops and tells you which one** rather than improvising a
-  different route to the same effect.
+- if a step no longer lands, the run **stops and tells you which one** instead of improvising a
+  different route to the same result.
 
-If two recordings could plausibly match what you asked for, you will be asked which — never guessed
-between, because replaying the wrong workflow spends real clicks on your real account.
+If two recordings could match what you asked for, you are asked which one. The agent never guesses
+between them, because replaying the wrong workflow spends real clicks on your real account.
 
 ---
 
 ## Where they live
 
 In the extension's own storage, not on disk. That is why `browsentic skills` does not list them,
-and why `page_listRecordings` and `page_readRecording` exist as tools.
+and why `page_listRecordings` and `page_readRecording` exist as tools. Removing the extension
+removes them.
 
-Removing the extension removes them.
-
-The one time a recording leaves the browser is the local, one-shot call that turns the raw trace
-into named steps.
+A recording leaves the browser only for the local, one-shot call that turns the raw trace into
+named steps.
 
 ---
 
 ## See also
 
-- [Site maps](site-maps.md) — the other kind of memory
-- [Skills](skills.md) — `browse-navigation` is the skill that replays these
-- [internals/subsystems.md](../../internals/subsystems.md) — capture, scrubbing and step synthesis
+- [Site maps](site-maps.md): the other kind of memory
+- [Skills](skills.md): `browse-navigation` is the skill that replays these
+- [internals/subsystems.md](../../internals/subsystems.md): capture, scrubbing and step synthesis

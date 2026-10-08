@@ -50,25 +50,25 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
 
 Browsentic is your browser's superpower, free and open source. One install sets up everything, the extension included.
 
-**macOS** — one line installs [the app](docs/guide/mac-app.md), which brings Node and everything else:
+**macOS**: one line installs [the app](docs/guide/mac-app.md), which brings Node and everything else:
 
 ```sh
 curl -fsSL https://browsentic.com/install.sh | sh
 ```
 
-**Windows** — one line in PowerShell installs [the Windows app](docs/guide/windows-app.md) ([experimental](docs/guide/limits.md#windows-is-experimental)):
+**Windows**: one line in PowerShell installs [the Windows app](docs/guide/windows-app.md) ([experimental](docs/guide/limits.md#windows-is-experimental)):
 
 ```powershell
 irm https://browsentic.com/install.ps1 | iex
 ```
 
-**Any platform** — with [Node.js](https://nodejs.org) 20 or newer:
+**Any platform**, with [Node.js](https://nodejs.org) 20 or newer:
 
 ```sh
 npx browsentic@latest setup
 ```
 
-Setup asks which browser you use and opens Browsentic's store page in it. Press **Add to Chrome** (**Get** in Edge, **Add** in Firefox), then click Browsentic in the toolbar and enter the code setup shows. That's the whole install, and the extension updates itself from its store from then on. The apps do the same from their Overview tab.
+Setup asks which browser you use and opens Browsentic's store page in it (the apps do the same from their Overview tab). Press **Add to Chrome** (**Get** in Edge, **Add** in Firefox), then click Browsentic in the toolbar and enter the code setup shows. From then on the extension updates itself from its store.
 
 The extension is on the Chrome Web Store for Chrome, Brave, Arc, Vivaldi and Opera, on Edge Add-ons for Edge, and Firefox gets an add-on signed by Mozilla:
 
@@ -78,9 +78,9 @@ The extension is on the Chrome Web Store for Chrome, Brave, Arc, Vivaldi and Ope
   <a href="https://browsentic.com/download/firefox"><img src="https://img.shields.io/badge/Signed%20add--on%20for-Firefox-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Signed add-on for Firefox"></a>
 </p>
 
-Added it from the store already? Run the same line and enter the code it shows.
+If you added the extension from a store first, run the same line and enter the code it shows.
 
-The side panel runs on an agent CLI you're signed in to: [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [another supported one](docs/guide/agents.md). You probably have one already. No API key, no account, no subscription.
+The side panel runs on an agent CLI you are signed in to: [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex/cli) or [another supported one](docs/guide/agents.md). It uses the one you already have, so there is no API key, no account and no extra subscription.
 
 Full guide, Firefox and unpacked installs included: **[browsentic.com/docs/guide/install](https://browsentic.com/docs/guide/install/)**
 
@@ -146,11 +146,11 @@ The extension dials out to Browsentic Bridge, because a Manifest V3 service work
 
 ## Privacy and Security
 
-Nothing connects until you pair, both ends prove themselves, consequential actions ask first, credentials on a page are sealed before the agent sees them, and the sites you [block](docs/guide/features/blocked-sites.md) are off-limits to every agent — enforced in the browser, where none of them can reach the list. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
+Nothing connects until you pair, and both ends prove who they are. The agent asks before any consequential action, credentials on a page are sealed before the agent sees them, and the sites you [block](docs/guide/features/blocked-sites.md) are off-limits to every agent: the browser enforces that list, where no agent can reach it. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
 
 ## Contributing
 
-Bugs and ideas are welcome — start at [CONTRIBUTING.md](CONTRIBUTING.md).
+Bugs and ideas are welcome. Start at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
@@ -164,4 +164,4 @@ Browsentic is licensed under the [Apache License 2.0](LICENSE). Versions up to 0
 
 **Short answer:** "Browse" + "agentic".
 
-**Long answer:** Most browser automation asks you to hand the work to a *different* browser — a headless one, in a container, logged in to nothing. Browsentic is the other way round: the agentic part happens in the browser you are already looking at, with the sessions you are already signed in to. The name is the thesis — browsing, made agentic, where you already browse.
+**Long answer:** Most browser automation hands the work to a *different* browser: a headless one, in a container, logged in to nothing. Browsentic works the other way round. The agent acts in the browser you are already looking at, with the sessions you are already signed in to: browsing, made agentic, where you already browse.

@@ -1,6 +1,7 @@
 # State on disk
 
-Nothing lives in the repository.
+Where Browsentic keeps its state: `~/.browsentic` and `~/browsentic` on disk, npm's npx cache, and
+the browser's own storage for what never reaches disk. Nothing is kept in the repository.
 
 ![Who writes what, where it lands, and the three things that never reach disk](../assets/state.png)
 
@@ -25,7 +26,7 @@ Nothing lives in the repository.
 ├── extension/chrome-mv3/      the unpacked extension `browsentic setup --unpacked` writes, when asked for
 ├── skills/                    panel uploads + activated site maps
 │   ├── acme-com/SKILL.md
-│   └── .staging/              maps awaiting review — unreadable to the loader
+│   └── .staging/              maps awaiting review (unreadable to the loader)
 └── screenshot/    0600        captures taken with save: true
 ```
 
@@ -33,7 +34,7 @@ Nothing lives in the repository.
 | --- | --- | --- |
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
 | `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
-| `config.json` | You, the agent picker, and the settings page and desktop app for `theme` and `guardrails` | Re-read before every run — no restart needed — and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
+| `config.json` | You, the agent picker, and the settings page and desktop app for `theme` and `guardrails` | Re-read before every run (no restart needed) and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
 | `profile.json` | The settings page's **Profile** section | Only exists while something is filled in: clearing every field deletes it. Re-read before every run and watched like `config.json`; kept apart from it so the config never holds personal details. [Reference](../guide/configuration.md#profile) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
@@ -43,18 +44,18 @@ Nothing lives in the repository.
 | `cli/`, `bin/`, `runtime/` | The [macOS](../guide/mac-app.md) or [Windows](../guide/windows-app.md) app | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
 
-## The one that is not yours
+## npm's npx cache
 
-`~/.npm/_npx/<hash>/` is npm's, not Browsentic's, but a machine set up with `npx browsentic setup`
-keeps the whole package there — CLI and extension payload both — and npm reuses it without ever
-re-checking the registry. It therefore behaves like state: it decides which version you run, it
-survives deleting both directories above, and it is why a reinstall could land on a months-old
-build. `browsentic update` replaces it; `browsentic uninstall` deletes it.
+`~/.npm/_npx/<hash>/` belongs to npm, but a machine set up with `npx browsentic setup` keeps the
+whole package there (CLI and extension payload both), and npm reuses it without re-checking the
+registry. So it behaves like state: it decides which version you run, it survives deleting both
+directories above, and it is why a reinstall could land on a months-old build. `browsentic update`
+replaces it; `browsentic uninstall` deletes it.
 
-## The exceptions
+## State kept in the browser
 
-**Held secrets** never reach disk at all. A credential the sanitizer seals out of a page is kept in
-the extension's `browser.storage.session` under `browsentic/secrets`, capped at 64 entries, expiring
+**Held secrets** never reach disk. A credential the sanitizer seals out of a page is kept in the
+extension's `browser.storage.session` under `browsentic/secrets`, capped at 64 entries, expiring
 after two hours and emptied by the browser on restart. The daemon never receives one.
 
 **Recordings** stay in the extension's own storage, not on disk. Removing the extension removes them.
@@ -70,16 +71,17 @@ leaves history. The daemon holds a copy only while the analyst reads it, in the 
 workspace at `0600`, and deletes it when the report is in.
 
 **Tab sessions** live in `browser.storage.session` under `browsentic/tabSessions`, so they are gone
-when the browser closes. So does **hands-free mode** (`browsentic/handsFree`, the listening
-state under `browsentic/dictation`, and the approvals it has already announced under
-`browsentic/approvalsAnnounced`) — a restarted browser never comes back with a microphone on.
-Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
+when the browser closes. **Diagnostics buffers** (`browsentic/diagnostics`), monitors and timers are
+kept the same way: nothing a page reported about itself outlives the browser that reported it. So is
+**hands-free mode** (`browsentic/handsFree`, the listening state under `browsentic/dictation`, and
+the approvals it has already announced under `browsentic/approvalsAnnounced`): a restarted browser
+never comes back with a microphone on. Only where the orb was dragged to (`browsentic/orbPosition`), whether hold-to-talk is on
 (`browsentic/pushToTalk`) and whether this browser's speech service has ever worked
 (`browsentic/speechService`) are kept in `storage.local`, along with which right-click items this
 browser shows (`browsentic/contextMenu`, both on when absent) and whether agent actions are ringed on
 the page (`browsentic/actionCues`, off when absent).
 
-**Blocked sites** are `browsentic/blockedSites` in `storage.local` — a list of patterns, up to 500, that
+**Blocked sites** are `browsentic/blockedSites` in `storage.local`: a list of up to 500 patterns that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.
 
 **The star request** is `browsentic/starNudge` in `storage.local`: whether its star was clicked, how
@@ -88,8 +90,7 @@ counted since the last close. It never leaves the browser.
 
 **The theme** is config.json's `theme`, mirrored into `storage.local` under `browsentic/theme` so a
 page paints before any socket is up. `browsentic/theme.unsynced` marks a pick the daemon has not heard
-yet, handed over at the next connect. So do **diagnostics buffers** (`browsentic/diagnostics`), monitors and
-timers — none of what a page reported about itself outlives the browser that reported it.
+yet, handed over at the next connect.
 
 ## Relocating
 

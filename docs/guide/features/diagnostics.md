@@ -1,8 +1,7 @@
 # Diagnostics
 
-Reading what a page **reports** — console errors, uncaught exceptions, failed requests — rather than
-what it renders. The difference between "verify it in the browser" and "verify it in the browser and
-tell me why it broke".
+The diagnostics tools record a page's console messages, uncaught exceptions and network requests
+while you reproduce a problem, so the agent can tell you why the page broke as well as what it shows.
 
 ---
 
@@ -22,125 +21,122 @@ Chrome only. It shows the debugger bar for as long as it runs.
 
 ## Why it is a session and not a read
 
-Every other tool answers from the page as it stands right now. This one cannot: `Runtime.consoleAPICalled`
-and `Network.responseReceived` are delivered **only while Chrome's debugger is attached**, and there is
-no backlog kept anywhere to go and fetch afterwards. By the time anyone thinks to ask what errored, the
-event is long gone.
+Every other tool answers from the page as it is now. This one cannot: `Runtime.consoleAPICalled` and
+`Network.responseReceived` are delivered **only while Chrome's debugger is attached**, and no backlog
+is kept to fetch afterwards. By the time anyone asks what errored, the event is gone.
 
-So it has the shape [monitoring](monitoring.md) has — start, read, stop — for the same reason: the
-interesting thing happens between two calls, not during one.
+So it works like [monitoring](monitoring.md), with start, read and stop, for the same reason: what
+matters happens between two calls, not during one.
 
-The practical consequence is the whole usage rule. **Start it before the thing you are diagnosing
-happens.** Attach after the failure and you get an empty buffer.
+That gives one usage rule: **start it before the thing you are diagnosing happens.** Attach after the
+failure and the buffer is empty.
 
-`reload: true` handles the common case where the failure *is* the load — a blank screen, a chunk that
-404s, a component that throws on mount. It reloads once recording has started, so those errors land in
-the buffer instead of having happened before anything was watching.
+`reload: true` covers the common case where the failure *is* the load: a blank screen, a chunk that
+404s, a component that throws on mount. It reloads once recording has started, so those errors land
+in the buffer instead of happening before anything was watching.
 
 ---
 
 ## The bar across your browser
 
 While a recording runs, Chrome shows **"Browsentic is debugging this browser"** across the top of the
-window, with a **Cancel** button. That is Chrome's, not Browsentic's, and it cannot be suppressed —
-it is the price of the only API that can see a page's console.
+window, with a **Cancel** button. The bar is Chrome's and cannot be suppressed; it comes with the only
+API that can see a page's console.
 
-Two things make it bounded rather than permanent:
+Two things stop it staying up:
 
 | | |
 | --- | --- |
 | **A timeout** | Five minutes by default, thirty at most. It detaches on its own, so a forgotten recording cannot leave the bar up |
 | **The run** | Inside a side-panel conversation, a recording ends when the turn that started it ends |
 
-Pressing **Cancel** in the bar detaches immediately; the recording reports `phase: "detached"` and what
-it already collected stays readable.
+Pressing **Cancel** in the bar detaches at once; the recording reports `phase: "detached"` and what it
+already collected stays readable.
 
-An MCP client — Claude Code, Codex — has no side-panel turn to end, so its recordings live until it
-stops them or the timeout fires. That is deliberate: it is what makes the tools usable across several
-calls.
+An MCP client such as Claude Code or Codex has no side-panel turn to end, so its recordings last until
+it stops them or the timeout fires. That is deliberate: it lets one recording span several calls.
 
 ---
 
 ## What comes back
 
-**`page_readConsole`** — level, text, the file and line that logged it, and a stack for errors. Three
-kinds are collected: `console` (a `console.*` call), `exception` (uncaught) and `browser` (Chrome's own
-reports — CSP violations, mixed content, resources that failed to load).
+**`page_readConsole`** returns the level, the text, the file and line that logged it, and a stack for
+errors. Three kinds are collected: `console` (a `console.*` call), `exception` (uncaught) and
+`browser` (Chrome's own reports: CSP violations, mixed content, resources that failed to load).
 
 Start with `level: "error"`. A busy SPA logs constantly and almost none of it is the fault.
 
-**`page_readNetwork`** — method, URL, status, resource type, timing, size, and the browser's own error
-text for requests that failed. Start with `status: "problems"`, which is everything that failed outright
-or came back 4xx/5xx. `status: "pending"` is the other useful filter: a request that never came back is
-why the spinner is still spinning.
+**`page_readNetwork`** returns the method, URL, status, resource type, timing, size, and the browser's
+own error text for requests that failed. Start with `status: "problems"`: everything that failed
+outright or came back 4xx/5xx. `status: "pending"` is the other useful filter, because a request that
+never came back is why the spinner is still spinning.
 
-Both take `contains`/`urlContains` and `limit` to narrow, and `drain: true` to forget what was returned
-so a second call reports only what happened since.
+Both take `contains`/`urlContains` and `limit` to narrow the result, and `drain: true` to forget what
+was returned so the next call reports only what happened since.
 
 ### When the buffers overflow
 
-500 console entries and 1,000 requests are kept, newest first out the far end. Every read reports
-`droppedConsole` and `droppedNetwork` — non-zero means older entries were evicted and the picture is
-partial. A truncated answer that says so is worth more than a complete-looking one that lies.
+500 console entries and 1,000 requests are kept; past that, the oldest are dropped. Every read reports
+`droppedConsole` and `droppedNetwork`: non-zero means older entries were evicted and the picture is
+partial.
 
 ---
 
-## Security: this is the richest surface in the product
+## Security: what network data reaches the agent
 
-Network data is where credentials actually live. Request headers carry `Cookie` and
-`Authorization: Bearer …`; responses carry `Set-Cookie`; URLs carry tokens in query strings; bodies
-carry session tokens, API keys and other people's personal data wholesale.
+Network data is where credentials live. Request headers carry `Cookie` and `Authorization: Bearer …`;
+responses carry `Set-Cookie`; URLs carry tokens in query strings; bodies carry session tokens, API
+keys and other people's personal data.
 
-The policy splits metadata from payload:
+The policy separates metadata from payload:
 
 | | |
 | --- | --- |
-| **Metadata** — method, URL, status, type, timing, size | Free, like any read |
-| **Headers** — request and response | Off by default; `includeHeaders: true` turns them on, [sanitized](../../internals/guardrails.md) like everything else |
+| **Metadata** (method, URL, status, type, timing, size) | Free, like any read |
+| **Headers** (request and response) | Off by default; `includeHeaders: true` turns them on, [sanitized](../../internals/guardrails.md) like everything else |
 | **Bodies** | **Denied by default.** `includeBodies: true` returns `BLOCKED` unless the user allows it |
 
-Everything that does come back crosses the socket through the same deterministic sanitizer as every
-other result: a cookie, a bearer token or an API key in a header, a URL or a body is replaced by a
-sealed placeholder such as `⟦token:4f2a@example.com⟧` before it reaches the agent. The real value stays
-in the browser.
+Everything that does come back passes through the same deterministic sanitizer as every other result
+before it crosses the socket: a cookie, a bearer token or an API key in a header, a URL or a body is
+replaced by a sealed placeholder such as `⟦token:4f2a@example.com⟧` before it reaches the agent. The
+real value stays in the browser.
 
 **Bodies are denied by default** for the same reason [raw HTML is](../approvals.md): the read that
-diagnoses is much narrower than the read that empties the page, and the sanitizer seals shapes it
-recognises — a JSON blob of somebody's account data is not one of them. Status, timing, headers and the
-browser's error text answer nearly every real question. To allow them anyway:
+diagnoses is much narrower than the read that empties the page, and the sanitizer seals only the
+shapes it recognises. A JSON blob of somebody's account data is not one of them. Status, timing,
+headers and the browser's error text answer nearly every real question. To allow bodies anyway:
 
 ```json
 { "guardrails": { "rules": { "network-body-read": "allow" } } }
 ```
 
-or the same row in the guardrail settings in the side panel. Bodies also only exist while the recording
-is attached — Chrome discards them once its own buffer moves on — so a `stopDiagnostics` before the read
-means no bodies regardless of policy.
+or set the same row in the guardrail settings in the side panel. Bodies also exist only while the
+recording is attached (Chrome discards them once its own buffer moves on), so a `stopDiagnostics`
+before the read means no bodies whatever the policy.
 
 ---
 
 ## Edges
 
 **DevTools wins.** Chrome allows one debugger per tab. With DevTools open on that tab, attaching fails
-with `DEBUGGER_UNAVAILABLE` and a hint saying so — which is annoying precisely because it is the moment
-a developer is most likely to ask. Close DevTools and retry.
+with `DEBUGGER_UNAVAILABLE` and a hint saying so. Close DevTools and retry.
 
-**Firefox has none of this.** There is no CDP, so a Firefox build leaves all four tools off the list it
-offers, along with `page_trustedClick`, the captcha tools and the page-code tools. An older
+**Firefox has none of this.** Firefox has no CDP, so the Firefox build leaves all four tools off its
+tool list, along with `page_trustedClick`, the captcha tools and the page-code tools. An older
 instruction that still names one gets `UNSUPPORTED`.
 
 **Top-level frame only.** What a cross-origin iframe logs to its own console is not collected.
 
 **Two tabs at a time**, one recording per tab. Starting a third returns `DIAGNOSTICS_LIMIT`.
 
-**http(s) only** — browser pages report nothing to attach to.
+**http(s) only.** Browser pages have nothing to attach to.
 
 ---
 
 ## See also
 
-- [reference/tools.md](../../reference/tools.md#diagnostics) — the four tools and their parameters
-- [reference/errors.md](../../reference/errors.md) — `DEBUGGER_UNAVAILABLE`, `DIAGNOSTICS_NOT_FOUND` and friends
-- [Approvals](../approvals.md) — the `network-body-read` rule
-- [Monitoring](monitoring.md) — the same start/read/stop shape, for progress rather than faults
-- [Captchas](captcha.md) — the other feature built on Chrome's debugger
+- [reference/tools.md](../../reference/tools.md#diagnostics): the four tools and their parameters
+- [reference/errors.md](../../reference/errors.md): `DEBUGGER_UNAVAILABLE`, `DIAGNOSTICS_NOT_FOUND` and related codes
+- [Approvals](../approvals.md): the `network-body-read` rule
+- [Monitoring](monitoring.md): the same start, read and stop shape, for progress instead of faults
+- [Captchas](captcha.md): the other feature built on Chrome's debugger
