@@ -55,6 +55,8 @@ front on the phone, kept up to date as it changes.
   has focus to type on the phone. The bar above has back, forward, reload, the page's address (type
   an address or a search to go there) and the phone's tabs.
 - **It follows the phone.** Switch tabs on the phone itself and the picture follows.
+- **You can see when the agent is at work.** **Agent working** shows at the top of the phone frame
+  while a run is going. The phone stays yours to use meanwhile.
 - **Switch it off**, or close the phone tab, to stop. Unplugging the phone or closing Chrome on it
   ends the session too, and the phone tab says why, with a button to reconnect.
 

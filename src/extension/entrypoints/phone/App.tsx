@@ -6,6 +6,7 @@ import { ANDROID_PROTOCOL } from '@/lib/actions/protocol';
 import { askPhone, usePhoneSession } from '@/lib/bridge/phone-client';
 import type { PhoneEndReason, PhoneSession } from '@/lib/bridge/phone';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+import { useTabSessions } from '@/lib/bridge/use-tab-sessions';
 import { addressOf } from '@/lib/phone/mirror';
 import { cn } from '@/lib/utils';
 import { useMirror, type Mirror } from './use-mirror';
@@ -59,6 +60,7 @@ export default function App() {
   const visible = useVisible();
   const live = !!session && !session.ended && !session.waitingForChrome;
   const mirror = useMirror(live && visible);
+  const working = useTabSessions().some((each) => each.runId !== null && each.phone?.serial === session?.serial);
   const device = daemon?.android?.devices.find((each) => each.serial === session?.serial);
   const asleep = device?.problem?.code === 'SCREEN_OFF';
   const tooOld = !!daemon?.connected && (daemon.protocolVersion ?? 0) < ANDROID_PROTOCOL;
@@ -91,8 +93,8 @@ export default function App() {
   return (
     <div className="dot-grid flex h-screen flex-col items-center gap-3 overflow-hidden p-4">
       <Header session={session} />
-      <PhoneFrame session={session} device={device} mirror={mirror} live={live} overlay={overlay} />
-      {mirror.error && <p className="rounded-lg border border-destructive/40 bg-surface px-3 py-1.5 text-xs text-ink">{mirror.error}</p>}
+      <PhoneFrame session={session} device={device} mirror={mirror} live={live} working={live && working} overlay={overlay} />
+      {live && mirror.error && <p className="rounded-lg border border-destructive/40 bg-surface px-3 py-1.5 text-xs text-ink">{mirror.error}</p>}
     </div>
   );
 }
@@ -122,12 +124,15 @@ function PhoneFrame({
   device,
   mirror,
   live,
+  working,
   overlay,
 }: {
   session: PhoneSession | null;
   device?: { transport: 'usb' | 'wifi'; screen?: { width: number; height: number } };
   mirror: Mirror;
   live: boolean;
+  /** A conversation on this phone has a run going; the user can still use the phone meanwhile. */
+  working: boolean;
   overlay: ReactNode;
 }) {
   const [tabsOpen, setTabsOpen] = useState(false);
@@ -138,6 +143,12 @@ function PhoneFrame({
       <div className="flex flex-col rounded-[2.25rem] border border-line-strong bg-surface p-2.5 shadow-2xl" style={{ width: screen.width + FRAME_CHROME_PX.width }}>
         <div className="flex items-center justify-between px-3 pt-1 pb-2 text-[11px] text-ink-dim">
           <span className="truncate font-medium text-ink">{session?.model ?? 'Android'}</span>
+          {working && (
+            <span role="status" className="flex shrink-0 items-center gap-1.5 rounded-full bg-brand/12 px-2 py-0.5 text-brand">
+              <span className="size-1.5 animate-pulse rounded-full bg-brand" />
+              Agent working
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span className={cn('glow-dot size-1.5 rounded-full', live ? 'bg-lime' : 'bg-amber')} />
             {device?.transport === 'wifi' ? 'Wi-Fi' : 'USB'}

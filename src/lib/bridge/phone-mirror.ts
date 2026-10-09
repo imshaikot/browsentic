@@ -1,7 +1,7 @@
 import { browser, type Browser } from 'wxt/browser';
 import { PHONE_PORT, keyEvents, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
 import type { PhoneTarget } from '@/lib/phone/types';
-import { numbered, readPhone, updatePhone, type PhoneSession } from './phone';
+import { numbered, onPhoneReset, readPhone, updatePhone, type PhoneSession } from './phone';
 import { refusalFor } from './site-guard';
 import { onCdpEvent, onDaemonClosed, onPhoneClosed, sendCdp, type CdpEvent } from './socket';
 import { hostOf, patchSession, sessionForTab } from './tab-sessions';
@@ -349,4 +349,5 @@ export function servePhoneMirror(): void {
   onCdpEvent(onEvent);
   onPhoneClosed(forget);
   onDaemonClosed(forget);
+  onPhoneReset(forget);
 }

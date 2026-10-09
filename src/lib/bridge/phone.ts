@@ -60,6 +60,15 @@ export async function readPhone(): Promise<PhoneSession | null> {
   return (stored[PHONE_KEY] as PhoneSession | undefined) ?? null;
 }
 
+const resetListeners = new Set<() => void>();
+
+/** Hears the extension end or replace the session itself, which the Bridge never reports back: a new DevTools connection knows none of the old one's sessions. */
+export const onPhoneReset = (listener: () => void): void => void resetListeners.add(listener);
+
+function reset(): void {
+  for (const listener of resetListeners) listener();
+}
+
 const writePhone = (session: PhoneSession | null): Promise<void> =>
   session ? browser.storage.session.set({ [PHONE_KEY]: session }) : browser.storage.session.remove(PHONE_KEY);
 
@@ -96,6 +105,7 @@ export function startPhone(serial: string, windowId?: number): Promise<ActionRes
       return success(held);
     }
     if (held && !held.ended) closePhone(held.serial);
+    reset();
 
     const opened = await openPhone(serial);
     if (!opened.ok && opened.error.code !== 'CHROME_NOT_RUNNING') return opened;
@@ -127,6 +137,7 @@ export function endPhone(reason: PhoneEndReason): Promise<void> {
     if (!held) return;
     if (reason === 'closed') {
       if (!held.ended) closePhone(held.serial);
+      reset();
       await writePhone(null);
       await clearNotification();
       if (await tabExists(held.mirrorTabId)) await browser.tabs.remove(held.mirrorTabId).catch(() => undefined);

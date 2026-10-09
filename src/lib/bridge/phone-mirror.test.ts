@@ -75,6 +75,16 @@ beforeEach(async () => {
 });
 
 describe('the mirror in the background', () => {
+  test('a session the extension ended attaches afresh next time, since a new connection knows none of the old sessions', async () => {
+    const { attachedSession } = await import('./phone-mirror');
+    const { endPhone } = await import('./phone');
+    await attachedSession(SERIAL, FRONT);
+    await attachedSession(SERIAL, FRONT);
+    await endPhone('closed');
+    await attachedSession(SERIAL, FRONT);
+    expect(methods().filter((method) => method === 'Target.attachToTarget')).toHaveLength(2);
+  });
+
   test('watching follows the tab in front, not the first listed, and streams it', async () => {
     const page = connectPage();
     page.say({ op: 'watch' });
