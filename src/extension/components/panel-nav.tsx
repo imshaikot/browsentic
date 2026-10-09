@@ -23,10 +23,12 @@ export function PanelNav({
   tab,
   counts,
   onSelect,
+  hidden = [],
 }: {
   tab: PanelTab;
   counts: PanelCounts;
   onSelect: (tab: PanelTab) => void;
+  hidden?: PanelTab[];
 }) {
   const nav = useRef<HTMLElement>(null);
   const [fit, setFit] = useState<Fit>('full');
@@ -66,7 +68,7 @@ export function PanelNav({
       aria-label="Panel sections"
       className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-line px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      {TABS.map(({ id, label, icon: Icon }) => {
+      {TABS.filter(({ id }) => !hidden.includes(id)).map(({ id, label, icon: Icon }) => {
         const active = tab === id;
         const count = counts[id] ?? 0;
         const labelled = fit === 'full' || (fit === 'active' && active);

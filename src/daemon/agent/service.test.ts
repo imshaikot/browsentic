@@ -8,6 +8,10 @@ import { profilePath } from '../profile';
 import { configPath } from './config';
 import { stubCli } from './runners/fixtures/support';
 import { AgentSession } from './service';
+import { hashManifest } from '@/lib/actions/manifest';
+import { describeActions } from '@/lib/actions/registry';
+import { PHONE_TOOLS } from '@/lib/phone/features';
+import type { PhoneContext } from '@/lib/phone/types';
 
 const CODE_TOOLS = ['page.injectCode', 'page.runCode'];
 
@@ -27,12 +31,57 @@ beforeEach(() => {
   });
 });
 
-async function offerTo(runId: string, context: { sessionId?: string; liveTools?: boolean }) {
+async function offerTo(runId: string, context: { sessionId?: string; liveTools?: boolean; phone?: PhoneContext }) {
   session.handle({ t: 'instruct', id: runId, text: 'click Sign in', context });
   const offer = session.offerFor(runId);
   await vi.waitFor(() => expect(ended).toContain(runId), { timeout: 5_000 });
   return offer;
 }
+
+const PHONE: PhoneContext = { serial: 'emulator-5554', model: 'Pixel 8', android: '16', chrome: '150', viewport: { width: 411, height: 675, dpr: 2.625 } };
+
+describe('what a phone run is offered', () => {
+  const names = describeActions('chromium').map(({ name }) => name);
+
+  beforeEach(() => {
+    session = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void (event.kind === 'error' && ended.push(runId)),
+      draft: () => {},
+      actionNames: () => names,
+    });
+  });
+
+  test('exactly the phone’s tools, and no reserved ones, even with Live tool on', async () => {
+    const offer = await offerTo('p', { sessionId: 's1', phone: PHONE, liveTools: true });
+    expect(names.filter((name) => !offer!.withheld.includes(name)).sort()).toEqual([...PHONE_TOOLS].sort());
+    expect(offer!.reserved).toEqual([]);
+  });
+
+  test('a desktop run beside it is offered what it always was', async () => {
+    expect(await offerTo('d', { sessionId: 's2' })).toEqual({ withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION] });
+  });
+
+  test('a phone run leaves the tool list the browser describes, and so its hash, as it was', async () => {
+    const before = hashManifest(describeActions('chromium'));
+    await offerTo('p', { sessionId: 's1', phone: PHONE });
+    expect(hashManifest(describeActions('chromium'))).toBe(before);
+  });
+
+  test('a call to a tool off the list is refused before the browser hears of it', async () => {
+    const invoked: string[] = [];
+    const phoneSession = new AgentSession({
+      invoke: async (action) => (invoked.push(action), success({})),
+      emit: () => {},
+      draft: () => {},
+      actionNames: () => names,
+    });
+    phoneSession.handle({ t: 'instruct', id: 'p2', text: 'look', context: { sessionId: 's3', phone: PHONE } });
+    expect(await phoneSession.invokeForRun('p2', 'page.hoverElement', {})).toMatchObject({ ok: false, error: { code: 'NOT_ON_PHONE' } });
+    expect(invoked).toEqual([]);
+    phoneSession.dispose();
+  });
+});
 
 describe("what a run's tool list holds", () => {
   test('nothing, for a run that is not active', () => {

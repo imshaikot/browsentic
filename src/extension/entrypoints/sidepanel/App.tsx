@@ -5,7 +5,7 @@ import { browser } from 'wxt/browser';
 import { invokeInActiveTab } from '@/lib/actions/client';
 import { isHandsFreeCommand, isRemoveToolsCommand } from '@/lib/bridge/commands';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
-import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
+import { BRIDGE_CHANNEL, failure, type ActionResult, type FocusedElement } from '@/lib/actions/protocol';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { Wordmark } from '@/extension/components/brand';
 import { BLOCKED_HERE, BlockedSiteNote } from '@/extension/components/blocked-site-note';
@@ -17,6 +17,8 @@ import { Greeting } from '@/extension/components/greeting';
 import { MonitorBar } from '@/extension/components/monitor-bar';
 import { PanelNav, type PanelTab } from '@/extension/components/panel-nav';
 import { PhoneToggle } from '@/extension/components/phone-toggle';
+import { currentTarget } from '@/lib/bridge/phone';
+import { useMirroredPhone } from '@/lib/bridge/phone-client';
 import { RecordingBar } from '@/extension/components/recording-bar';
 import { RecordingPanel } from '@/extension/components/recording-panel';
 import { RunTimeline } from '@/extension/components/run-timeline';
@@ -59,6 +61,8 @@ const PINNED_SLACK_PX = 56;
 const DETACH_MS = 560;
 
 const DETACH_STUCK_MS = 1_500;
+/** Recordings and schedules run in desktop tabs; the phone conversation has neither. */
+const PHONE_HIDDEN_TABS: PanelTab[] = ['recordings', 'tasks'];
 
 export default function App() {
   const daemon = useDaemonState();
@@ -66,7 +70,7 @@ export default function App() {
   const star = useStarNudge(run.completed, run.sessionId, run.running);
   const [voiceEnabled, setVoiceEnabled] = useVoiceEnabled();
   const [actionCues, setActionCues] = useActionCues();
-  const handsFree = useHandsFreeSupported();
+  const handsFreeSupported = useHandsFreeSupported();
   const storedFiles = useStoredFiles();
   const sessions = useStoredSessions();
   const recordings = useStoredRecordings();
@@ -76,7 +80,10 @@ export default function App() {
   const [scheduling, setScheduling] = useState(false);
   const takeSeed = useCallback(() => setTaskSeed(null), []);
   const tabUrl = useActiveTabUrl();
-  const blockedHere = useBlockedPattern(tabUrl);
+  const phone = useMirroredPhone();
+  const onPhone = phone !== null;
+  const handsFree = handsFreeSupported && !onPhone;
+  const blockedHere = useBlockedPattern(phone ? (currentTarget(phone)?.url ?? '') : tabUrl);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
@@ -84,6 +91,14 @@ export default function App() {
   const [picking, setPicking] = useState(false);
   const [liveTools, setLiveTools] = useState(false);
   const [tab, setTab] = usePanelTab();
+  useEffect(() => {
+    if (onPhone && PHONE_HIDDEN_TABS.includes(tab)) setTab('chat');
+  }, [onPhone, tab, setTab]);
+  useEffect(() => {
+    if (!onPhone) return;
+    setScheduling(false);
+    setFocus(null);
+  }, [onPhone]);
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [, setCollapsed] = usePanelCollapsed();
   const viewport = useRef<HTMLDivElement>(null);
@@ -248,7 +263,10 @@ export default function App() {
       setAttachError(BLOCKED_HERE);
       return;
     }
-    const result = await invokeInActiveTab(getPageInfo, {});
+    const result: ActionResult<{ document: { title: string; url: string }; selection?: string }> = onPhone
+      ? ((await browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'invoke', action: getPageInfo.name, input: {} })) ??
+        failure('BRIDGE_ERROR', 'The extension did not answer.'))
+      : await invokeInActiveTab(getPageInfo, {});
     if (!result.ok) {
       voice.setInput(`${voice.input}\n[couldn’t read this page: ${result.error.message}]\n`);
       return;
@@ -358,7 +376,7 @@ export default function App() {
 
       {connectionOpen && <ConnectionSheet onClose={() => setConnectionOpen(false)} />}
 
-      <PanelNav tab={tab} counts={counts} onSelect={open} />
+      <PanelNav tab={tab} counts={counts} onSelect={open} hidden={onPhone ? PHONE_HIDDEN_TABS : []} />
 
       <SessionRail
         sessions={run.sessions}
@@ -382,7 +400,7 @@ export default function App() {
               <span className="shrink-0 font-mono text-[10px] tracking-[0.12em] text-brand uppercase">Watch</span>
             </button>
           )}
-          {run.recording && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
+          {run.recording && !onPhone && <RecordingBar state={run.recording} onStop={run.stopRecording} />}
           {run.monitors.map((monitor) => (
             <MonitorBar key={monitor.monitorId} state={monitor} onStop={() => run.stopMonitor(monitor.monitorId)} />
           ))}
@@ -396,6 +414,7 @@ export default function App() {
             run.items.length === 0 ? (
               <Greeting
                 blocker={status.blocker}
+                hidden={onPhone ? PHONE_HIDDEN_TABS : []}
                 voiceOn={voiceEnabled && voice.supported}
                 onGo={open}
                 onFix={() => setConnectionOpen(true)}
@@ -406,7 +425,7 @@ export default function App() {
                 items={run.items}
                 running={run.running}
                 onDecide={run.decide}
-                onSchedule={(text) => schedule({ text, url: tabUrl })}
+                onSchedule={onPhone ? undefined : (text) => schedule({ text, url: tabUrl })}
               />
             )
           ) : tab === 'history' ? (
@@ -461,7 +480,7 @@ export default function App() {
         {starShown && <StarBadge onStar={star.star} onClose={star.close} />}
       </div>
 
-      {showTools && (
+      {showTools && !onPhone && (
         <SavedToolList
           tools={run.tools}
           autoRunReady={run.autoRunReady}
@@ -474,7 +493,7 @@ export default function App() {
       {tab === 'chat' && (
         <footer className="shrink-0 border-t border-line p-3">
           {blockedHere && <BlockedSiteNote pattern={blockedHere} />}
-          {run.toolOffer && (
+          {run.toolOffer && !onPhone && (
             <KeepToolPrompt
               offer={run.toolOffer}
               autoRunReady={run.autoRunReady}
@@ -502,6 +521,7 @@ export default function App() {
             onToggleActionCues={() => setActionCues(!actionCues)}
             onAttachSkill={setAttachedSkill}
             handsFree={handsFree}
+            onPhone={onPhone}
             onCommand={(command) => {
               if (handsFree && isHandsFreeCommand(command)) {
                 detach();
@@ -514,7 +534,7 @@ export default function App() {
               open('chat');
               run.send(command);
             }}
-            tools={run.tools}
+            tools={onPhone ? [] : run.tools}
             onRunTool={(id) => {
               open('chat');
               run.runTool(id);

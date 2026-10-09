@@ -18,6 +18,7 @@ import { pickElement } from '@/lib/actions/page/pick-element';
 import { runCode } from '@/lib/actions/page/run-code';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { waitForElement } from '@/lib/actions/page/wait-for-element';
+import { notOnPhone, phoneOffers } from '@/lib/phone/features';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import type { FileReport } from '@/lib/files/report';
@@ -98,6 +99,8 @@ interface ActiveRun {
   focusShot?: string;
   /** The composer's “Live tool” switch, as it stood when this instruction was sent. */
   liveTools: boolean;
+  /** It drives Chrome on an Android phone, which is offered only the tools that work there. */
+  phone: boolean;
   /** Actions the user allowed once in this run that stay allowed for the rest of it. */
   approved: Set<string>;
   /** A schedule started it: an approval nobody answers is declined rather than awaited forever. */
@@ -199,6 +202,7 @@ export class AgentSession {
   offerFor(runId: string): { withheld: string[]; reserved: string[] } | null {
     const run = this.runs.get(runId);
     if (!run) return null;
+    if (run.phone) return { withheld: this.deps.actionNames().filter((name) => !phoneOffers(name)), reserved: [] };
     const codeListed = run.liveTools || (run.sessionId !== undefined && this.codeListed.has(run.sessionId));
     return {
       withheld: codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
@@ -249,6 +253,11 @@ export class AgentSession {
         summary: result.ok ? 'the picked element, as photographed' : 'no pick attached',
       });
       return result;
+    }
+
+    if (run.phone && !phoneOffers(action)) {
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'not available on the phone' });
+      return failure('NOT_ON_PHONE', notOnPhone(action));
     }
 
     if (!run.liveTools && (action === INJECT_ACTION || action === RUN_CODE_ACTION)) {
@@ -463,6 +472,7 @@ export class AgentSession {
       ownedTabIds: [],
       focusShot: context?.focus?.shot,
       liveTools: context?.liveTools === true,
+      phone: context?.phone !== undefined,
       approved: new Set(),
       scheduled: context?.task !== undefined,
       limits: RUNNERS[config.agent].limits,

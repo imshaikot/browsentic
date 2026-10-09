@@ -9,6 +9,7 @@ import { Button } from '@/extension/components/ui/button';
 import { Input } from '@/extension/components/ui/input';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { startHandsFree } from '@/lib/bridge/panel-view';
+import { useMirroredPhone } from '@/lib/bridge/phone-client';
 import { openSidePanel } from '@/lib/bridge/side-panel';
 import { useRun } from '@/lib/bridge/use-run';
 import { useHandsFreeSupported } from '@/lib/bridge/use-speech';
@@ -25,7 +26,8 @@ export default function App() {
   const daemon = useDaemonState();
   const run = useRun();
   const [micOn, setMicOn] = useState(false);
-  const handsFree = useHandsFreeSupported();
+  const onPhone = useMirroredPhone() !== null;
+  const handsFree = useHandsFreeSupported() && !onPhone;
 
   const paired = daemon?.paired ?? false;
 
