@@ -1,0 +1,2 @@
+adb-R5CT1234567-AbCdEf._adb-tls-connect._tcp device product:dm3q model:SM_S918B device:dm3q transport_id:7
+192.168.1.20:5555      offline transport_id:8

@@ -1,0 +1,2 @@
+List of devices attached
+emulator-5554          offline transport_id:18

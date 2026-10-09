@@ -112,6 +112,7 @@ const BINDING_IDLE_MS = 2 * 60 * 1000;
 const BROWSER_LABEL_MAX = 40;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const EXTENSION_ORIGIN = /^(chrome|moz|safari-web)-extension:\/\//;
+const CHROMIUM_ORIGIN = /^chrome-extension:\/\//;
 const LOOPBACK_HOST = /^(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?$/i;
 
 interface Binding {
@@ -546,7 +547,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     accepted.send({ t: 'preferencesInfo', id: '', result: success(preferencesNow()) });
     accepted.send({ t: 'taskList', id: '', result: success(scheduler.list()) });
     scheduler.linkOpened();
-    if (accepted.speaks(ANDROID_PROTOCOL)) watchAndroid(accepted);
+    if (accepted.speaks(ANDROID_PROTOCOL) && CHROMIUM_ORIGIN.test(accepted.origin)) watchAndroid(accepted);
     if (!known) await adoptExtensionManifest(accepted);
   }
 
