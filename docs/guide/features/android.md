@@ -63,9 +63,6 @@ front on the phone, kept up to date as it changes.
 The picture pauses while the phone tab is hidden, and while the phone's screen is off, because
 Chrome stops drawing then. The phone tab asks you to wake the phone.
 
-An [MCP client](../mcp-clients.md) drives the phone too while the phone tab is the active tab, with
-the same limits as below.
-
 ## What works on the phone
 
 Reading and acting on a page work the same way: page info and text, waiting for an element,
