@@ -52,10 +52,10 @@ describe('what a phone run is offered', () => {
     });
   });
 
-  test('exactly the phone’s tools with Live tool on, and no reserved ones', async () => {
+  test('exactly the phone’s tools with Live tool on, and the tool that shows an A-Eye pick', async () => {
     const offer = await offerTo('p', { sessionId: 's1', phone: PHONE, liveTools: true });
     expect(names.filter((name) => !offer!.withheld.includes(name)).sort()).toEqual([...PHONE_TOOLS].sort());
-    expect(offer!.reserved).toEqual([]);
+    expect(offer!.reserved).toEqual([FOCUS_SHOT_ACTION]);
   });
 
   test('the page-code tools only with Live tool on, the same rule as a desktop run', async () => {

@@ -19,7 +19,8 @@ vi.mock('./socket', () => ({
     phone.sent.push({ method, params });
     if (method === 'Page.getFrameTree') return success({ frameTree: { frame: { id: 'TOP' } } });
     if (method === 'Page.createIsolatedWorld') return success({ executionContextId: ++phone.contexts });
-    if (method === 'Page.getLayoutMetrics') return success({ cssVisualViewport: phone.viewport });
+    if (method === 'Page.getLayoutMetrics') return success({ cssVisualViewport: phone.viewport, cssLayoutViewport: { pageX: 0, pageY: 300, clientWidth: 411, clientHeight: 675 } });
+    if (method === 'Page.captureScreenshot') return success({ data: 'SHOT' });
     if (method === 'Runtime.evaluate' && String(params?.expression).startsWith('__browsenticPhone.dispatch')) {
       if (phone.goneOnce) {
         phone.goneOnce = false;
@@ -37,7 +38,7 @@ vi.mock('./socket', () => ({
 
 vi.mock('./phone-mirror', () => ({ attachedSession: async () => 'session-1' }));
 
-const { pageSideOnPhone, shotClip } = await import('./phone-backend');
+const { pageSideOnPhone, pickClip, shotClip } = await import('./phone-backend');
 
 const SESSION: PhoneSession = {
   serial: 'emulator-5554',
@@ -124,5 +125,31 @@ describe('a screenshot on the phone', () => {
     expect(shot.truncated).toBe(true);
     expect(shot.clip.height).toBe(5400);
     expect([shot.width, shot.height]).toEqual([Math.round(411 * (1600 / 5400)), 1600]);
+  });
+});
+
+describe('A-Eye on the phone', () => {
+  const capture = { region: { x: 20, y: 100, w: 200, h: 40 }, viewport: { w: 411, h: 675 }, dpr: 2.625 };
+  const layout = { pageX: 0, pageY: 300, clientWidth: 411, clientHeight: 675 };
+
+  test('the photograph is the element’s box, padded and kept on screen, in document coordinates at device resolution', () => {
+    expect(pickClip({ x: 20, y: 100 }, capture, layout)).toEqual({
+      clip: { x: 4, y: 384, width: 232, height: 72, scale: 1 },
+      width: Math.round(232 * 2.625),
+      height: Math.round(72 * 2.625),
+    });
+  });
+
+  test('a big element is shrunk to the longest side the desktop pick allows', () => {
+    const planned = pickClip({ x: 0, y: 0 }, { ...capture, region: { x: 0, y: 0, w: 411, h: 675 } }, layout)!;
+    expect(Math.max(planned.width, planned.height)).toBe(1200);
+  });
+
+  test('the pick runs in the page with a wait the relay allows, and comes back with the element’s photograph', async () => {
+    phone.answer = () => ({ ok: true, data: { element: { tag: 'button', selector: '#buy' }, content: 'Buy', truncated: false, url: 'https://shop.example/', title: 'Shop', capture } });
+    const picked = await pageSideOnPhone('page.pickElement', { timeoutMs: 300_000 }, SESSION);
+    expect(picked).toMatchObject({ ok: true, data: { element: { selector: '#buy' }, shot: { dataUrl: 'data:image/jpeg;base64,SHOT' } } });
+    expect(String(phone.sent.find(({ params }) => String(params?.expression).includes('page.pickElement'))?.params?.expression)).toContain('"timeoutMs":170000');
+    expect(phone.sent.find(({ method }) => method === 'Page.captureScreenshot')?.params?.clip).toEqual({ x: 4, y: 384, width: 232, height: 72, scale: 1 });
   });
 });

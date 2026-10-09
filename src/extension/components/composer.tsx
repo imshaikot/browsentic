@@ -252,19 +252,17 @@ export function Composer({
         />
 
         <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
-          {!onPhone && (
-            <Button
-              variant={focus || picking ? 'subtle' : 'ghost'}
-              size="icon-sm"
-              title="A-Eye — point at an element on the page and send it with your next message"
-              aria-label="Point at an element with A-Eye"
-              onClick={onPick}
-              disabled={!connected || picking}
-              className={cn(focus || picking ? 'text-ember' : undefined)}
-            >
-              <ScanEye className={cn('size-3.5', picking && 'animate-pulse')} />
-            </Button>
-          )}
+          <Button
+            variant={focus || picking ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            title="A-Eye — point at an element on the page and send it with your next message"
+            aria-label="Point at an element with A-Eye"
+            onClick={onPick}
+            disabled={!connected || picking}
+            className={cn(focus || picking ? 'text-ember' : undefined)}
+          >
+            <ScanEye className={cn('size-3.5', picking && 'animate-pulse')} />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"

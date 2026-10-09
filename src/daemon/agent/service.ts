@@ -206,7 +206,7 @@ export class AgentSession {
     const codeWithheld = codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION];
     if (run.phone) {
       const offPhone = this.deps.actionNames().filter((name) => !phoneOffers(name));
-      return { withheld: [...new Set([...offPhone, ...codeWithheld])], reserved: [] };
+      return { withheld: [...new Set([...offPhone, ...codeWithheld])], reserved: [FOCUS_SHOT_ACTION] };
     }
     return {
       withheld: codeWithheld,

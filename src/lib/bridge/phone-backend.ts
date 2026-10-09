@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { z } from 'zod';
+import { PICK_DEFAULT_TIMEOUT_MS } from '@/lib/actions/page/pick-element';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
 import { switchFrame } from '@/lib/actions/page/switch-frame';
@@ -21,6 +22,12 @@ const LOAD_POLL_MS = 150;
 const SETTLE_MS = 300;
 const SCROLL_PAGE = 0.85;
 const MAX_SHOT_SCREENS = 8;
+const PICK_PADDING_CSS_PX = 16;
+const MAX_PICK_SHOT_SIDE = 1200;
+const PICK_SHOT_QUALITY = 85;
+const PAINT_SETTLE_MS = 120;
+/** Under the relay's 180 s cap on one command, so the page's own timeout answers first. */
+const MAX_PICK_WAIT_MS = 170_000;
 const GONE = 'The phone disconnected. Reconnect it and switch Android on again.';
 
 type CdpResult = ActionResult<Record<string, unknown>>;
@@ -283,6 +290,58 @@ async function screenshotOn(here: Here, input: unknown): Promise<ActionResult> {
   return success({ format: plan.format, width, height, dataUrl: `data:image/${plan.format};base64,${String(shot.data.data)}`, ...(truncated ? { truncated } : {}) });
 }
 
+interface PickCapture {
+  region: { x: number; y: number; w: number; h: number };
+  viewport: { w: number; h: number };
+  dpr: number;
+}
+
+interface LayoutViewport {
+  pageX: number;
+  pageY: number;
+  clientWidth: number;
+  clientHeight: number;
+}
+
+/**
+ * The picked element's photograph: its box padded and kept on screen, in the document coordinates a
+ * phone screenshot clips in, at device resolution up to the longest side the desktop pick allows.
+ */
+export function pickClip(corner: Point, capture: PickCapture, layout: LayoutViewport): { clip: { x: number; y: number; width: number; height: number; scale: number }; width: number; height: number } | null {
+  const x = Math.max(0, corner.x - PICK_PADDING_CSS_PX);
+  const y = Math.max(0, corner.y - PICK_PADDING_CSS_PX);
+  const w = Math.min(layout.clientWidth, corner.x + capture.region.w + PICK_PADDING_CSS_PX) - x;
+  const h = Math.min(layout.clientHeight, corner.y + capture.region.h + PICK_PADDING_CSS_PX) - y;
+  if (w < 1 || h < 1) return null;
+  const dpr = capture.dpr || 1;
+  const perCssPx = Math.min(dpr, MAX_PICK_SHOT_SIDE / Math.max(w, h));
+  return {
+    clip: { x: x + layout.pageX, y: y + layout.pageY, width: w, height: h, scale: perCssPx / dpr },
+    width: Math.max(1, Math.round(w * perCssPx)),
+    height: Math.max(1, Math.round(h * perCssPx)),
+  };
+}
+
+/** A-Eye on the phone: the pick's own lens in the page, where a tap picks what is under it, then the element photographed before anything moves it. */
+async function pickOn(here: Here, input: Record<string, unknown>): Promise<ActionResult> {
+  const timeoutMs = Math.min(Number(input.timeoutMs) || PICK_DEFAULT_TIMEOUT_MS, MAX_PICK_WAIT_MS);
+  const picked = await inPage(here, 'page.pickElement', { ...input, timeoutMs });
+  if (!picked.ok) return picked;
+  const { capture, ...data } = picked.data as { capture?: PickCapture } & Record<string, unknown>;
+  const shot = capture ? await pickShot(here, capture).catch(() => null) : null;
+  return success(shot ? { ...data, shot } : data);
+}
+
+async function pickShot(here: Here, capture: PickCapture): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  const metrics = await here.cdp('Page.getLayoutMetrics');
+  if (!metrics.ok) return null;
+  const planned = pickClip(await inTopDocument(here, { x: capture.region.x, y: capture.region.y }), capture, metrics.data.cssLayoutViewport as LayoutViewport);
+  if (!planned) return null;
+  await pause(PAINT_SETTLE_MS);
+  const shot = await here.cdp('Page.captureScreenshot', { format: 'jpeg', quality: PICK_SHOT_QUALITY, clip: planned.clip, fromSurface: true }, 30_000);
+  return shot.ok ? { dataUrl: `data:image/jpeg;base64,${String(shot.data.data)}`, width: planned.width, height: planned.height } : null;
+}
+
 async function switchFrameOn(here: Here, input: unknown): Promise<ActionResult> {
   const parsed = switchFrame.input.safeParse(input ?? {});
   if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
@@ -322,6 +381,7 @@ const TOOLS: Record<string, PhoneTool> = {
   'page.scrollTo': scrollOn,
   'page.screenshot': screenshotOn,
   'page.switchFrame': switchFrameOn,
+  'page.pickElement': pickOn,
   'page.searchSite': (here, input, action) => thenLoaded(here, action, input),
   'page.submitForm': (here, input, action) => thenLoaded(here, action, input),
 };
