@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { STAR_NUDGE_KEY, asStarNudge, isDue, noteClosed, noteFinishedTurn, noteStarred, openRepositoryBeside } from './star-nudge';
+import { STAR_NUDGE_KEY, asStarNudge, noteFinishedTurn, noteStarred, openRepositoryBeside } from './star-nudge';
 import { useLocalSetting } from './use-extension-settings';
 import type { CompletedTurn } from './use-run';
 
@@ -9,19 +9,13 @@ export interface StarNudgeView {
   close: () => void;
 }
 
-interface Raise {
-  sessionId: string;
-  closes: number;
-}
-
 /**
- * Raised by a turn that finished cleanly in the conversation on screen, and only there. The next run
- * there takes it down, so a turn that fails or is stopped never brings it back, and a close in any
- * other panel retires it.
+ * Raised at most once in a conversation, by a turn that finished cleanly while it was on screen. The
+ * next run there takes it down, and a star clicked in any panel retires it everywhere.
  */
 export function useStarNudge(completed: CompletedTurn | null, onScreen: string | null, running: boolean): StarNudgeView {
   const [nudge] = useLocalSetting(STAR_NUDGE_KEY, asStarNudge);
-  const [raise, setRaise] = useState<Raise | null>(null);
+  const [raisedIn, setRaisedIn] = useState<string | null>(null);
   const watching = useRef(onScreen);
 
   useEffect(() => {
@@ -29,27 +23,23 @@ export function useStarNudge(completed: CompletedTurn | null, onScreen: string |
   }, [onScreen]);
 
   useEffect(() => {
-    if (running) setRaise(null);
+    if (running) setRaisedIn(null);
   }, [running]);
 
   useEffect(() => {
     if (!completed || completed.sessionId !== watching.current) return;
-    void noteFinishedTurn(completed.sessionId).then((next) => {
-      if (isDue(next, completed.sessionId)) setRaise({ sessionId: completed.sessionId, closes: next.closes });
+    void noteFinishedTurn(completed.sessionId).then((asks) => {
+      if (asks) setRaisedIn(completed.sessionId);
     });
   }, [completed]);
 
   return {
-    raised: raise !== null && raise.sessionId === onScreen && raise.closes === nudge.closes && isDue(nudge, raise.sessionId),
+    raised: raisedIn !== null && raisedIn === onScreen && !nudge.starred,
     star: () => {
-      setRaise(null);
+      setRaisedIn(null);
       void openRepositoryBeside();
       void noteStarred();
     },
-    close: () => {
-      if (!raise) return;
-      setRaise(null);
-      void noteClosed(raise.sessionId);
-    },
+    close: () => setRaisedIn(null),
   };
 }

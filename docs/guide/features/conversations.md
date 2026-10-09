@@ -140,10 +140,10 @@ Every action appears as it happens, with what it targeted and what came back.
 
 When an agent finishes a turn cleanly, a small **Star us on GitHub** pill can appear above the
 composer. **Star** opens the repository in a tab beside the one you are on, and the pill never comes
-back. **×** dismisses it for that conversation; it asks again in the next one, and after a second
-dismissal it waits two conversations, then three after every dismissal from then on. A stopped,
-failed or instant-command turn never raises it, and neither does a run in a tab you are not looking
-at.
+back. **×** dismisses it, and so does your next instruction. It asks at most once in a conversation
+and three times in all: in your first conversation, in the next one, and once more three
+conversations later. A stopped, failed or instant-command turn never raises it, and neither does a
+run in a tab you are not looking at.
 
 ---
 
