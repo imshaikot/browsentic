@@ -172,10 +172,34 @@ someone makes it work there and adds it, with a test. `HOST_SIDE` lists the tool
 
 The tool list a browser describes, and so its manifest hash, never changes for the phone. Instead
 `AgentSession.offerFor` withholds every tool `phoneOffers` rejects for a run whose context carries
-`phone`, and `invokeForRun` refuses a call to one. On the phone tab the side panel hides recordings,
-schedules, live tools and saved tools, A-Eye, action cues and hands-free, by the phone tab's id
-(`useMirroredPhone` in `phone-client.ts`), because without the `tabs` permission an extension
-page's URL is hidden from the panel.
+`phone`, plus the page-code tools unless Live tool is on (the desktop rule), and lists
+`browsentic_focusShot` for a pick's photograph. `invokeForRun` refuses a call to a tool off the
+list. On the phone tab the side panel hides recordings, schedules, action cues and hands-free, and
+every saved tool's "every visit" switch, by the phone tab's id (`useMirroredPhone` in
+`phone-client.ts`), because without the `tabs` permission an extension page's URL is hidden from
+the panel.
+
+## Live tools on the phone
+
+`code-toolkit.ts` keeps each approved toolkit for a **place** (`ToolkitPlace`): a desktop tab
+(`tabPlace`), or the phone's front tab (`phoneToolkitPlace` in `phone-backend.ts`, keyed
+`phone:<targetId>`). On the phone the installer is evaluated in the top document's main world with a
+plain `Runtime.evaluate` over the relay, which no page CSP can refuse. Calls run `page.runCode`'s own
+page side in the bundle's isolated world, which reaches the toolkit by DOM events exactly as the
+desktop content script does. `toolkitPlaceFor` in `phone-invoke.ts` picks the place for the panel's
+`keepTool` and `/` run. Every-visit tools need `chrome.userScripts` in the page, so they stay desktop
+only.
+
+## A-Eye on the phone
+
+`page.pickElement` runs its own lens in the bundle's world on the phone. A click on the phone tab's
+picture arrives as a tap, and the lens takes the click that follows it and swallows it, so the page
+never sees it. The wait is capped at 170 s, under the relay's 180 s per command, so the page's own
+timeout answers first. `pickOn` then photographs the element: `pickClip` pads its box, keeps it on
+screen, moves it into document coordinates (plus any frame's offset), and asks `Page.captureScreenshot`
+for it at device resolution, up to 1,200 px on the long side. The panel's A-Eye button reaches the
+phone through the background (`pickFocus` in `aeye.ts` sends the `invoke` bridge op), because the
+panel cannot reach the socket.
 
 ## The prompt
 

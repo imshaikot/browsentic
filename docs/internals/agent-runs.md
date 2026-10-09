@@ -491,23 +491,24 @@ Chrome versions, and the viewport, read when the message is sent. The run change
 
 - **Its base skill is always `phone`** (`PHONE_SKILL` in `skills.ts`), whatever the words would
   have routed to, even when a `@name` names another general skill. `browser-control.md` teaches
-  desktop tools a phone run is not offered (hover, captchas, downloads, a site's own tools, page
-  code), and naming a withheld tool invites the agent to try it. `phone.md` names only
-  `PHONE_TOOLS`, and a test holds it to that. Site notes for the phone page's host still ride
-  along; the page-scripting overlay never does, even with `liveTools` set. Like `page-scripting`,
+  desktop tools a phone run is not offered (hover, captchas, downloads, a site's own tools), and
+  naming a withheld tool invites the agent to try it. `phone.md` names only `PHONE_TOOLS`, and a
+  test holds it to that. Site notes for the phone page's host still ride along, and the
+  page-scripting overlay does with Live tool on, as on desktop. Like `page-scripting`,
   `phone` is a `general` skill kept out of desktop routing by name.
 - **Its prompt opens on the phone** (`PHONE_OPENING` in `prompt.ts`): every tool call lands on the
   tab in front on the phone, not on "whichever tab is frontmost". The numbered rules are the same.
 - **An `# Android phone` section** carries `phoneBlock(context.phone)`, such as
   `Pixel 8 · Android 16 · Chrome 150 · viewport 411×915 CSS px at 2.625x`, so the agent needs no
   tool call to learn the device. It holds no address, so it does not change with every message.
-- **Its tool list is smaller.** `offerFor` withholds every tool off `PHONE_TOOLS`, and
-  `invokeForRun` refuses a call to one with `NOT_ON_PHONE`. The tool list the browser describes
+- **Its tool list is smaller.** `offerFor` withholds every tool off `PHONE_TOOLS`, and the
+  page-code tools unless Live tool is on, and `invokeForRun` refuses a call to one with
+  `NOT_ON_PHONE`. The tool list the browser describes
   is never varied, because it feeds the manifest hash.
 
-Together these make a phone run's fixed overhead about 40 % smaller than a desktop run's: measured
-as sent on 9 Oct 2026, the repository's part of the system prompt was 7.9 KB against 19.6 KB, and
-the tool list 31 tools in 39.6 KB of JSON against 52 in 60.7 KB.
+Together these make a phone run's fixed overhead close to 40 % smaller than a desktop run's:
+measured as sent on 10 Oct 2026 with Live tool off, the repository's part of the system prompt was
+9.0 KB against 20.7 KB, and the tool list 33 tools in 41.0 KB of JSON against 52 in 60.7 KB.
 
 A conversation can move between the phone and a desktop tab when it is restored onto the other. A
 CLI that keeps its first prompt then hears the change in its next message: the `phone` and `skill`

@@ -82,16 +82,25 @@ phone's tabs, and timers. The differences:
 [Blocked sites](blocked-sites.md) are checked against the phone's own address, and
 [approvals](../approvals.md) work as they do on a desktop tab.
 
+**[A-Eye](a-eye.md)** works on the phone tab too. Press its button in the side panel, and when the
+lens shows on the phone, click the element on the phone tab's picture: that tap picks it rather
+than pressing it, and the pick carries a photograph of the element from the phone. When the agent
+asks you to point at something, it works the same way.
+
+**Live tools** work there as well. With the Live tool switch on, the agent can write code for the
+phone's page; you approve it before it runs, as on a desktop tab. You can keep the result as a
+saved tool and run it with `/` on the phone tab. A saved tool can't run on every visit on the
+phone, because nothing of Browsentic is installed there.
+
 ## What is off on the phone
 
 While the phone tab is in front, the side panel hides what only works in a desktop tab:
-[recordings](recordings.md), [scheduling](scheduling.md), live tools and saved tools,
-[A-Eye](a-eye.md), [action cues](action-cues.md) and [hands-free](hands-free.md). Voice in the
-panel, attaching a file and attaching the page's context still work. They all come back when you
-switch to a desktop tab.
+[recordings](recordings.md), [scheduling](scheduling.md), [action cues](action-cues.md) and
+[hands-free](hands-free.md). Voice in the panel, attaching a file and attaching the page's context
+still work. They all come back when you switch to a desktop tab.
 
 The agent is offered only the tools that work on the phone. Hovering, captchas, downloads,
-uploading a file to a page, page code, a site's own tools, monitors and diagnostics stay on the
+uploading a file to a page, a site's own tools, monitors and diagnostics stay on the
 desktop. If you ask for one of those, the agent says it is not available on the phone.
 
 ## Privacy and safety

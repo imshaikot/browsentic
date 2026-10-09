@@ -196,7 +196,10 @@ command or an MCP client instead.
   the agent's actions can stall or fail. Keep the phone unlocked while it works.
 - **USB, or Wi-Fi already paired with adb.** Browsentic does not pair a phone over Wi-Fi for you.
 - **Desktop-only tools stay on the desktop**: hover, captchas, downloads, uploading a file to a
-  page, page code, a site's own tools, monitors, diagnostics, recordings, scheduling and A-Eye.
+  page, a site's own tools, monitors, diagnostics, recordings and scheduling.
+- **Saved tools don't run on every visit on the phone.** They run with `/` on the phone tab; every
+  visit needs Browsentic in the page, and nothing of it is installed on the phone.
+- **Page code installs in the top document.** In a frame, the agent steps back out first.
 - **Native pickers are out of reach.** A `<select>` opens the phone's own picker, which is not part
   of the page; the agent sets its value instead. The same goes for permission prompts and anything
   else Android draws over Chrome.
