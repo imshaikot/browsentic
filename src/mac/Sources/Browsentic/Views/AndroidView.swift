@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The same words as the Windows app's Android tab (src/windows/ui/views/android.tsx): change both together.
+/// The words of src/lib/phone/copy.ts, which the Windows app imports: change both together.
 enum AndroidCopy {
     static let title = "Drive Chrome on your Android phone"
     static let subtitle = "Browsentic Bridge reaches Chrome on your phone through adb, Android's debugging tool. Nothing is installed on the phone."

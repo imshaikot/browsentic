@@ -57,13 +57,14 @@ its shell commands through.
 
 ## The window
 
-The tabs float at the top; Ctrl+1 to Ctrl+8 switch between them. Ctrl+Shift+D turns the Bridge
+The tabs float at the top; Ctrl+1 to Ctrl+9 switch between them. Ctrl+Shift+D turns the Bridge
 on or off, Ctrl+Shift+R restarts it, and Ctrl+Shift+P gets a new pairing code.
 
 | Tab | What you do there |
 | --- | --- |
 | **Overview** | Turn Browsentic Bridge on and off with the power button, restart it, see its address and version. One row per browser: where its extension comes from, whether it is connected, and a button that adds it from the store. The unpacked folder sits behind **Load it unpacked instead** |
 | **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser and the store its extension came from, unpair one or all |
+| **Android** | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each, the same checks `browsentic android` prints. A row that fails says what to do, with **Open Chrome on the phone**, **Get Chrome**, the `winget` command that installs adb, or the page of phone makers' USB drivers, which many phones need before Windows shows them to adb. **Set up your phone** has the steps. The Bridge looks for phones only while this tab is open |
 | **Agents** | See which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |

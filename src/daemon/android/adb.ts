@@ -5,6 +5,8 @@ import { posix, win32 } from 'node:path';
 import { spawnCli, stopTree, variable } from '../agent/runners/command';
 
 const VERSION_TIMEOUT_MS = 5_000;
+/** `winget install Google.PlatformTools` unpacks here and puts the folder on PATH, which a Bridge started earlier does not see. */
+const WINGET_PLATFORM_TOOLS = 'Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe';
 const START_SERVER_TIMEOUT_MS = 15_000;
 
 export interface AdbFound {
@@ -26,11 +28,12 @@ export function adbCandidates({ configured, env = process.env, platform = proces
   const windows = platform === 'win32';
   const path = windows ? win32 : posix;
   const exe = windows ? 'adb.exe' : 'adb';
+  const localAppData = variable(env, 'LOCALAPPDATA') ?? path.join(home, 'AppData', 'Local');
   const sdkRoots = [
     variable(env, 'ANDROID_HOME'),
     variable(env, 'ANDROID_SDK_ROOT'),
     platform === 'darwin' ? path.join(home, 'Library', 'Android', 'sdk') : undefined,
-    windows ? path.join(variable(env, 'LOCALAPPDATA') ?? path.join(home, 'AppData', 'Local'), 'Android', 'Sdk') : undefined,
+    windows ? path.join(localAppData, 'Android', 'Sdk') : undefined,
     platform === 'linux' ? path.join(home, 'Android', 'Sdk') : undefined,
   ];
   const candidates = [
@@ -41,7 +44,7 @@ export function adbCandidates({ configured, env = process.env, platform = proces
       .filter(Boolean)
       .map((dir) => path.join(dir, exe)),
     ...sdkRoots.filter((root): root is string => !!root).map((root) => path.join(root, 'platform-tools', exe)),
-    ...(windows ? [] : ['/opt/homebrew/bin/adb', '/usr/local/bin/adb']),
+    ...(windows ? [path.join(localAppData, 'Microsoft', 'WinGet', 'Packages', WINGET_PLATFORM_TOOLS, 'platform-tools', exe)] : ['/opt/homebrew/bin/adb', '/usr/local/bin/adb']),
   ];
   return [...new Set(candidates.filter((candidate): candidate is string => !!candidate))];
 }

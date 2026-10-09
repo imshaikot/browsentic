@@ -28,14 +28,19 @@ describe('where adb is looked for', () => {
     ]);
   });
 
-  test('Windows: adb.exe on PATH however the variable is spelled, then the SDK under LOCALAPPDATA', () => {
+  test('Windows: adb.exe on PATH however the variable is spelled, the SDK under LOCALAPPDATA, then where winget unpacks it', () => {
     expect(
       adbCandidates({
         platform: 'win32',
         home: 'C:\\Users\\me',
         env: { Path: '"C:\\Tools";C:\\Windows', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
       }),
-    ).toEqual(['C:\\Tools\\adb.exe', 'C:\\Windows\\adb.exe', 'C:\\Users\\me\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe']);
+    ).toEqual([
+      'C:\\Tools\\adb.exe',
+      'C:\\Windows\\adb.exe',
+      'C:\\Users\\me\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe',
+      'C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\platform-tools\\adb.exe',
+    ]);
   });
 
   test('Linux: the SDK Android Studio makes in the home directory', () => {

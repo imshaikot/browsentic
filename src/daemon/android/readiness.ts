@@ -1,9 +1,8 @@
+import { PLATFORM_TOOLS_URL } from '@/lib/phone/copy';
 import type { AndroidDevice, AndroidProblem, AndroidState } from '@/lib/phone/types';
 import type { AdbFound } from './adb';
 import type { TrackedDevice } from './devices';
 import type { PhoneFacts } from './phone-facts';
-
-export const PLATFORM_TOOLS_URL = 'https://developer.android.com/tools/releases/platform-tools';
 
 const INSTALL_ADB: Partial<Record<NodeJS.Platform, string>> = {
   darwin: 'brew install --cask android-platform-tools',

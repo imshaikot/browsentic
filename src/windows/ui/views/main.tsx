@@ -1,10 +1,11 @@
-import { AlignLeft, BookOpen, Globe, Info, Power, Settings, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { AlignLeft, BookOpen, Globe, Info, Power, Settings, ShieldCheck, Smartphone, Sparkles, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { TABS, type Model, type State, type Tab } from '../model';
 import { AboutView } from './about';
 import { ActivityView } from './activity';
 import { AgentsView } from './agents';
+import { AndroidView } from './android';
 import { BrowsersView } from './browsers';
 import { LogsView } from './logs';
 import { OverviewView } from './overview';
@@ -14,6 +15,7 @@ import { SkillsView } from './skills';
 const TAB: Record<Tab, { label: string; icon: LucideIcon; view: typeof OverviewView }> = {
   overview: { label: 'Overview', icon: Power, view: OverviewView },
   browsers: { label: 'Browsers', icon: Globe, view: BrowsersView },
+  android: { label: 'Android', icon: Smartphone, view: AndroidView },
   agents: { label: 'Agents', icon: Sparkles, view: AgentsView },
   skills: { label: 'Skills', icon: BookOpen, view: SkillsView },
   activity: { label: 'Activity', icon: ShieldCheck, view: ActivityView },
@@ -36,7 +38,7 @@ export function MainView({ model, state }: { model: Model; state: State }) {
   );
 }
 
-/** The view switcher floats at the top centre, Ctrl+1…Ctrl+8. */
+/** The view switcher floats at the top centre, Ctrl+1…Ctrl+9. */
 function TabCapsule({ model, state }: { model: Model; state: State }) {
   return (
     <nav className="absolute top-1.5 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full border border-line bg-surface/80 p-1 shadow-[0_6px_18px_rgb(0_0_0/0.25)] backdrop-blur-md">

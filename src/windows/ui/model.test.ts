@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Backend } from './backend';
 import { mockBackend } from './mock-backend';
-import { Model, outcome, parseJson, short, type State } from './model';
+import { Model, TABS, outcome, parseJson, short, type State } from './model';
 import { splitLine } from './views/logs';
 
 const instantly = () => Promise.resolve();
@@ -178,5 +178,74 @@ describe('the running app', () => {
     model.setStartDaemonOnLaunch(false);
     const again = start(mockBackend({ instant: true }));
     expect([again.snapshot().appearance, again.snapshot().startDaemonOnLaunch]).toEqual(['dark', false]);
+  });
+});
+
+describe('the Android tab', () => {
+  /** The mock backend, with a hand on its event stream and a record of what reached the control socket. */
+  function phoneBackend() {
+    const backend = mockBackend({ instant: true });
+    const frames: Record<string, unknown>[] = [];
+    let announce: (event: string) => void = () => undefined;
+    return {
+      frames,
+      announce: (event: string) => announce(event),
+      backend: {
+        ...backend,
+        controlRequest: (frame: Record<string, unknown>, timeoutMs?: number) => (frames.push(frame), backend.controlRequest(frame, timeoutMs)),
+        onControlEvent: (listener: (event: string) => void) => ((announce = listener), backend.onControlEvent(listener)),
+      } satisfies Backend,
+    };
+  }
+
+  it('sits after Browsers, so Ctrl+3 opens it and About is Ctrl+9', () => {
+    expect(TABS.indexOf('android')).toBe(2);
+    expect(TABS.at(-1)).toBe('about');
+    expect(TABS.length).toBeLessThanOrEqual(9);
+  });
+
+  it('watches for phones only while it shows, and reads the checklist the CLI prints', async () => {
+    const { backend, frames } = phoneBackend();
+    const model = start(backend);
+    await model.runPreflight();
+    await until(model, (state) => state.daemon === 'on');
+    await model.watchAndroid(true);
+    const android = model.snapshot().android;
+    expect(android?.problem?.code).toBe('ADB_MISSING');
+    expect(android?.report.sections[0].checks[0]).toMatchObject({ label: 'adb', mark: 'failed', fix: 'winget install Google.PlatformTools' });
+    await model.watchAndroid(false);
+    expect(frames.filter((frame) => frame.op === 'android')).toEqual([
+      { op: 'android', watch: true },
+      { op: 'android', watch: false },
+    ]);
+  });
+
+  it('reads the phone again when the Bridge says it changed, and the Windows copy names the USB driver', async () => {
+    const { backend, announce } = phoneBackend();
+    const model = start(backend);
+    await model.runPreflight();
+    await until(model, (state) => state.daemon === 'on');
+    await model.watchAndroid(true);
+    announce('android-changed');
+    await until(model, (state) => state.android?.problem?.code === 'NO_DEVICE');
+    expect(model.snapshot().android?.problem?.message).toMatch(/USB driver/);
+  });
+
+  it('opens Chrome on the phone through the Bridge, and remembers that a phone has been ready', async () => {
+    const { backend, frames } = phoneBackend();
+    const model = start(backend);
+    await model.runPreflight();
+    await until(model, (state) => state.daemon === 'on');
+    await model.watchAndroid(true);
+    for (const code of ['NO_DEVICE', 'DEVICE_UNAUTHORIZED', 'CHROME_NOT_RUNNING']) {
+      await model.loadAndroid();
+      expect(model.snapshot().android?.problem?.code).toBe(code);
+    }
+    expect(model.snapshot().androidReadyOnce).toBe(false);
+    await model.openChrome('38041FDJH00ABC');
+    expect(frames.at(-1)).toEqual({ op: 'android', launch: '38041FDJH00ABC' });
+    expect(model.snapshot().android?.ready).toBe(true);
+    expect(model.snapshot().androidReadyOnce).toBe(true);
+    expect(start(mockBackend({ instant: true })).snapshot().androidReadyOnce).toBe(true);
   });
 });
