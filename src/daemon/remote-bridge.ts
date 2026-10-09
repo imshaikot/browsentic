@@ -73,7 +73,7 @@ export class RemoteBridge implements Bridge {
     throw new Error('The Browsentic daemon did not answer about its agent');
   }
 
-  async android(request?: { launch?: string; watch?: boolean }): Promise<ActionResult<AndroidState>> {
+  async android(request?: { launch?: string; url?: string; watch?: boolean; peek?: boolean }): Promise<ActionResult<AndroidState>> {
     const reply = await this.request({ id: randomUUID(), op: 'android', ...request });
     if (reply && 'op' in reply && reply.op === 'android') return reply.result;
     return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not answer about Android');

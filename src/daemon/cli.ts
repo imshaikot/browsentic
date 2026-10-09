@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { describeActions } from '@/lib/actions/registry';
+import { ANDROID_PROTOCOL } from '@/lib/actions/protocol';
+import type { AndroidState } from '@/lib/phone/types';
 import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type AgentState, type ModelList } from '@/lib/agents/catalog';
 import { SOURCE_LABEL } from '@/lib/stores';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
@@ -10,6 +12,7 @@ import { formatWhen } from '@/lib/format-when';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { agentSkills } from './agent/agent-skills';
+import { androidArgs, androidJson, androidLines, androidStatus } from './android/report';
 import {
   BROWSER_IDS,
   BROWSERS,
@@ -62,6 +65,9 @@ const USAGE = `browsentic ${pkg.version} — Browsentic Bridge, the half of Brow
   browsentic agent model <name> [model]   pin that agent's model, or omit it for the CLI's default
   browsentic agent models <name>          list the models that agent offers; --refresh asks its CLI again
 
+  browsentic android          whether a phone is ready to drive from the side panel, and what to fix if not
+  browsentic android open [url]       open Chrome on the phone, at that page if one is given; --serial picks the phone
+
   browsentic skills           list the skills the agent can route to, and where they came from
   browsentic approvals        list the “always on this site” approvals you have granted
   browsentic approvals clear [host]   forget them, all of them or one site's
@@ -77,7 +83,7 @@ const USAGE = `browsentic ${pkg.version} — Browsentic Bridge, the half of Brow
   browsentic restart          stop the Bridge and bring up a fresh one
   browsentic token            print the control token (for MCP clients, not the browser)
 
-  setup, browsers, agent, skills, approvals, tasks and downloads take --json, which is what the apps read.
+  setup, browsers, agent, android, skills, approvals, tasks and downloads take --json, which is what the apps read.
   browsentic --version        print the version
 
 Getting started:  browsentic setup
@@ -145,6 +151,9 @@ switch (command) {
     break;
   case 'agent':
     await chooseAgent(positional[0], positional[1], positional[2]);
+    break;
+  case 'android':
+    await android(process.argv.slice(3));
     break;
   case 'tools':
     printTools();
@@ -289,6 +298,7 @@ async function showStatus(): Promise<void> {
   const status = await bridge.status();
   const sessions = await bridge.sessions();
   const agents = await bridge.agent();
+  const phone = status.protocolVersion >= ANDROID_PROTOCOL ? await bridge.android({ peek: true }) : null;
   await bridge.close();
   const active = agents.runners.find((runner) => runner.kind === agents.active);
   console.log(`bridge:    running on 127.0.0.1:${status.port} (pid ${lock.pid}, v${status.daemonVersion})`);
@@ -296,6 +306,7 @@ async function showStatus(): Promise<void> {
   console.log(
     `agent:     ${AGENTS[agents.active].label} — ${active?.ready ? active.version ?? 'ready' : active?.problem?.message ?? 'unavailable'}`,
   );
+  if (phone) console.log(`android:   ${androidStatus(phone.ok ? phone.data : null)}`);
 
   // An unpacked copy is the one thing an update cannot reach: "updated, never pressed ↻" is the
   // failure the reload hint names. A store copy updates when its browser says, so it gets none.
@@ -905,6 +916,52 @@ async function revoke(browser?: string): Promise<void> {
   await bridge.close();
   if (!revoked) return console.log(browser ? `No session for ${browser}.` : 'Nothing to revoke.');
   console.log(`Revoked ${revoked} session(s). Pair again with "browsentic pair".`);
+}
+
+async function android(args: string[]): Promise<void> {
+  const { sub, url, serial: named } = androidArgs(args);
+  if (sub && sub !== 'open') {
+    console.error(`Unknown command "android ${sub}". Use "browsentic android" or "browsentic android open [url]".`);
+    process.exit(1);
+  }
+
+  const bridge = await connect();
+  const read = await bridge.android();
+  if (!read.ok) {
+    await bridge.close();
+    console.error(read.error.message);
+    process.exit(1);
+  }
+  if (!sub) {
+    await bridge.close();
+    if (wantsJson) console.log(JSON.stringify(androidJson(read.data), null, 2));
+    else console.log(androidLines(read.data).join('\n'));
+    return;
+  }
+
+  const serial = named ?? onlyPhone(read.data);
+  const opened = await bridge.android({ launch: serial, url });
+  await bridge.close();
+  if (!opened.ok) {
+    console.error(opened.error.message);
+    process.exit(1);
+  }
+  const phone = opened.data.devices.find((device) => device.serial === serial);
+  if (!phone?.chrome.debuggable) {
+    console.error(phone?.problem?.message ?? 'Chrome did not open on the phone.');
+    process.exit(1);
+  }
+  console.log(url ? `Opened ${url} in Chrome on ${phone.model ?? serial}.` : `Chrome is open on ${phone.model ?? serial}.`);
+}
+
+function onlyPhone(state: AndroidState): string {
+  if (state.devices.length === 1) return state.devices[0].serial;
+  if (!state.devices.length) {
+    console.error(state.problem?.message ?? 'No Android phone is connected.');
+    process.exit(1);
+  }
+  console.error(`${state.devices.length} phones are connected. Name one with --serial: ${state.devices.map((device) => device.serial).join(', ')}`);
+  process.exit(1);
 }
 
 async function connect(): Promise<RemoteBridge> {

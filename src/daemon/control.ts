@@ -51,8 +51,11 @@ export type ControlRequest =
   /** `watch` also subscribes this caller to `settings-changed`, which no other caller is sent. */
   | { id: string; op: 'preferences'; watch?: boolean }
   | { id: string; op: 'setPreference'; change: unknown }
-  /** `launch` opens Chrome on that phone. `watch` subscribes this caller to `android-changed`. */
-  | { id: string; op: 'android'; launch?: string; watch?: boolean };
+  /**
+   * `launch` opens Chrome on that phone, at `url` when one is given. `watch` subscribes this caller to
+   * `android-changed`. `peek` answers only what is already known, NOT_CHECKED while nobody watches.
+   */
+  | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }

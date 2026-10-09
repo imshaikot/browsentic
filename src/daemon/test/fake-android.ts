@@ -43,6 +43,10 @@ export class FakeAndroid implements Android {
     return this.current;
   }
 
+  peek(): AndroidState | null {
+    return this.watchers ? this.current : null;
+  }
+
   watch(listener: (state: AndroidState) => void): () => void {
     this.listeners.add(listener);
     queueMicrotask(() => this.listeners.has(listener) && listener(this.current));

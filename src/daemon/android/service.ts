@@ -12,6 +12,8 @@ import { startRelay, type CdpRequest, type PhoneOwner } from './relay';
 
 export interface Android {
   state(): Promise<AndroidState>;
+  /** What is already known, without looking: null while nobody watches, so a status line never starts adb. */
+  peek(): AndroidState | null;
   /**
    * A watcher hears the state as soon as it is known, then every change. The Bridge looks for phones
    * only while someone holds a watch, and the returned function lets go of it.
@@ -45,6 +47,7 @@ export const ANDROID_OFF_STATE: AndroidState = judge({ enabled: false, platform:
 export function androidOff(): Android {
   return {
     state: async () => ANDROID_OFF_STATE,
+    peek: () => ANDROID_OFF_STATE,
     watch: (listener) => {
       queueMicrotask(() => listener(ANDROID_OFF_STATE));
       return () => {};
@@ -210,6 +213,7 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
 
   return {
     state: current,
+    peek: () => (watched() ? latest : null),
 
     watch(listener) {
       heard.set(listener, '');
@@ -240,7 +244,7 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
       }
       try {
         if (!device.chrome.installed) await openChromeListing(deps.server, serial);
-        else if (!device.chrome.debuggable) await launchChrome(deps.server, serial, url);
+        else if (!device.chrome.debuggable || url) await launchChrome(deps.server, serial, url);
       } catch (error) {
         return failure('DEVICE_OFFLINE', `The phone did not open Chrome: ${error instanceof Error ? error.message : String(error)}`);
       }

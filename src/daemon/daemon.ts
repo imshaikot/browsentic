@@ -559,6 +559,11 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     androidWatches.set(link, android.watch(push));
   }
 
+  function peekAndroid(): ActionResult<AndroidState> {
+    const known = android.peek();
+    return known ? success(known) : failure('NOT_CHECKED', 'Nobody is watching for phones, so the Bridge has not looked.');
+  }
+
   function unwatchAndroid(watcher: ExtensionLink | WebSocket): void {
     androidWatches.get(watcher)?.();
     androidWatches.delete(watcher);
@@ -887,7 +892,11 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         if (request.watch && !androidWatches.has(ws)) {
           androidWatches.set(ws, android.watch((state) => send(ws, { event: 'android-changed', state })));
         }
-        const result = request.launch ? await android.launch(request.launch) : success(await android.state());
+        const result = request.launch
+          ? await android.launch(request.launch, request.url)
+          : request.peek
+            ? peekAndroid()
+            : success(await android.state());
         return send(ws, { id: request.id, op: 'android', result });
       }
       if (request.op === 'setPreference') {

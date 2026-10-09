@@ -9,8 +9,8 @@ const AM_TIMEOUT_MS = 10_000;
 export const INSTALL_CHROME_COMMAND = `am start -a android.intent.action.VIEW -d 'market://details?id=${CHROME_PACKAGE}'`;
 
 /**
- * A VIEW intent opens a new tab every time Chrome is already running, so a URL rides along only
- * on a cold start; a running Chrome is sent its URLs over DevTools.
+ * With a URL this is a VIEW intent, which opens a new tab every time Chrome is already running:
+ * only a person asking for that page sends one, and a session opens its pages over DevTools.
  */
 export function launchChromeCommand(url?: string): string {
   const target = url && webUrl(url);

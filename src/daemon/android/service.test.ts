@@ -209,7 +209,7 @@ describe('opening Chrome on the phone', () => {
     expect(adb.shells).toContain(launchChromeCommand());
   });
 
-  test('a URL rides along on a cold start only', async () => {
+  test('a URL rides along with the start', async () => {
     start();
     adb.facts = fixture('facts-chrome-closed.txt');
     await android.launch('emulator-5554', 'https://example.com/a');
@@ -219,10 +219,25 @@ describe('opening Chrome on the phone', () => {
     expect(launchChromeCommand('javascript:alert(1)')).toBe(launchChromeCommand());
   });
 
-  test('an open Chrome is left alone', async () => {
+  test('an open Chrome is left alone, unless a page was asked for, which opens in a new tab', async () => {
     start();
-    await android.launch('emulator-5554', 'https://example.com');
+    await android.launch('emulator-5554');
     expect(adb.shells.filter((command) => command.startsWith('am start'))).toEqual([]);
+    await android.launch('emulator-5554', 'https://example.com/');
+    expect(adb.shells.filter((command) => command.startsWith('am start'))).toEqual([launchChromeCommand('https://example.com/')]);
+  });
+
+  test('a peek knows nothing until someone watches, and never asks the phone', async () => {
+    start();
+    expect(android.peek()).toBeNull();
+    const { states, listener } = heard();
+    const release = android.watch(listener);
+    await until(() => states.length === 1);
+    const asked = adb.shells.length;
+    expect(android.peek()).toEqual(states[0]);
+    expect(adb.shells.length).toBe(asked);
+    release();
+    expect(android.peek()).toBeNull();
   });
 
   test('a missing Chrome opens its Play Store page instead', async () => {

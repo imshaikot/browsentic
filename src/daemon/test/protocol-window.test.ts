@@ -174,6 +174,12 @@ describe('Android across the protocol window', () => {
     expect(android.watchers).toBe(0);
   });
 
+  test('a peek answers only while someone watches', async () => {
+    expect(await (await control()).android({ peek: true })).toMatchObject({ ok: false, error: { code: 'NOT_CHECKED' } });
+    await pair({ ...store, protocolVersion: ANDROID_PROTOCOL });
+    expect(await (await control()).android({ peek: true })).toEqual({ ok: true, data: NO_PHONE });
+  });
+
   test('an agent run cannot open Chrome on the phone through the control socket', async () => {
     const run = await RemoteBridge.connect(daemon.port, readLockfile()!.token, 'run-1');
     opened.push(run);

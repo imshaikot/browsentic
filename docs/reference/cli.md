@@ -96,6 +96,18 @@ See [guide/pair.md](../guide/pair.md).
 `agent fix` was called `agent setup` before `setup` came to mean installing Browsentic. The old
 spelling still works and is undocumented.
 
+## Android
+
+| Command | Does |
+| --- | --- |
+| `browsentic android` | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each. A row that fails says what to do; when nothing is ready, the setup steps follow |
+| `browsentic android open [url]` | Open Chrome on the phone, at that page if one is given (in a new tab when Chrome is already open). With more than one phone, name it with `--serial <serial>` |
+
+`android` takes `--json`: the state the apps read, with the setup steps as `guide`. Browsentic finds
+adb on `PATH`, under `ANDROID_HOME` or `ANDROID_SDK_ROOT`, in Android Studio's SDK, or where Homebrew
+puts it; `"android": { "adb": "<path>" }` in `config.json` names one, and
+`"android": { "enabled": false }` stops the Bridge using adb at all.
+
 ## MCP
 
 | Command | Does |
@@ -109,7 +121,7 @@ configurations written against the older name keep working.
 
 | Command | Does |
 | --- | --- |
-| `browsentic status` | The Bridge, which browsers can start it, the agent, and one row per paired browser with its extension version, its store and whether it is connected; flags an unpacked copy that needs ↻ and two copies answering in one browser |
+| `browsentic status` | The Bridge, which browsers can start it, the agent, Android, and one row per paired browser with its extension version, its store and whether it is connected; flags an unpacked copy that needs ↻ and two copies answering in one browser. The Android line says what the Bridge already knows and never starts adb: `not checked` until a browser is watching for phones |
 | `browsentic logs` | Print the Bridge's log (`~/.browsentic/daemon.log`) |
 | `browsentic tools` | Print the bundled tool manifest as JSON. **No browser needed** |
 | `browsentic skills` | Every skill the router can see, tagged `bundled`, `user` or `uploaded` |
@@ -122,7 +134,7 @@ configurations written against the older name keep working.
 | `browsentic downloads clear` | Delete all of them |
 | `browsentic token` | The control token, for MCP clients. Not for the browser |
 
-`agent`, `skills`, `approvals`, `tasks` and `downloads` take `--json`. It is what the [macOS](../guide/mac-app.md) and
+`agent`, `android`, `skills`, `approvals`, `tasks` and `downloads` take `--json`. It is what the [macOS](../guide/mac-app.md) and
 [Windows](../guide/windows-app.md) apps read, so an app and a terminal can never disagree about what is on disk.
 
 ## Lifecycle
