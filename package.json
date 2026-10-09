@@ -1,6 +1,6 @@
 {
   "name": "browsentic",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Browsentic: an agentic browser harness for the AI agent you already run",
   "license": "Apache-2.0",
   "private": true,

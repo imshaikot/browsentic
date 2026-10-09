@@ -1,7 +1,7 @@
 {
   "name": "browsentic",
   "mcpName": "io.github.imshaikot/browsentic",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "An agentic browser harness: run the agent CLI you already use (Claude Code, Codex, Cursor) in your real, signed-in browser from a side panel. Sets up Browsentic Bridge and the extension; MCP is optional.",
   "type": "module",
   "license": "Apache-2.0",
