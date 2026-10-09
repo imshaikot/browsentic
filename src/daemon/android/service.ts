@@ -1,5 +1,5 @@
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
-import type { AndroidState } from '@/lib/phone/types';
+import type { AndroidState, PhoneOpened } from '@/lib/phone/types';
 import { androidSettings, readAgentConfig, type AndroidSettings } from '../agent/config';
 import { log } from '../log';
 import { locateAdb, startServer, type AdbFound } from './adb';
@@ -8,6 +8,7 @@ import { parseDeviceList, type TrackedDevice } from './devices';
 import { launchChrome, openChromeListing } from './launch';
 import { FACTS_COMMAND, parseFacts, type PhoneFacts } from './phone-facts';
 import { judge } from './readiness';
+import { startRelay, type CdpRequest, type PhoneOwner } from './relay';
 
 export interface Android {
   state(): Promise<AndroidState>;
@@ -17,6 +18,12 @@ export interface Android {
    */
   watch(listener: (state: AndroidState) => void): () => void;
   launch(serial: string, url?: string): Promise<ActionResult<AndroidState>>;
+  /** A session with Chrome on the phone, owned by the browser that opened it; only that browser's commands reach it. */
+  open(owner: PhoneOwner, serial: string): Promise<ActionResult<PhoneOpened>>;
+  command(owner: PhoneOwner, request: CdpRequest): Promise<ActionResult<Record<string, unknown>>>;
+  close(owner: PhoneOwner, serial: string): Promise<void>;
+  /** The owner went away: its sessions end without telling it. */
+  release(owner: PhoneOwner): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -42,10 +49,16 @@ export function androidOff(): Android {
       queueMicrotask(() => listener(ANDROID_OFF_STATE));
       return () => {};
     },
-    launch: async () => failure('ANDROID_OFF', ANDROID_OFF_STATE.problem?.message ?? 'Android is switched off.'),
+    launch: async () => switchedOff(),
+    open: async () => switchedOff(),
+    command: async () => switchedOff(),
+    close: async () => {},
+    release: async () => {},
     stop: async () => {},
   };
 }
+
+const switchedOff = () => failure('ANDROID_OFF', ANDROID_OFF_STATE.problem?.message ?? 'Android is switched off.');
 
 export function liveAndroidDeps(): AndroidDeps {
   return {
@@ -71,6 +84,17 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
   let retrack: ReturnType<typeof setTimeout> | undefined;
   let refreshing: Promise<AndroidState> | null = null;
   let again = false;
+  let session: AndroidState['session'];
+  const current = (): Promise<AndroidState> => (latest && tracker ? Promise.resolve(latest) : refresh());
+  const relay = startRelay({
+    server: deps.server,
+    state: current,
+    onSession: (next) => {
+      session = next;
+      if (latest) publish({ ...latest, session });
+      void refresh();
+    },
+  });
 
   const watched = () => heard.size > 0;
 
@@ -128,7 +152,7 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
 
   async function observe(): Promise<AndroidState> {
     const settings = deps.settings();
-    const seen = { enabled: settings.enabled, platform: deps.platform, devices: [] };
+    const seen = { enabled: settings.enabled, platform: deps.platform, devices: [], session };
     if (!settings.enabled) {
       stopTracking();
       return judge(seen);
@@ -185,7 +209,7 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
   }
 
   return {
-    state: () => (latest && tracker ? Promise.resolve(latest) : refresh()),
+    state: current,
 
     watch(listener) {
       heard.set(listener, '');
@@ -223,7 +247,13 @@ export function startAndroid(deps: AndroidDeps = liveAndroidDeps()): Android {
       return success(await refresh());
     },
 
+    open: (owner, serial) => relay.open(owner, serial),
+    command: (owner, request) => relay.command(owner, request),
+    close: (owner, serial) => relay.close(owner, serial),
+    release: (owner) => relay.release(owner),
+
     async stop() {
+      await relay.stop();
       heard.clear();
       clearInterval(ticker);
       stopTracking();

@@ -425,6 +425,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         scheduler.linkClosed(closing.id);
         analyses.cancelOwnedBy(closing);
         unwatchAndroid(closing);
+        void android.release(closing);
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
         scheduleIdleExit();
@@ -573,9 +574,13 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     }
     if (request.t === 'phoneLaunch') {
       void android.launch(request.serial, request.url).then((result) => source.send({ t: 'androidInfo', id: request.id, result }));
-      return;
+    } else if (request.t === 'phoneOpen') {
+      void android.open(source, request.serial).then((result) => source.send({ t: 'phoneOpened', id: request.id, result }));
+    } else if (request.t === 'cdp') {
+      void android.command(source, request).then((result) => source.send({ t: 'cdpResult', id: request.id, result }));
+    } else {
+      void android.close(source, request.serial);
     }
-    answer(failure('UNSUPPORTED', 'This Bridge cannot drive a phone yet.'));
   }
 
   function openLinks(): ExtensionLink[] {

@@ -34,6 +34,8 @@ afterEach(async () => {
   clearAuth();
   android.current = NO_PHONE;
   android.launched.length = 0;
+  android.asked.length = 0;
+  android.released.length = 0;
 });
 
 async function control(): Promise<RemoteBridge> {
@@ -129,6 +131,34 @@ describe('Android across the protocol window', () => {
       result: { ok: true, data: READY_PHONE },
     });
     expect(android.launched).toEqual(['emulator-5554']);
+  });
+
+  test('a protocol-23 extension\'s phone requests reach the Bridge\'s Android half, and leaving releases its sessions', async () => {
+    android.current = READY_PHONE;
+    const browser = await pair({ ...store, protocolVersion: ANDROID_PROTOCOL });
+    expect(await browser.ask({ t: 'phoneOpen', id: 'open-2', serial: 'emulator-5554' })).toMatchObject({
+      t: 'phoneOpened',
+      result: { ok: true, data: { device: { serial: 'emulator-5554' } } },
+    });
+    expect(await browser.ask({ t: 'cdp', id: 'cdp-2', serial: 'emulator-5554', method: 'Runtime.evaluate', params: { expression: '1' } })).toEqual({
+      t: 'cdpResult',
+      id: 'cdp-2',
+      result: { ok: true, data: { echoed: 'Runtime.evaluate' } },
+    });
+    browser.tell({ t: 'phoneClose', id: 'close-2', serial: 'emulator-5554' });
+    await browser.focus();
+    expect(android.asked.map(({ t, method }) => method ?? t)).toEqual(['phoneOpen', 'Runtime.evaluate', 'phoneClose']);
+    expect(new Set(android.asked.map(({ owner }) => owner))).toEqual(new Set([store.installId]));
+
+    browser.close();
+    await browser.closed;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(android.released).toEqual([store.installId]);
+  });
+
+  test('a Firefox extension is not watched for phones, since its toggle is hidden', async () => {
+    await pair({ origin: 'moz-extension://8f0e1d2c-0000-4000-8000-000000000000', installId: 'install-firefox-01', browser: 'Firefox', protocolVersion: ANDROID_PROTOCOL });
+    expect(android.watchers).toBe(0);
   });
 
   test('the control op answers the state, and a watcher hears it and each change', async () => {

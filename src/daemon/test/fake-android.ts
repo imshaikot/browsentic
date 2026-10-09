@@ -1,5 +1,6 @@
-import { success, type ActionResult } from '@/lib/actions/protocol';
-import type { AndroidState } from '@/lib/phone/types';
+import { failure, success, type ActionResult } from '@/lib/actions/protocol';
+import type { AndroidState, PhoneOpened } from '@/lib/phone/types';
+import type { CdpRequest, PhoneOwner } from '../android/relay';
 import type { Android } from '../android/service';
 
 export const NO_PHONE: AndroidState = {
@@ -29,6 +30,9 @@ export const READY_PHONE: AndroidState = {
 export class FakeAndroid implements Android {
   current: AndroidState = NO_PHONE;
   readonly launched: string[] = [];
+  /** Every phone request that reached the Bridge's Android half, by the browser that sent it. */
+  readonly asked: { owner: string; t: string; serial: string; method?: string }[] = [];
+  readonly released: string[] = [];
   private readonly listeners = new Set<(state: AndroidState) => void>();
 
   get watchers(): number {
@@ -48,6 +52,25 @@ export class FakeAndroid implements Android {
   async launch(serial: string): Promise<ActionResult<AndroidState>> {
     this.launched.push(serial);
     return success(this.current);
+  }
+
+  async open(owner: PhoneOwner, serial: string): Promise<ActionResult<PhoneOpened>> {
+    this.asked.push({ owner: owner.id, t: 'phoneOpen', serial });
+    const device = this.current.devices.find((each) => each.serial === serial);
+    return device ? success({ device, targets: [], browserVersion: 'Chrome/150.0.7871.186' }) : failure('NO_DEVICE', 'No such phone.');
+  }
+
+  async command(owner: PhoneOwner, request: CdpRequest): Promise<ActionResult<Record<string, unknown>>> {
+    this.asked.push({ owner: owner.id, t: 'cdp', serial: request.serial, method: request.method });
+    return success({ echoed: request.method });
+  }
+
+  async close(owner: PhoneOwner, serial: string): Promise<void> {
+    this.asked.push({ owner: owner.id, t: 'phoneClose', serial });
+  }
+
+  async release(owner: PhoneOwner): Promise<void> {
+    this.released.push(owner.id);
   }
 
   async stop(): Promise<void> {

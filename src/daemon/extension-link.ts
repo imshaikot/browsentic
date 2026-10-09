@@ -83,6 +83,10 @@ export class ExtensionLink {
     return this.protocolVersion >= version;
   }
 
+  get bufferedAmount(): number {
+    return this.socket.bufferedAmount;
+  }
+
   get isOpen(): boolean {
     return !this.closed && this.socket.readyState === this.socket.OPEN;
   }
