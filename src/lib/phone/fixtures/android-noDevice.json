@@ -9,8 +9,7 @@
   "devices": [],
   "problem": {
     "code": "NO_DEVICE",
-    "message": "No Android phone is connected.",
-    "fix": "Turn on USB debugging on the phone and connect it with a USB cable. Run \"browsentic android\" for the steps."
+    "message": "No Android phone is connected. Turn on USB debugging on the phone and connect it with a USB cable."
   },
   "guide": [
     {
@@ -38,5 +37,30 @@
       "title": "Switch on Android",
       "detail": "In your browser, open the Browsentic side panel and switch on Android."
     }
-  ]
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "passed",
+            "value": "/Users/me/Library/Android/sdk/platform-tools/adb (37.0.0-14910828)"
+          }
+        ]
+      },
+      {
+        "checks": [
+          {
+            "label": "Phone",
+            "mark": "failed",
+            "value": "No Android phone is connected. Turn on USB debugging on the phone and connect it with a USB cable.",
+            "code": "NO_DEVICE"
+          }
+        ]
+      }
+    ],
+    "ready": false,
+    "guided": true
+  }
 }

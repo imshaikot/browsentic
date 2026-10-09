@@ -169,6 +169,12 @@ describe('Android across the protocol window', () => {
     android.change(READY_PHONE);
     await bridge.status();
     expect(heard).toEqual([NO_PHONE, READY_PHONE]);
+    await bridge.android({ watch: false });
+    expect(android.watchers).toBe(0);
+    android.change(NO_PHONE);
+    await bridge.status();
+    expect(heard).toHaveLength(2);
+    await bridge.android({ watch: true });
     bridge.close();
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(android.watchers).toBe(0);

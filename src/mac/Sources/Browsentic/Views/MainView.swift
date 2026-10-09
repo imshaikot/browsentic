@@ -10,6 +10,7 @@ struct MainView: View {
                     switch model.tab {
                     case .overview: OverviewView()
                     case .browsers: BrowsersView()
+                    case .android: AndroidView()
                     case .agents: AgentsView()
                     case .skills: SkillsView()
                     case .activity: ActivityView()
@@ -34,7 +35,7 @@ struct MainView: View {
     }
 }
 
-/// The view switcher floats at the top centre, ⌘1…⌘8.
+/// The view switcher floats at the top centre, ⌘1…⌘9.
 private struct TabCapsule: View {
     @EnvironmentObject private var model: AppModel
     @Namespace private var highlight

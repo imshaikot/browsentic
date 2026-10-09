@@ -59,26 +59,26 @@ describe('browsentic android', () => {
 
   test('no phone: the phone row fails, then the setup steps, with the Wi-Fi one marked for Android 11', () => {
     const lines = androidLines(STATES.noDevice);
-    expect(lines[1]).toBe('✗ Phone              No Android phone is connected.');
+    expect(lines[1]).toBe('✗ Phone              No Android phone is connected. Turn on USB debugging on the phone and connect it with a USB cable.');
     expect(lines.find((line) => line.startsWith('  4. '))).toMatch(/^ {2}4\. Or connect over Wi-Fi \(Android 11 or later\): /);
   });
 
   test('waiting for Allow: the USB debugging row fails with what to tap', () => {
     expect(androidLines(STATES.unauthorized).slice(1, 4)).toEqual([
       '✓ Phone              Android phone, USB (R5CT1234567)',
-      '✗ USB debugging      The phone has not allowed this computer yet.',
-      '                     Unlock your phone and tap Allow on the USB debugging prompt. If no prompt shows, unplug the phone and plug it in again.',
+      '✗ USB debugging      The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again.',
+      '',
     ]);
   });
 
   const failingRows: [string, AndroidState, string][] = [
-    ['offline', seen([phone(null, { ...emulator, state: 'offline', adbState: 'offline' })]), '✗ Phone              sdk gphone16k arm64, USB (emulator-5554): The phone is connected but not answering adb.'],
-    ['silent', seen([phone(null)]), '✗ Phone              sdk gphone16k arm64, USB (emulator-5554): The phone stopped answering adb.'],
+    ['offline', seen([phone(null, { ...emulator, state: 'offline', adbState: 'offline' })]), '✗ Phone              sdk gphone16k arm64, USB (emulator-5554): The phone is connected but not answering adb. Unplug it and plug it in again.'],
+    ['silent', seen([phone(null)]), '✗ Phone              sdk gphone16k arm64, USB (emulator-5554): The phone stopped answering adb. Unlock it, or unplug it and plug it in again.'],
     ['booting', seen([phone({ ...open, booted: false })]), '✗ Phone              sdk_gphone16k_arm64, Android 17, USB (emulator-5554): The phone is still starting up.'],
-    ['no udev rules', seen([phone(null, { ...emulator, state: 'no-permissions', adbState: 'no permissions' })], { platform: 'linux' }), "✗ Phone              sdk gphone16k arm64, USB (emulator-5554): This computer is not allowed to open the phone's USB connection."],
-    ['no Chrome', seen([phone(chrome({ installed: false, version: undefined, running: false, debuggable: false }))]), '✗ Chrome             Chrome is not installed on the phone.'],
+    ['no udev rules', seen([phone(null, { ...emulator, state: 'no-permissions', adbState: 'no permissions' })], { platform: 'linux' }), "✗ Phone              sdk gphone16k arm64, USB (emulator-5554): This computer is not allowed to open the phone's USB connection. Add udev rules for Android phones, then plug the phone in again."],
+    ['no Chrome', seen([phone(chrome({ installed: false, version: undefined, running: false, debuggable: false }))]), '✗ Chrome             Chrome is not installed on the phone. Install Google Chrome from the Play Store.'],
     ['Chrome closed', seen([phone(chrome({ running: false, debuggable: false }))]), '✗ Chrome open        Chrome is not open on the phone.'],
-    ['adb broken', seen([], { adb: { path: ADB.path, broken: 'Bad CPU type in executable' } }), `✗ adb                adb at ${ADB.path} does not run: Bad CPU type in executable`],
+    ['adb broken', seen([], { adb: { path: ADB.path, broken: 'Bad CPU type in executable' } }), `✗ adb                adb at ${ADB.path} does not run: Bad CPU type in executable. Reinstall platform-tools, or name a working adb in ~/.browsentic/config.json.`],
   ];
 
   test.each(failingRows)('%s: one failing row, and nothing past it', (_name, state, failing) => {
@@ -98,23 +98,22 @@ describe('browsentic android', () => {
   test('Chrome closed also names the command that opens it', () => {
     const lines = androidLines(failingRows[5][1]);
     const at = lines.indexOf('✗ Chrome open        Chrome is not open on the phone.');
-    expect(lines.slice(at, at + 3)).toEqual([
+    expect(lines.slice(at, at + 2)).toEqual([
       '✗ Chrome open        Chrome is not open on the phone.',
-      '                     Open Chrome on the phone.',
-      '                     or run "browsentic android open"',
+      '                     Open it on the phone, or run "browsentic android open".',
     ]);
   });
 
   test('the screen off is advice under a ready phone', () => {
     const lines = androidLines(seen([phone({ ...open, screen: { ...open.screen!, awake: false } })]));
-    expect(lines).toContain("· Screen             The phone's screen is off, so Chrome is not drawing the page.");
+    expect(lines).toContain("· Screen             The phone's screen is off, so Chrome is not drawing the page. Unlock the phone.");
     expect(lines.at(-1)).toMatch(/^Ready\./);
   });
 
   test('switched off is one line', () => {
     expect(androidLines(judge({ enabled: false, platform: 'darwin', devices: [] }))).toEqual([
-      '· Android            Android is switched off for this computer.',
-      '                     Set "android": { "enabled": true } in ~/.browsentic/config.json',
+      '· Android            Android is switched off in ~/.browsentic/config.json.',
+      '                     "android": { "enabled": true }',
     ]);
   });
 
@@ -122,6 +121,7 @@ describe('browsentic android', () => {
     const lines = androidLines(seen([phone(), phone(null, { ...emulator, serial: 'R5CT1234567', state: 'unauthorized', adbState: 'unauthorized' })]));
     expect(lines.filter((line) => line === 'emulator-5554' || line === 'R5CT1234567')).toEqual(['emulator-5554', 'R5CT1234567']);
     expect(lines.indexOf('R5CT1234567')).toBe(lines.indexOf('emulator-5554') + 7);
+    expect(lines[0]).toMatch(/^✓ adb /);
   });
 });
 

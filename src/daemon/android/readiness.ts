@@ -22,11 +22,12 @@ export interface Observed {
   session?: AndroidState['session'];
 }
 
+/** `message` says what is wrong and what to do; `fix`, when there is one, is only ever something to copy: a command or a line of config. */
 export const PROBLEMS = {
   off: (): AndroidProblem => ({
     code: 'ANDROID_OFF',
-    message: 'Android is switched off for this computer.',
-    fix: 'Set "android": { "enabled": true } in ~/.browsentic/config.json',
+    message: 'Android is switched off in ~/.browsentic/config.json.',
+    fix: '"android": { "enabled": true }',
   }),
   adbMissing: (platform: NodeJS.Platform): AndroidProblem => ({
     code: 'ADB_MISSING',
@@ -35,41 +36,36 @@ export const PROBLEMS = {
   }),
   adbBroken: (path: string, why: string): AndroidProblem => ({
     code: 'ADB_BROKEN',
-    message: `adb at ${path} does not run: ${why}`,
-    fix: `Reinstall platform-tools, or set "android": { "adb": "<path to a working adb>" } in ~/.browsentic/config.json`,
+    message: `adb at ${path} does not run: ${why}. Reinstall platform-tools, or name a working adb in ~/.browsentic/config.json.`,
+    fix: '"android": { "adb": "/path/to/adb" }',
   }),
   noDevice: (platform: NodeJS.Platform): AndroidProblem => ({
     code: 'NO_DEVICE',
     message:
       platform === 'win32'
-        ? 'No Android phone is connected. On Windows the phone also needs its USB driver, from its maker or Google, before adb can see it.'
-        : 'No Android phone is connected.',
-    fix: 'Turn on USB debugging on the phone and connect it with a USB cable. Run "browsentic android" for the steps.',
+        ? 'No Android phone is connected. Turn on USB debugging on the phone and connect it with a USB cable. On Windows the phone also needs its USB driver, from its maker or Google, before adb can see it.'
+        : 'No Android phone is connected. Turn on USB debugging on the phone and connect it with a USB cable.',
   }),
   unauthorized: (): AndroidProblem => ({
     code: 'DEVICE_UNAUTHORIZED',
-    message: 'The phone has not allowed this computer yet.',
-    fix: 'Unlock your phone and tap Allow on the USB debugging prompt. If no prompt shows, unplug the phone and plug it in again.',
+    message: 'The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again.',
   }),
-  offline: (device: TrackedDevice): AndroidProblem => ({
-    code: 'DEVICE_OFFLINE',
-    message: 'The phone is connected but not answering adb.',
-    fix: device.transport === 'wifi' ? `adb connect ${device.serial}` : 'Unplug the phone and plug it in again.',
-  }),
+  offline: (device: TrackedDevice): AndroidProblem =>
+    device.transport === 'wifi'
+      ? { code: 'DEVICE_OFFLINE', message: 'The phone is connected over Wi-Fi but not answering adb. Connect to it again.', fix: `adb connect ${device.serial}` }
+      : { code: 'DEVICE_OFFLINE', message: 'The phone is connected but not answering adb. Unplug it and plug it in again.' },
   otherMode: (device: TrackedDevice): AndroidProblem => ({
     code: 'DEVICE_OFFLINE',
-    message: `The phone is in ${device.adbState} mode.`,
-    fix: 'Restart the phone normally.',
+    message: `The phone is in ${device.adbState} mode. Restart it normally.`,
   }),
   silent: (): AndroidProblem => ({
     code: 'DEVICE_OFFLINE',
-    message: 'The phone stopped answering adb.',
-    fix: 'Unlock the phone. If that does not help, unplug it and plug it in again.',
+    message: 'The phone stopped answering adb. Unlock it, or unplug it and plug it in again.',
   }),
   noPermissions: (): AndroidProblem => ({
     code: 'NO_PERMISSIONS',
-    message: 'This computer is not allowed to open the phone\'s USB connection.',
-    fix: 'Add udev rules for Android phones (the android-sdk-platform-tools-common package has them), then plug the phone in again.',
+    message: "This computer is not allowed to open the phone's USB connection. Add udev rules for Android phones, then plug the phone in again.",
+    fix: 'sudo apt install android-sdk-platform-tools-common',
   }),
   booting: (): AndroidProblem => ({
     code: 'DEVICE_BOOTING',
@@ -77,20 +73,17 @@ export const PROBLEMS = {
   }),
   chromeMissing: (): AndroidProblem => ({
     code: 'CHROME_MISSING',
-    message: 'Chrome is not installed on the phone.',
-    fix: 'Install Google Chrome from the Play Store on the phone.',
+    message: 'Chrome is not installed on the phone. Install Google Chrome from the Play Store.',
     action: 'installChrome',
   }),
   chromeClosed: (): AndroidProblem => ({
     code: 'CHROME_NOT_RUNNING',
     message: 'Chrome is not open on the phone.',
-    fix: 'Open Chrome on the phone.',
     action: 'launchChrome',
   }),
   screenOff: (): AndroidProblem => ({
     code: 'SCREEN_OFF',
-    message: 'The phone\'s screen is off, so Chrome is not drawing the page.',
-    fix: 'Unlock the phone.',
+    message: "The phone's screen is off, so Chrome is not drawing the page. Unlock the phone.",
   }),
 } as const;
 

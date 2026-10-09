@@ -42,25 +42,25 @@ describe('readiness', () => {
     ]);
   });
 
-  const rows: [string, Observed, AndroidProblemCode, Partial<{ ready: boolean; fix: RegExp; action: string }>?][] = [
-    ['switched off in config.json', observed([], { enabled: false, adb: undefined }), 'ANDROID_OFF', { fix: /"enabled": true/ }],
-    ['no adb on macOS', observed([], { adb: null }), 'ADB_MISSING', { fix: /^brew install --cask android-platform-tools$/ }],
-    ['no adb on Windows', observed([], { adb: null, platform: 'win32' }), 'ADB_MISSING', { fix: /^winget install Google\.PlatformTools$/ }],
-    ['no adb on Linux', observed([], { adb: null, platform: 'linux' }), 'ADB_MISSING', { fix: /adb/ }],
-    ['an adb that does not run', observed([], { adb: { path: ADB.path, broken: 'Bad CPU type in executable' } }), 'ADB_BROKEN'],
+  const rows: [string, Observed, AndroidProblemCode, Partial<{ ready: boolean; says: RegExp; fix: string; action: string }>?][] = [
+    ['switched off in config.json', observed([], { enabled: false, adb: undefined }), 'ANDROID_OFF', { says: /config\.json/, fix: '"android": { "enabled": true }' }],
+    ['no adb on macOS', observed([], { adb: null }), 'ADB_MISSING', { fix: 'brew install --cask android-platform-tools' }],
+    ['no adb on Windows', observed([], { adb: null, platform: 'win32' }), 'ADB_MISSING', { fix: 'winget install Google.PlatformTools' }],
+    ['no adb on Linux', observed([], { adb: null, platform: 'linux' }), 'ADB_MISSING', { fix: 'sudo apt install adb' }],
+    ['an adb that does not run', observed([], { adb: { path: ADB.path, broken: 'Bad CPU type in executable' } }), 'ADB_BROKEN', { says: /Bad CPU type in executable\. Reinstall/ }],
     ['adb\'s server that will not start', observed([], { serverError: 'start-server did not start adb\'s server' }), 'ADB_BROKEN'],
-    ['adb with no phone', observed([]), 'NO_DEVICE', { fix: /USB debugging/ }],
-    ['a phone waiting for Allow', observed([phone({ state: 'unauthorized', adbState: 'unauthorized' })]), 'DEVICE_UNAUTHORIZED', { fix: /tap Allow/ }],
-    ['a phone offline on USB', observed([phone({ state: 'offline', adbState: 'offline' })]), 'DEVICE_OFFLINE', { fix: /plug it in again/ }],
+    ['adb with no phone', observed([]), 'NO_DEVICE', { says: /USB debugging/ }],
+    ['a phone waiting for Allow', observed([phone({ state: 'unauthorized', adbState: 'unauthorized' })]), 'DEVICE_UNAUTHORIZED', { says: /tap Allow/ }],
+    ['a phone offline on USB', observed([phone({ state: 'offline', adbState: 'offline' })]), 'DEVICE_OFFLINE', { says: /plug it in again/ }],
     [
       'a phone offline over Wi-Fi',
       observed([phone({ serial: '192.168.1.20:5555', transport: 'wifi', state: 'offline', adbState: 'offline' })]),
       'DEVICE_OFFLINE',
-      { fix: /^adb connect 192\.168\.1\.20:5555$/ },
+      { fix: 'adb connect 192.168.1.20:5555' },
     ],
-    ['a phone in recovery', observed([phone({ state: 'other', adbState: 'recovery' })]), 'DEVICE_OFFLINE', { fix: /Restart the phone/ }],
+    ['a phone in recovery', observed([phone({ state: 'other', adbState: 'recovery' })]), 'DEVICE_OFFLINE', { says: /recovery mode\. Restart it normally/ }],
     ['a phone that stopped answering', observed([phone({}, null)]), 'DEVICE_OFFLINE'],
-    ['Linux without udev rules', observed([phone({ state: 'no-permissions', adbState: 'no permissions' })], { platform: 'linux' }), 'NO_PERMISSIONS', { fix: /udev/ }],
+    ['Linux without udev rules', observed([phone({ state: 'no-permissions', adbState: 'no permissions' })], { platform: 'linux' }), 'NO_PERMISSIONS', { says: /udev/, fix: 'sudo apt install android-sdk-platform-tools-common' }],
     ['a phone still booting', observed([phone({}, { ...open, booted: false })]), 'DEVICE_BOOTING'],
     ['no Chrome on the phone', observed([phone({}, withChrome({ installed: false, version: undefined, running: false, debuggable: false }))]), 'CHROME_MISSING', { action: 'installChrome' }],
     ['Chrome closed', observed([phone({}, withChrome({ running: false, debuggable: false }))]), 'CHROME_NOT_RUNNING', { action: 'launchChrome' }],
@@ -77,9 +77,10 @@ describe('readiness', () => {
     const state = judge(seen);
     expect(state.problem?.code).toBe(code);
     expect(state.ready).toBe(expected.ready ?? false);
-    if (expected.fix) expect(state.problem?.fix).toMatch(expected.fix);
+    if (expected.says) expect(state.problem?.message).toMatch(expected.says);
+    expect(state.problem?.fix).toBe(expected.fix ?? (code === 'ADB_BROKEN' ? '"android": { "adb": "/path/to/adb" }' : undefined));
     if (expected.action) expect(state.problem?.action).toBe(expected.action);
-    expect(state.problem?.message).not.toMatch(/—/);
+    expect(state.problem?.message).not.toMatch(/\u2014/);
   });
 
   test('adb problems sit on adb as well as at the top', () => {

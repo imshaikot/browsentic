@@ -53,7 +53,8 @@ export type ControlRequest =
   | { id: string; op: 'setPreference'; change: unknown }
   /**
    * `launch` opens Chrome on that phone, at `url` when one is given. `watch` subscribes this caller to
-   * `android-changed`. `peek` answers only what is already known, NOT_CHECKED while nobody watches.
+   * `android-changed` and `watch: false` lets go, so the Bridge stops looking once nobody shows phones.
+   * `peek` answers only what is already known, NOT_CHECKED while nobody watches.
    */
   | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
 

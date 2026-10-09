@@ -73,7 +73,7 @@ the folder holds a newer build than the browser has loaded.
 
 ## The window
 
-The tabs float at the top; ⌘1 to ⌘8 switch between them.
+The tabs float at the top; ⌘1 to ⌘9 switch between them.
 
 ![Browsentic Bridge running, with one row per browser: Chrome connected from the Chrome Web Store, Brave from an unpacked folder, and Edge and Firefox with an add button each.](../assets/mac-app/overview.webp "Overview")
 ![The Get a pairing code button, and two paired browsers, each with where its extension came from.](../assets/mac-app/browsers.webp "Browsers")
@@ -86,6 +86,7 @@ The tabs float at the top; ⌘1 to ⌘8 switch between them.
 | --- | --- |
 | **Overview** | Turn Browsentic Bridge on and off with the power button, restart it, see its address and version. One row per browser: where its extension comes from, whether it is connected, and a button that adds it from the store. The unpacked folder sits behind **Load it unpacked instead** |
 | **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser and the store its extension came from, unpair one or all |
+| **Android** | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each, the same checks `browsentic android` prints. A row that fails says what to do, with **Open Chrome on the phone**, **Get Chrome** or the adb install command to copy. **Set up your phone** has the steps. The Bridge looks for phones only while this tab is open |
 | **Agents** | See which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |

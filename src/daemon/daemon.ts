@@ -892,6 +892,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         if (request.watch && !androidWatches.has(ws)) {
           androidWatches.set(ws, android.watch((state) => send(ws, { event: 'android-changed', state })));
         }
+        if (request.watch === false) unwatchAndroid(ws);
         const result = request.launch
           ? await android.launch(request.launch, request.url)
           : request.peek

@@ -1,28 +1,21 @@
+import { phoneReport, type CheckMark, type PhoneCheck, type PhoneReport } from '@/lib/phone/checks';
 import { PHONE_GUIDE, type GuideStep } from '@/lib/phone/guide';
-import type { AndroidDevice, AndroidProblem, AndroidProblemCode, AndroidState } from '@/lib/phone/types';
+import type { AndroidFixAction, AndroidProblemCode, AndroidState } from '@/lib/phone/types';
 
 const LABEL_WIDTH = 19;
 const INDENT = ' '.repeat(LABEL_WIDTH + 2);
-
-type Mark = '✓' | '·' | '✗';
-
-const row = (mark: Mark, label: string, value: string): string => `${mark} ${label.padEnd(LABEL_WIDTH)}${value}`;
-
-const failed = (label: string, problem: AndroidProblem, mark: Mark = '✗'): string[] => [
-  row(mark, label, problem.message),
-  ...(problem.fix ? [`${INDENT}${problem.fix}`] : []),
-];
-
-const PHONE_ROW_PROBLEMS: ReadonlySet<AndroidProblemCode> = new Set(['DEVICE_OFFLINE', 'NO_PERMISSIONS', 'DEVICE_BOOTING']);
-
-/** Problems the setup steps answer. Once the phone is connected and allowed, each row's own fix says more than the steps would. */
-const GUIDED: ReadonlySet<AndroidProblemCode> = new Set(['ADB_MISSING', 'NO_DEVICE', 'DEVICE_UNAUTHORIZED']);
+const MARKS: Record<CheckMark, string> = { passed: '✓', failed: '✗', advisory: '·' };
+const ACTION_HINTS: Record<AndroidFixAction, string> = {
+  launchChrome: 'Open it on the phone, or run "browsentic android open".',
+  installChrome: 'Run "browsentic android open" to open its Play Store page on the phone.',
+};
 
 export interface AndroidJson extends AndroidState {
   guide: readonly GuideStep[];
+  report: PhoneReport;
 }
 
-export const androidJson = (state: AndroidState): AndroidJson => ({ ...state, guide: PHONE_GUIDE });
+export const androidJson = (state: AndroidState): AndroidJson => ({ ...state, guide: PHONE_GUIDE, report: phoneReport(state) });
 
 /** What follows `browsentic android`: `open`, a URL, and `--serial <serial>` anywhere among them. */
 export function androidArgs(args: readonly string[]): { sub?: string; url?: string; serial?: string } {
@@ -32,46 +25,20 @@ export function androidArgs(args: readonly string[]): { sub?: string; url?: stri
   return { sub, url, serial };
 }
 
-/** `browsentic android`: one checklist row per check, stopping at the first that fails, then the setup steps while no phone is connected and allowed. */
+/** `browsentic android`: the shared checklist as text, then the setup steps while no phone is connected and allowed. */
 export function androidLines(state: AndroidState): string[] {
-  if (!state.enabled) return state.problem ? failed('Android', state.problem, '·') : [];
-  const adb = state.adb.problem ? failed('adb', state.adb.problem) : [row('✓', 'adb', `${state.adb.path}${state.adb.version ? ` (${state.adb.version})` : ''}`)];
-  if (state.adb.problem) return [...adb, ...(GUIDED.has(state.adb.problem.code) ? guide() : [])];
-
-  const phones = state.devices.length
-    ? state.devices.flatMap((device, index) => [...(index ? [''] : []), ...deviceLines(device, state.devices.length > 1)])
-    : state.problem
-      ? failed('Phone', state.problem)
-      : [];
-  const closing = state.ready
-    ? ['', state.session ? `Android is on in a browser, driving ${state.session.serial}.` : 'Ready. Switch on Android in the Browsentic side panel to drive it.']
-    : state.problem && GUIDED.has(state.problem.code)
-      ? guide()
-      : [];
-  return [...adb, ...phones, ...closing];
+  const report = phoneReport(state);
+  const sections = report.sections.flatMap((section) => [...(section.serial ? ['', section.serial] : []), ...section.checks.flatMap(checkLines)]);
+  const closing = report.summary ? ['', report.summary] : report.guided ? guide() : [];
+  return [...sections, ...closing];
 }
 
-function deviceLines(device: AndroidDevice, several: boolean): string[] {
-  const problem = device.problem;
-  const code = problem?.code;
-  const phone = [
-    device.model ?? 'Android phone',
-    ...(device.android ? [`Android ${device.android}`] : []),
-    device.transport === 'wifi' ? 'Wi-Fi' : 'USB',
-  ].join(', ');
-  const heading = several ? [device.serial] : [];
-  const phoneRow = `${phone}${several ? '' : ` (${device.serial})`}`;
-
-  if (code && PHONE_ROW_PROBLEMS.has(code)) return [...heading, ...failed('Phone', { ...problem, message: `${phoneRow}: ${problem.message}` })];
-  const lines = [...heading, row('✓', 'Phone', phoneRow)];
-  if (code === 'DEVICE_UNAUTHORIZED') return [...lines, ...failed('USB debugging', problem!)];
-  lines.push(row('✓', 'USB debugging', 'allowed'));
-  if (code === 'CHROME_MISSING') return [...lines, ...failed('Chrome', problem!)];
-  lines.push(row('✓', 'Chrome', device.chrome.version ?? 'installed'));
-  if (code === 'CHROME_NOT_RUNNING') return [...lines, ...failed('Chrome open', problem!), `${INDENT}or run "browsentic android open"`];
-  lines.push(row('✓', 'Chrome open', 'its DevTools socket is open'));
-  if (code === 'SCREEN_OFF') return [...lines, ...failed('Screen', problem!, '·')];
-  return [...lines, row('✓', 'Screen', 'awake')];
+function checkLines(check: PhoneCheck): string[] {
+  return [
+    `${MARKS[check.mark]} ${check.label.padEnd(LABEL_WIDTH)}${check.value}`,
+    ...(check.fix ? [`${INDENT}${check.fix}`] : []),
+    ...(check.action ? [`${INDENT}${ACTION_HINTS[check.action]}`] : []),
+  ];
 }
 
 function guide(): string[] {

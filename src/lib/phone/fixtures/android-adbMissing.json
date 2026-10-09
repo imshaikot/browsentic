@@ -41,5 +41,22 @@
       "title": "Switch on Android",
       "detail": "In your browser, open the Browsentic side panel and switch on Android."
     }
-  ]
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "failed",
+            "value": "Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from https://developer.android.com/tools/releases/platform-tools.",
+            "fix": "brew install --cask android-platform-tools",
+            "code": "ADB_MISSING"
+          }
+        ]
+      }
+    ],
+    "ready": false,
+    "guided": true
+  }
 }

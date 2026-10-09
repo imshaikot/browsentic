@@ -18,15 +18,13 @@
       },
       "problem": {
         "code": "DEVICE_UNAUTHORIZED",
-        "message": "The phone has not allowed this computer yet.",
-        "fix": "Unlock your phone and tap Allow on the USB debugging prompt. If no prompt shows, unplug the phone and plug it in again."
+        "message": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again."
       }
     }
   ],
   "problem": {
     "code": "DEVICE_UNAUTHORIZED",
-    "message": "The phone has not allowed this computer yet.",
-    "fix": "Unlock your phone and tap Allow on the USB debugging prompt. If no prompt shows, unplug the phone and plug it in again."
+    "message": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again."
   },
   "guide": [
     {
@@ -54,5 +52,35 @@
       "title": "Switch on Android",
       "detail": "In your browser, open the Browsentic side panel and switch on Android."
     }
-  ]
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "passed",
+            "value": "/Users/me/Library/Android/sdk/platform-tools/adb (37.0.0-14910828)"
+          }
+        ]
+      },
+      {
+        "checks": [
+          {
+            "label": "Phone",
+            "mark": "passed",
+            "value": "Android phone, USB (R5CT1234567)"
+          },
+          {
+            "label": "USB debugging",
+            "mark": "failed",
+            "value": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again.",
+            "code": "DEVICE_UNAUTHORIZED"
+          }
+        ]
+      }
+    ],
+    "ready": false,
+    "guided": true
+  }
 }

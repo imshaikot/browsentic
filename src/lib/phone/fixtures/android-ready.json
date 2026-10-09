@@ -55,5 +55,50 @@
       "title": "Switch on Android",
       "detail": "In your browser, open the Browsentic side panel and switch on Android."
     }
-  ]
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "passed",
+            "value": "/Users/me/Library/Android/sdk/platform-tools/adb (37.0.0-14910828)"
+          }
+        ]
+      },
+      {
+        "checks": [
+          {
+            "label": "Phone",
+            "mark": "passed",
+            "value": "sdk_gphone16k_arm64, Android 17, USB (emulator-5554)"
+          },
+          {
+            "label": "USB debugging",
+            "mark": "passed",
+            "value": "allowed"
+          },
+          {
+            "label": "Chrome",
+            "mark": "passed",
+            "value": "150.0.7871.186"
+          },
+          {
+            "label": "Chrome open",
+            "mark": "passed",
+            "value": "its DevTools socket is open"
+          },
+          {
+            "label": "Screen",
+            "mark": "passed",
+            "value": "awake"
+          }
+        ]
+      }
+    ],
+    "ready": true,
+    "guided": false,
+    "summary": "Ready. Switch on Android in the Browsentic side panel to drive it."
+  }
 }

@@ -84,6 +84,14 @@ actor ControlClient {
         try await request(["op": "preferences", "watch": watch], as: Reply<Outcome<Preferences>>.self, key: "result").value()
     }
 
+    /// `watch` subscribes this socket to `android-changed`, and `false` lets go so the Bridge stops looking for phones. `launch` opens Chrome on that phone.
+    func android(watch: Bool? = nil, launch: String? = nil) async throws -> AndroidState {
+        var frame: [String: Any] = ["op": "android"]
+        if let watch { frame["watch"] = watch }
+        if let launch { frame["launch"] = launch }
+        return try await request(frame, as: Reply<Outcome<AndroidState>>.self, key: "result", timeout: launch == nil ? 20 : 40).value()
+    }
+
     func setTheme(_ theme: BrowserTheme) async throws -> Preferences {
         try await setPreference(["kind": "theme", "theme": theme.rawValue])
     }

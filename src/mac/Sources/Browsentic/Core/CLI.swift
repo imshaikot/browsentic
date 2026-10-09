@@ -53,6 +53,7 @@ struct CLI {
     func browsers() async throws -> [BrowserRow] { try await json(["browsers"], as: BrowserListing.self).browsers }
 
     func agents() async throws -> AgentState { try await json(["agent"], as: AgentState.self) }
+    func android() async throws -> AndroidState { try await json(["android"], as: AndroidState.self, timeout: 30) }
     func setModel(_ model: String?, for kind: String) async throws { try await run(["agent", "model", kind] + (model.map { [$0] } ?? [])) }
     func skills() async throws -> SkillListing { try await json(["skills"], as: SkillListing.self) }
     func approvals() async throws -> [Grant] { try await json(["approvals"], as: GrantListing.self).grants }
