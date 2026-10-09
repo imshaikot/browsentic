@@ -181,7 +181,7 @@ function overlaysFor(skills: Skill[], context: RunContext | undefined, forced: S
         .sort((a, b) => b.match.length - a.match.length)
         .map((entry) => entry.skill)
     : [];
-  const scripting = context?.liveTools && !context.phone
+  const scripting = context?.liveTools
     ? skills.filter((skill) => skill.name === SCRIPTING_SKILL && !forced.includes(skill))
     : [];
   return [...forced, ...matched, ...scripting];

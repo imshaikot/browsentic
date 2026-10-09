@@ -285,25 +285,23 @@ export function Composer({
           >
             <FileUp className="size-3.5" />
           </Button>
-          {!onPhone && (
-            <Button
-              variant={liveTools ? 'subtle' : 'ghost'}
-              size="icon-sm"
-              role="switch"
-              aria-checked={liveTools}
-              aria-label={liveTools ? 'Turn live tools off' : 'Turn live tools on'}
-              title={
-                liveTools
-                  ? 'Live tool is on — the agent may write a small script for this page and ask you to approve it. Turn it off to keep to the built-in tools.'
-                  : 'Live tool — let the agent write a small script for repetitive work or for something no tool covers. You review and approve the code before it runs.'
-              }
-              onClick={onToggleLiveTools}
-              disabled={!connected}
-              className={cn(liveTools ? 'text-ember' : undefined)}
-            >
-              <Code2 className="size-3.5" />
-            </Button>
-          )}
+          <Button
+            variant={liveTools ? 'subtle' : 'ghost'}
+            size="icon-sm"
+            role="switch"
+            aria-checked={liveTools}
+            aria-label={liveTools ? 'Turn live tools off' : 'Turn live tools on'}
+            title={
+              liveTools
+                ? 'Live tool is on — the agent may write a small script for this page and ask you to approve it. Turn it off to keep to the built-in tools.'
+                : 'Live tool — let the agent write a small script for repetitive work or for something no tool covers. You review and approve the code before it runs.'
+            }
+            onClick={onToggleLiveTools}
+            disabled={!connected}
+            className={cn(liveTools ? 'text-ember' : undefined)}
+          >
+            <Code2 className="size-3.5" />
+          </Button>
           {!onPhone && (
             <Button
               variant={scheduling ? 'subtle' : 'ghost'}

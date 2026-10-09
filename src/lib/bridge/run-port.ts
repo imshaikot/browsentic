@@ -18,6 +18,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
 import { autoRunReady, syncAutoRuns } from './auto-run';
 import { onToolOffer, runSavedTool, toolkitCode, type ToolOffer } from './code-toolkit';
+import { toolkitPlaceFor } from './phone-invoke';
 import { CONTEXT_COMMAND, isContextCommand, type ContextBreakdown } from './commands';
 import { listSavedTools, withoutCode, type SavedToolMeta } from './saved-tools';
 import { dropTool, keepTool, switchAutoRun } from './tool-registry';
@@ -370,7 +371,8 @@ function handle(command: RunCommand): void {
     case 'keepTool':
       void serialized(async () => {
         const offer = pendingOffers.get(command.toolkitId);
-        const code = offer ? await toolkitCode(command.tabId, command.toolkitId) : null;
+        const at = offer ? await toolkitPlaceFor(command.tabId, undefined) : null;
+        const code = at ? await toolkitCode(at.place, command.toolkitId) : null;
         if (offer && code) {
           await keepTool({ offer, code, slug: command.slug, autoRun: command.autoRun }).catch(() => undefined);
         }
@@ -397,7 +399,8 @@ function handle(command: RunCommand): void {
       return;
     case 'runTool':
       void serialized(async () => {
-        const result = await runSavedTool(command.tab.tabId, command.tab.url, command.id);
+        const at = await toolkitPlaceFor(command.tab.tabId, command.tab.url);
+        const result = at ? await runSavedTool(at.place, at.url, command.id) : failure('PHONE_GONE', 'The phone disconnected. Reconnect it and switch Android on again.');
         broadcast({ op: 'item', item: toolRunItem(command.id, result) });
       });
       return;
@@ -621,7 +624,7 @@ async function startTurn(
       agentSessionId: session.agentSessionId,
       agentSkillId,
       focus: hidden ? undefined : focus,
-      liveTools: session.phone ? undefined : liveTools,
+      liveTools,
       files: await attachedFiles(session),
       recordings: session.phone ? undefined : await attachedRecordings(),
       task,

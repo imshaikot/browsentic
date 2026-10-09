@@ -52,10 +52,15 @@ describe('what a phone run is offered', () => {
     });
   });
 
-  test('exactly the phone’s tools, and no reserved ones, even with Live tool on', async () => {
+  test('exactly the phone’s tools with Live tool on, and no reserved ones', async () => {
     const offer = await offerTo('p', { sessionId: 's1', phone: PHONE, liveTools: true });
     expect(names.filter((name) => !offer!.withheld.includes(name)).sort()).toEqual([...PHONE_TOOLS].sort());
     expect(offer!.reserved).toEqual([]);
+  });
+
+  test('the page-code tools only with Live tool on, the same rule as a desktop run', async () => {
+    const offer = await offerTo('q', { sessionId: 's4', phone: PHONE });
+    expect(names.filter((name) => !offer!.withheld.includes(name)).sort()).toEqual([...PHONE_TOOLS].filter((name) => !CODE_TOOLS.includes(name)).sort());
   });
 
   test('a desktop run beside it is offered what it always was', async () => {

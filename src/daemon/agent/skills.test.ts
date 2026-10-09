@@ -167,8 +167,9 @@ describe('a run on the Android phone', () => {
     expect(onPhone('@page-theming make it readable')).toMatchObject({ base: { name: PHONE_SKILL }, text: 'make it readable' });
   });
 
-  test("still gets the notes for the phone page's site, and never the scripting skill", () => {
-    expect(onPhone('click sign in', { url: 'https://example.com/', liveTools: true })?.overlays.map((overlay) => overlay.name)).toEqual(['example-com']);
+  test("still gets the notes for the phone page's site, and the scripting skill only with Live tool on", () => {
+    expect(onPhone('click sign in', { url: 'https://example.com/' })?.overlays.map((overlay) => overlay.name)).toEqual(['example-com']);
+    expect(onPhone('click sign in', { url: 'https://example.com/', liveTools: true })?.overlays.map((overlay) => overlay.name)).toEqual(['example-com', SCRIPTING_SKILL]);
   });
 
   test('a desktop run is never routed to the phone skill, not even with no default', () => {

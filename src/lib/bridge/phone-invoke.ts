@@ -2,14 +2,17 @@ import { browser } from 'wxt/browser';
 import { z } from 'zod';
 import { ActionError } from '@/lib/actions/core';
 import { closeTab } from '@/lib/actions/page/close-tab';
+import { injectCode } from '@/lib/actions/page/inject-code';
 import { navigate, resolveNavigation, type NavigateInput } from '@/lib/actions/page/navigate';
 import { openTab } from '@/lib/actions/page/open-tab';
+import { runCode } from '@/lib/actions/page/run-code';
 import { switchTab } from '@/lib/actions/page/switch-tab';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
 import { notOnPhone, phoneOffers } from '@/lib/phone/features';
 import { currentTarget, isLive, readPhone, targetForNumber, updatePhone, numbered, type PhoneSession } from './phone';
-import { hereOn, pageSideOnPhone, waitForLoad } from './phone-backend';
+import { installToolkit, runToolkit, tabPlace, type ToolkitPlace } from './code-toolkit';
+import { hereOn, pageSideOnPhone, phoneToolkitPlace, waitForLoad } from './phone-backend';
 import { attachedSession, bringToFront, followTarget } from './phone-mirror';
 import { releaseForAction, sealForPage } from './secret-vault';
 import { refusalFor } from './site-guard';
@@ -71,12 +74,30 @@ function destinationsOf(action: string, input: unknown, base?: string): (string 
   }
 }
 
+const withToolkit =
+  (use: typeof installToolkit): PhoneBackend =>
+  async (_action, input, phone) => {
+    const place = await phoneToolkitPlace(phone);
+    return place ? use(place, currentTarget(phone)?.url, input) : failure('PHONE_GONE', GONE);
+  };
+
 const TAB_TOOLS: Record<string, PhoneBackend> = {
   [navigate.name]: navigateOnPhone,
   [openTab.name]: openPhoneTab,
   [switchTab.name]: switchPhoneTab,
   [closeTab.name]: closePhoneTab,
+  [injectCode.name]: withToolkit(installToolkit),
+  [runCode.name]: withToolkit(runToolkit),
 };
+
+/** Where `/` runs a saved tool and a kept toolkit is read from: the phone's front tab when the panel is on the phone tab. Null once the phone is gone. */
+export async function toolkitPlaceFor(tabId: number, url: string | undefined): Promise<{ place: ToolkitPlace; url: string | undefined } | null> {
+  const phone = await phoneRoute(tabId, undefined);
+  if (phone === null) return { place: tabPlace(tabId), url };
+  if (phone === 'gone') return null;
+  const place = await phoneToolkitPlace(phone);
+  return place && { place, url: currentTarget(phone)?.url };
+}
 
 export async function inCurrentTab(phone: PhoneSession, method: string, params?: Record<string, unknown>) {
   const target = currentTarget(phone);

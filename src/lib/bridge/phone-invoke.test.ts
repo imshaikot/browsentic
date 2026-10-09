@@ -113,9 +113,9 @@ describe('a tool on the phone', () => {
   const route = async () => (await phoneRoute(mirrorTabId, undefined))!;
 
   test('a tool off the list is refused with where it does work', async () => {
-    expect(await invokeOnPhone('page.injectCode', {}, await route())).toEqual({
+    expect(await invokeOnPhone('page.captureDownload', {}, await route())).toEqual({
       ok: false,
-      error: { code: 'NOT_ON_PHONE', message: 'page.injectCode isn’t available on the phone. It works in desktop tabs.' },
+      error: { code: 'NOT_ON_PHONE', message: 'page.captureDownload isn’t available on the phone. It works in desktop tabs.' },
     });
   });
 

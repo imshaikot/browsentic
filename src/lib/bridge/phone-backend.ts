@@ -7,8 +7,10 @@ import { typeText } from '@/lib/actions/page/type-text';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { PHONE_API } from '@/lib/phone/page-api';
 import { drag, keyPress, onScreen, tap, typing, wheel, type InputStep, type Point, type Viewport } from '@/lib/phone/touch';
+import type { EvaluateReply, ToolkitPlace } from './code-toolkit';
 import { currentTarget, type PhoneSession } from './phone';
 import { attachedSession } from './phone-mirror';
+import { refusalFor } from './site-guard';
 import { sendCdp } from './socket';
 
 const BUNDLE = '/phone-page.js';
@@ -323,6 +325,24 @@ const TOOLS: Record<string, PhoneTool> = {
   'page.searchSite': (here, input, action) => thenLoaded(here, action, input),
   'page.submitForm': (here, input, action) => thenLoaded(here, action, input),
 };
+
+const TOP_DOCUMENT_ONLY = 'Page code on the phone installs in the top document. Call page.switchFrame with no arguments first.';
+
+/** The phone's front tab as the home of approved page code: installed in its top document's main world, called from the bundle's world. */
+export async function phoneToolkitPlace(phone: PhoneSession): Promise<ToolkitPlace | null> {
+  const here = await hereOn(phone);
+  if (!here) return null;
+  return {
+    key: `phone:${here.targetId}`,
+    evaluate: async (source) => {
+      if ((await focusedFrame(here)).path.length) return failure('FRAME_UNREACHABLE', TOP_DOCUMENT_ONLY);
+      const evaluated = await here.cdp('Runtime.evaluate', { expression: source, returnByValue: true, awaitPromise: true });
+      return evaluated.ok ? success(evaluated.data as EvaluateReply) : evaluated;
+    },
+    call: (input) => inPage(here, 'page.runCode', input),
+    refusal: () => refusalFor(here.url),
+  };
+}
 
 /** Every page-side tool on the phone: its own code in the page where it can be, real input where the page cannot fake it. */
 export async function pageSideOnPhone(action: string, input: unknown, phone: PhoneSession): Promise<ActionResult> {

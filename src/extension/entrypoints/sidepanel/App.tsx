@@ -83,7 +83,8 @@ export default function App() {
   const phone = useMirroredPhone();
   const onPhone = phone !== null;
   const handsFree = handsFreeSupported && !onPhone;
-  const blockedHere = useBlockedPattern(phone ? (currentTarget(phone)?.url ?? '') : tabUrl);
+  const pageUrl = phone ? (currentTarget(phone)?.url ?? '') : tabUrl;
+  const blockedHere = useBlockedPattern(pageUrl);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
@@ -480,10 +481,11 @@ export default function App() {
         {starShown && <StarBadge onStar={star.star} onClose={star.close} />}
       </div>
 
-      {showTools && !onPhone && (
+      {showTools && (
         <SavedToolList
           tools={run.tools}
           autoRunReady={run.autoRunReady}
+          everyVisit={!onPhone}
           onAutoRun={run.setAutoRun}
           onForget={run.forgetTool}
           onClose={() => setShowTools(false)}
@@ -493,10 +495,11 @@ export default function App() {
       {tab === 'chat' && (
         <footer className="shrink-0 border-t border-line p-3">
           {blockedHere && <BlockedSiteNote pattern={blockedHere} />}
-          {run.toolOffer && !onPhone && (
+          {run.toolOffer && (
             <KeepToolPrompt
               offer={run.toolOffer}
               autoRunReady={run.autoRunReady}
+              everyVisit={!onPhone}
               onKeep={run.keepTool}
               onDismiss={run.dismissTool}
             />
@@ -509,7 +512,7 @@ export default function App() {
             files={files}
             attachError={attachError}
             catalog={daemon?.skillCatalog}
-            tabUrl={tabUrl}
+            tabUrl={pageUrl}
             attachedSkill={attachedSkill}
             focus={focus}
             picking={picking}
@@ -534,7 +537,7 @@ export default function App() {
               open('chat');
               run.send(command);
             }}
-            tools={onPhone ? [] : run.tools}
+            tools={run.tools}
             onRunTool={(id) => {
               open('chat');
               run.runTool(id);

@@ -27,6 +27,8 @@ export const PHONE_TOOLS: ReadonlySet<string> = new Set([
   'page.switchTab',
   'page.closeTab',
   'page.switchFrame',
+  'page.injectCode',
+  'page.runCode',
   'page.startTimer',
   'page.timerStatus',
   'page.stopTimer',

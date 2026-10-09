@@ -202,10 +202,14 @@ export class AgentSession {
   offerFor(runId: string): { withheld: string[]; reserved: string[] } | null {
     const run = this.runs.get(runId);
     if (!run) return null;
-    if (run.phone) return { withheld: this.deps.actionNames().filter((name) => !phoneOffers(name)), reserved: [] };
     const codeListed = run.liveTools || (run.sessionId !== undefined && this.codeListed.has(run.sessionId));
+    const codeWithheld = codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION];
+    if (run.phone) {
+      const offPhone = this.deps.actionNames().filter((name) => !phoneOffers(name));
+      return { withheld: [...new Set([...offPhone, ...codeWithheld])], reserved: [] };
+    }
     return {
-      withheld: codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
+      withheld: codeWithheld,
       // A mapping run never resumes a conversation, so its tool can come and go. A pick
       // comes and goes between the messages of one, so the tool that shows it stays.
       reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), FOCUS_SHOT_ACTION],

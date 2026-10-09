@@ -67,29 +67,53 @@ export function onToolOffer(listener: (offer: ToolOffer) => void): void {
 
 type ToolkitMap = Record<string, StoredToolkit>;
 
-interface EvaluateReply {
+export interface EvaluateReply {
   result?: { value?: unknown };
   exceptionDetails?: { text?: string; exception?: { description?: string } };
 }
+
+/**
+ * Where a toolkit lives: a desktop tab, or the tab in front on the phone. `key` names its record,
+ * `evaluate` runs the installer in the page's main world through a debugger, and `call` runs
+ * `page.runCode`'s page side, which reaches the toolkit by DOM events from its own world.
+ */
+export interface ToolkitPlace {
+  key: string;
+  evaluate(source: string): Promise<ActionResult<EvaluateReply>>;
+  call(input: unknown): Promise<ActionResult>;
+  /** The blocked-sites refusal for the page there now, if any. */
+  refusal(): Promise<ActionResult | null>;
+}
+
+export const tabPlace = (tabId: number): ToolkitPlace => ({
+  key: String(tabId),
+  evaluate: (source) =>
+    withDebugger(tabId, FIREFOX_HINT, async (session) => {
+      const context = await mainWorldOf(session);
+      return context ? success(await evaluate(context, source)) : failure('FRAME_UNREACHABLE', FRAME_CONTEXT_HINT);
+    }) as Promise<ActionResult<EvaluateReply>>,
+  call: (input) => invokeInTab(tabId, runCode.name, input),
+  refusal: () => refusalForTab(tabId),
+});
 
 async function readToolkits(): Promise<ToolkitMap> {
   const stored = await browser.storage.session.get(TOOLKITS_KEY);
   return (stored[TOOLKITS_KEY] as ToolkitMap | undefined) ?? {};
 }
 
-async function writeToolkit(tabId: number, toolkit: StoredToolkit | null): Promise<void> {
+async function writeToolkit(key: string, toolkit: StoredToolkit | null): Promise<void> {
   const map = await readToolkits();
-  if (toolkit) map[String(tabId)] = toolkit;
-  else delete map[String(tabId)];
+  if (toolkit) map[key] = toolkit;
+  else delete map[key];
   await browser.storage.session.set({ [TOOLKITS_KEY]: map });
 }
 
-async function forgetToolkit(tabId: number): Promise<void> {
-  await writeToolkit(tabId, null);
+async function forgetToolkit(key: string): Promise<void> {
+  await writeToolkit(key, null);
 }
 
 export function serveCodeToolkits(): void {
-  browser.tabs.onRemoved.addListener((tabId) => void forgetToolkit(tabId));
+  browser.tabs.onRemoved.addListener((tabId) => void forgetToolkit(String(tabId)));
 }
 
 export function originOf(url: string | undefined): string | undefined {
@@ -102,7 +126,7 @@ export function originOf(url: string | undefined): string | undefined {
   }
 }
 
-export async function installToolkit(tabId: number, url: string | undefined, input: unknown): Promise<ActionResult> {
+export async function installToolkit(place: ToolkitPlace, url: string | undefined, input: unknown): Promise<ActionResult> {
   const parsed = injectCode.input.safeParse(input ?? {});
   if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
 
@@ -121,11 +145,11 @@ export async function installToolkit(tabId: number, url: string | undefined, inp
     installedAt: Date.now(),
   };
 
-  const installed = await evaluateInstaller(tabId, toolkit);
+  const installed = await evaluateInstaller(place, toolkit);
   if (!installed.ok) return installed;
 
   toolkit.entries = installed.data as ToolkitEntry[];
-  await writeToolkit(tabId, toolkit);
+  await writeToolkit(place.key, toolkit);
 
   const summary = {
     toolkitId: toolkit.id,
@@ -134,7 +158,7 @@ export async function installToolkit(tabId: number, url: string | undefined, inp
     functions: toolkit.entries.map((entry) => entry.name),
   };
 
-  const called = call ? await runToolkit(tabId, url, { function: call.function, args: call.args }) : null;
+  const called = call ? await runToolkit(place, url, { function: call.function, args: call.args }) : null;
   offerToKeep(toolkit, url, call?.function);
 
   if (!called) return success(summary);
@@ -175,8 +199,8 @@ function offerToKeep(toolkit: StoredToolkit, url: string | undefined, called: st
  * loop at all — which is also what keeps it out of reach of an MCP client. Blocked sites
  * are the exception: they bind the user's own tools too.
  */
-export async function runSavedTool(tabId: number, url: string | undefined, toolId: string): Promise<ActionResult> {
-  const refused = await refusalForTab(tabId);
+export async function runSavedTool(place: ToolkitPlace, url: string | undefined, toolId: string): Promise<ActionResult> {
+  const refused = await place.refusal();
   if (refused) return refused;
   const tool = await getSavedTool(toolId);
   if (!tool) return failure('UNKNOWN_TOOL', 'That tool is no longer saved.');
@@ -195,12 +219,12 @@ export async function runSavedTool(tabId: number, url: string | undefined, toolI
     entries: [],
     installedAt: Date.now(),
   };
-  const installed = await evaluateInstaller(tabId, staged);
+  const installed = await evaluateInstaller(place, staged);
   if (!installed.ok) return installed;
 
   staged.entries = installed.data as ToolkitEntry[];
-  await writeToolkit(tabId, staged);
-  return invokeInTab(tabId, runCode.name, { function: tool.fn, args: [], timeoutMs: 10_000 });
+  await writeToolkit(place.key, staged);
+  return place.call({ function: tool.fn, args: [], timeoutMs: 10_000 });
 }
 
 /**
@@ -208,16 +232,16 @@ export async function runSavedTool(tabId: number, url: string | undefined, toolI
  * carried. Saving reads it from here rather than from the panel, so the code makes one
  * fewer hop and the panel never has to hold it to hand it back.
  */
-export async function toolkitCode(tabId: number, toolkitId: string): Promise<string | null> {
-  const toolkit = (await readToolkits())[String(tabId)];
+export async function toolkitCode(place: Pick<ToolkitPlace, 'key'>, toolkitId: string): Promise<string | null> {
+  const toolkit = (await readToolkits())[place.key];
   return toolkit && toolkit.id === toolkitId ? toolkit.code : null;
 }
 
-export async function runToolkit(tabId: number, url: string | undefined, input: unknown): Promise<ActionResult> {
+export async function runToolkit(place: ToolkitPlace, url: string | undefined, input: unknown): Promise<ActionResult> {
   const parsed = runCode.input.safeParse(input ?? {});
   if (!parsed.success) return failure('INVALID_INPUT', z.prettifyError(parsed.error));
 
-  const toolkit = (await readToolkits())[String(tabId)];
+  const toolkit = (await readToolkits())[place.key];
   if (!toolkit) {
     return failure(
       TOOLKIT_MISSING,
@@ -227,7 +251,7 @@ export async function runToolkit(tabId: number, url: string | undefined, input: 
 
   const origin = originOf(url);
   if (origin !== toolkit.origin) {
-    await forgetToolkit(tabId);
+    await forgetToolkit(place.key);
     return failure(
       'TOOLKIT_SCOPE',
       `That toolkit was approved for ${toolkit.origin}, but this tab is on ${origin ?? 'another page'}. Install it again here if the job continues.`,
@@ -241,29 +265,26 @@ export async function runToolkit(tabId: number, url: string | undefined, input: 
     );
   }
 
-  const called = await invokeInTab(tabId, runCode.name, parsed.data);
+  const called = await place.call(parsed.data);
   if (called.ok || called.error.code !== TOOLKIT_MISSING) return called;
 
-  const reinstalled = await evaluateInstaller(tabId, toolkit);
+  const reinstalled = await evaluateInstaller(place, toolkit);
   if (!reinstalled.ok) return reinstalled;
-  return invokeInTab(tabId, runCode.name, parsed.data);
+  return place.call(parsed.data);
 }
 
-function evaluateInstaller(tabId: number, toolkit: StoredToolkit): Promise<ActionResult> {
-  return withDebugger(tabId, FIREFOX_HINT, async (session) => {
-    const context = await mainWorldOf(session);
-    if (!context) return failure('FRAME_UNREACHABLE', FRAME_CONTEXT_HINT);
-    const reply = await evaluate(context, installerSource(toolkit.id, toolkit.code));
-    const thrown = reply.exceptionDetails;
-    if (thrown) {
-      return failure('CODE_ERROR', `The code failed while installing: ${describeThrow(thrown)}`);
-    }
-    const entries = reply.result?.value;
-    if (!Array.isArray(entries)) {
-      return failure('CODE_ERROR', 'The code installed but reported no functions.');
-    }
-    return success(entries as ToolkitEntry[]);
-  });
+async function evaluateInstaller(place: ToolkitPlace, toolkit: StoredToolkit): Promise<ActionResult> {
+  const evaluated = await place.evaluate(installerSource(toolkit.id, toolkit.code));
+  if (!evaluated.ok) return evaluated;
+  const thrown = evaluated.data.exceptionDetails;
+  if (thrown) {
+    return failure('CODE_ERROR', `The code failed while installing: ${describeThrow(thrown)}`);
+  }
+  const entries = evaluated.data.result?.value;
+  if (!Array.isArray(entries)) {
+    return failure('CODE_ERROR', 'The code installed but reported no functions.');
+  }
+  return success(entries as ToolkitEntry[]);
 }
 
 function evaluate({ session, contextId }: FrameContext, expression: string): Promise<EvaluateReply> {

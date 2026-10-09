@@ -17,11 +17,14 @@ import { displayName, slugify } from '@/lib/skills/saved-tool';
 export function KeepToolPrompt({
   offer,
   autoRunReady,
+  everyVisit = true,
   onKeep,
   onDismiss,
 }: {
   offer: ToolOffer;
   autoRunReady: boolean;
+  /** Whether running on every visit is offered: never on the phone, where nothing of the extension is in the page. */
+  everyVisit?: boolean;
   onKeep: (slug: string, autoRun: boolean) => void;
   onDismiss: () => void;
 }) {
@@ -62,11 +65,13 @@ export function KeepToolPrompt({
         runs with /{displayName({ host: offer.host, segment: offer.segment }, clean)}
       </p>
 
-      <label className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-dim">
-        <Switch checked={autoRun} onChange={setAutoRun} label={`Also run it on every visit to ${where}`} />
-        Also run it on every visit to {where}
-      </label>
-      {autoRun && !autoRunReady && <AllowUserScripts />}
+      {everyVisit && (
+        <label className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-dim">
+          <Switch checked={autoRun} onChange={setAutoRun} label={`Also run it on every visit to ${where}`} />
+          Also run it on every visit to {where}
+        </label>
+      )}
+      {everyVisit && autoRun && !autoRunReady && <AllowUserScripts />}
 
       <div className="mt-2.5 flex gap-1.5">
         <Button variant="ghost" size="sm" className="flex-1" onClick={onDismiss}>
@@ -96,12 +101,15 @@ function AllowUserScripts() {
 export function SavedToolList({
   tools,
   autoRunReady,
+  everyVisit = true,
   onAutoRun,
   onForget,
   onClose,
 }: {
   tools: SavedToolMeta[];
   autoRunReady: boolean;
+  /** Whether each tool's every-visit switch is shown: not on the phone, where it would only govern desktop visits. */
+  everyVisit?: boolean;
   onAutoRun: (id: string, on: boolean) => void;
   onForget: (id: string) => void;
   onClose: () => void;
@@ -123,7 +131,7 @@ export function SavedToolList({
           <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">
             Removing one deletes its code from the browser and its note from the daemon.
           </p>
-          {!autoRunReady && tools.some((tool) => tool.autoRun) && <AllowUserScripts />}
+          {everyVisit && !autoRunReady && tools.some((tool) => tool.autoRun) && <AllowUserScripts />}
         </div>
         <button
           type="button"
@@ -148,14 +156,16 @@ export function SavedToolList({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-[11px] text-ink">{tool.name}</p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-ink-dim">{tool.description}</p>
-                  <label className="mt-1.5 flex items-center gap-2 text-[10px] text-ink-faint">
-                    <Switch
-                      checked={tool.autoRun === true}
-                      onChange={(on) => onAutoRun(tool.id, on)}
-                      label={`Run ${tool.name} on every visit`}
-                    />
-                    Every visit
-                  </label>
+                  {everyVisit && (
+                    <label className="mt-1.5 flex items-center gap-2 text-[10px] text-ink-faint">
+                      <Switch
+                        checked={tool.autoRun === true}
+                        onChange={(on) => onAutoRun(tool.id, on)}
+                        label={`Run ${tool.name} on every visit`}
+                      />
+                      Every visit
+                    </label>
+                  )}
                 </div>
                 <button
                   type="button"
