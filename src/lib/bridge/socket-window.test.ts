@@ -80,5 +80,11 @@ describe('an extension against a Bridge from before Android', () => {
     expect(worker.daemonSpeaks(RELEASED_BRIDGE.protocolVersion)).toBe(true);
     expect(worker.daemonSpeaks(ANDROID_PROTOCOL)).toBe(false);
     expect(heard.find((frame) => frame.t === 'hello')).toMatchObject({ protocolVersion: ANDROID_PROTOCOL });
+
+    expect(await worker.openPhone('emulator-5554')).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED' } });
+    expect(await worker.sendCdp('emulator-5554', 'Runtime.evaluate')).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED' } });
+    worker.closePhone('emulator-5554');
+    expect(heard.map(({ t }) => t).filter((t) => t.startsWith('phone') || t === 'cdp')).toEqual([]);
+    expect((await daemonState())?.android).toBeUndefined();
   }, TEST_TIMEOUT_MS);
 });

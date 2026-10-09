@@ -64,7 +64,10 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveTask'; task: unknown }
   | { channel: typeof BRIDGE_CHANNEL; op: 'deleteTask'; taskId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'runTaskNow'; taskId: string }
-  | { channel: typeof BRIDGE_CHANNEL; op: 'pauseTasks'; paused: boolean };
+  | { channel: typeof BRIDGE_CHANNEL; op: 'pauseTasks'; paused: boolean }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'phoneStart'; serial: string; windowId?: number }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'phoneEnd' }
+  | { channel: typeof BRIDGE_CHANNEL; op: 'phoneOpenChrome' };
 
 export type ActionResult<T = unknown> =
   | { ok: true; data: T }

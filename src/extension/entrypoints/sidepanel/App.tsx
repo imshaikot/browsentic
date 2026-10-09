@@ -16,6 +16,7 @@ import { DropMask } from '@/extension/components/drop-mask';
 import { Greeting } from '@/extension/components/greeting';
 import { MonitorBar } from '@/extension/components/monitor-bar';
 import { PanelNav, type PanelTab } from '@/extension/components/panel-nav';
+import { PhoneToggle } from '@/extension/components/phone-toggle';
 import { RecordingBar } from '@/extension/components/recording-bar';
 import { RecordingPanel } from '@/extension/components/recording-panel';
 import { RunTimeline } from '@/extension/components/run-timeline';
@@ -323,6 +324,7 @@ export default function App() {
         >
           <SquarePen className="size-3.5" />
         </Button>
+        <PhoneToggle />
         {handsFree && (
           <Button
             variant="ghost"

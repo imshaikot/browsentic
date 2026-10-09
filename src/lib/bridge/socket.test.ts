@@ -98,7 +98,14 @@ describe('keeping one link to the daemon', () => {
     await online();
     expect((await daemonState())?.protocolVersion).toBe(SOCKET_PROTOCOL_VERSION);
     expect(socket.daemonSpeaks(ANDROID_PROTOCOL)).toBe(true);
+    for (let tries = 0; !(await daemonState())?.android; tries++) {
+      if (tries > 100) throw new Error('the Bridge never said what it knows about phones');
+      await wait(20);
+    }
+    expect((await daemonState())?.android).toMatchObject({ enabled: false, problem: { code: 'ANDROID_OFF' } });
+    expect(await socket.openPhone('emulator-5554')).toMatchObject({ ok: false, error: { code: 'ANDROID_OFF' } });
     await socket.disconnectDaemon();
     expect(socket.daemonSpeaks(ANDROID_PROTOCOL)).toBe(false);
+    expect((await daemonState())?.android).toBeUndefined();
   }, TEST_TIMEOUT_MS);
 });
