@@ -4,6 +4,7 @@ import type { FileReport, FileVerdict } from '@/lib/files/report';
 import type { MonitorSample } from '@/lib/monitor/events';
 import type { RecordedEvent } from '@/lib/recordings/events';
 import type { RecordingWorkflow } from '@/lib/recordings/workflow';
+import type { AndroidState, PhoneClosedReason, PhoneContext, PhoneOpened } from '@/lib/phone/types';
 import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
@@ -12,7 +13,10 @@ import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedul
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 22;
+export const SOCKET_PROTOCOL_VERSION = 23;
+
+/** The first protocol with the Android frames: `androidInfo`, the phone requests, `cdpEvent` and `phoneClosed`. */
+export const ANDROID_PROTOCOL = 23;
 
 /**
  * The oldest extension the daemon lets in. A store copy updates when its browser decides to, so it
@@ -167,6 +171,8 @@ export interface RunContext {
   liveTools?: boolean;
   /** Set when a schedule started this run: nobody is watching it, and it should end on one line saying what it found. */
   task?: TaskContext;
+  /** Set when the run drives Chrome on an Android phone through the mirror tab. */
+  phone?: PhoneContext;
 }
 
 /** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */
@@ -276,7 +282,16 @@ export type SocketFrame =
   | { t: 'pauseTasks'; id: string; paused: boolean }
   | { t: 'taskDone'; id: string; taskId: string; result: TaskResult }
   | { t: 'taskList'; id: string; result: ActionResult<TaskList> }
-  | { t: 'runTask'; id: string; order: TaskOrder };
+  | { t: 'runTask'; id: string; order: TaskOrder }
+  | { t: 'androidInfo'; id: string; result: ActionResult<AndroidState> }
+  | { t: 'phoneOpen'; id: string; serial: string }
+  | { t: 'phoneOpened'; id: string; result: ActionResult<PhoneOpened> }
+  | { t: 'phoneClose'; id: string; serial: string }
+  | { t: 'phoneLaunch'; id: string; serial: string; url?: string }
+  | { t: 'cdp'; id: string; serial: string; method: string; params?: Record<string, unknown>; sessionId?: string }
+  | { t: 'cdpResult'; id: string; result: ActionResult<Record<string, unknown>> }
+  | { t: 'cdpEvent'; serial: string; method: string; params: Record<string, unknown>; sessionId?: string }
+  | { t: 'phoneClosed'; serial: string; reason: PhoneClosedReason };
 
 export interface RecordingAnalysis {
   workflow: RecordingWorkflow;
@@ -316,6 +331,10 @@ export const EXTENSION_REQUEST_FRAMES = [
   'runTaskNow',
   'pauseTasks',
   'taskDone',
+  'phoneOpen',
+  'phoneClose',
+  'phoneLaunch',
+  'cdp',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

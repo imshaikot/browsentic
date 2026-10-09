@@ -5,6 +5,7 @@ import { fakeBrowser } from 'wxt/testing';
 import { startDaemon, type Daemon } from '@/daemon/daemon';
 import { logPath, readLockfile } from '@/daemon/lockfile';
 import { RemoteBridge } from '@/daemon/remote-bridge';
+import { ANDROID_PROTOCOL, SOCKET_PROTOCOL_VERSION } from '@/lib/actions/protocol';
 import type { DaemonState } from './socket';
 
 const ports = vi.hoisted(() => [] as number[]);
@@ -90,4 +91,14 @@ describe('keeping one link to the daemon', () => {
     expect((await daemonState())?.connected).toBe(true);
   }, TEST_TIMEOUT_MS);
 
+  test('the welcome says which protocol the Bridge speaks, and this one speaks Android', async () => {
+    const socket = await revivedWorker();
+    expect(socket.daemonSpeaks(ANDROID_PROTOCOL)).toBe(false);
+    await socket.connectDaemon();
+    await online();
+    expect((await daemonState())?.protocolVersion).toBe(SOCKET_PROTOCOL_VERSION);
+    expect(socket.daemonSpeaks(ANDROID_PROTOCOL)).toBe(true);
+    await socket.disconnectDaemon();
+    expect(socket.daemonSpeaks(ANDROID_PROTOCOL)).toBe(false);
+  }, TEST_TIMEOUT_MS);
 });

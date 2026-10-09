@@ -113,7 +113,7 @@ dialling. It never deletes the stored key; only pairing again or `disconnect` re
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **22**). They used to have to match
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **23**). They used to have to match
 exactly. A store copy updates when its browser decides to, not when the daemon does, so the
 extension and the daemon are routinely a version apart, and the daemon accepts a **window**:
 
@@ -132,6 +132,31 @@ bumps `SOCKET_PROTOCOL_VERSION`, and the new frame is sent only to a peer whose 
 a change neither side can do without raises a minimum. A refusal must never strand a browser: the
 v0.8.0 store build unpairs on any refusal and does not retry, so no daemon may refuse protocol 22
 until a store build that retries has replaced it.
+
+### Protocol 23: Android
+
+Protocol 23 adds the frames that let a browser drive Chrome on an Android phone through the Bridge.
+The Bridge keeps the number each extension's `hello` claimed and sends these frames only to an
+extension that speaks 23. The extension keeps the number the `welcome` carried (`daemonSpeaks`) and
+sends them only to a Bridge that speaks 23. An extension that speaks 22 is never sent one, and a phone
+request from it is answered `UNSUPPORTED`. The shapes are in `src/lib/phone/types.ts`.
+
+| Frame | From | What it carries |
+| --- | --- | --- |
+| `androidInfo` | Bridge | The phones and whether one is ready (`AndroidState`). Pushed with an empty `id` on connect and on every change, and the answer to `phoneLaunch` |
+| `phoneOpen` | extension | `serial`: start a session with Chrome on that phone. Answered by `phoneOpened` |
+| `phoneOpened` | Bridge | The device, its open tabs and Chrome's version, or an error |
+| `phoneClose` | extension | `serial`: end the session. Not answered |
+| `phoneLaunch` | extension | `serial` and an optional `url`: open Chrome on the phone |
+| `cdp` | extension | One DevTools command for the phone's Chrome: `method`, `params` and `sessionId`. Answered by `cdpResult` |
+| `cdpResult` | Bridge | Chrome's result, or `CDP_ERROR`, `TIMEOUT`, `PHONE_GONE` or `NOT_OWNER` |
+| `cdpEvent` | Bridge | Every DevTools event from the phone, screencast frames included, sent only to the extension that opened the session |
+| `phoneClosed` | Bridge | `serial` and why the session ended: `unplugged`, `chrome-exited`, `bridge-stopping` or `closed` |
+
+The control socket has an `android` op that reads the same state, subscribes to `android-changed`
+with `watch`, and opens Chrome on a phone with `launch` (refused to an agent run's connection). It
+has no way to send a DevTools command. Every action on the phone goes through the extension, which
+is where the blocked-sites list is checked.
 
 ---
 

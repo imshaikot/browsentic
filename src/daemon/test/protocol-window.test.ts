@@ -1,10 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
-import { MIN_EXTENSION_PROTOCOL, SOCKET_PROTOCOL_VERSION } from '@/lib/actions/protocol';
+import { ANDROID_PROTOCOL, MIN_EXTENSION_PROTOCOL, SOCKET_PROTOCOL_VERSION, type SocketFrame } from '@/lib/actions/protocol';
 import { CHROME_WEB_STORE } from '@/lib/stores';
 import { clearAuth } from '../auth-store';
 import { startDaemon, type Daemon } from '../daemon';
 import { readLockfile } from '../lockfile';
 import { RemoteBridge } from '../remote-bridge';
+import { FakeAndroid, NO_PHONE, READY_PHONE } from './fake-android';
 import { FakeBrowser, type Profile } from './fake-browser';
 
 const store: Profile = {
@@ -14,10 +15,12 @@ const store: Profile = {
 };
 
 let daemon: Daemon;
+let android: FakeAndroid;
 let opened: { close(): unknown }[] = [];
 
 beforeAll(async () => {
-  daemon = await startDaemon({ version: '0.0.0-test', idleExit: false });
+  android = new FakeAndroid();
+  daemon = await startDaemon({ version: '0.0.0-test', idleExit: false, android });
 });
 
 afterAll(async () => {
@@ -29,6 +32,8 @@ afterEach(async () => {
   opened = [];
   await new Promise((resolve) => setTimeout(resolve, 20));
   clearAuth();
+  android.current = NO_PHONE;
+  android.launched.length = 0;
 });
 
 async function control(): Promise<RemoteBridge> {
@@ -74,5 +79,78 @@ describe('the protocol window', () => {
     await pair(store);
     const [session] = await (await control()).sessions();
     expect([session.source, session.connected]).toEqual(['chrome-web-store', true]);
+  });
+});
+
+const ANDROID_FRAMES: ReadonlySet<SocketFrame['t']> = new Set(['androidInfo', 'phoneOpened', 'cdpResult', 'cdpEvent', 'phoneClosed']);
+
+describe('Android across the protocol window', () => {
+  const store22 = { ...store, protocolVersion: ANDROID_PROTOCOL - 1 };
+
+  test('a protocol-22 store copy is sent no Android frame, and its phone requests are refused with an answer', async () => {
+    const browser = await pair(store22);
+    android.change(READY_PHONE);
+    await browser.focus();
+    expect(browser.received.map(({ t }) => t).filter((t) => ANDROID_FRAMES.has(t))).toEqual([]);
+    expect(android.watchers).toBe(0);
+
+    const refused = { ok: false, error: { code: 'UNSUPPORTED' } };
+    expect(await browser.ask({ t: 'phoneOpen', id: 'open-1', serial: 'emulator-5554' })).toMatchObject({ t: 'phoneOpened', result: refused });
+    expect(await browser.ask({ t: 'cdp', id: 'cdp-1', serial: 'emulator-5554', method: 'Browser.getVersion' })).toMatchObject({
+      t: 'cdpResult',
+      result: refused,
+    });
+    expect(await browser.ask({ t: 'phoneLaunch', id: 'launch-1', serial: 'emulator-5554' })).toMatchObject({ t: 'androidInfo', result: refused });
+    expect(android.launched).toEqual([]);
+  });
+
+  test('a protocol-23 extension is sent the state on connect and on every change, and stops watching when it leaves', async () => {
+    const browser = await pair({ ...store, protocolVersion: ANDROID_PROTOCOL });
+    const [first] = await browser.frames('androidInfo');
+    expect(first).toEqual({ t: 'androidInfo', id: '', result: { ok: true, data: NO_PHONE } });
+    expect(android.watchers).toBe(1);
+
+    android.change(READY_PHONE);
+    const [, second] = await browser.frames('androidInfo', 2);
+    expect(second.result).toEqual({ ok: true, data: READY_PHONE });
+
+    browser.close();
+    await browser.closed;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(android.watchers).toBe(0);
+  });
+
+  test('a protocol-23 extension can ask the Bridge to open Chrome on the phone', async () => {
+    android.current = READY_PHONE;
+    const browser = await pair({ ...store, protocolVersion: ANDROID_PROTOCOL });
+    expect(await browser.ask({ t: 'phoneLaunch', id: 'launch-2', serial: 'emulator-5554' })).toEqual({
+      t: 'androidInfo',
+      id: 'launch-2',
+      result: { ok: true, data: READY_PHONE },
+    });
+    expect(android.launched).toEqual(['emulator-5554']);
+  });
+
+  test('the control op answers the state, and a watcher hears it and each change', async () => {
+    const bridge = await control();
+    const heard: unknown[] = [];
+    bridge.onAndroidChanged((state) => heard.push(state));
+    expect(await bridge.android({ watch: true })).toEqual({ ok: true, data: NO_PHONE });
+    android.change(READY_PHONE);
+    await bridge.status();
+    expect(heard).toEqual([NO_PHONE, READY_PHONE]);
+    bridge.close();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(android.watchers).toBe(0);
+  });
+
+  test('an agent run cannot open Chrome on the phone through the control socket', async () => {
+    const run = await RemoteBridge.connect(daemon.port, readLockfile()!.token, 'run-1');
+    opened.push(run);
+    await run.describe();
+    expect(await run.android({ launch: 'emulator-5554' })).toMatchObject({ ok: false, error: { code: 'BLOCKED' } });
+    expect(android.launched).toEqual([]);
+    expect(await (await control()).android({ launch: 'emulator-5554' })).toEqual({ ok: true, data: NO_PHONE });
+    expect(android.launched).toEqual(['emulator-5554']);
   });
 });

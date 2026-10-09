@@ -22,7 +22,7 @@ class FakeSocket extends EventEmitter {
   }
 }
 
-const hello = { extensionVersion: '0.6.2', manifestHash: 'abc', origin: 'chrome-extension://abcdefghijklmnop', installId: 'install-chrome-0001' };
+const hello = { protocolVersion: 22, extensionVersion: '0.6.2', manifestHash: 'abc', origin: 'chrome-extension://abcdefghijklmnop', installId: 'install-chrome-0001' };
 
 let socket: FakeSocket;
 let closed: ExtensionLink[];

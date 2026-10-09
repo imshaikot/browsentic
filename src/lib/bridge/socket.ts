@@ -74,6 +74,8 @@ export interface DaemonState {
   paired: boolean;
   port?: number;
   daemonVersion?: string;
+  /** What the Bridge speaks. Absent from a Bridge before 0.8, which speaks 22 or less. */
+  protocolVersion?: number;
   manifestInSync?: boolean;
   /** Which agent CLI the daemon runs, and what each one's state is. Pushed on connect. */
   agent?: AgentState;
@@ -87,6 +89,7 @@ export interface DaemonState {
 
 let socket: WebSocket | null = null;
 let welcomedSocket: WebSocket | null = null;
+let daemonProtocol = 0;
 let attempts = 0;
 let connecting: Promise<void> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -588,6 +591,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
       attempt.done();
       welcomedSocket = ws;
+      daemonProtocol = frame.protocolVersion ?? 0;
       // A link that is welcomed and then dropped at once has not recovered, and forgetting the
       // backoff on the welcome alone lets two peers take the link from each other every second.
       clearTimeout(stableTimer);
@@ -599,6 +603,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
         paired: true,
         port: attempt.port,
         daemonVersion: frame.daemonVersion,
+        protocolVersion: frame.protocolVersion,
         manifestInSync: frame.manifestInSync,
         error: undefined,
         lastChangeAt: Date.now(),
@@ -692,7 +697,15 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
 /** Held back until the daemon has welcomed us: mid-handshake it would be read as the proof. */
 export function reportFocus(): void {
-  if (socket && socket === welcomedSocket) post({ t: 'focus' });
+  if (isWelcomed()) post({ t: 'focus' });
+}
+
+export function daemonSpeaks(version: number): boolean {
+  return isWelcomed() && daemonProtocol >= version;
+}
+
+function isWelcomed(): boolean {
+  return !!socket && socket === welcomedSocket;
 }
 
 function send(ws: WebSocket, frame: SocketFrame): void {
