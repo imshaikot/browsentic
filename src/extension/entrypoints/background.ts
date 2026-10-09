@@ -23,6 +23,7 @@ import { endHandsFree } from '@/lib/bridge/panel-view';
 import { serveLaunchers } from '@/lib/bridge/launchers';
 import { servePreferences } from '@/lib/bridge/preferences';
 import { endPhone, openChromeOnPhone, servePhone, startPhone } from '@/lib/bridge/phone';
+import { servePhoneMirror } from '@/lib/bridge/phone-mirror';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
@@ -234,6 +235,7 @@ export default defineBackground(() => {
   serveHandsFree();
   servePreferences();
   servePhone();
+  servePhoneMirror();
   void syncRail();
 
   onWelcome(() => {

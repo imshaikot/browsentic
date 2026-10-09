@@ -53,7 +53,7 @@ describe('the phone session', () => {
     const started = await startPhone(SERIAL);
     expect(started.ok).toBe(true);
     const session = await readPhone();
-    expect(session).toMatchObject({ serial: SERIAL, model: 'Pixel 8', targets: OPENED.targets, activeTargetId: OPENED.targets[0].targetId, waitingForChrome: false });
+    expect(session).toMatchObject({ serial: SERIAL, model: 'Pixel 8', transport: 'usb', targets: OPENED.targets, waitingForChrome: false });
     const mirror = await fakeBrowser.tabs.get(session!.mirrorTabId);
     expect(mirror.url).toMatch(/phone\.html$/);
     expect(notify).not.toHaveBeenCalled();

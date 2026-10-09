@@ -86,11 +86,11 @@ describe('finding adb', () => {
   });
 
   test.skipIf(process.platform === 'win32')('start-server is judged by its exit, not by output a forked server could hold open', async () => {
-    const forks = fake('adb-forks', `require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 3000)'], { stdio: 'inherit', detached: true }).unref();`);
+    const forks = fake('adb-forks', `require('node:child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 20000)'], { stdio: 'inherit', detached: true }).unref();`);
     const started = Date.now();
     expect(await startServer(forks)).toBe(true);
-    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(Date.now() - started).toBeLessThan(10_000);
     expect(await startServer(fake('adb-refuses', 'process.exit(1);'))).toBe(false);
     expect(await startServer(join(dir, 'missing'))).toBe(false);
-  });
+  }, 30_000);
 });

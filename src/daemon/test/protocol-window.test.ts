@@ -84,6 +84,13 @@ describe('the protocol window', () => {
   });
 });
 
+async function eventually(done: () => boolean): Promise<void> {
+  for (let tries = 0; !done(); tries++) {
+    if (tries > 400) throw new Error('timed out waiting');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 const ANDROID_FRAMES: ReadonlySet<SocketFrame['t']> = new Set(['androidInfo', 'phoneOpened', 'cdpResult', 'cdpEvent', 'phoneClosed']);
 
 describe('Android across the protocol window', () => {
@@ -118,8 +125,7 @@ describe('Android across the protocol window', () => {
 
     browser.close();
     await browser.closed;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(android.watchers).toBe(0);
+    await eventually(() => android.watchers === 0);
   });
 
   test('a protocol-23 extension can ask the Bridge to open Chrome on the phone', async () => {
@@ -152,7 +158,7 @@ describe('Android across the protocol window', () => {
 
     browser.close();
     await browser.closed;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await eventually(() => android.released.length > 0);
     expect(android.released).toEqual([store.installId]);
   });
 
@@ -176,8 +182,7 @@ describe('Android across the protocol window', () => {
     expect(heard).toHaveLength(2);
     await bridge.android({ watch: true });
     bridge.close();
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(android.watchers).toBe(0);
+    await eventually(() => android.watchers === 0);
   });
 
   test('a peek answers only while someone watches', async () => {

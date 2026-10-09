@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
-import type { PhoneClosedReason, PhoneOpened, PhoneTarget } from '@/lib/phone/types';
+import type { AndroidDevice, PhoneClosedReason, PhoneOpened, PhoneTarget } from '@/lib/phone/types';
 import { DAEMON_STATE_KEY, closePhone, launchPhoneChrome, onDaemonClosed, onPhoneClosed, openPhone, type DaemonState } from './socket';
 
 export const PHONE_KEY = 'browsentic/phone';
@@ -16,10 +16,12 @@ export type PhoneEndReason = PhoneClosedReason | 'bridge-gone';
 export interface PhoneSession {
   serial: string;
   model?: string;
+  transport?: AndroidDevice['transport'];
   mirrorTabId: number;
   windowId: number;
   openedAt: number;
   targets: PhoneTarget[];
+  /** The tab the mirror follows: the one in front on the phone, found once the mirror starts. */
   activeTargetId?: string;
   /** Chrome was not open on the phone; the mirror waits, and the notification offers to open it. */
   waitingForChrome?: boolean;
@@ -45,24 +47,39 @@ export async function readPhone(): Promise<PhoneSession | null> {
 const writePhone = (session: PhoneSession | null): Promise<void> =>
   session ? browser.storage.session.set({ [PHONE_KEY]: session }) : browser.storage.session.remove(PHONE_KEY);
 
-const opening = (opened: ActionResult<PhoneOpened>) =>
-  opened.ok
-    ? { targets: opened.data.targets, activeTargetId: opened.data.targets[0]?.targetId, waitingForChrome: false }
-    : { targets: [], activeTargetId: undefined, waitingForChrome: true };
-
-async function modelOf(serial: string): Promise<string | undefined> {
-  const stored = await browser.storage.session.get(DAEMON_STATE_KEY);
-  return (stored[DAEMON_STATE_KEY] as DaemonState | undefined)?.android?.devices.find((device) => device.serial === serial)?.model;
+/** A change to the live session, made in turn with every other; nothing happens when there is none. */
+export function updatePhone(change: (session: PhoneSession) => PhoneSession): Promise<PhoneSession | null> {
+  return locked(async () => {
+    const held = await readPhone();
+    if (!held || held.ended) return held;
+    const next = change(held);
+    await writePhone(next);
+    return next;
+  });
 }
 
-/** Starts the session and opens its mirror beside the tab the user is on. A second start shows the mirror already open. */
+const opening = (opened: ActionResult<PhoneOpened>) =>
+  opened.ok
+    ? { targets: opened.data.targets, activeTargetId: undefined, waitingForChrome: false }
+    : { targets: [], activeTargetId: undefined, waitingForChrome: true };
+
+async function deviceOf(serial: string): Promise<AndroidDevice | undefined> {
+  const stored = await browser.storage.session.get(DAEMON_STATE_KEY);
+  return (stored[DAEMON_STATE_KEY] as DaemonState | undefined)?.android?.devices.find((device) => device.serial === serial);
+}
+
+/**
+ * Starts the session and opens its mirror beside the tab the user is on. A second start for the same
+ * phone shows the mirror already open; one for another phone moves the session, and its tab, to it.
+ */
 export function startPhone(serial: string, windowId?: number): Promise<ActionResult<PhoneSession>> {
   return locked(async () => {
     const held = await readPhone();
-    if (held && !held.ended) {
+    if (held && !held.ended && held.serial === serial) {
       await showTab(held.mirrorTabId, held.windowId);
       return success(held);
     }
+    if (held && !held.ended) closePhone(held.serial);
 
     const opened = await openPhone(serial);
     if (!opened.ok && opened.error.code !== 'CHROME_NOT_RUNNING') return opened;
@@ -79,7 +96,7 @@ export function startPhone(serial: string, windowId?: number): Promise<ActionRes
       windowId: mirror.windowId ?? windowId ?? browser.windows.WINDOW_ID_CURRENT,
       openedAt: Date.now(),
       ...opening(opened),
-      model: (opened.ok ? opened.data.device.model : undefined) ?? (await modelOf(serial)),
+      ...(await describedPhone(serial, opened)),
     };
     await writePhone(session);
     if (session.waitingForChrome) await askToOpenChrome(session);
@@ -138,6 +155,11 @@ export function servePhone(): void {
   browser.notifications?.onButtonClicked?.addListener((notificationId) => {
     if (notificationId === NOTIFICATION_ID) void openChromeOnPhone();
   });
+}
+
+async function describedPhone(serial: string, opened: ActionResult<PhoneOpened>): Promise<Pick<PhoneSession, 'model' | 'transport'>> {
+  const device = opened.ok ? opened.data.device : await deviceOf(serial);
+  return { model: device?.model, transport: device?.transport };
 }
 
 async function openMirror(windowId?: number) {
