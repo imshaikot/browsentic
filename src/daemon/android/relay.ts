@@ -32,6 +32,8 @@ export interface RelayDeps {
 
 const DEVTOOLS_SOCKET = 'localabstract:chrome_devtools_remote';
 const TIMEOUTS = { connect: 5_000, command: 15_000, slow: 30_000 };
+/** The longest a caller may ask one command to wait: a page-side wait or a long typing run awaited in the page. */
+const LONGEST_COMMAND_MS = 180_000;
 const SLOW_COMMANDS = new Set(['Page.captureScreenshot', 'Page.navigate']);
 const FRAME_BACKLOG_BYTES = 4 * 1024 * 1024;
 const MAX_MESSAGE_BYTES = 256 * 1024 * 1024;
@@ -63,12 +65,12 @@ export function startRelay({ server, state, onSession, host = '127.0.0.1', timeo
     onSession(current && { serial: current.serial, since: current.since });
   };
 
-  function call(session: Session, method: string, params?: Record<string, unknown>, sessionId?: string): Promise<CdpResult> {
+  function call(session: Session, method: string, params?: Record<string, unknown>, sessionId?: string, asked?: number): Promise<CdpResult> {
     if (sessions.get(session.serial) !== session || session.socket.readyState !== WebSocket.OPEN) {
       return Promise.resolve(failure('PHONE_GONE', 'The phone disconnected.'));
     }
     const id = session.nextId++;
-    const timeoutMs = SLOW_COMMANDS.has(method) ? timeouts.slow : timeouts.command;
+    const timeoutMs = asked ? Math.min(asked, LONGEST_COMMAND_MS) : SLOW_COMMANDS.has(method) ? timeouts.slow : timeouts.command;
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
         session.calls.delete(id);
@@ -199,12 +201,12 @@ export function startRelay({ server, state, onSession, host = '127.0.0.1', timeo
   return {
     open,
 
-    async command(owner, { serial, method, params, sessionId }) {
+    async command(owner, { serial, method, params, sessionId, timeoutMs }) {
       const session = sessions.get(serial);
       if (!session) return failure('PHONE_GONE', 'No phone session is open. Switch Android on again.');
       if (session.owner !== owner) return failure('NOT_OWNER', 'Another browser is driving this phone.');
       const started = Date.now();
-      const result = await call(session, method, params, sessionId);
+      const result = await call(session, method, params, sessionId, timeoutMs);
       if (!isChatter(method, params)) log(`phone ${serial} ${method} ${result.ok ? 'ok' : result.error.code} in ${Date.now() - started} ms`);
       return result;
     },

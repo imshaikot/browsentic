@@ -413,8 +413,9 @@ export function sendCdp(
   method: string,
   params?: Record<string, unknown>,
   sessionId?: string,
+  timeoutMs?: number,
 ): Promise<ActionResult<Record<string, unknown>>> {
-  return phoneOp({ t: 'cdp', id: crypto.randomUUID(), serial, method, params, sessionId }, PHONE_COMMAND_TIMEOUT_MS);
+  return phoneOp({ t: 'cdp', id: crypto.randomUUID(), serial, method, params, sessionId, timeoutMs }, (timeoutMs ?? 0) + PHONE_COMMAND_TIMEOUT_MS);
 }
 
 export function closePhone(serial: string): void {

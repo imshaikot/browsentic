@@ -8,7 +8,8 @@ import { switchTab } from '@/lib/actions/page/switch-tab';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
 import { notOnPhone, phoneOffers } from '@/lib/phone/features';
-import { isLive, readPhone, targetForNumber, updatePhone, numbered, type PhoneSession } from './phone';
+import { currentTarget, isLive, readPhone, targetForNumber, updatePhone, numbered, type PhoneSession } from './phone';
+import { hereOn, pageSideOnPhone, waitForLoad } from './phone-backend';
 import { attachedSession, bringToFront, followTarget } from './phone-mirror';
 import { releaseForAction, sealForPage } from './secret-vault';
 import { refusalFor } from './site-guard';
@@ -16,15 +17,12 @@ import { sendCdp } from './socket';
 import { sessionForRun, type TabSession } from './tab-sessions';
 
 const GONE = 'The phone disconnected. Reconnect it and switch Android on again.';
-const LOAD_TIMEOUT_MS = 15_000;
-const LOAD_POLL_MS = 150;
 
 /** Pages a tool lands on, checked against the blocked list once it has run. */
 const LANDS = new Set([navigate.name, openTab.name, 'page.searchSite', 'page.submitForm', 'page.clickElement', 'page.trustedClick']);
 
 type PhoneBackend = (action: string, input: unknown, phone: PhoneSession) => Promise<ActionResult>;
 
-const pageSide: PhoneBackend = async (action) => failure('NOT_BUILT', `${action} is not built for the phone yet.`);
 
 /**
  * The phone session a call belongs to: its run's conversation lives on the phone tab, or, with no
@@ -40,7 +38,7 @@ export async function phoneRoute(tabId: number | undefined, runId: string | unde
   return isLive(phone) ? phone : 'gone';
 }
 
-export const currentTarget = (phone: PhoneSession) => phone.targets.find((target) => target.targetId === phone.activeTargetId) ?? phone.targets[0];
+export { currentTarget };
 
 export async function invokeOnPhone(action: string, input: unknown, route: PhoneSession | 'gone'): Promise<ActionResult> {
   if (route === 'gone') return failure('PHONE_GONE', GONE);
@@ -54,7 +52,7 @@ export async function invokeOnPhone(action: string, input: unknown, route: Phone
   if (release.refused.length) return failure('SECRET_NOT_RELEASABLE', REFUSED_MESSAGE);
   if (release.unresolved.length) return failure('SECRET_EXPIRED', EXPIRED_MESSAGE);
 
-  const result = await (TAB_TOOLS[action] ?? pageSide)(action, release.input, route);
+  const result = await (TAB_TOOLS[action] ?? pageSideOnPhone)(action, release.input, route);
   if (result.ok && LANDS.has(action)) {
     const landed = await refusalFor(currentTarget((await readPhone()) ?? route)?.url, textOf((result.data as { finalUrl?: unknown })?.finalUrl));
     if (landed) return landed;
@@ -86,20 +84,9 @@ export async function inCurrentTab(phone: PhoneSession, method: string, params?:
   return sessionId ? sendCdp(phone.serial, method, params, sessionId) : failure('PHONE_GONE', GONE);
 }
 
-async function loaded(phone: PhoneSession, sinceUrl?: string): Promise<{ url: string; title: string; loaded: boolean }> {
-  const deadline = Date.now() + LOAD_TIMEOUT_MS;
-  let seen = { url: sinceUrl ?? '', title: '', readyState: '' };
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, LOAD_POLL_MS));
-    const state = await inCurrentTab(phone, 'Runtime.evaluate', {
-      expression: 'JSON.stringify({ url: location.href, title: document.title, readyState: document.readyState })',
-      returnByValue: true,
-    });
-    if (!state.ok) continue;
-    seen = JSON.parse(String((state.data.result as { value?: unknown }).value ?? '{}'));
-    if (seen.readyState === 'complete' && seen.url !== 'about:blank') return { url: seen.url, title: seen.title, loaded: true };
-  }
-  return { url: seen.url, title: seen.title, loaded: false };
+async function loaded(phone: PhoneSession): Promise<{ url: string; title: string; loaded: boolean }> {
+  const here = await hereOn(phone);
+  return here ? waitForLoad(here) : { url: currentTarget(phone)?.url ?? '', title: '', loaded: false };
 }
 
 async function navigateOnPhone(_action: string, input: unknown, phone: PhoneSession): Promise<ActionResult> {

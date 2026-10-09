@@ -64,6 +64,7 @@ import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
 import { adoptSubtab, sessionForRun, sessionForTab, setCurrentTab, type TabSession } from '@/lib/bridge/tab-sessions';
 import { invokeOnPhone, phoneRoute } from '@/lib/bridge/phone-invoke';
+import { HOST_SIDE } from '@/lib/phone/features';
 
 /**
  * The sanitizer's client-side half, wrapped around every action the harness runs.
@@ -79,7 +80,7 @@ export async function invokeForHarness(
   tabId?: number,
   runId?: string,
 ): Promise<ActionResult> {
-  const phone = await phoneRoute(tabId, runId);
+  const phone = HOST_SIDE.has(action) ? null : await phoneRoute(tabId, runId);
   if (phone) return invokeOnPhone(action, input, phone);
 
   const refused = await guardTarget(action, input, tabId, runId);

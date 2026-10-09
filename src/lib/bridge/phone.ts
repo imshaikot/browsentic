@@ -41,6 +41,9 @@ export function numbered(session: PhoneSession, targets: PhoneTarget[] = session
   return { ...session, targets, tabNumbers };
 }
 
+export const currentTarget = (phone: PhoneSession): PhoneTarget | undefined =>
+  phone.targets.find((target) => target.targetId === phone.activeTargetId) ?? phone.targets[0];
+
 export const targetForNumber = (session: PhoneSession, number: number): string | undefined =>
   Object.entries(session.tabNumbers ?? {}).find(([, value]) => value === number)?.[0];
 

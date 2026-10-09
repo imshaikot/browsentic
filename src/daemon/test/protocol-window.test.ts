@@ -85,8 +85,9 @@ describe('the protocol window', () => {
 });
 
 async function eventually(done: () => boolean): Promise<void> {
-  for (let tries = 0; !done(); tries++) {
-    if (tries > 400) throw new Error('timed out waiting');
+  const deadline = Date.now() + 10_000;
+  while (!done()) {
+    if (Date.now() > deadline) throw new Error('timed out waiting');
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 }

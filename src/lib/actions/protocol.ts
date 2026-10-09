@@ -291,7 +291,7 @@ export type SocketFrame =
   | { t: 'phoneOpened'; id: string; result: ActionResult<PhoneOpened> }
   | { t: 'phoneClose'; id: string; serial: string }
   | { t: 'phoneLaunch'; id: string; serial: string; url?: string }
-  | { t: 'cdp'; id: string; serial: string; method: string; params?: Record<string, unknown>; sessionId?: string }
+  | { t: 'cdp'; id: string; serial: string; method: string; params?: Record<string, unknown>; sessionId?: string; timeoutMs?: number }
   | { t: 'cdpResult'; id: string; result: ActionResult<Record<string, unknown>> }
   | { t: 'cdpEvent'; serial: string; method: string; params: Record<string, unknown>; sessionId?: string }
   | { t: 'phoneClosed'; serial: string; reason: PhoneClosedReason };

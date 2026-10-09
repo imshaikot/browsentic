@@ -34,6 +34,9 @@ export const PHONE_TOOLS: ReadonlySet<string> = new Set([
 
 export const PHONE_RESERVED: ReadonlySet<string> = new Set();
 
+/** Tools that touch no page and keep their state in the browser, so a phone run uses them exactly as a desktop one does. */
+export const HOST_SIDE: ReadonlySet<string> = new Set(['page.startTimer', 'page.timerStatus', 'page.stopTimer']);
+
 export const phoneOffers = (action: string): boolean => PHONE_TOOLS.has(action) || PHONE_RESERVED.has(action);
 
 export const notOnPhone = (action: string): string => `${action} isn’t available on the phone. It works in desktop tabs.`;

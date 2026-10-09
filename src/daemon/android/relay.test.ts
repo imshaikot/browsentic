@@ -200,6 +200,13 @@ describe('commands and events', () => {
     expect(chrome.commands.at(-1)).toEqual({ method: 'Runtime.evaluate', params: { expression: 'document.title' }, sessionId: 'S1' });
   });
 
+  test('a command can ask to wait longer than the default, for a page-side wait', async () => {
+    const asked = relay.command(owner, { t: 'cdp', id: 'f7', serial: SERIAL, method: 'Hang.forever', timeoutMs: 400 });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await Promise.race([asked, Promise.resolve('still waiting')])).toBe('still waiting');
+    expect(await asked).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } });
+  });
+
   test('Chrome\'s refusal is CDP_ERROR in its own words, and silence is TIMEOUT', async () => {
     expect(await relay.command(owner, { t: 'cdp', id: 'f2', serial: SERIAL, method: 'Nope.nope' })).toEqual({
       ok: false,
