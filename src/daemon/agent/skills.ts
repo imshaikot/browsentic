@@ -135,9 +135,13 @@ export interface RoutedSkill {
  */
 export const SCRIPTING_SKILL = 'page-scripting';
 
+/** The base of every run on the Android phone, whatever the instruction says or names: the other bases teach desktop tools a phone run is not offered. */
+export const PHONE_SKILL = 'phone';
+
 export function routeSkill(skills: Skill[], instruction: string, context?: RunContext): RoutedSkill | null {
   if (!skills.length) return null;
-  const bases = skills.filter((skill) => skill.category === 'general' && skill.name !== SCRIPTING_SKILL);
+  const bases = skills.filter((skill) => skill.category === 'general' && skill.name !== SCRIPTING_SKILL && skill.name !== PHONE_SKILL);
+  const phone = context?.phone ? skills.find((skill) => skill.name === PHONE_SKILL) : undefined;
   const fallback = bases.find((skill) => skill.isDefault) ?? bases[0] ?? skills[0];
 
   let text = instruction;
@@ -148,10 +152,11 @@ export function routeSkill(skills: Skill[], instruction: string, context?: RunCo
     const named = skills.find((skill) => skill.name.toLowerCase() === explicit[1].toLowerCase());
     if (named) {
       text = instruction.slice(explicit[0].length);
-      if (named.category === 'general') return { base: named, overlays: overlaysFor(skills, context, []), text };
+      if (named.category === 'general') return { base: phone ?? named, overlays: overlaysFor(skills, context, []), text };
       forced.push(named);
     }
   }
+  if (phone) return { base: phone, overlays: overlaysFor(skills, context, forced), text };
 
   const haystack = text.toLowerCase();
   let best = fallback;
@@ -176,7 +181,7 @@ function overlaysFor(skills: Skill[], context: RunContext | undefined, forced: S
         .sort((a, b) => b.match.length - a.match.length)
         .map((entry) => entry.skill)
     : [];
-  const scripting = context?.liveTools
+  const scripting = context?.liveTools && !context.phone
     ? skills.filter((skill) => skill.name === SCRIPTING_SKILL && !forced.includes(skill))
     : [];
   return [...forced, ...matched, ...scripting];

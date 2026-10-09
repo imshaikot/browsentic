@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { byteLength } from '@/lib/skills/format';
 import { FENCE_NOTE } from '../guardrails/fence';
-import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage } from './prompt';
+import type { PhoneContext } from '@/lib/phone/types';
+import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage } from './prompt';
 import type { Skill } from './skills';
 
 const skill = (name: string, body: string, provenance: Skill['provenance'] = 'authored'): Skill => ({
@@ -250,5 +251,48 @@ describe('a run a schedule started', () => {
     expect(scheduledBlock({ id: 't1', name: 'PR digest' })).toBe('Task: PR digest');
     expect(scheduledBlock(undefined)).toBeUndefined();
     expect(buildSystemPrompt(base, [], { scheduled: scheduledBlock(undefined) }).prompt).not.toContain('# Scheduled run');
+  });
+});
+
+describe('a run on the Android phone', () => {
+  const PIXEL: PhoneContext = { serial: 'emulator-5554', model: 'Pixel 8', android: '16', chrome: '150', viewport: { width: 411, height: 675, dpr: 2.625 } };
+  const phoneSkill = skill('phone', 'Tap, do not hover.');
+  const onPhone = buildSystemPrompt(phoneSkill, [], { phone: phoneBlock(PIXEL) });
+  const onDesktop = buildSystemPrompt(base);
+
+  test('is told the device in one line, so it needs no tool call to learn it', () => {
+    expect(phoneBlock(PIXEL)).toBe('Pixel 8 · Android 16 · Chrome 150 · viewport 411×675 CSS px at 2.625x');
+    expect(onPhone.prompt).toContain('# Android phone');
+    expect(onPhone.prompt).toContain('Pixel 8 · Android 16');
+  });
+
+  test('leaves out what the Bridge could not read rather than showing it empty', () => {
+    expect(phoneBlock({ ...PIXEL, android: '', chrome: '', viewport: { width: 0, height: 0, dpr: 1 } })).toBe('Pixel 8');
+    expect(phoneBlock(undefined)).toBeUndefined();
+  });
+
+  test('opens on the phone and its front tab, and keeps every rule a desktop run has', () => {
+    expect(onPhone.prompt.startsWith("You are Browsentic, driving Chrome on the user's Android phone")).toBe(true);
+    expect(onPhone.prompt).not.toContain('frontmost');
+    expect(onPhone.prompt.slice(onPhone.prompt.indexOf('Rules that hold for every task:'))).toContain(
+      onDesktop.prompt.slice(onDesktop.prompt.indexOf('Rules that hold for every task:'), onDesktop.prompt.indexOf('# Skill:')),
+    );
+  });
+
+  test('a desktop run opens as it always did, on the frontmost tab, with no phone section', () => {
+    expect(onDesktop.prompt.startsWith("You are Browsentic, driving the user's real Chrome browser")).toBe(true);
+    expect(onDesktop.prompt).toContain('whichever tab is frontmost');
+    expect(onDesktop.prompt).not.toContain('# Android phone');
+  });
+
+  test('a conversation that moves onto the phone hears its skill and the device', () => {
+    const update = promptUpdate(onDesktop.sections, onPhone)!;
+    expect([update.changed.sort(), update.text.includes('Pixel 8 · Android 16')]).toEqual([['phone', 'skill'], true]);
+  });
+
+  test('a conversation that moves off the phone hears the desktop skill, and that the phone no longer applies', () => {
+    const update = promptUpdate(onPhone.sections, onDesktop)!;
+    expect(update.text).toContain('# Skill: browser-control');
+    expect(update.text).toContain('No longer in force: the Android phone (this conversation now drives the desktop browser, on whichever tab is frontmost).');
   });
 });

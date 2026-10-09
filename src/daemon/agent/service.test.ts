@@ -383,3 +383,59 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
     ]).toEqual([true, true, false]);
   });
 });
+
+describe('the prompt of a run on the phone', () => {
+  test('is the phone skill and the device, and a turn back on a desktop tab hears that the phone no longer applies', async () => {
+    const dir = `${dirname(configPath)}/phone-turns`;
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const agent = stubCli(
+      join(dir, 'claude'),
+      `const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log('2.1.283 (Claude Code)');
+  process.exit(0);
+}
+const turn = ${JSON.stringify(dir)} + '/turn-' + fs.readdirSync(${JSON.stringify(dir)}).filter((name) => name.startsWith('turn-')).length;
+const prompt = fs.readFileSync(process.argv[process.argv.indexOf('--append-system-prompt-file') + 1], 'utf8');
+let heard = '';
+process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
+  fs.writeFileSync(turn, JSON.stringify({ prompt, heard }));
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1', mcp_servers: [{ name: 'browsentic', status: 'connected' }] }));
+  console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
+});`,
+    );
+    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    const done: string[] = [];
+    const turns = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void ((event.kind === 'done' || event.kind === 'error') && done.push(runId)),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    const turn = async (id: string, phone?: PhoneContext) => {
+      turns.handle({ t: 'instruct', id, text: 'click the first result', context: { sessionId: 's1', phone } });
+      await vi.waitFor(() => expect(done).toContain(id), { timeout: 5_000 });
+    };
+
+    try {
+      await turn('r1', PHONE);
+      await turn('r2');
+    } finally {
+      turns.dispose();
+    }
+    const [first, second] = [0, 1].map((n) => JSON.parse(readFileSync(`${dir}/turn-${n}`, 'utf8')) as { prompt: string; heard: string });
+
+    expect([
+      first.prompt.startsWith("You are Browsentic, driving Chrome on the user's Android phone"),
+      first.prompt.includes('# Skill: phone'),
+      first.prompt.includes('Pixel 8 · Android 16 · Chrome 150 · viewport 411×675 CSS px at 2.625x'),
+      first.prompt.includes('# Skill: browser-control'),
+    ]).toEqual([true, true, true, false]);
+    expect([
+      second.heard.includes('# Skill: browser-control'),
+      second.heard.includes('No longer in force: the Android phone'),
+      second.heard.endsWith('click the first result'),
+    ]).toEqual([true, true, true]);
+  });
+});

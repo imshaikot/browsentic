@@ -49,7 +49,7 @@ import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
+import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState, RUNNERS } from './runners';
 import type { CallLimits } from './runners/types';
@@ -525,6 +525,7 @@ export class AgentSession {
           attachments: handover.known,
           recordings: recordingsBlock(context?.recordings),
           scheduled: scheduledBlock(context?.task),
+          phone: phoneBlock(context?.phone),
         });
         // The CLI sends the prompt its session began with, so what has changed since goes in the message.
         const update =
