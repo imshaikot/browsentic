@@ -184,6 +184,27 @@ and it does nothing but start the Bridge. The trust boundary is unchanged: your 
 and Vivaldi and Arc on Windows, are not registered yet, so there the Bridge starts with the app, a
 command or an MCP client instead.
 
+## Android phones
+
+[Driving a phone](features/android.md) has limits of its own:
+
+- **One phone at a time**, driven by one browser at a time.
+- **Google Chrome only**, the stable app from the Play Store. Chrome Beta, Dev and Canary and other
+  Android browsers are not found.
+- **Chromium desktop browsers only.** Firefox has no Android switch.
+- **The screen has to stay on.** With the screen off Chrome stops drawing, the picture stops, and
+  the agent's actions can stall or fail. Keep the phone unlocked while it works.
+- **USB, or Wi-Fi already paired with adb.** Browsentic does not pair a phone over Wi-Fi for you.
+- **Desktop-only tools stay on the desktop**: hover, captchas, downloads, uploading a file to a
+  page, page code, a site's own tools, monitors, diagnostics, recordings, scheduling and A-Eye.
+- **Native pickers are out of reach.** A `<select>` opens the phone's own picker, which is not part
+  of the page; the agent sets its value instead. The same goes for permission prompts and anything
+  else Android draws over Chrome.
+- **New tabs open in front.** Chrome on Android always brings a new tab forward, so a tab the agent
+  opens "in the background" shows briefly before it switches back.
+- **Out-of-process iframes** have not been tested on a real phone; the emulator keeps every frame in
+  one process.
+
 ## Unpacked extension
 
 An unpacked copy (`setup --unpacked`, or a source build) is not updated by any store, and the

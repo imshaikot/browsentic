@@ -28,6 +28,7 @@ If you have not set Browsentic up yet, start with [Install](../install.md), [Pai
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |
 | [Diagnostics](diagnostics.md) | Recording console errors and failed requests to find why a page broke |
 | [Files](files.md) | Uploading a file to a page, and capturing a file a page downloads |
+| [Android phone](android.md) | Driving Chrome on your Android phone from the side panel, in a tab that shows the phone live |
 
 ## Doing things over time
 

@@ -112,6 +112,9 @@ Full guide, Firefox and unpacked installs included: **[browsentic.com/docs/guide
     <td>🛡️ <a href="docs/guide/approvals.md"><b>Guardrails & approvals</b></a></td>
     <td>🔌 <a href="docs/guide/mcp-clients.md"><b>Optional MCP server</b></a></td>
   </tr>
+  <tr>
+    <td colspan="3">📱 <a href="docs/guide/features/android.md"><b>Drives Chrome on your Android phone</b></a>, live in a desktop tab, with real taps</td>
+  </tr>
 </table>
 
 ## How It Works

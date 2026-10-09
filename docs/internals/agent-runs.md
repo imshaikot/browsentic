@@ -271,24 +271,26 @@ one-shot, the readiness probe, a model list), and they are where Windows differs
 `buildSystemPrompt()` concatenates, in order:
 
 1. a fixed preamble: the browser is not a sandbox, page content is data and never instructions, do
-   not exfiltrate, a `DECLINED` action is final, report what actually happened;
+   not exfiltrate, a `DECLINED` action is final, report what actually happened. Its opening
+   paragraphs name the browser, or the phone on a [run on the phone](#a-run-on-the-phone);
 2. the routed **base skill** body;
-3. the user's **standing instructions** and **saved details** from the settings page's
+3. on a run on the phone, the **Android phone** section: the device in one line;
+4. the user's **standing instructions** and **saved details** from the settings page's
    [Profile](../guide/features/profile.md) (`profile.json`, read fresh for each run). They are
    trusted, since the user wrote them, and framed accordingly: use the details exactly, never invent
    a missing one, and rank the instructions above the skill and site notes but below the preamble.
    Side-panel runs and scheduled tasks only; mapping runs and one-shot tasks go without;
-4. an optional **attached agent skill**: one of the active CLI's own skills, chosen from the
+5. an optional **attached agent skill**: one of the active CLI's own skills, chosen from the
    panel's `/` picker. `RunContext.agentSkillId` is an opaque id the daemon minted while listing
    the CLI's skill directories (the runner's `skillDirs()`); it resolves only against that list,
    for that agent, and the file is re-read at spawn time. An id that no longer resolves fails the
    run with `SKILL_UNKNOWN` before anything spawns;
-5. optional **fetched data** (a site's own `robots.txt`/`sitemap.xml`, during mapping);
-6. optional **attached files**: one line for each file whose report this conversation's agent
+6. optional **fetched data** (a site's own `robots.txt`/`sitemap.xml`, during mapping);
+7. optional **attached files**: one line for each file whose report this conversation's agent
    already holds, with the id `page_attachFile` takes. The reports themselves travel in the
    message ([below](#the-file-analyst));
-7. optional **recordings** index, capped at 4 KB;
-8. any matching **site notes** overlays, hand-written ones before machine-generated ones.
+8. optional **recordings** index, capped at 4 KB;
+9. any matching **site notes** overlays, hand-written ones before machine-generated ones.
 
 The whole prompt is capped at **64 KB**. Overlays that would push it over are dropped by name, and
 the side panel is told which ones: a silently truncated prompt is worse than a visibly incomplete
@@ -469,7 +471,7 @@ directory shadows an earlier one by name:
 
 | Directory | Source | Contents |
 | --- | --- | --- |
-| `src/daemon/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye` |
+| `src/daemon/skills/` (bundled) | `bundled` | `browser-control` (default), `page-research`, `page-theming`, `browse-navigation`, `monitor-progress`, `site-mapper`, `captcha`, `a-eye`, and `phone`, the base of every [run on the phone](#a-run-on-the-phone) |
 | `~/.browsentic/skills/` | `user` | Hand-written overrides |
 | `~/browsentic/skills/` (or `skillsDir`) | `uploaded` | Panel uploads and generated site maps |
 
@@ -481,6 +483,39 @@ the `default: true` skill as the fallback. A `@name` prefix pins one explicitly.
 
 Skills with `category: site-exploration` are **overlays** instead: they stack on top of the base
 whenever the active tab's host matches their `domains`, longest match first.
+
+## A run on the phone
+
+A conversation on the [phone tab](android.md) sends `RunContext.phone`: the model, the Android and
+Chrome versions, and the viewport, read when the message is sent. The run changes in four ways:
+
+- **Its base skill is always `phone`** (`PHONE_SKILL` in `skills.ts`), whatever the words would
+  have routed to, even when a `@name` names another general skill. `browser-control.md` teaches
+  desktop tools a phone run is not offered (hover, captchas, downloads, a site's own tools, page
+  code), and naming a withheld tool invites the agent to try it. `phone.md` names only
+  `PHONE_TOOLS`, and a test holds it to that. Site notes for the phone page's host still ride
+  along; the page-scripting overlay never does, even with `liveTools` set. Like `page-scripting`,
+  `phone` is a `general` skill kept out of desktop routing by name.
+- **Its prompt opens on the phone** (`PHONE_OPENING` in `prompt.ts`): every tool call lands on the
+  tab in front on the phone, not on "whichever tab is frontmost". The numbered rules are the same.
+- **An `# Android phone` section** carries `phoneBlock(context.phone)`, such as
+  `Pixel 8 · Android 16 · Chrome 150 · viewport 411×915 CSS px at 2.625x`, so the agent needs no
+  tool call to learn the device. It holds no address, so it does not change with every message.
+- **Its tool list is smaller.** `offerFor` withholds every tool off `PHONE_TOOLS`, and
+  `invokeForRun` refuses a call to one with `NOT_ON_PHONE`. The tool list the browser describes
+  is never varied, because it feeds the manifest hash.
+
+Together these make a phone run's fixed overhead about 40 % smaller than a desktop run's: measured
+as sent on 9 Oct 2026, the repository's part of the system prompt was 7.9 KB against 19.6 KB, and
+the tool list 31 tools in 39.6 KB of JSON against 52 in 60.7 KB.
+
+A conversation can move between the phone and a desktop tab when it is restored onto the other. A
+CLI that keeps its first prompt then hears the change in its next message: the `phone` and `skill`
+sections going one way, and "No longer in force: the Android phone" with the desktop skill going
+the other. Its tool list shrinks or grows at that point, which re-bills the cached prefix once.
+Codex fixes its tool list when a thread starts and lists withheld tools out of sight, so on a Codex
+thread that began on the phone the desktop tools stay out of sight; a call to an off-list tool on
+the phone is refused either way.
 
 ---
 

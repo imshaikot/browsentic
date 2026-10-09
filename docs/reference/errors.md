@@ -130,6 +130,25 @@ and handed to the agent with the file so it can say why it cannot answer from it
 | `FILE_NOT_FOUND` | failed | The browser no longer holds the file's bytes. Attach it again |
 | `AGENT_FAILED` | failed | The agent could not start, or returned something that was not a report. The message says which |
 
+
+## Android phones
+
+These come from a conversation on the [phone tab](../guide/features/android.md). The readiness codes
+(`ADB_MISSING`, `NO_DEVICE`, `DEVICE_UNAUTHORIZED` and the rest) are what `browsentic android` and
+the apps report; each has a row in [troubleshooting](../guide/troubleshooting.md#android-phones).
+
+| Code | Origin | Meaning and next move |
+| --- | --- | --- |
+| `NOT_ON_PHONE` | Daemon or extension | The tool works only in desktop tabs. A phone run is not offered it, so only an MCP client or a stale skill reaches this. Do that step in a desktop tab |
+| `PHONE_GONE` | Extension | The phone session ended: the phone was unplugged, Chrome closed on it, Android was switched off, or the Bridge went away. **Retrying will not help**; reconnect from the phone tab |
+| `PHONE_PAGE_UNREACHABLE` | Extension | The page on the phone was loading, or kept navigating, so its script world could not be made. Try again once it has loaded |
+| `TAP_MISSED` | Extension | The point was outside the visible part of the phone's screen, so nothing was touched. Scroll it into view first |
+| `NAVIGATION_FAILED` | Extension | Chrome on the phone could not open the address; the message carries Chrome's reason |
+| `CHROME_NOT_RUNNING` | Daemon | Chrome is not open on the phone, so the session could not start. Open it, or run `browsentic android open` |
+| `NOT_OWNER` | Daemon | Another paired browser is already driving this phone. One browser drives a phone at a time |
+| `NOT_CHECKED` | Daemon | `browsentic android` asked before any browser or app was watching for phones, so the Bridge has not looked yet |
+| `CDP_ERROR` | Daemon | Chrome on the phone refused a command. The message carries Chrome's reason |
+
 ---
 
 ## See also

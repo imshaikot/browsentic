@@ -148,15 +148,18 @@ request from it is answered `UNSUPPORTED`. The shapes are in `src/lib/phone/type
 | `phoneOpened` | Bridge | The device, its open tabs and Chrome's version, or an error |
 | `phoneClose` | extension | `serial`: end the session. Not answered |
 | `phoneLaunch` | extension | `serial` and an optional `url`: open Chrome on the phone |
-| `cdp` | extension | One DevTools command for the phone's Chrome: `method`, `params` and `sessionId`. Answered by `cdpResult` |
+| `cdp` | extension | One DevTools command for the phone's Chrome: `method`, `params`, `sessionId`, and `timeoutMs` (at most 180 s) when the command waits inside the page. Answered by `cdpResult` |
 | `cdpResult` | Bridge | Chrome's result, or `CDP_ERROR`, `TIMEOUT`, `PHONE_GONE` or `NOT_OWNER` |
-| `cdpEvent` | Bridge | Every DevTools event from the phone, screencast frames included, sent only to the extension that opened the session |
+| `cdpEvent` | Bridge | Every DevTools event from the phone, screencast frames included, sent only to the extension that opened the session. A screencast frame that finds the socket more than 4 MB behind is dropped and acknowledged to the phone, so the stream keeps going |
 | `phoneClosed` | Bridge | `serial` and why the session ended: `unplugged`, `chrome-exited`, `bridge-stopping` or `closed` |
 
-The control socket has an `android` op that reads the same state, subscribes to `android-changed`
-with `watch`, and opens Chrome on a phone with `launch` (refused to an agent run's connection). It
-has no way to send a DevTools command. Every action on the phone goes through the extension, which
-is where the blocked-sites list is checked.
+The Bridge looks for phones only while someone is watching: an extension that speaks 23, or an app
+showing its Android tab. The control socket has an `android` op that reads the same state,
+subscribes to `android-changed` with `watch` (and lets go with `watch: false`), answers only what is
+already known with `peek` (`NOT_CHECKED` while nobody watches), and opens Chrome on a phone with
+`launch` and an optional `url` (refused to an agent run's connection). It has no way to send a
+DevTools command. Every action on the phone goes through the extension, which
+is where the blocked-sites list is checked. [Android phones](android.md) follows a tap through all of it.
 
 ---
 

@@ -105,6 +105,32 @@ Those three answer most questions. The Bridge's log is at `~/.browsentic/daemon.
 | A tool set to run on every visit never runs | Chrome keeps user scripts off until you allow them for the extension | Open `chrome://extensions` → Browsentic → **Details** and turn on **Allow User Scripts**. See [Running one on every visit](features/page-actions.md#running-one-on-every-visit) |
 | A tool set to run on every visit ran but changed nothing | It ran before the site had drawn what it changes, or the site changed its markup | Check the page's console for a `Browsentic:` line, which appears if it threw. Run the tool with `/` to check it still works; if it does not, make a new one with the Live tool switch |
 
+## Android phones
+
+`browsentic android`, or the **Android** tab in the Mac and Windows apps, runs every check below and
+names the one that fails. See [Android phone](features/android.md) for setting a phone up.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| No Android switch in the side panel | The Bridge sees no phone, the Bridge predates Android, or the browser is Firefox | Run `browsentic android`. Update the Bridge if it does not know the command. Firefox has no Android switch |
+| `ANDROID_OFF` | `"android": { "enabled": false }` is set in `config.json` | Set it to `true`, or remove it |
+| `ADB_MISSING` | adb, from Android's platform-tools, is not installed, or not where the Bridge looks | Install platform-tools (the check prints the command for your system), or name your adb with `"android": { "adb": "/path/to/adb" }` |
+| `ADB_BROKEN` | The adb the Bridge found does not run | Reinstall platform-tools, or name a working adb in `config.json` |
+| `NO_DEVICE` | No phone is connected, USB debugging is off, or the cable only charges | Turn on USB debugging and connect with a data cable. On Windows, see the next row |
+| adb sees nothing on Windows | Many phones need their maker's USB driver, or Google's, before Windows lets adb see them | Install the driver from Android's [OEM USB drivers](https://developer.android.com/studio/run/oem-usb) page, then plug the phone in again |
+| `DEVICE_UNAUTHORIZED` | The phone has not allowed this computer | Unlock the phone and tap **Allow** on the USB debugging prompt. If no prompt shows, unplug it and plug it in again |
+| `DEVICE_OFFLINE` | The phone is connected but not answering adb, or it is in recovery or bootloader mode | Unplug it and plug it in again; over Wi-Fi, run `adb connect <ip:port>` again. A phone in another mode needs a normal restart |
+| `DEVICE_BOOTING` | The phone is still starting up | Wait for it to finish |
+| `NO_PERMISSIONS` (Linux) | The system does not let your user open the phone's USB connection | Install udev rules for Android phones (`sudo apt install android-sdk-platform-tools-common` on Debian and Ubuntu), then plug the phone in again |
+| `CHROME_MISSING` | Google Chrome is not installed on the phone | Install it from the Play Store. The Android tab's **Get Chrome** opens its page on the phone |
+| `CHROME_NOT_RUNNING` | Chrome is not open on the phone | Open it, or run `browsentic android open`. The phone tab and the Android tab have a button that does the same |
+| `SCREEN_OFF` | The phone's screen is off, so Chrome is not drawing | Unlock the phone. Keep it awake while the agent works |
+| The phone tab's picture is black or frozen | The phone's screen went off, or the phone tab was hidden, which pauses the picture | Wake the phone, and bring the phone tab to the front |
+| Taps land in the wrong place | The page moved between finding the element and tapping it, or the phone's keyboard or a banner covers it | Ask again once the page has settled. The agent finds the element again before every tap |
+| `NOT_ON_PHONE` | The tool works only in desktop tabs | Do that step in a desktop tab |
+| `PHONE_GONE` | The phone session ended: the phone was unplugged, Chrome closed on it, or Android was switched off | Press **Reconnect** in the phone tab, or switch Android on again |
+| `PHONE_PAGE_UNREACHABLE` | The page on the phone was still loading or kept navigating | Wait for it to load and try again |
+
 ## MCP clients
 
 These apply only when another tool drives Browsentic through its optional MCP endpoint.
