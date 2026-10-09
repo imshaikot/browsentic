@@ -1,9 +1,10 @@
 import { browser, type Browser } from 'wxt/browser';
 import { PHONE_PORT, keyEvents, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
 import type { PhoneTarget } from '@/lib/phone/types';
-import { readPhone, updatePhone, type PhoneSession } from './phone';
+import { numbered, readPhone, updatePhone, type PhoneSession } from './phone';
 import { refusalFor } from './site-guard';
 import { onCdpEvent, onDaemonClosed, onPhoneClosed, sendCdp, type CdpEvent } from './socket';
+import { hostOf, patchSession, sessionForTab } from './tab-sessions';
 
 type Port = Browser.runtime.Port;
 type InputCommand = Extract<MirrorCommand, { op: 'touch' | 'wheel' | 'text' | 'key' }>;
@@ -28,6 +29,7 @@ let page: PageState | null = null;
 let finding: Promise<void> | null = null;
 const inputs: InputCommand[] = [];
 let pumping = false;
+const attachments = new Map<string, Promise<string | null>>();
 
 const broadcast = (message: MirrorMessage) => {
   for (const port of ports) port.postMessage(message);
@@ -54,15 +56,43 @@ function call(method: string, params?: Record<string, unknown>) {
   return held ? sendCdp(held.serial, method, params, held.sessionId) : Promise.resolve(null);
 }
 
+/** One DevTools session per phone tab, shared by the mirror and the tools, made on first use. */
+export function attachedSession(serial: string, targetId: string): Promise<string | null> {
+  const held = attachments.get(targetId);
+  if (held) return held;
+  const attaching = sendCdp(serial, 'Target.attachToTarget', { targetId, flatten: true }).then(async (attached) => {
+    if (!attached.ok) {
+      attachments.delete(targetId);
+      return null;
+    }
+    const sessionId = String(attached.data.sessionId);
+    await sendCdp(serial, 'Page.enable', {}, sessionId);
+    return sessionId;
+  });
+  attachments.set(targetId, attaching);
+  return attaching;
+}
+
+/** Moves the mirror, and with it the conversation's idea of the current phone tab, to this one. */
+export async function followTarget(targetId: string): Promise<void> {
+  const session = await liveSession();
+  if (session) await follow(session, targetId);
+}
+
+async function reflect(url: string, title: string): Promise<void> {
+  const phone = await readPhone();
+  const conversation = phone && (await sessionForTab(phone.mirrorTabId));
+  if (!conversation?.phone || (conversation.url === url && conversation.title === title)) return;
+  await patchSession(conversation.sessionId, { url, host: hostOf(url), title: title || conversation.title });
+}
+
 async function follow(session: PhoneSession, targetId: string): Promise<void> {
   if (followed?.serial === session.serial && followed.targetId === targetId) return;
   await stopStream();
-  if (followed) void sendCdp(followed.serial, 'Target.detachFromTarget', { sessionId: followed.sessionId });
   followed = null;
-  const attached = await sendCdp(session.serial, 'Target.attachToTarget', { targetId, flatten: true });
-  if (!attached.ok) return tellError(attached.error.message);
-  followed = { serial: session.serial, targetId, sessionId: String(attached.data.sessionId) };
-  await call('Page.enable');
+  const sessionId = await attachedSession(session.serial, targetId);
+  if (!sessionId) return tellError('The phone did not let Browsentic attach to that tab.');
+  followed = { serial: session.serial, targetId, sessionId };
   await updatePhone((held) => ({ ...held, activeTargetId: targetId }));
   await publishPage();
   if (watchers.size) await startStream();
@@ -112,6 +142,7 @@ async function publishPage(): Promise<void> {
     canGoForward: current < entries.length - 1,
   };
   broadcast({ kind: 'page', ...page });
+  await reflect(page.url, page.title);
 }
 
 /** A tab switch made on the phone fires no Target event; the tab whose document is visible is the one in front. */
@@ -128,18 +159,19 @@ function findFront(): Promise<void> {
 }
 
 async function isVisible(serial: string, targetId: string): Promise<boolean> {
-  const own = followed?.targetId === targetId ? followed.sessionId : undefined;
-  const attached = own ? null : await sendCdp(serial, 'Target.attachToTarget', { targetId, flatten: true });
-  const sessionId = own ?? (attached?.ok ? String(attached.data.sessionId) : null);
+  const sessionId = await attachedSession(serial, targetId);
   if (!sessionId) return false;
   const state = await sendCdp(serial, 'Runtime.evaluate', { expression: 'document.visibilityState', returnByValue: true }, sessionId);
-  if (!own) void sendCdp(serial, 'Target.detachFromTarget', { sessionId });
   return state.ok && (state.data.result as { value?: unknown } | undefined)?.value === 'visible';
 }
 
 async function trackTargets(event: CdpEvent): Promise<void> {
   const info = (event.params.targetInfo ?? {}) as TargetInfo;
-  if (event.method === 'Target.detachedFromTarget' && event.params.sessionId === followed?.sessionId) {
+  if (event.method === 'Target.detachedFromTarget') {
+    for (const [targetId, attaching] of attachments) {
+      if ((await attaching) === event.params.sessionId) attachments.delete(targetId);
+    }
+    if (event.params.sessionId !== followed?.sessionId) return;
     followed = null;
     streaming = false;
     if (watchers.size) void ensureFollowed();
@@ -147,6 +179,7 @@ async function trackTargets(event: CdpEvent): Promise<void> {
   }
   if (event.method === 'Target.targetDestroyed') {
     const targetId = String(event.params.targetId);
+    attachments.delete(targetId);
     await updatePhone((held) => ({ ...held, targets: held.targets.filter((target) => target.targetId !== targetId) }));
     if (followed?.targetId === targetId) {
       followed = null;
@@ -157,15 +190,18 @@ async function trackTargets(event: CdpEvent): Promise<void> {
   }
   if ((event.method !== 'Target.targetCreated' && event.method !== 'Target.targetInfoChanged') || !isPageTarget(info)) return;
   const target: PhoneTarget = { targetId: info.targetId, url: info.url ?? '', title: info.title ?? '' };
-  await updatePhone((held) => ({
-    ...held,
-    targets: held.targets.some((each) => each.targetId === target.targetId)
-      ? held.targets.map((each) => (each.targetId === target.targetId ? target : each))
-      : [...held.targets, target],
-  }));
+  await updatePhone((held) =>
+    numbered(
+      held,
+      held.targets.some((each) => each.targetId === target.targetId)
+        ? held.targets.map((each) => (each.targetId === target.targetId ? target : each))
+        : [...held.targets, target],
+    ),
+  );
   if (page && followed?.targetId === target.targetId) {
     page = { ...page, url: target.url, title: target.title };
     broadcast({ kind: 'page', ...page });
+    await reflect(target.url, target.title);
   }
 }
 
@@ -216,7 +252,7 @@ async function dispatchInput(command: InputCommand): Promise<void> {
 }
 
 /** Chrome on Android can ignore an activation that lands just after a tab opened, so it is asked again until the tab is in front. */
-async function bringToFront(serial: string, targetId: string): Promise<void> {
+export async function bringToFront(serial: string, targetId: string): Promise<void> {
   for (let attempt = 0; attempt < ACTIVATE_TRIES; attempt++) {
     await sendCdp(serial, 'Target.activateTarget', { targetId });
     await new Promise((resolve) => setTimeout(resolve, ACTIVATE_SETTLE_MS));
@@ -296,6 +332,7 @@ function forget(): void {
   streaming = false;
   page = null;
   inputs.length = 0;
+  attachments.clear();
 }
 
 export function servePhoneMirror(): void {

@@ -23,6 +23,8 @@ export interface PhoneSession {
   targets: PhoneTarget[];
   /** The tab the mirror follows: the one in front on the phone, found once the mirror starts. */
   activeTargetId?: string;
+  /** The number each phone tab goes by in tool results, counting from 1 and never reused, since a tab id is an integer there. */
+  tabNumbers?: Record<string, number>;
   /** Chrome was not open on the phone; the mirror waits, and the notification offers to open it. */
   waitingForChrome?: boolean;
   /** The session is over but its mirror tab is still open, to say why and offer to reconnect. */
@@ -30,6 +32,17 @@ export interface PhoneSession {
 }
 
 export const isLive = (session: PhoneSession | null | undefined): boolean => !!session && !session.ended;
+
+/** The session with every tab it knows numbered. */
+export function numbered(session: PhoneSession, targets: PhoneTarget[] = session.targets): PhoneSession {
+  const tabNumbers = { ...session.tabNumbers };
+  let next = Math.max(0, ...Object.values(tabNumbers)) + 1;
+  for (const { targetId } of targets) tabNumbers[targetId] ??= next++;
+  return { ...session, targets, tabNumbers };
+}
+
+export const targetForNumber = (session: PhoneSession, number: number): string | undefined =>
+  Object.entries(session.tabNumbers ?? {}).find(([, value]) => value === number)?.[0];
 
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -90,14 +103,14 @@ export function startPhone(serial: string, windowId?: number): Promise<ActionRes
       if (opened.ok) closePhone(serial);
       return failure('BRIDGE_ERROR', 'The phone tab could not be opened.');
     }
-    const session: PhoneSession = {
+    const session: PhoneSession = numbered({
       serial,
       mirrorTabId: mirror.id,
       windowId: mirror.windowId ?? windowId ?? browser.windows.WINDOW_ID_CURRENT,
       openedAt: Date.now(),
       ...opening(opened),
       ...(await describedPhone(serial, opened)),
-    };
+    });
     await writePhone(session);
     if (session.waitingForChrome) await askToOpenChrome(session);
     return success(session);
@@ -129,7 +142,7 @@ export function openChromeOnPhone(): Promise<ActionResult<PhoneSession>> {
     const launched = await launchPhoneChrome(held.serial);
     if (!launched.ok) return launched;
     const opened = await openPhone(held.serial);
-    const session = { ...held, ...opening(opened) };
+    const session = numbered({ ...held, ...opening(opened) });
     await writePhone(session);
     if (!session.waitingForChrome) await clearNotification();
     return success(session);
