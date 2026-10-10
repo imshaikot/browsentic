@@ -1,0 +1,104 @@
+{
+  "enabled": true,
+  "adb": {
+    "found": true,
+    "path": "/Users/me/Library/Android/sdk/platform-tools/adb",
+    "version": "37.0.0-14910828"
+  },
+  "ready": true,
+  "devices": [
+    {
+      "serial": "emulator-5554",
+      "transport": "usb",
+      "state": "ready",
+      "model": "sdk_gphone16k_arm64",
+      "manufacturer": "Google",
+      "android": "17",
+      "sdk": 37,
+      "screen": {
+        "width": 1080,
+        "height": 2092,
+        "density": 420,
+        "awake": true
+      },
+      "chrome": {
+        "installed": true,
+        "version": "150.0.7871.186",
+        "running": true,
+        "debuggable": true
+      }
+    }
+  ],
+  "guide": [
+    {
+      "title": "Turn on Developer options",
+      "detail": "On the phone, open Settings, then About phone, and tap Build number seven times."
+    },
+    {
+      "title": "Turn on USB debugging",
+      "detail": "Open Settings, then System, then Developer options, and turn on USB debugging."
+    },
+    {
+      "title": "Connect the phone",
+      "detail": "Connect it to this computer with a USB cable. When the phone asks, tick \"Always allow from this computer\" and tap Allow."
+    },
+    {
+      "title": "Or connect over Wi-Fi",
+      "detail": "In Developer options, turn on Wireless debugging and tap Pair device with pairing code. On this computer, run \"adb pair <ip:port> <code>\", then \"adb connect <ip:port>\".",
+      "platform": "android11+"
+    },
+    {
+      "title": "Open Chrome on the phone",
+      "detail": "Browsentic drives the Chrome app, so it has to be open."
+    },
+    {
+      "title": "Switch on Android",
+      "detail": "In your browser, open the Browsentic side panel and switch on Android."
+    }
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "passed",
+            "value": "/Users/me/Library/Android/sdk/platform-tools/adb (37.0.0-14910828)"
+          }
+        ]
+      },
+      {
+        "checks": [
+          {
+            "label": "Phone",
+            "mark": "passed",
+            "value": "sdk_gphone16k_arm64, Android 17, USB (emulator-5554)"
+          },
+          {
+            "label": "USB debugging",
+            "mark": "passed",
+            "value": "allowed"
+          },
+          {
+            "label": "Chrome",
+            "mark": "passed",
+            "value": "150.0.7871.186"
+          },
+          {
+            "label": "Chrome open",
+            "mark": "passed",
+            "value": "its DevTools socket is open"
+          },
+          {
+            "label": "Screen",
+            "mark": "passed",
+            "value": "awake"
+          }
+        ]
+      }
+    ],
+    "ready": true,
+    "guided": false,
+    "summary": "Ready. Switch on Android in the Browsentic side panel to drive it."
+  }
+}

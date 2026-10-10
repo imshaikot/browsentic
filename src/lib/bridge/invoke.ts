@@ -39,7 +39,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { EXPIRED_MESSAGE, REFUSED_MESSAGE } from '@/lib/secrets';
 import { releaseForAction, sealForPage } from '@/lib/bridge/secret-vault';
 import { findCaptchaInTab, solveCaptchaInTab } from '@/lib/bridge/captcha';
-import { installToolkit, runToolkit } from '@/lib/bridge/code-toolkit';
+import { installToolkit, runToolkit, tabPlace } from '@/lib/bridge/code-toolkit';
 import { callSiteToolInTab, listSiteToolsInTab, pageInfoWithSiteTools } from '@/lib/bridge/site-tools';
 import { captureFromPage } from '@/lib/bridge/downloads';
 import { focusedUrl, forgetFrameFocus, framePath, TOP_FRAME } from '@/lib/bridge/frame-focus';
@@ -63,6 +63,8 @@ import { screenshotTab } from '@/lib/bridge/screenshot';
 import { dragInTab, trustedClickInTab } from '@/lib/bridge/trusted-input';
 import { closeOpenTab, openNewTab, switchToTab, watchForLoad, type TabRef } from '@/lib/bridge/tabs';
 import { adoptSubtab, sessionForRun, sessionForTab, setCurrentTab, type TabSession } from '@/lib/bridge/tab-sessions';
+import { invokeOnPhone, phoneRoute } from '@/lib/bridge/phone-invoke';
+import { HOST_SIDE } from '@/lib/phone/features';
 
 /**
  * The sanitizer's client-side half, wrapped around every action the harness runs.
@@ -78,6 +80,9 @@ export async function invokeForHarness(
   tabId?: number,
   runId?: string,
 ): Promise<ActionResult> {
+  const phone = HOST_SIDE.has(action) ? null : await phoneRoute(tabId, runId);
+  if (phone) return invokeOnPhone(action, input, phone);
+
   const refused = await guardTarget(action, input, tabId, runId);
   if (refused) return refused;
 
@@ -257,8 +262,8 @@ async function routeInTab(
   if (action === pickElement.name) return pickInTab({ id: tab.id, windowId: tab.windowId }, input);
   if (action === attachFile.name) return attachStoredFile(tab.id, input);
   if (action === captureDownload.name) return captureFromPage(tab.id, input);
-  if (action === injectCode.name) return installToolkit(tab.id, await focusedUrl(tab.id, tab.url), input);
-  if (action === runCode.name) return runToolkit(tab.id, await focusedUrl(tab.id, tab.url), input);
+  if (action === injectCode.name) return installToolkit(tabPlace(tab.id), await focusedUrl(tab.id, tab.url), input);
+  if (action === runCode.name) return runToolkit(tabPlace(tab.id), await focusedUrl(tab.id, tab.url), input);
   if (action === getPageInfo.name) return pageInfoWithSiteTools(tab.id, tab.url, input);
   if (action === listSiteTools.name) return listSiteToolsInTab(tab.id, await focusedUrl(tab.id, tab.url));
   if (action === callSiteTool.name) return callSiteToolInTab(tab.id, await focusedUrl(tab.id, tab.url), input);

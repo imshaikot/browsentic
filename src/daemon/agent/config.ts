@@ -45,6 +45,17 @@ export interface AgentConfig {
     maxScreenshots?: number;
     timeoutMs?: number;
   };
+  /** Driving Chrome on an Android phone. Off stops every use of adb; `adb` names the binary to use. */
+  android?: { enabled?: boolean; adb?: string };
+}
+
+export interface AndroidSettings {
+  enabled: boolean;
+  adb?: string;
+}
+
+export function androidSettings(config: AgentConfig): AndroidSettings {
+  return { enabled: config.android?.enabled !== false, adb: text(config.android?.adb) };
 }
 
 export const CONCURRENT_RUNS = { fallback: 3, max: 8 } as const;

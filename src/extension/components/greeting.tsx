@@ -22,9 +22,11 @@ export function Greeting({
   onGo,
   onFix,
   onUse,
+  hidden = [],
 }: {
   blocker?: StatusBlocker;
   voiceOn: boolean;
+  hidden?: PanelTab[];
   onGo: (tab: PanelTab) => void;
   onFix: () => void;
   onUse: (text: string) => void;
@@ -70,7 +72,7 @@ export function Greeting({
 
           <div className="flex flex-wrap gap-1.5">
             <Quick icon={BookOpen} label="Teach it this site" onClick={() => onGo('skills')} />
-            <Quick icon={Clapperboard} label="Record a flow" onClick={() => onGo('recordings')} />
+            {!hidden.includes('recordings') && <Quick icon={Clapperboard} label="Record a flow" onClick={() => onGo('recordings')} />}
             <Quick icon={History} label="Past chats" onClick={() => onGo('history')} />
           </div>
         </>

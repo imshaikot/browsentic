@@ -1,6 +1,7 @@
 import type { ActionResult } from '@/lib/actions/protocol';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { AndroidState } from '@/lib/phone/types';
 import type { Preferences } from '@/lib/settings/preferences';
 import type { Source } from '@/lib/stores';
 
@@ -49,7 +50,13 @@ export type ControlRequest =
   | { id: string; op: 'agent'; set?: AgentKind; grant?: AgentKind; models?: AgentKind }
   /** `watch` also subscribes this caller to `settings-changed`, which no other caller is sent. */
   | { id: string; op: 'preferences'; watch?: boolean }
-  | { id: string; op: 'setPreference'; change: unknown };
+  | { id: string; op: 'setPreference'; change: unknown }
+  /**
+   * `launch` opens Chrome on that phone, at `url` when one is given. `watch` subscribes this caller to
+   * `android-changed` and `watch: false` lets go, so the Bridge stops looking once nobody shows phones.
+   * `peek` answers only what is already known, NOT_CHECKED while nobody watches.
+   */
+  | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
@@ -61,9 +68,11 @@ export type ControlMessage =
   | { id: string; op: 'revoke'; revoked: number }
   | { id: string; op: 'agent'; state: AgentState }
   | { id: string; op: 'preferences'; result: ActionResult<Preferences> }
+  | { id: string; op: 'android'; result: ActionResult<AndroidState> }
   | { event: 'manifest-changed' }
   /** config.json changed, from any side: read the preferences and the agent state again. */
-  | { event: 'settings-changed' };
+  | { event: 'settings-changed' }
+  | { event: 'android-changed'; state: AndroidState };
 
 export interface Described {
   tools: ToolDescriptor[];

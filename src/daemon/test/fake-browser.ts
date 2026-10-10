@@ -44,6 +44,9 @@ export class FakeBrowser {
   preferences: Preferences | null = null;
   /** The agent state the daemon last pushed or answered with. */
   agent: AgentState | null = null;
+  /** Every frame the daemon sent after the welcome, in arrival order. */
+  readonly received: SocketFrame[] = [];
+  private readonly arrivals = new Set<() => void>();
   /** While set, every invoke is answered only once it resolves. */
   holdInvokes: Promise<void> | null = null;
   private readonly replies = new Map<string, (frame: SocketFrame) => void>();
@@ -122,6 +125,13 @@ export class FakeBrowser {
     this.socket.close(1000, 'test over');
   }
 
+  /** Resolves once the daemon has sent this many frames of a kind, with every one of them. */
+  async frames<T extends SocketFrame['t']>(t: T, count = 1): Promise<Extract<SocketFrame, { t: T }>[]> {
+    const ofKind = () => this.received.filter((frame): frame is Extract<SocketFrame, { t: T }> => frame.t === t);
+    while (ofKind().length < count) await new Promise<void>((resolve) => this.arrivals.add(resolve));
+    return ofKind();
+  }
+
   /** Sends what the side panel would, and resolves with the daemon's answer to it. */
   ask(request: Extract<ExtensionRequest, { id: string }>): Promise<SocketFrame> {
     const answered = new Promise<SocketFrame>((resolve) => this.replies.set(request.id, resolve));
@@ -134,6 +144,9 @@ export class FakeBrowser {
   }
 
   private receive(frame: SocketFrame | null): void {
+    if (frame) this.received.push(frame);
+    for (const arrived of this.arrivals) arrived();
+    this.arrivals.clear();
     if (frame?.t === 'taskList' && frame.result.ok) this.tasks = frame.result.data;
     if (frame?.t === 'preferencesInfo' && frame.result.ok) this.preferences = frame.result.data;
     if (frame?.t === 'agentInfo' && frame.result.ok) this.agent = frame.result.data;

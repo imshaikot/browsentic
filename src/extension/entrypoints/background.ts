@@ -22,6 +22,8 @@ import { serveHandsFree } from '@/lib/bridge/hands-free';
 import { endHandsFree } from '@/lib/bridge/panel-view';
 import { serveLaunchers } from '@/lib/bridge/launchers';
 import { servePreferences } from '@/lib/bridge/preferences';
+import { endPhone, openChromeOnPhone, servePhone, startPhone } from '@/lib/bridge/phone';
+import { servePhoneMirror } from '@/lib/bridge/phone-mirror';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
@@ -140,6 +142,24 @@ export default defineBackground(() => {
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }
+    if (message.op === 'phoneStart' && typeof message.serial === 'string') {
+      startPhone(message.serial, typeof message.windowId === 'number' ? message.windowId : undefined)
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'phoneEnd') {
+      endPhone('closed')
+        .then(() => sendResponse(success(true)))
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'phoneOpenChrome') {
+      openChromeOnPhone()
+        .then(sendResponse)
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
     if (message.op === 'tasks' || message.op === 'pauseTasks') {
       taskOp(message.op === 'tasks' ? { t: 'tasks' } : { t: 'pauseTasks', paused: message.paused === true })
         .then(sendResponse)
@@ -181,7 +201,7 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"preferences"|"setPreference"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"}',
+        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"preferences"|"setPreference"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"|"phoneStart"|"phoneEnd"|"phoneOpenChrome"}',
       ),
     );
     return;
@@ -214,6 +234,8 @@ export default defineBackground(() => {
   serveToast();
   serveHandsFree();
   servePreferences();
+  servePhone();
+  servePhoneMirror();
   void syncRail();
 
   onWelcome(() => {

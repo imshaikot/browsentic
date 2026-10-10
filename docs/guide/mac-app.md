@@ -73,37 +73,44 @@ the folder holds a newer build than the browser has loaded.
 
 ## The window
 
-The tabs float at the top; ⌘1 to ⌘8 switch between them.
+The tabs float at the top; ⌘1 to ⌘5 switch between them. Agents, Skills, Activity and Logs are
+pages of **Settings**, picked from its sidebar.
 
 ![Browsentic Bridge running, with one row per browser: Chrome connected from the Chrome Web Store, Brave from an unpacked folder, and Edge and Firefox with an add button each.](../assets/mac-app/overview.webp "Overview")
 ![The Get a pairing code button, and two paired browsers, each with where its extension came from.](../assets/mac-app/browsers.webp "Browsers")
-![Every agent CLI with its version and a model select; Codex runs the side panel.](../assets/mac-app/agents.webp "Agents")
-![The three folders skills are read from, a filter, and a card for every skill the agent can route to.](../assets/mac-app/skills.webp "Skills")
-![The Bridge log, followed live as the Bridge restarts and the extension reconnects.](../assets/mac-app/logs.webp "Logs")
-![The update check, this window’s appearance, the theme every paired browser uses, and the guardrails.](../assets/mac-app/settings.webp "Settings")
+![Every agent CLI with its version and a model select; Codex runs the side panel.](../assets/mac-app/agents.webp "Settings → Agents")
+![The three folders skills are read from, a filter, and a card for every skill the agent can route to.](../assets/mac-app/skills.webp "Settings → Skills")
+![The Bridge log, followed live as the Bridge restarts and the extension reconnects.](../assets/mac-app/logs.webp "Settings → Logs")
+![The update check, this window’s appearance, the theme every paired browser uses, and the guardrails.](../assets/mac-app/settings.webp "Settings → General")
 
 | Tab | What you do there |
 | --- | --- |
 | **Overview** | Turn Browsentic Bridge on and off with the power button, restart it, see its address and version. One row per browser: where its extension comes from, whether it is connected, and a button that adds it from the store. The unpacked folder sits behind **Load it unpacked instead** |
 | **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser and the store its extension came from, unpair one or all |
+| **Android** (experimental) | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each, the same checks `browsentic android` prints. A row that fails says what to do, with **Open Chrome on the phone**, **Get Chrome** or the adb install command to copy. **Set up your phone** has the steps. The Bridge looks for phones only while this tab is open |
+| **Settings** | Five pages, picked from its sidebar; see below |
+| **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in; nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
+
+| Settings page | What you do there |
+| --- | --- |
+| **General** | Light, dark or system appearance for this window; whether the Bridge starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
 | **Agents** | See which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
 | **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
 | **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
 | **Logs** | `~/.browsentic/daemon.log`, followed live |
-| **Settings** | Light, dark or system appearance for this window; whether the Bridge starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
-| **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in; nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
 
-A menu bar item shows the Bridge’s state and has the same on, off and restart controls.
+A menu bar item, the Browsentic mark with its centre dot filled while the Bridge runs, shows the
+Bridge’s state and has the same on, off and restart controls.
 
 **Closing the window does not stop anything.** The Bridge is a background process of its own, so
 the side panel and any MCP client keep working with the app closed or quit.
 
 ## `browsentic` in your terminal
 
-**Settings → “browsentic” in your terminal** links the launcher into a folder that is already on
-your `PATH` and writable: `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin`. It edits no shell
-profile and asks for no password. Every command in the [CLI reference](../reference/cli.md) then
-works against the install the app manages.
+**Settings → General → “browsentic” in your terminal** links the launcher into a folder that is
+already on your `PATH` and writable: `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin`. It
+edits no shell profile and asks for no password. Every command in the
+[CLI reference](../reference/cli.md) then works against the install the app manages.
 
 If you also installed it with `npm i -g browsentic`, remove that copy (`npm rm -g browsentic`) so
 two versions cannot drift apart.
@@ -128,10 +135,10 @@ line, which installs the same release from a terminal.
 
 ## Uninstall
 
-**Settings → Uninstall…** runs [`browsentic uninstall`](../reference/cli.md#uninstall): it unpairs
-every browser, stops the Bridge and removes `~/.browsentic` and `~/browsentic`, optionally keeping
-your skills. Remove the extension from each browser first (right-click its toolbar icon →
-**Remove**), and drag the app to the Trash afterwards.
+**Settings → General → Uninstall…** runs [`browsentic uninstall`](../reference/cli.md#uninstall):
+it unpairs every browser, stops the Bridge and removes `~/.browsentic` and `~/browsentic`,
+optionally keeping your skills. Remove the extension from each browser first (right-click its
+toolbar icon → **Remove**), and drag the app to the Trash afterwards.
 
 ## Building it yourself
 

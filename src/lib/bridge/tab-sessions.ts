@@ -50,6 +50,8 @@ export interface TabSession {
   handing?: string[];
   /** Set when a schedule opened this conversation; it files to the task's runs, not History. */
   task?: TaskTag;
+  /** Set when this conversation lives on the phone tab: its url and title are the phone's, and its tools act on the phone. */
+  phone?: { serial: string };
 }
 
 export type TabSessionMap = Record<string, TabSession>;

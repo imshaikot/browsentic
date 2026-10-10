@@ -1,0 +1,62 @@
+{
+  "enabled": true,
+  "adb": {
+    "found": false,
+    "problem": {
+      "code": "ADB_MISSING",
+      "message": "Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from https://developer.android.com/tools/releases/platform-tools.",
+      "fix": "brew install --cask android-platform-tools"
+    }
+  },
+  "ready": false,
+  "devices": [],
+  "problem": {
+    "code": "ADB_MISSING",
+    "message": "Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from https://developer.android.com/tools/releases/platform-tools.",
+    "fix": "brew install --cask android-platform-tools"
+  },
+  "guide": [
+    {
+      "title": "Turn on Developer options",
+      "detail": "On the phone, open Settings, then About phone, and tap Build number seven times."
+    },
+    {
+      "title": "Turn on USB debugging",
+      "detail": "Open Settings, then System, then Developer options, and turn on USB debugging."
+    },
+    {
+      "title": "Connect the phone",
+      "detail": "Connect it to this computer with a USB cable. When the phone asks, tick \"Always allow from this computer\" and tap Allow."
+    },
+    {
+      "title": "Or connect over Wi-Fi",
+      "detail": "In Developer options, turn on Wireless debugging and tap Pair device with pairing code. On this computer, run \"adb pair <ip:port> <code>\", then \"adb connect <ip:port>\".",
+      "platform": "android11+"
+    },
+    {
+      "title": "Open Chrome on the phone",
+      "detail": "Browsentic drives the Chrome app, so it has to be open."
+    },
+    {
+      "title": "Switch on Android",
+      "detail": "In your browser, open the Browsentic side panel and switch on Android."
+    }
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "failed",
+            "value": "Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from https://developer.android.com/tools/releases/platform-tools.",
+            "fix": "brew install --cask android-platform-tools",
+            "code": "ADB_MISSING"
+          }
+        ]
+      }
+    ],
+    "ready": false,
+    "guided": true
+  }
+}

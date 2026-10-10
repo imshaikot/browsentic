@@ -12,6 +12,7 @@ import {
   type Transcript,
 } from '@/lib/actions/handshake';
 import {
+  ANDROID_PROTOCOL,
   DAEMON_PORTS,
   SOCKET_PROTOCOL_VERSION,
   failure,
@@ -26,6 +27,7 @@ import {
   type SocketFrame,
 } from '@/lib/actions/protocol';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { AndroidState, PhoneClosedReason, PhoneOpened } from '@/lib/phone/types';
 import type { FileReport } from '@/lib/files/report';
 import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillDraft } from '@/lib/skills/format';
@@ -74,6 +76,8 @@ export interface DaemonState {
   paired: boolean;
   port?: number;
   daemonVersion?: string;
+  /** What the Bridge speaks. Absent from a Bridge before 0.8, which speaks 22 or less. */
+  protocolVersion?: number;
   manifestInSync?: boolean;
   /** Which agent CLI the daemon runs, and what each one's state is. Pushed on connect. */
   agent?: AgentState;
@@ -81,12 +85,15 @@ export interface DaemonState {
   skillCatalog?: SkillCatalog;
   /** The settings config.json holds for every surface. Pushed on connect and whenever the file changes. */
   preferences?: Preferences;
+  /** The phones the Bridge sees. Pushed only by a Bridge that speaks Android, on connect and on every change. */
+  android?: AndroidState;
   error?: string;
   lastChangeAt: number;
 }
 
 let socket: WebSocket | null = null;
 let welcomedSocket: WebSocket | null = null;
+let daemonProtocol = 0;
 let attempts = 0;
 let connecting: Promise<void> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -96,6 +103,22 @@ const welcomeListeners = new Set<() => void>();
 let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
 let taskRunner: ((order: TaskOrder) => Promise<ActionResult>) | null = null;
 let preferencesListener: ((preferences: Preferences) => void) | null = null;
+
+export type CdpEvent = Extract<SocketFrame, { t: 'cdpEvent' }>;
+
+const cdpListeners = new Set<(event: CdpEvent) => void>();
+const phoneClosedListeners = new Set<(serial: string, reason: PhoneClosedReason) => void>();
+const closedListeners = new Set<() => void>();
+
+const listen = <T>(listeners: Set<T>, listener: T): (() => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+export const onCdpEvent = (listener: (event: CdpEvent) => void) => listen(cdpListeners, listener);
+export const onPhoneClosed = (listener: (serial: string, reason: PhoneClosedReason) => void) => listen(phoneClosedListeners, listener);
+/** The link to a Bridge that had welcomed us went down. */
+export const onDaemonClosed = (listener: () => void) => listen(closedListeners, listener);
 
 export function onPreferences(listener: (preferences: Preferences) => void): void {
   preferencesListener = listener;
@@ -348,6 +371,57 @@ export function reportTaskDone(taskId: string, result: TaskResult): boolean {
   return post({ t: 'taskDone', id: crypto.randomUUID(), taskId, result });
 }
 
+const PHONE_OPEN_TIMEOUT_MS = 20_000;
+const PHONE_COMMAND_TIMEOUT_MS = 40_000;
+
+const pendingPhoneOps = new Map<string, (result: ActionResult<never>) => void>();
+
+type PhoneFrame = Extract<SocketFrame, { t: 'phoneOpen' | 'phoneLaunch' | 'cdp' }>;
+
+function phoneOp<T>(frame: PhoneFrame, timeoutMs: number): Promise<ActionResult<T>> {
+  if (!daemonSpeaks(ANDROID_PROTOCOL)) {
+    return Promise.resolve(failure('UNSUPPORTED', 'This Browsentic Bridge predates Android. Update it with “browsentic update”.'));
+  }
+  if (!post(frame)) return Promise.resolve(failure('EXTENSION_OFFLINE', 'No Browsentic daemon is attached — pair the browser first.'));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingPhoneOps.delete(frame.id);
+      resolve(failure('TIMEOUT', 'Browsentic Bridge did not answer about the phone in time.'));
+    }, timeoutMs);
+    pendingPhoneOps.set(frame.id, (result) => {
+      clearTimeout(timer);
+      resolve(result as ActionResult<T>);
+    });
+  });
+}
+
+function settlePhoneOp(id: string, result: ActionResult<unknown>): void {
+  pendingPhoneOps.get(id)?.(result as ActionResult<never>);
+  pendingPhoneOps.delete(id);
+}
+
+export function openPhone(serial: string): Promise<ActionResult<PhoneOpened>> {
+  return phoneOp({ t: 'phoneOpen', id: crypto.randomUUID(), serial }, PHONE_OPEN_TIMEOUT_MS);
+}
+
+export function launchPhoneChrome(serial: string, url?: string): Promise<ActionResult<AndroidState>> {
+  return phoneOp({ t: 'phoneLaunch', id: crypto.randomUUID(), serial, url }, PHONE_COMMAND_TIMEOUT_MS);
+}
+
+export function sendCdp(
+  serial: string,
+  method: string,
+  params?: Record<string, unknown>,
+  sessionId?: string,
+  timeoutMs?: number,
+): Promise<ActionResult<Record<string, unknown>>> {
+  return phoneOp({ t: 'cdp', id: crypto.randomUUID(), serial, method, params, sessionId, timeoutMs }, (timeoutMs ?? 0) + PHONE_COMMAND_TIMEOUT_MS);
+}
+
+export function closePhone(serial: string): void {
+  if (daemonSpeaks(ANDROID_PROTOCOL)) post({ t: 'phoneClose', id: crypto.randomUUID(), serial });
+}
+
 export function cancelRun(id: string): boolean {
   return post({ t: 'cancel', id });
 }
@@ -410,7 +484,7 @@ export async function disconnectDaemon(): Promise<void> {
   clearTimeout(reconnectTimer);
   disconnectSocket();
   await browser.storage.local.remove(SESSION_KEY_STORE);
-  await setState({ connected: false, paired: false, error: undefined, agent: undefined, lastChangeAt: Date.now() });
+  await setState({ connected: false, paired: false, error: undefined, agent: undefined, android: undefined, lastChangeAt: Date.now() });
 }
 
 let pairingResult: ((result: { ok: boolean; error?: string }) => void) | null = null;
@@ -508,7 +582,9 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
     // Nothing on this port ever proved itself — a squatter, a stale daemon, an empty port — so the
     // walk continues instead of pinning the extension to whoever answered first.
     if (!welcomed) return dial(credential, portIndex + 1, refusal);
-    void setState({ connected: false, paired: true, error: undefined, lastChangeAt: Date.now() });
+    void setState({ connected: false, paired: true, error: undefined, android: undefined, lastChangeAt: Date.now() });
+    for (const [id] of pendingPhoneOps) settlePhoneOp(id, failure('PHONE_GONE', 'The link to Browsentic Bridge went down.'));
+    for (const listener of closedListeners) listener();
     if (credential.kind === 'session') scheduleRetry();
   };
 }
@@ -588,6 +664,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
       attempt.done();
       welcomedSocket = ws;
+      daemonProtocol = frame.protocolVersion ?? 0;
       // A link that is welcomed and then dropped at once has not recovered, and forgetting the
       // backoff on the welcome alone lets two peers take the link from each other every second.
       clearTimeout(stableTimer);
@@ -599,6 +676,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
         paired: true,
         port: attempt.port,
         daemonVersion: frame.daemonVersion,
+        protocolVersion: frame.protocolVersion,
         manifestInSync: frame.manifestInSync,
         error: undefined,
         lastChangeAt: Date.now(),
@@ -669,6 +747,24 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
     case 'siteMapDraft':
       return draftListener?.(frame.id, frame.draft);
 
+    case 'androidInfo': {
+      if (frame.id) settlePhoneOp(frame.id, frame.result);
+      if (frame.result.ok) await setState({ android: frame.result.data, lastChangeAt: Date.now() });
+      return;
+    }
+
+    case 'phoneOpened':
+    case 'cdpResult':
+      return settlePhoneOp(frame.id, frame.result);
+
+    case 'cdpEvent':
+      for (const listener of cdpListeners) listener(frame);
+      return;
+
+    case 'phoneClosed':
+      for (const listener of phoneClosedListeners) listener(frame.serial, frame.reason);
+      return;
+
     case 'taskList': {
       pendingTaskOps.get(frame.id)?.(frame.result);
       pendingTaskOps.delete(frame.id);
@@ -692,7 +788,15 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
 /** Held back until the daemon has welcomed us: mid-handshake it would be read as the proof. */
 export function reportFocus(): void {
-  if (socket && socket === welcomedSocket) post({ t: 'focus' });
+  if (isWelcomed()) post({ t: 'focus' });
+}
+
+export function daemonSpeaks(version: number): boolean {
+  return isWelcomed() && daemonProtocol >= version;
+}
+
+function isWelcomed(): boolean {
+  return !!socket && socket === welcomedSocket;
 }
 
 function send(ws: WebSocket, frame: SocketFrame): void {

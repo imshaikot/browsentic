@@ -48,6 +48,7 @@ export function Composer({
   liveTools,
   handsFree,
   onToggleLiveTools,
+  onPhone = false,
   scheduling,
   onToggleScheduling,
   actionCues,
@@ -80,6 +81,8 @@ export function Composer({
   liveTools: boolean;
   /** Whether `/hands-free` is offered — never where the browser cannot transcribe speech. */
   handsFree: boolean;
+  /** The panel is showing the phone conversation: what only works in a desktop tab is not offered. */
+  onPhone?: boolean;
   onToggleLiveTools: () => void;
   scheduling: boolean;
   onToggleScheduling: () => void;
@@ -297,37 +300,41 @@ export function Composer({
           >
             <Code2 className="size-3.5" />
           </Button>
-          <Button
-            variant={scheduling ? 'subtle' : 'ghost'}
-            size="icon-sm"
-            role="switch"
-            aria-checked={scheduling}
-            aria-label={scheduling ? 'Send now instead of scheduling' : 'Schedule this for later'}
-            title={
-              scheduling
-                ? 'Scheduling is on — sending opens the schedule for this message instead of running it now.'
-                : 'Schedule — run this later, or on repeat, instead of now.'
-            }
-            onClick={onToggleScheduling}
-            disabled={!connected}
-          >
-            <CalendarClock className="size-3.5" />
-          </Button>
-          <Button
-            variant={actionCues ? 'subtle' : 'ghost'}
-            size="icon-sm"
-            role="switch"
-            aria-checked={actionCues}
-            aria-label={actionCues ? 'Hide what the agent does' : 'Show what the agent does'}
-            title={
-              actionCues
-                ? 'Showing what the agent does — a glowing ring marks each element it acts on. Turn it off to hide it.'
-                : 'Show what the agent does — mark each element it acts on with a glowing ring.'
-            }
-            onClick={onToggleActionCues}
-          >
-            <SquareDashedMousePointer className="size-3.5" />
-          </Button>
+          {!onPhone && (
+            <Button
+              variant={scheduling ? 'subtle' : 'ghost'}
+              size="icon-sm"
+              role="switch"
+              aria-checked={scheduling}
+              aria-label={scheduling ? 'Send now instead of scheduling' : 'Schedule this for later'}
+              title={
+                scheduling
+                  ? 'Scheduling is on — sending opens the schedule for this message instead of running it now.'
+                  : 'Schedule — run this later, or on repeat, instead of now.'
+              }
+              onClick={onToggleScheduling}
+              disabled={!connected}
+            >
+              <CalendarClock className="size-3.5" />
+            </Button>
+          )}
+          {!onPhone && (
+            <Button
+              variant={actionCues ? 'subtle' : 'ghost'}
+              size="icon-sm"
+              role="switch"
+              aria-checked={actionCues}
+              aria-label={actionCues ? 'Hide what the agent does' : 'Show what the agent does'}
+              title={
+                actionCues
+                  ? 'Showing what the agent does — a glowing ring marks each element it acts on. Turn it off to hide it.'
+                  : 'Show what the agent does — mark each element it acts on with a glowing ring.'
+              }
+              onClick={onToggleActionCues}
+            >
+              <SquareDashedMousePointer className="size-3.5" />
+            </Button>
+          )}
           <Button
             variant={voiceEnabled && !voice.error ? 'subtle' : 'ghost'}
             size="icon-sm"

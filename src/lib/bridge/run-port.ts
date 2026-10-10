@@ -18,6 +18,7 @@ import type { SiteMapDraft } from '@/lib/skills/site-map';
 import { navigate } from '@/lib/actions/page/navigate';
 import { autoRunReady, syncAutoRuns } from './auto-run';
 import { onToolOffer, runSavedTool, toolkitCode, type ToolOffer } from './code-toolkit';
+import { toolkitPlaceFor } from './phone-invoke';
 import { CONTEXT_COMMAND, isContextCommand, type ContextBreakdown } from './commands';
 import { listSavedTools, withoutCode, type SavedToolMeta } from './saved-tools';
 import { dropTool, keepTool, switchAutoRun } from './tool-registry';
@@ -35,6 +36,7 @@ import {
   type NewFile,
 } from './file-store';
 import { invokeForHarness } from './invoke';
+import { phoneAnchor, phoneContext } from './phone-conversation';
 import {
   acknowledgeCompleted,
   activeMonitorStates,
@@ -67,6 +69,7 @@ import {
   activateSiteMap,
   cancelRun,
   discardSiteMap,
+  onPhoneClosed,
   onRunEvent,
   onSiteMapDraft,
   onTaskOrder,
@@ -87,6 +90,7 @@ import {
   remapTab,
   sessionForRun,
   sessionForTab,
+  type Ensured,
   type TabAnchor,
   type TabSession,
   type TaskTag,
@@ -367,7 +371,8 @@ function handle(command: RunCommand): void {
     case 'keepTool':
       void serialized(async () => {
         const offer = pendingOffers.get(command.toolkitId);
-        const code = offer ? await toolkitCode(command.tabId, command.toolkitId) : null;
+        const at = offer ? await toolkitPlaceFor(command.tabId, undefined) : null;
+        const code = at ? await toolkitCode(at.place, command.toolkitId) : null;
         if (offer && code) {
           await keepTool({ offer, code, slug: command.slug, autoRun: command.autoRun }).catch(() => undefined);
         }
@@ -394,7 +399,8 @@ function handle(command: RunCommand): void {
       return;
     case 'runTool':
       void serialized(async () => {
-        const result = await runSavedTool(command.tab.tabId, command.tab.url, command.id);
+        const at = await toolkitPlaceFor(command.tab.tabId, command.tab.url);
+        const result = at ? await runSavedTool(at.place, at.url, command.id) : failure('PHONE_GONE', 'The phone disconnected. Reconnect it and switch Android on again.');
         broadcast({ op: 'item', item: toolRunItem(command.id, result) });
       });
       return;
@@ -428,7 +434,7 @@ type Attached = { ok: true } | { ok: false; error: string };
 
 /** A file belongs to the conversation of the tab it was dropped on, which is started here if need be. */
 async function attach(file: NewFile, anchor: TabAnchor): Promise<Attached> {
-  const ensured = await ensureSessionForTab(anchor);
+  const ensured = await ensureConversation(anchor);
   if (!ensured.ok) {
     await removeFile(file.id);
     broadcast({ op: 'event', runId: LOCAL_RUN, event: { kind: 'error', code: 'SESSION_LIMIT', message: ensured.message } });
@@ -540,6 +546,15 @@ async function settle(sessionId: string): Promise<void> {
   await nameStoredSession(sessionId).catch(() => undefined);
 }
 
+/** The conversation of the tab the user is on; on the phone tab it is bound to the phone and carries the phone's address. */
+async function ensureConversation(anchor: TabAnchor): Promise<Ensured> {
+  const { anchor: anchored, serial } = await phoneAnchor(anchor);
+  const ensured = await ensureSessionForTab(anchored);
+  if (!ensured.ok || !serial || ensured.session.phone?.serial === serial) return ensured;
+  await patchSession(ensured.session.sessionId, { phone: { serial } });
+  return { ok: true, session: { ...ensured.session, phone: { serial } } };
+}
+
 async function instruct(
   text: string,
   anchor: TabAnchor,
@@ -547,7 +562,7 @@ async function instruct(
   focus?: FocusedElement,
   liveTools?: boolean,
 ): Promise<void> {
-  const ensured = await ensureSessionForTab(anchor);
+  const ensured = await ensureConversation(anchor);
   if (!ensured.ok) {
     broadcast({
       op: 'event',
@@ -611,8 +626,9 @@ async function startTurn(
       focus: hidden ? undefined : focus,
       liveTools,
       files: await attachedFiles(session),
-      recordings: await attachedRecordings(),
+      recordings: session.phone ? undefined : await attachedRecordings(),
       task,
+      phone: await phoneContext(session),
     });
     if (!runId) {
       await append(
@@ -728,6 +744,7 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
     transcript?.items ?? [notice('error', 'That conversation’s messages are no longer stored.')],
   );
 
+  const { anchor: anchored, serial } = await phoneAnchor(anchor);
   const session = await bindStoredSession(
     {
       sessionId,
@@ -735,14 +752,15 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
       agent: meta.agent,
       agentSessionId: meta.agentSessionId,
       usage: meta.usage,
-      url: meta.url,
-      title: titleOf(meta) ?? anchor.title,
+      url: serial ? anchored.url : meta.url,
+      title: titleOf(meta) ?? anchored.title,
     },
-    anchor,
+    anchored,
   );
+  if (serial) await patchSession(sessionId, { phone: { serial } });
   broadcast({ op: 'items', sessionId, items: buffers.get(sessionId) ?? [] });
 
-  if (meta.url && /^https?:$/.test(safeProtocol(meta.url))) {
+  if (!serial && meta.url && /^https?:$/.test(safeProtocol(meta.url))) {
     await invokeForHarness(navigate.name, { url: meta.url }, session.currentTabId).catch(() => undefined);
   }
 }
@@ -824,6 +842,14 @@ export function serveTabSessions(): void {
     });
   });
 
+  onPhoneClosed(() => {
+    void serialized(async () => {
+      for (const session of Object.values(await readTabSessions())) {
+        if (session.phone && session.runId) await append(session.sessionId, notice('error', 'PHONE_GONE: The phone disconnected. Reconnect it and switch Android on again.'));
+      }
+    });
+  });
+
   browser.tabs.onReplaced.addListener((added, removed) => {
     void serialized(() => remapTab(removed, added));
   });
@@ -832,7 +858,7 @@ export function serveTabSessions(): void {
     if (changeInfo.title === undefined && changeInfo.url === undefined) return;
     void serialized(async () => {
       const session = await sessionForTab(tabId);
-      if (!session) return;
+      if (!session || session.phone) return;
       const patch: Partial<TabSession> = {};
       if (tabId === session.mainTabId && tab.title && tab.title !== session.title) patch.title = tab.title;
       if (tabId === session.currentTabId && changeInfo.url) {

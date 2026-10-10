@@ -1,0 +1,4 @@
+Android Debug Bridge version 1.0.41
+Version 37.0.0-14910828
+Installed as /Users/shahriar/Library/Android/sdk/platform-tools/adb
+Running on Darwin 25.6.0 (arm64)

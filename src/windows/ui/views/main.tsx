@@ -1,24 +1,18 @@
-import { AlignLeft, BookOpen, Globe, Info, Power, Settings, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { Globe, Info, Power, Settings, Smartphone, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { TABS, type Model, type State, type Tab } from '../model';
 import { AboutView } from './about';
-import { ActivityView } from './activity';
-import { AgentsView } from './agents';
+import { AndroidView } from './android';
 import { BrowsersView } from './browsers';
-import { LogsView } from './logs';
 import { OverviewView } from './overview';
-import { SettingsView } from './settings';
-import { SkillsView } from './skills';
+import { SettingsScreen } from './settings-screen';
 
-const TAB: Record<Tab, { label: string; icon: LucideIcon; view: typeof OverviewView }> = {
+const TAB: Record<Tab, { label: string; icon: LucideIcon; view: typeof OverviewView; badge?: string }> = {
   overview: { label: 'Overview', icon: Power, view: OverviewView },
   browsers: { label: 'Browsers', icon: Globe, view: BrowsersView },
-  agents: { label: 'Agents', icon: Sparkles, view: AgentsView },
-  skills: { label: 'Skills', icon: BookOpen, view: SkillsView },
-  activity: { label: 'Activity', icon: ShieldCheck, view: ActivityView },
-  logs: { label: 'Logs', icon: AlignLeft, view: LogsView },
-  settings: { label: 'Settings', icon: Settings, view: SettingsView },
+  android: { label: 'Android', icon: Smartphone, view: AndroidView, badge: 'Experimental' },
+  settings: { label: 'Settings', icon: Settings, view: SettingsScreen },
   about: { label: 'About', icon: Info, view: AboutView },
 };
 
@@ -27,7 +21,7 @@ export function MainView({ model, state }: { model: Model; state: State }) {
   return (
     <div className="relative h-full">
       <div className="h-full overflow-y-auto [scrollbar-width:none]">
-        <div key={state.tab} className="enter mx-auto max-w-[880px] px-7 pt-16 pb-9">
+        <div key={state.tab} className={cn('enter mx-auto px-7 pt-16 pb-9', state.tab === 'settings' ? 'max-w-[1076px]' : 'max-w-[880px]')}>
           <View model={model} state={state} />
         </div>
       </div>
@@ -36,12 +30,12 @@ export function MainView({ model, state }: { model: Model; state: State }) {
   );
 }
 
-/** The view switcher floats at the top centre, Ctrl+1…Ctrl+8. */
+/** The view switcher floats at the top centre, Ctrl+1…Ctrl+5. */
 function TabCapsule({ model, state }: { model: Model; state: State }) {
   return (
     <nav className="absolute top-1.5 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full border border-line bg-surface/80 p-1 shadow-[0_6px_18px_rgb(0_0_0/0.25)] backdrop-blur-md">
       {TABS.map((tab, index) => {
-        const { label, icon: Icon } = TAB[tab];
+        const { label, icon: Icon, badge } = TAB[tab];
         const selected = state.tab === tab;
         return (
           <button
@@ -57,6 +51,16 @@ function TabCapsule({ model, state }: { model: Model; state: State }) {
           >
             <Icon className="size-3" strokeWidth={2.5} />
             {label}
+            {badge && (
+              <span
+                className={cn(
+                  'rounded-sm border px-1 font-mono text-[9px] tracking-wider uppercase',
+                  selected ? 'border-ground/50 text-ground' : 'border-amber/50 text-amber',
+                )}
+              >
+                {badge}
+              </span>
+            )}
             {tab === 'overview' && state.update && <span className={cn('size-1.5 rounded-full', selected ? 'bg-ground' : 'bg-brand')} />}
           </button>
         );

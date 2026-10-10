@@ -1,4 +1,8 @@
 import type { BrowserRow } from '@/daemon/browsers';
+import { judge } from '@/daemon/android/readiness';
+import { androidJson, type AndroidJson } from '@/daemon/android/report';
+import type { PhoneFacts } from '@/daemon/android/phone-facts';
+import type { TrackedDevice } from '@/daemon/android/devices';
 import { AGENT_LIST, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
@@ -24,6 +28,8 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
   const models: Partial<Record<AgentKind, string>> = {};
   const listeners = new Set<(event: string) => void>();
   let preferences: Preferences = { theme: null, guardrails: guardrails(`${home}\\.browsentic\\config.json`), profile: EMPTY_PROFILE };
+  const phones = phoneStates(home);
+  let phone = -1;
 
   const ok = (stdout: string): CliOutput => ({ ok: true, code: 0, stdout, stderr: '' });
   const later = <T>(value: T, ms = 350) => new Promise<T>((resolve) => setTimeout(() => resolve(value), instant ? 0 : ms));
@@ -61,6 +67,10 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       if (typeof set === 'string') active = set as AgentKind;
       return { state: agents() };
     },
+    android: ({ launch }) => {
+      if (launch) phone = phones.length - 2;
+      return { result: { ok: true, data: phones[Math.max(phone, 0)] } };
+    },
   };
 
   const commands: Record<string, (args: string[]) => CliOutput> = {
@@ -81,6 +91,7 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       if (args[1] === 'model') models[args[2] as AgentKind] = args[3];
       return ok(JSON.stringify(agents()));
     },
+    android: () => ok(JSON.stringify(phones[(phone = (phone + 1) % phones.length)])),
     skills: () => ok(JSON.stringify(skills(home))),
     approvals: () => ok(JSON.stringify({ grants: [{ action: 'page.submitForm', host: 'github.com', at: ago(2 * 86400) }, { action: 'page.captureDownload', host: 'github.com', at: ago(86400) }, { action: 'page.submitForm', host: 'news.ycombinator.com', at: ago(3600) }] })),
     downloads: () => ok(JSON.stringify({ dir: `${home}\\browsentic\\downloads`, downloads: [{ id: 'd1', name: 'invoice-2026-09.pdf', mime: 'application/pdf', size: 48213, url: 'https://example.com/invoice.pdf', host: 'example.com', notes: 'PDF, 47 KB, from example.com', savedTo: `${home}\\browsentic\\downloads\\invoice-2026-09.pdf`, capturedAt: ago(5400) }] })),
@@ -254,4 +265,28 @@ function log() {
     `${stamp(60)} run 7f3a finished in 41s`,
     `${stamp(30)} agent codex: version probe failed: exited 1`,
   ].join('\n');
+}
+
+/** What `browsentic android --json` says on Windows, one state per "Check again": no adb, no phone, waiting for Allow, Chrome closed, ready. */
+function phoneStates(home: string): AndroidJson[] {
+  const adb = { path: `${home}\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe`, version: '37.0.1-14963125' };
+  const pixel: TrackedDevice = { serial: '38041FDJH00ABC', state: 'ready', adbState: 'device', transport: 'usb', model: 'Pixel 8', transportId: '3' };
+  const facts: PhoneFacts = {
+    booted: true,
+    model: 'Pixel 8',
+    manufacturer: 'Google',
+    android: '16',
+    sdk: 36,
+    screen: { width: 1080, height: 2400, density: 420, awake: true },
+    chrome: { installed: true, version: '150.0.7871.186', running: true, debuggable: true },
+  };
+  const seen = (devices: Parameters<typeof judge>[0]['devices'], found: typeof adb | null = adb) =>
+    androidJson(judge({ enabled: true, platform: 'win32', adb: found, devices }));
+  return [
+    seen([], null),
+    seen([]),
+    seen([{ device: { ...pixel, state: 'unauthorized', adbState: 'unauthorized', model: undefined }, facts: null }]),
+    seen([{ device: pixel, facts: { ...facts, chrome: { ...facts.chrome, running: false, debuggable: false } } }]),
+    seen([{ device: pixel, facts }]),
+  ];
 }

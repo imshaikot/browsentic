@@ -175,3 +175,65 @@ import Testing
     }
 }
 
+
+/// The samples `browsentic android --json` writes in src/lib/phone/fixtures, kept current by the CLI's own tests.
+@Suite struct AndroidDecodingTests {
+    private func sample(_ name: String) throws -> AndroidState {
+        let repo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../..").standardized
+        let data = try Data(contentsOf: repo.appendingPathComponent("src/lib/phone/fixtures/android-\(name).json"))
+        return try JSONDecoder().decode(AndroidState.self, from: data)
+    }
+
+    @Test func ready() throws {
+        let state = try sample("ready")
+        #expect(state.isReady)
+        #expect(state.devices?.first?.chrome?.debuggable == true)
+        #expect(state.report?.sections.flatMap(\.checks).map(\.label) == ["adb", "Phone", "USB debugging", "Chrome", "Chrome open", "Screen"])
+        #expect(state.report?.summary == "Ready. Switch on Android in the Browsentic side panel to drive it.")
+        #expect(state.guide?.count == 6)
+    }
+
+    @Test func noAdb() throws {
+        let state = try sample("adbMissing")
+        #expect(state.adb?.found == false)
+        let check = state.report?.sections.first?.checks.first
+        #expect(check?.code == "ADB_MISSING" && check?.failed == true)
+        #expect(check?.fix == "brew install --cask android-platform-tools")
+        #expect(state.report?.guided == true)
+    }
+
+    @Test func noPhone() throws {
+        let state = try sample("noDevice")
+        #expect(state.devices?.isEmpty == true)
+        #expect(state.problem?.code == "NO_DEVICE")
+        #expect(state.report?.sections.last?.checks.last?.label == "Phone")
+    }
+
+    @Test func unauthorized() throws {
+        let state = try sample("unauthorized")
+        #expect(state.devices?.first?.state == "unauthorized")
+        #expect(state.report?.sections.last?.checks.last?.code == "DEVICE_UNAUTHORIZED")
+        #expect(state.guide?.contains { $0.platform == "android11+" } == true)
+    }
+
+    @Test func theControlSocketAnswerHasNoReport() throws {
+        let answer = #"{"enabled":true,"ready":false,"adb":{"found":true,"path":"/x/adb"},"devices":[],"problem":{"code":"NO_DEVICE","message":"No Android phone is connected."}}"#
+        let state = try JSONDecoder().decode(AndroidState.self, from: Data(answer.utf8))
+        #expect(state.report == nil && state.guide == nil && state.isReady == false)
+    }
+}
+
+@Suite struct TabTests {
+    /// The View menu gives tab n the shortcut ⌘n, and `Character("10")` traps: nine tabs is the most there can be.
+    @Test func everyTabHasADigitShortcut() {
+        #expect(Tab.allCases.count <= 9)
+        #expect(Tab.allCases.firstIndex(of: .android) == 2)
+        #expect(Tab.allCases.last == .about)
+    }
+
+    @Test func agentsSkillsActivityAndLogsLiveInSettings() {
+        #expect(Tab.allCases.map(\.rawValue) == ["overview", "browsers", "android", "settings", "about"])
+        #expect(SettingsSection.allCases.map(\.label) == ["General", "Agents", "Skills", "Activity", "Logs"])
+        #expect(Tab.allCases.compactMap(\.badge) == ["Experimental"])
+    }
+}

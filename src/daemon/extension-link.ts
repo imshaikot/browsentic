@@ -38,6 +38,7 @@ export class ExtensionLink {
   readonly origin: string;
   readonly id: string;
   readonly browser?: string;
+  readonly protocolVersion: number;
   /** Which connected browser the user was last in, so a caller that names none reaches that one. */
   lastActive = touched();
   /** What this browser offers: a Firefox build lists fewer tools than a Chromium one, and a drifted build its own. */
@@ -48,7 +49,14 @@ export class ExtensionLink {
 
   constructor(
     private readonly socket: WebSocket,
-    hello: { extensionVersion: string; manifestHash: string; origin: string; installId: string; browser?: string },
+    hello: {
+      protocolVersion: number;
+      extensionVersion: string;
+      manifestHash: string;
+      origin: string;
+      installId: string;
+      browser?: string;
+    },
     private readonly onClose: (link: ExtensionLink) => void,
     private readonly onRequest?: (request: ExtensionRequest, link: ExtensionLink) => void,
   ) {
@@ -57,6 +65,7 @@ export class ExtensionLink {
     this.origin = hello.origin;
     this.id = hello.installId;
     this.browser = hello.browser;
+    this.protocolVersion = hello.protocolVersion;
     socket.on('message', (raw) => this.receive(String(raw)));
     socket.on('close', () => this.dispose('socket closed'));
     socket.on('error', (error) => {
@@ -68,6 +77,14 @@ export class ExtensionLink {
 
   get label(): string {
     return this.browser ?? this.origin;
+  }
+
+  speaks(version: number): boolean {
+    return this.protocolVersion >= version;
+  }
+
+  get bufferedAmount(): number {
+    return this.socket.bufferedAmount;
   }
 
   get isOpen(): boolean {

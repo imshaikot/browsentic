@@ -5,6 +5,7 @@ import type { GuardrailValue } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
 import type { ThemeId } from '@/lib/settings/theme';
 import type { BrowserRow } from '@/daemon/browsers';
+import type { AndroidJson } from '@/daemon/android/report';
 import type {
   AgentListing,
   AppInfo,
@@ -27,8 +28,11 @@ import type {
 
 export type Phase = 'preflight' | 'main';
 export type DaemonPhase = 'off' | 'starting' | 'on' | 'stopping';
-export type Tab = 'overview' | 'browsers' | 'agents' | 'skills' | 'activity' | 'logs' | 'settings' | 'about';
-export const TABS: Tab[] = ['overview', 'browsers', 'agents', 'skills', 'activity', 'logs', 'settings', 'about'];
+export type Tab = 'overview' | 'browsers' | 'android' | 'settings' | 'about';
+export const TABS: Tab[] = ['overview', 'browsers', 'android', 'settings', 'about'];
+export type SettingsSection = 'general' | 'agents' | 'skills' | 'activity' | 'logs';
+export const SETTINGS_SECTIONS: SettingsSection[] = ['general', 'agents', 'skills', 'activity', 'logs'];
+export const isSettingsSection = (value: string): value is SettingsSection => (SETTINGS_SECTIONS as string[]).includes(value);
 
 export type CheckId = 'system' | 'node' | 'command' | 'browser' | 'agent';
 export const CHECKS: CheckId[] = ['system', 'node', 'command', 'browser', 'agent'];
@@ -62,6 +66,7 @@ export interface Notice {
 export interface State {
   phase: Phase;
   tab: Tab;
+  settingsSection: SettingsSection;
   checks: Record<CheckId, CheckState>;
   preflightBusy: boolean;
   fixing: boolean;
@@ -73,6 +78,10 @@ export interface State {
   sessions: SessionSummary[];
   pairing?: PairingCode;
   agents?: AgentListing;
+  /** `browsentic android --json` while the Android tab is open; the Bridge looks for phones only then. */
+  android?: AndroidJson;
+  /** A phone has been ready on this computer before, so the setup steps start folded. */
+  androidReadyOnce: boolean;
   preferences?: Preferences;
   /** The running daemon never answered for its settings: it predates this app and needs a restart. */
   preferencesUnsupported: boolean;
@@ -98,6 +107,7 @@ const MINIMUM_NODE = 20;
 const FINISH_UPDATE = 'browsentic/finishUpdateOnLaunch';
 const APPEARANCE = 'browsentic/appearance';
 const START_ON_LAUNCH = 'browsentic/startDaemonOnLaunch';
+const ANDROID_READY_ONCE = 'browsentic/androidReadyOnce';
 const CLAUDE_CODE = '@anthropic-ai/claude-code';
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -125,7 +135,7 @@ export const isInstalling = (phase: UpdatePhase) => phase.kind === 'downloading'
 
 export function failureOf(output: CliOutput): string {
   const text = (output.stderr.trim() || output.stdout.trim()).slice(-400);
-  return text || 'The browsentic command exited with an error. See the Logs tab.';
+  return text || 'The browsentic command exited with an error. See Settings → Logs.';
 }
 
 /** The CLI's --json output, from its first bracket: a warning printed before it is not part of it. */
@@ -149,6 +159,7 @@ export function short(path: string, info: AppInfo | undefined): string {
 export const initialState = (): State => ({
   phase: 'preflight',
   tab: 'overview',
+  settingsSection: 'general',
   checks: Object.fromEntries(CHECKS.map((id) => [id, { kind: 'waiting' }])) as Record<CheckId, CheckState>,
   preflightBusy: true,
   fixing: false,
@@ -163,6 +174,7 @@ export const initialState = (): State => ({
   busy: [],
   appearance: (stored(APPEARANCE) as Appearance | null) ?? 'system',
   startDaemonOnLaunch: stored(START_ON_LAUNCH) !== 'false',
+  androidReadyOnce: stored(ANDROID_READY_ONCE) === '1',
 });
 
 export class Model {
@@ -171,6 +183,7 @@ export class Model {
   private poller?: ReturnType<typeof setInterval>;
   private updateWatcher?: ReturnType<typeof setInterval>;
   private stopEvents?: () => void;
+  private watchingAndroid = false;
   private noticeTimer?: ReturnType<typeof setTimeout>;
   private noticeCount = 0;
   private started = false;
@@ -386,11 +399,16 @@ export class Model {
     if (this.state.phase === 'main') this.set({ tab });
   }
 
+  openSettings(settingsSection: SettingsSection) {
+    if (this.state.phase === 'main') this.set({ tab: 'settings', settingsSection });
+  }
+
   // Daemon
 
   private startPolling() {
     this.stopEvents?.();
     this.stopEvents = this.backend.onControlEvent((event) => {
+      if (event === 'android-changed') return void this.loadAndroid();
       if (event !== 'settings-changed') return;
       void this.loadPreferences();
       void this.loadAgents();
@@ -415,7 +433,10 @@ export class Model {
     const lock = await this.backend.readLock().catch(() => null);
     if (!lock) return this.markOff();
     try {
-      if (await this.backend.controlConnect()) void this.loadPreferences(true);
+      if (await this.backend.controlConnect()) {
+        void this.loadPreferences(true);
+        if (this.watchingAndroid) void this.watchAndroid(true);
+      }
       const status = (await this.control({ op: 'status' })).status as BridgeStatus;
       const sessions = (await this.control({ op: 'sessions' })).sessions as SessionSummary[];
       const stamp = await this.backend.extensionStamp();
@@ -493,8 +514,36 @@ export class Model {
     try {
       this.set({ agents: parseJson<AgentListing>(await this.backend.cli(['agent', '--json']), 'agent') });
     } catch {
-      /* The Agents tab shows its own offline hint; a failed background read says nothing. */
+      /* Settings → Agents shows its own offline hint; a failed background read says nothing. */
     }
+  }
+
+  /** The tab subscribes while it shows and lets go when it leaves, so phones are looked for only while someone is looking at them. */
+  async watchAndroid(on: boolean) {
+    this.watchingAndroid = on;
+    if (this.state.daemon !== 'on') return;
+    await this.control({ op: 'android', watch: on }).catch(() => undefined);
+    if (on) await this.loadAndroid();
+  }
+
+  loadAndroid() {
+    return this.perform('android', async () => this.showAndroid(await this.readAndroid()), true);
+  }
+
+  openChrome(serial: string) {
+    return this.perform(`android:${serial}`, async () => {
+      outcome((await this.control({ op: 'android', launch: serial }, 40_000)).result);
+      this.showAndroid(await this.readAndroid());
+    });
+  }
+
+  private async readAndroid() {
+    return parseJson<AndroidJson>(await this.backend.cli(['android', '--json'], 30), 'android');
+  }
+
+  private showAndroid(android: AndroidJson) {
+    if (android.ready && !this.state.androidReadyOnce) store(ANDROID_READY_ONCE, '1');
+    this.set((state) => ({ android, androidReadyOnce: state.androidReadyOnce || android.ready }));
   }
 
   async loadPreferences(watch = false) {

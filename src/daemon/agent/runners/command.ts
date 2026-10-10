@@ -69,7 +69,7 @@ function onPath(bin: string, env: NodeJS.ProcessEnv, exists: (path: string) => b
 }
 
 /** Windows spells a variable any way it likes, and a plain copy of the environment keeps that spelling. */
-function variable(env: NodeJS.ProcessEnv, name: string): string | undefined {
+export function variable(env: NodeJS.ProcessEnv, name: string): string | undefined {
   return Object.entries(env).find(([key]) => key.toUpperCase() === name)?.[1];
 }
 

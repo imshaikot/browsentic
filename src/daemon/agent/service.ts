@@ -18,6 +18,7 @@ import { pickElement } from '@/lib/actions/page/pick-element';
 import { runCode } from '@/lib/actions/page/run-code';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { waitForElement } from '@/lib/actions/page/wait-for-element';
+import { notOnPhone, phoneOffers } from '@/lib/phone/features';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import type { FileReport } from '@/lib/files/report';
@@ -48,7 +49,7 @@ import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
+import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState, RUNNERS } from './runners';
 import type { CallLimits } from './runners/types';
@@ -98,6 +99,8 @@ interface ActiveRun {
   focusShot?: string;
   /** The composer's “Live tool” switch, as it stood when this instruction was sent. */
   liveTools: boolean;
+  /** It drives Chrome on an Android phone, which is offered only the tools that work there. */
+  phone: boolean;
   /** Actions the user allowed once in this run that stay allowed for the rest of it. */
   approved: Set<string>;
   /** A schedule started it: an approval nobody answers is declined rather than awaited forever. */
@@ -200,8 +203,13 @@ export class AgentSession {
     const run = this.runs.get(runId);
     if (!run) return null;
     const codeListed = run.liveTools || (run.sessionId !== undefined && this.codeListed.has(run.sessionId));
+    const codeWithheld = codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION];
+    if (run.phone) {
+      const offPhone = this.deps.actionNames().filter((name) => !phoneOffers(name));
+      return { withheld: [...new Set([...offPhone, ...codeWithheld])], reserved: [FOCUS_SHOT_ACTION] };
+    }
     return {
-      withheld: codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION],
+      withheld: codeWithheld,
       // A mapping run never resumes a conversation, so its tool can come and go. A pick
       // comes and goes between the messages of one, so the tool that shows it stays.
       reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), FOCUS_SHOT_ACTION],
@@ -249,6 +257,11 @@ export class AgentSession {
         summary: result.ok ? 'the picked element, as photographed' : 'no pick attached',
       });
       return result;
+    }
+
+    if (run.phone && !phoneOffers(action)) {
+      emit({ kind: 'toolResult', toolId, ok: false, summary: 'not available on the phone' });
+      return failure('NOT_ON_PHONE', notOnPhone(action));
     }
 
     if (!run.liveTools && (action === INJECT_ACTION || action === RUN_CODE_ACTION)) {
@@ -463,6 +476,7 @@ export class AgentSession {
       ownedTabIds: [],
       focusShot: context?.focus?.shot,
       liveTools: context?.liveTools === true,
+      phone: context?.phone !== undefined,
       approved: new Set(),
       scheduled: context?.task !== undefined,
       limits: RUNNERS[config.agent].limits,
@@ -515,6 +529,7 @@ export class AgentSession {
           attachments: handover.known,
           recordings: recordingsBlock(context?.recordings),
           scheduled: scheduledBlock(context?.task),
+          phone: phoneBlock(context?.phone),
         });
         // The CLI sends the prompt its session began with, so what has changed since goes in the message.
         const update =

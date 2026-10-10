@@ -6,6 +6,7 @@ import { SOLVE_CAPTCHA_TIMEOUT_MS, solveCaptcha } from '@/lib/actions/page/solve
 import { startMonitor } from '@/lib/actions/page/start-monitor';
 import { failure, type ActionResult } from '@/lib/actions/protocol';
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
+import type { AndroidState } from '@/lib/phone/types';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 
@@ -14,6 +15,7 @@ const REQUEST_TIMEOUT_MS = 60_000;
 export class RemoteBridge implements Bridge {
   private readonly pending = new Map<string, (message: ControlMessage) => void>();
   private readonly manifestListeners = new Set<() => void>();
+  private readonly androidListeners = new Set<(state: AndroidState) => void>();
 
   private constructor(
     private readonly socket: WebSocket,
@@ -67,8 +69,18 @@ export class RemoteBridge implements Bridge {
 
   async agent(change?: { set?: AgentKind; grant?: AgentKind; models?: AgentKind }): Promise<AgentState> {
     const reply = await this.request({ id: randomUUID(), op: 'agent', ...change });
-    if (reply && 'state' in reply) return reply.state;
+    if (reply && 'op' in reply && reply.op === 'agent') return reply.state;
     throw new Error('The Browsentic daemon did not answer about its agent');
+  }
+
+  async android(request?: { launch?: string; url?: string; watch?: boolean; peek?: boolean }): Promise<ActionResult<AndroidState>> {
+    const reply = await this.request({ id: randomUUID(), op: 'android', ...request });
+    if (reply && 'op' in reply && reply.op === 'android') return reply.result;
+    return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not answer about Android');
+  }
+
+  onAndroidChanged(listener: (state: AndroidState) => void): void {
+    this.androidListeners.add(listener);
   }
 
   /** A browser is named by its session id; an origin still unpairs every browser presenting it. */
@@ -120,6 +132,7 @@ export class RemoteBridge implements Bridge {
     }
     if ('event' in message) {
       if (message.event === 'manifest-changed') for (const listener of this.manifestListeners) listener();
+      if (message.event === 'android-changed') for (const listener of this.androidListeners) listener(message.state);
       return;
     }
     this.pending.get(message.id)?.(message);

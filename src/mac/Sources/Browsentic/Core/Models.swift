@@ -310,3 +310,90 @@ enum Version {
         Int(version.trimmingCharacters(in: CharacterSet(charactersIn: "v \n")).split(separator: ".").first ?? "") ?? 0
     }
 }
+
+/// `browsentic android --json`, and the control socket's `android` answer without `guide` and `report`. Every field is optional, so an older or newer Bridge still decodes.
+struct AndroidState: Decodable, Equatable {
+    struct Problem: Decodable, Equatable {
+        let code: String
+        let message: String
+        let fix: String?
+        let action: String?
+    }
+
+    struct Adb: Decodable, Equatable {
+        let found: Bool?
+        let path: String?
+        let version: String?
+        let problem: Problem?
+    }
+
+    struct Chrome: Decodable, Equatable {
+        let installed: Bool?
+        let version: String?
+        let running: Bool?
+        let debuggable: Bool?
+    }
+
+    struct Device: Decodable, Identifiable, Equatable {
+        let serial: String
+        let transport: String?
+        let state: String?
+        let model: String?
+        let android: String?
+        let chrome: Chrome?
+        let problem: Problem?
+
+        var id: String { serial }
+    }
+
+    struct Session: Decodable, Equatable {
+        let serial: String
+        let since: String?
+    }
+
+    struct GuideStep: Decodable, Equatable, Identifiable {
+        let title: String
+        let detail: String
+        let platform: String?
+
+        var id: String { title }
+    }
+
+    /// One row of the checklist the CLI prints, worded once in src/lib/phone/checks.ts for every surface.
+    struct Check: Decodable, Equatable, Identifiable {
+        let label: String
+        let mark: String
+        let value: String
+        let fix: String?
+        let action: String?
+        let code: String?
+
+        var id: String { label }
+        var failed: Bool { mark == "failed" }
+    }
+
+    struct Section: Decodable, Equatable, Identifiable {
+        let serial: String?
+        let checks: [Check]
+
+        var id: String { serial ?? checks.first?.label ?? "" }
+    }
+
+    struct Report: Decodable, Equatable {
+        let sections: [Section]
+        let ready: Bool?
+        let guided: Bool?
+        let summary: String?
+    }
+
+    let enabled: Bool?
+    let ready: Bool?
+    let adb: Adb?
+    let devices: [Device]?
+    let problem: Problem?
+    let session: Session?
+    let guide: [GuideStep]?
+    let report: Report?
+
+    var isReady: Bool { ready == true }
+}

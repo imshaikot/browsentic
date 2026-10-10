@@ -26,6 +26,7 @@ Read in order, these pages follow a request through all of them:
 | **11.** [The macOS app](mac-app.md) | What is native, what stays in the daemon, and how the payload is laid down |
 | **12.** [The Windows app](windows-app.md) | The Tauri and React app, the launcher, the PATH, and how it updates |
 | **13.** [Store listings](stores.md) | The Chrome Web Store and Edge Add-ons IDs, submitting an update, and every field the dashboards ask for |
+| **14.** [Android phones](android.md) | adb without spawning adb, the DevTools relay, the phone tab, and one tap followed from the agent to the phone |
 
 Error codes are in [reference/errors.md](../reference/errors.md), and each tool's parameters in
 [reference/tools.md](../reference/tools.md).

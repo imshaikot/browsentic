@@ -1,0 +1,86 @@
+{
+  "enabled": true,
+  "adb": {
+    "found": true,
+    "path": "/Users/me/Library/Android/sdk/platform-tools/adb",
+    "version": "37.0.0-14910828"
+  },
+  "ready": false,
+  "devices": [
+    {
+      "serial": "R5CT1234567",
+      "transport": "usb",
+      "state": "unauthorized",
+      "chrome": {
+        "installed": false,
+        "running": false,
+        "debuggable": false
+      },
+      "problem": {
+        "code": "DEVICE_UNAUTHORIZED",
+        "message": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again."
+      }
+    }
+  ],
+  "problem": {
+    "code": "DEVICE_UNAUTHORIZED",
+    "message": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again."
+  },
+  "guide": [
+    {
+      "title": "Turn on Developer options",
+      "detail": "On the phone, open Settings, then About phone, and tap Build number seven times."
+    },
+    {
+      "title": "Turn on USB debugging",
+      "detail": "Open Settings, then System, then Developer options, and turn on USB debugging."
+    },
+    {
+      "title": "Connect the phone",
+      "detail": "Connect it to this computer with a USB cable. When the phone asks, tick \"Always allow from this computer\" and tap Allow."
+    },
+    {
+      "title": "Or connect over Wi-Fi",
+      "detail": "In Developer options, turn on Wireless debugging and tap Pair device with pairing code. On this computer, run \"adb pair <ip:port> <code>\", then \"adb connect <ip:port>\".",
+      "platform": "android11+"
+    },
+    {
+      "title": "Open Chrome on the phone",
+      "detail": "Browsentic drives the Chrome app, so it has to be open."
+    },
+    {
+      "title": "Switch on Android",
+      "detail": "In your browser, open the Browsentic side panel and switch on Android."
+    }
+  ],
+  "report": {
+    "sections": [
+      {
+        "checks": [
+          {
+            "label": "adb",
+            "mark": "passed",
+            "value": "/Users/me/Library/Android/sdk/platform-tools/adb (37.0.0-14910828)"
+          }
+        ]
+      },
+      {
+        "checks": [
+          {
+            "label": "Phone",
+            "mark": "passed",
+            "value": "Android phone, USB (R5CT1234567)"
+          },
+          {
+            "label": "USB debugging",
+            "mark": "failed",
+            "value": "The phone has not allowed this computer yet. Unlock it and tap Allow on the USB debugging prompt. If no prompt shows, unplug it and plug it in again.",
+            "code": "DEVICE_UNAUTHORIZED"
+          }
+        ]
+      }
+    ],
+    "ready": false,
+    "guided": true
+  }
+}

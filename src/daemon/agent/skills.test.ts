@@ -1,9 +1,11 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
 import type { RunContext } from '@/lib/actions/protocol';
+import { PHONE_TOOLS } from '@/lib/phone/features';
+import type { PhoneContext } from '@/lib/phone/types';
 import { stateDir } from '../lockfile';
-import { bundledSkillNames, loadSkills, routeSkill, SCRIPTING_SKILL, skillDirNames, uploadedSkillsDir, type Skill } from './skills';
+import { bundledSkillNames, loadSkills, PHONE_SKILL, routeSkill, SCRIPTING_SKILL, skillDirNames, uploadedSkillsDir, type Skill } from './skills';
 
 const skill = (name: string): Skill => ({
   name,
@@ -142,5 +144,43 @@ describe('routing an instruction', () => {
 
   test('with no skills at all there is nothing to route to', () => {
     expect(routeSkill([], 'click')).toBeNull();
+  });
+});
+
+describe('a run on the Android phone', () => {
+  const PIXEL: PhoneContext = { serial: 'emulator-5554', model: 'Pixel 8', android: '16', chrome: '150', viewport: { width: 411, height: 675, dpr: 2.625 } };
+  const general = (name: string, triggers: string[], isDefault = false): Skill => ({ ...skill(name), triggers, isDefault });
+  const skills = [
+    general('browser-control', ['click'], true),
+    general('page-theming', ['dark mode']),
+    general(PHONE_SKILL, []),
+    skill(SCRIPTING_SKILL),
+    { ...skill('example-com'), category: 'site-exploration' as const, domains: ['example.com'], triggers: [] },
+  ];
+  const onPhone = (instruction: string, context: RunContext = {}) => routeSkill(skills, instruction, { ...context, phone: PIXEL });
+
+  test('takes the phone skill as its base, whatever the words would have chosen', () => {
+    expect([onPhone('click sign in')?.base.name, onPhone('switch to dark mode')?.base.name]).toEqual([PHONE_SKILL, PHONE_SKILL]);
+  });
+
+  test('keeps the phone skill when a desktop skill is named, and takes the name off the words', () => {
+    expect(onPhone('@page-theming make it readable')).toMatchObject({ base: { name: PHONE_SKILL }, text: 'make it readable' });
+  });
+
+  test("still gets the notes for the phone page's site, and the scripting skill only with Live tool on", () => {
+    expect(onPhone('click sign in', { url: 'https://example.com/' })?.overlays.map((overlay) => overlay.name)).toEqual(['example-com']);
+    expect(onPhone('click sign in', { url: 'https://example.com/', liveTools: true })?.overlays.map((overlay) => overlay.name)).toEqual(['example-com', SCRIPTING_SKILL]);
+  });
+
+  test('a desktop run is never routed to the phone skill, not even with no default', () => {
+    expect(routeSkill(skills, 'click sign in')?.base.name).toBe('browser-control');
+    expect(routeSkill(skills.filter((each) => each.name !== 'browser-control'), 'hello')?.base.name).not.toBe(PHONE_SKILL);
+  });
+
+  test('the bundled phone skill names only tools a phone run is offered', () => {
+    const bundled = loadSkills().find((loaded) => loaded.name === PHONE_SKILL && loaded.source === 'bundled');
+    const named = [...new Set(readFileSync(new URL('../skills/phone.md', import.meta.url), 'utf8').match(/page_\w+/g))];
+    expect(bundled).toBeDefined();
+    expect(named.filter((name) => !PHONE_TOOLS.has(name.replace('page_', 'page.')))).toEqual([]);
   });
 });

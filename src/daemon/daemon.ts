@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
+  ANDROID_PROTOCOL,
   EXTERNAL_RUN_ID,
   MIN_EXTENSION_PROTOCOL,
   SOCKET_PROTOCOL_VERSION,
@@ -12,10 +13,12 @@ import {
   parseFrame,
   success,
   type ActionResult,
+  type ExtensionRequest,
   type RunEvent,
   type SkillCatalog,
   type SocketFrame,
 } from '@/lib/actions/protocol';
+import type { AndroidState } from '@/lib/phone/types';
 import type { TaskList } from '@/lib/schedules/task';
 import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
@@ -50,6 +53,7 @@ import {
   type Session,
 } from './auth-store';
 import { AgentSession } from './agent/service';
+import { androidOff, type Android } from './android/service';
 import { solveCaptchaWithAnalyst } from './agent/captcha-solver';
 import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
@@ -90,12 +94,25 @@ import { daemonPorts } from './ports';
 
 type AgentFrame = Extract<SocketFrame, { t: 'agentState' | 'setAgent' | 'setAgentModel' | 'grantAgent' }>;
 type TaskFrame = Extract<SocketFrame, { t: 'tasks' | 'saveTask' | 'deleteTask' | 'pauseTasks' }>;
+type PhoneRequest = Extract<ExtensionRequest, { t: 'phoneOpen' | 'phoneClose' | 'phoneLaunch' | 'cdp' }>;
+
+const PHONE_REQUESTS: ReadonlySet<string> = new Set<PhoneRequest['t']>(['phoneOpen', 'phoneClose', 'phoneLaunch', 'cdp']);
+
+const isPhoneRequest = (request: ExtensionRequest): request is PhoneRequest => PHONE_REQUESTS.has(request.t);
+
+function phoneReply(request: PhoneRequest, result: ActionResult<never>): SocketFrame | null {
+  if (request.t === 'phoneOpen') return { t: 'phoneOpened', id: request.id, result };
+  if (request.t === 'phoneLaunch') return { t: 'androidInfo', id: request.id, result };
+  if (request.t === 'cdp') return { t: 'cdpResult', id: request.id, result };
+  return null;
+}
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
 const BINDING_IDLE_MS = 2 * 60 * 1000;
 const BROWSER_LABEL_MAX = 40;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const EXTENSION_ORIGIN = /^(chrome|moz|safari-web)-extension:\/\//;
+const CHROMIUM_ORIGIN = /^chrome-extension:\/\//;
 const LOOPBACK_HOST = /^(127\.0\.0\.1|\[::1\]|localhost)(:\d+)?$/i;
 
 interface Binding {
@@ -128,6 +145,7 @@ export function protocolRefusal(hello: { protocolVersion: unknown; minDaemonProt
 export interface DaemonOptions {
   version: string;
   idleExit?: boolean;
+  android?: Android;
 }
 
 export interface Daemon extends Bridge {
@@ -177,7 +195,7 @@ function persistDownload(action: string, result: ActionResult, hosts?: readonly 
   return { ok: true, data: { downloadId: id, name, mime, size, host, notes, savedTo } };
 }
 
-export async function startDaemon({ version, idleExit = true }: DaemonOptions): Promise<Daemon> {
+export async function startDaemon({ version, idleExit = true, android = androidOff() }: DaemonOptions): Promise<Daemon> {
   const swept = sweepDownloads();
   if (swept) log(`swept ${swept} expired download${swept === 1 ? '' : 's'}`);
 
@@ -196,6 +214,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
   const analyses = new FileAnalyses();
   const controls = new Set<WebSocket>();
   const settingsWatchers = new Set<WebSocket>();
+  const androidWatches = new Map<ExtensionLink | WebSocket, () => void>();
   let configSeen = markConfig();
   const unwatchConfig = watchConfig(() => configChanged());
   let controlSeq = 0;
@@ -405,6 +424,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         agents.delete(closing);
         scheduler.linkClosed(closing.id);
         analyses.cancelOwnedBy(closing);
+        unwatchAndroid(closing);
+        void android.release(closing);
         if (links.get(closing.id) === closing) links.delete(closing.id);
         log(`${closing.label} disconnected`);
         scheduleIdleExit();
@@ -500,6 +521,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         if (request.t === 'discardSiteMap') {
           return source.send({ t: 'skillResult', id: request.id, result: discardStaging(request.stagingId) });
         }
+        if (isPhoneRequest(request)) return settlePhone(request, source);
         session(source).handle(request);
       },
     );
@@ -526,7 +548,44 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     accepted.send({ t: 'preferencesInfo', id: '', result: success(preferencesNow()) });
     accepted.send({ t: 'taskList', id: '', result: success(scheduler.list()) });
     scheduler.linkOpened();
+    if (accepted.speaks(ANDROID_PROTOCOL) && CHROMIUM_ORIGIN.test(accepted.origin)) watchAndroid(accepted);
     if (!known) await adoptExtensionManifest(accepted);
+  }
+
+  function watchAndroid(link: ExtensionLink): void {
+    const push = (state: AndroidState) => {
+      if (link.isOpen) link.send({ t: 'androidInfo', id: '', result: success(state) });
+    };
+    androidWatches.set(link, android.watch(push));
+  }
+
+  function peekAndroid(): ActionResult<AndroidState> {
+    const known = android.peek();
+    return known ? success(known) : failure('NOT_CHECKED', 'Nobody is watching for phones, so the Bridge has not looked.');
+  }
+
+  function unwatchAndroid(watcher: ExtensionLink | WebSocket): void {
+    androidWatches.get(watcher)?.();
+    androidWatches.delete(watcher);
+  }
+
+  function settlePhone(request: PhoneRequest, source: ExtensionLink): void {
+    const answer = (result: ActionResult<never>) => {
+      const reply = phoneReply(request, result);
+      if (reply) source.send(reply);
+    };
+    if (!source.speaks(ANDROID_PROTOCOL)) {
+      return answer(failure('UNSUPPORTED', `Android needs an extension that speaks protocol ${ANDROID_PROTOCOL}.`));
+    }
+    if (request.t === 'phoneLaunch') {
+      void android.launch(request.serial, request.url).then((result) => source.send({ t: 'androidInfo', id: request.id, result }));
+    } else if (request.t === 'phoneOpen') {
+      void android.open(source, request.serial).then((result) => source.send({ t: 'phoneOpened', id: request.id, result }));
+    } else if (request.t === 'cdp') {
+      void android.command(source, request).then((result) => source.send({ t: 'cdpResult', id: request.id, result }));
+    } else {
+      void android.close(source, request.serial);
+    }
   }
 
   function openLinks(): ExtensionLink[] {
@@ -821,6 +880,26 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
         if (request.watch) settingsWatchers.add(ws);
         return send(ws, { id: request.id, op: 'preferences', result: success(preferencesNow()) });
       }
+      if (request.op === 'android') {
+        if (request.launch && speaksForRun) {
+          log(`control ${client} tried to open Chrome on a phone from inside an agent run; refused`);
+          return send(ws, {
+            id: request.id,
+            op: 'android',
+            result: failure('BLOCKED', 'An agent run cannot open apps on the phone. Open Chrome from the side panel or the desktop app.'),
+          });
+        }
+        if (request.watch && !androidWatches.has(ws)) {
+          androidWatches.set(ws, android.watch((state) => send(ws, { event: 'android-changed', state })));
+        }
+        if (request.watch === false) unwatchAndroid(ws);
+        const result = request.launch
+          ? await android.launch(request.launch, request.url)
+          : request.peek
+            ? peekAndroid()
+            : success(await android.state());
+        return send(ws, { id: request.id, op: 'android', result });
+      }
       if (request.op === 'setPreference') {
         if (speaksForRun) {
           log(`control ${client} tried to change a setting from inside an agent run; refused`);
@@ -848,6 +927,7 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
       for (const call of inflight.values()) call.abort();
       controls.delete(ws);
       settingsWatchers.delete(ws);
+      unwatchAndroid(ws);
       scheduleIdleExit();
     };
     ws.on('close', drop);
@@ -965,6 +1045,8 @@ export async function startDaemon({ version, idleExit = true }: DaemonOptions): 
     if (idleTimer) clearTimeout(idleTimer);
     scheduler.stop();
     unwatchConfig();
+    for (const watcher of [...androidWatches.keys()]) unwatchAndroid(watcher);
+    await android.stop();
     for (const link of [...links.values()]) link.close('daemon shutting down');
     for (const ws of controls) ws.close(1001, 'daemon shutting down');
     wss.close();

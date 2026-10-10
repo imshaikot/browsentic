@@ -48,7 +48,7 @@ struct BrowsenticApp: App {
         MenuBarExtra {
             MenuBarContent().environmentObject(model)
         } label: {
-            Image(systemName: model.daemon == .on ? "circle.hexagongrid.fill" : "circle.hexagongrid")
+            Image(nsImage: model.daemon == .on ? MenuBarMark.on : MenuBarMark.off)
         }
     }
 }

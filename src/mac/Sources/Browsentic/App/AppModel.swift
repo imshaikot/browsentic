@@ -17,7 +17,7 @@ enum DaemonPhase: Equatable {
 }
 
 enum Tab: String, CaseIterable, Identifiable {
-    case overview, browsers, agents, skills, activity, logs, settings, about
+    case overview, browsers, android, settings, about
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
@@ -25,12 +25,26 @@ enum Tab: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "power"
         case .browsers: "globe"
+        case .android: "candybarphone"
+        case .settings: "gearshape"
+        case .about: "info.circle"
+        }
+    }
+    var badge: String? { self == .android ? "Experimental" : nil }
+}
+
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case general, agents, skills, activity, logs
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+    var icon: String {
+        switch self {
+        case .general: "slider.horizontal.3"
         case .agents: "sparkles"
         case .skills: "book.closed"
         case .activity: "checkmark.shield"
         case .logs: "text.alignleft"
-        case .settings: "gearshape"
-        case .about: "info.circle"
         }
     }
 }
@@ -45,6 +59,7 @@ struct Notice: Identifiable, Equatable {
 final class AppModel: ObservableObject {
     @Published var phase: Phase = .preflight
     @Published var tab: Tab = .overview
+    @Published var settingsSection: SettingsSection = .general
     @Published var checks: [CheckID: CheckState] = Dictionary(uniqueKeysWithValues: CheckID.allCases.map { ($0, .waiting) })
     @Published var preflightBusy = true
     @Published var fixing = false
@@ -55,6 +70,8 @@ final class AppModel: ObservableObject {
     @Published var sessions: [BrowserSession] = []
     @Published var pairing: PairingCode?
     @Published var agents: AgentState?
+    /// `browsentic android --json` while the Android tab is open; the Bridge looks for phones only then.
+    @Published var android: AndroidState?
     @Published var preferences: Preferences?
     /// The running daemon never answered for its settings: it predates this app and needs a restart.
     @Published var preferencesUnsupported = false
@@ -79,6 +96,7 @@ final class AppModel: ObservableObject {
     private var poller: Task<Void, Never>?
     private var eventWatcher: Task<Void, Never>?
     private var updateWatcher: Task<Void, Never>?
+    private var watchingAndroid = false
 
     var cli: CLI? { node.map(CLI.init) }
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? Payload.bundledVersion ?? "dev" }
@@ -227,9 +245,16 @@ final class AppModel: ObservableObject {
     func startPolling() {
         eventWatcher?.cancel()
         eventWatcher = Task { [weak self, control] in
-            for await event in control.events where event == "settings-changed" {
-                await self?.loadPreferences()
-                await self?.loadAgents()
+            for await event in control.events {
+                switch event {
+                case "settings-changed":
+                    await self?.loadPreferences()
+                    await self?.loadAgents()
+                case "android-changed":
+                    await self?.loadAndroid()
+                default:
+                    break
+                }
             }
         }
         poller?.cancel()
@@ -245,6 +270,7 @@ final class AppModel: ObservableObject {
         guard let lock = Self.readLock() else { return markOff() }
         if await control.connect(lock) {
             Task { await self.loadPreferences(watch: true) }
+            if watchingAndroid { Task { await self.watchAndroid(true) } }
         }
         do {
             let status = try await control.status()
@@ -321,6 +347,25 @@ final class AppModel: ObservableObject {
     func loadAgents() async {
         guard let cli else { return }
         if let state = try? await cli.agents() { agents = state }
+    }
+
+    /// The tab subscribes while it shows and lets go when it leaves, so phones are looked for only while someone is looking at them.
+    func watchAndroid(_ on: Bool) async {
+        watchingAndroid = on
+        guard daemon == .on else { return }
+        _ = try? await control.android(watch: on)
+        if on { await loadAndroid() }
+    }
+
+    func loadAndroid() async {
+        await perform("android", quiet: true) { cli, _ in self.android = try await cli.android() }
+    }
+
+    func openChrome(on serial: String) async {
+        await perform("android:\(serial)") { cli, control in
+            _ = try await control.android(launch: serial)
+            self.android = try await cli.android()
+        }
     }
 
     func loadPreferences(watch: Bool = false) async {

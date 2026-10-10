@@ -1,0 +1,29 @@
+@@browsentic:booted
+1
+@@browsentic:model
+sdk_gphone16k_arm64
+@@browsentic:manufacturer
+Google
+@@browsentic:release
+17
+@@browsentic:sdk
+37
+@@browsentic:size
+Physical size: 1080x2092
+@@browsentic:density
+Physical density: 420
+@@browsentic:power
+  mWakefulness=Awake
+mWakefulness=1
+@@browsentic:chrome
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/base.apk
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/split_chrome.apk
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/split_config.en.apk
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/split_dev_ui.apk
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/split_on_demand.apk
+package:/data/app/~~AJeAuDkePtHt3J0QDHOM6Q==/com.android.chrome-0E0i7Tl56_ENSRNcs5ki3g==/split_stack_unwinder.apk
+@@browsentic:version
+    versionName=150.0.7871.186
+    versionName=145.0.7632.218
+@@browsentic:pid
+@@browsentic:socket

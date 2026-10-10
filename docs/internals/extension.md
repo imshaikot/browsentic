@@ -421,6 +421,22 @@ remembers which frames are lit until a few seconds after the cue settles, longer
 tab's throttled timers take to fade it. The host answers after two frames, once the page has
 repainted without it, or at once in a hidden tab. A tab with nothing lit is not messaged at all.
 
+## The phone tab
+
+Driving a phone (see [Android phones](android.md)) adds two unlisted entrypoints and a Port:
+
+| Piece | What it is |
+| --- | --- |
+| `entrypoints/phone/` → `phone.html` | The phone tab: a phone frame the page draws itself, the screencast on a canvas, and a bar with back, forward, reload, the address and the phone's tabs. It holds no state of its own beyond what is on screen |
+| `entrypoints/phone-page.ts` → `phone-page.js` | The page bundle evaluated in an isolated world on the phone: the same action code desktop tabs run, under `__browsenticPhone`, with no extension API in it (`page-api.test.ts` fails the build on any). It is never injected into a desktop page |
+| `browsentic/phone` Port | Between the phone tab and the background (`phone-mirror.ts`): screencast frames and page state down, the user's taps, scrolls, keys and the bar's commands up |
+
+The phone session itself is `browsentic/phone` in `storage.session`, written only through
+`phone.ts`, and the side panel and popup read it with `usePhoneSession`. The panel recognises the
+phone tab by its id, not its URL: without the `tabs` permission an extension page's URL is hidden
+from `tabs.query`. The **Android** toggle is hidden on Firefox, and the Firefox build leaves out
+both entrypoints. No new permission was needed.
+
 ## Tab scoping
 
 A panel conversation is **bound to the tab it started in**.
@@ -447,6 +463,11 @@ elsewhere, and two sessions in two tabs act independently.
 
 Calls with no run behind them (an external MCP client, the local fast path) still target the
 **active tab of the current window**.
+
+A session on the [phone tab](android.md) carries `phone: { serial }` and is anchored on the
+phone's page, never on `phone.html`. Its runs take the phone branch in `invokeForHarness`, before
+`guardTarget` and every other desktop check, because the tab they resolve to is an extension page
+that must never be navigated, reloaded or injected into.
 
 A site-mapping run keeps its own older pin, threading a literal `tabId` and failing with
 `MAPPING_TAB_CHANGED` if that tab goes away.

@@ -42,7 +42,8 @@ None of these keys is required.
     "maxPages": 15,
     "maxScreenshots": 10,
     "timeoutMs": 600000
-  }
+  },
+  "android": { "enabled": true }
 }
 ```
 
@@ -100,6 +101,13 @@ settings page shows but will not change.
 | `downloadTtlDays` | `14` | How long a captured download is kept before the Bridge sweeps it. Fractions are allowed: `0.5` is twelve hours |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live |
 | `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup --unpacked` writes the unpacked extension. `--dir` writes it for you, and `update` reads it back so it refreshes the copy the browser actually loaded. If you change it by hand, load the new folder in the browser again, because the extension ID follows the path |
+
+## Android
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `android.enabled` | `true` | `false` stops the Bridge using adb at all: it never looks for phones, and the side panel shows no Android switch. See [Android phone](features/android.md) |
+| `android.adb` | found | Absolute path to the adb to use. Without it the Bridge looks on `PATH`, under `ANDROID_HOME` and `ANDROID_SDK_ROOT`, in Android Studio's SDK, where Homebrew puts it, and on Windows where winget, Scoop and Chocolatey put it and in `Downloads`. Name one when you have several, since two adb versions stop each other's server. On Windows write the path with forward slashes, `"C:/platform-tools/adb.exe"`: a single backslash is not valid JSON, and the Bridge then ignores the whole file |
 
 ## Site mapping
 
