@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['cli.ts', 'daemon-main.ts'],
+  entry: ['cli.ts', 'daemon-main.ts', 'mcp.ts'],
   format: ['esm'],
   target: 'node20',
   platform: 'node',

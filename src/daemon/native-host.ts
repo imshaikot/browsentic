@@ -12,7 +12,7 @@ import { FIREFOX_ADDON_ID, STORE_EXTENSION_IDS } from '@/lib/stores';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, posix } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 import { listSessions } from './auth-store';
 import { readAgentConfig } from './agent/config';
 import { stateDir } from './lockfile';
@@ -54,15 +54,26 @@ const LINUX_BROWSERS: [string, Family, string, string][] = [
   ['Firefox', 'firefox', '.mozilla', '.mozilla/native-messaging-hosts'],
 ];
 
-const WINDOWS_BROWSERS: [string, Family, string][] = [
-  ['Chrome', 'chromium', 'Google\\Chrome'],
-  ['Chromium', 'chromium', 'Chromium'],
-  ['Edge', 'chromium', 'Microsoft\\Edge'],
-  ['Brave', 'chromium', 'BraveSoftware\\Brave-Browser'],
-  ['Firefox', 'firefox', 'Mozilla'],
+/**
+ * Every Chromium build falls back to Chrome's key, and only Chromium's own reads another first
+ * (launch_context_win.cc), so Brave, Vivaldi and Chrome for Testing are let in through Chrome's.
+ */
+const WINDOWS_BROWSERS: [string, Family, string, 'LOCALAPPDATA' | 'APPDATA', string][] = [
+  ['Chrome', 'chromium', 'Google\\Chrome', 'LOCALAPPDATA', 'Google\\Chrome\\User Data'],
+  ['Chrome for Testing', 'chromium', 'Google\\Chrome', 'LOCALAPPDATA', 'Google\\Chrome for Testing\\User Data'],
+  ['Chromium', 'chromium', 'Chromium', 'LOCALAPPDATA', 'Chromium\\User Data'],
+  ['Edge', 'chromium', 'Microsoft\\Edge', 'LOCALAPPDATA', 'Microsoft\\Edge\\User Data'],
+  ['Brave', 'chromium', 'Google\\Chrome', 'LOCALAPPDATA', 'BraveSoftware\\Brave-Browser\\User Data'],
+  ['Vivaldi', 'chromium', 'Google\\Chrome', 'LOCALAPPDATA', 'Vivaldi\\User Data'],
+  ['Firefox', 'firefox', 'Mozilla', 'APPDATA', 'Mozilla\\Firefox'],
 ];
 
-export function hostTargets(platform: NodeJS.Platform = process.platform, home = homedir()): HostTarget[] {
+/** Written for Brave up to 0.8.1, which never read it; an uninstall still takes it away. */
+const RETIRED_WINDOWS_VENDORS = ['BraveSoftware\\Brave-Browser'];
+
+const windowsKey = (vendor: string) => `HKCU\\Software\\${vendor}\\NativeMessagingHosts\\${NATIVE_HOST_NAME}`;
+
+export function hostTargets(platform: NodeJS.Platform = process.platform, home = homedir(), env = process.env): HostTarget[] {
   if (platform === 'darwin') {
     const support = posix.join(home, 'Library', 'Application Support');
     return MAC_BROWSERS.map(([browser, family, dir]) => ({
@@ -73,11 +84,15 @@ export function hostTargets(platform: NodeJS.Platform = process.platform, home =
     }));
   }
   if (platform === 'win32') {
-    return WINDOWS_BROWSERS.map(([browser, family, vendor]) => ({
+    const roots = {
+      LOCALAPPDATA: env.LOCALAPPDATA ?? win32.join(home, 'AppData', 'Local'),
+      APPDATA: env.APPDATA ?? win32.join(home, 'AppData', 'Roaming'),
+    };
+    return WINDOWS_BROWSERS.map(([browser, family, vendor, root, profile]) => ({
       browser,
       family,
-      home: '',
-      registryKey: `HKCU\\Software\\${vendor}\\NativeMessagingHosts\\${NATIVE_HOST_NAME}`,
+      home: win32.join(roots[root], profile),
+      registryKey: windowsKey(vendor),
     }));
   }
   return LINUX_BROWSERS.map(([browser, family, dir, manifests]) => ({
@@ -132,8 +147,10 @@ export function launcherScript(options: {
 }): string {
   const { platform, cliPath, nodePath, pathEnv } = options;
   if (platform === 'win32') {
+    // cmd.exe reads each line in the console's code page, which mangles a UTF-8 path like C:\Users\José.
     return [
       '@echo off',
+      'chcp 65001 >nul',
       `set "PATH=${pathEnv}"`,
       `if exist "${cliPath}" (`,
       `  "${nodePath}" "${cliPath}" native-host %*`,
@@ -165,19 +182,64 @@ export interface HostInstall {
   browsers: string[];
 }
 
-function register(targets: HostTarget[], launcher: string, origins: readonly string[]): string[] {
+/** The keys Windows browsers read. A test hands in its own. */
+export interface Registry {
+  set(key: string, value: string): void;
+  has(key: string): boolean;
+  /** Throws when the key is not there. */
+  remove(key: string): void;
+}
+
+// The daemon re-registers on every pairing, and it has no console: each reg.exe would get a window of its own.
+const reg = (args: string[]) => execFileSync('reg', args, { stdio: 'ignore', windowsHide: true });
+
+export const windowsRegistry: Registry = {
+  set: (key, value) => reg(['add', key, '/ve', '/t', 'REG_SZ', '/d', value, '/f']),
+  has: (key) => {
+    try {
+      reg(['query', key, '/ve']);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  remove: (key) => reg(['delete', key, '/f']),
+};
+
+export interface HostOptions {
+  platform?: NodeJS.Platform;
+  home?: string;
+  env?: NodeJS.ProcessEnv;
+  /** Whether a browser's profile is there. */
+  exists?: (path: string) => boolean;
+  registry?: Registry;
+}
+
+const machine = ({
+  platform = process.platform,
+  home = homedir(),
+  env = process.env,
+  exists = existsSync,
+  registry = windowsRegistry,
+}: HostOptions) => ({ platform, targets: hostTargets(platform, home, env), exists, registry });
+
+function register(launcher: string, options: HostOptions): string[] {
+  const { platform, targets, exists, registry } = machine(options);
+  const origins = allowedOrigins(platform);
   const registered: string[] = [];
-  for (const target of targets) {
+  const written = new Set<string>();
+  for (const target of targets.filter((candidate) => exists(candidate.home))) {
     const manifest = `${JSON.stringify(hostManifest(target.family, launcher, origins), null, 2)}\n`;
     try {
-      if (target.registryKey) {
+      if (target.registryKey && !written.has(target.registryKey)) {
         const file = join(nativeHostDir, `${target.family}.json`);
         writeFileSync(file, manifest);
-        execFileSync('reg', ['add', target.registryKey, '/ve', '/t', 'REG_SZ', '/d', file, '/f'], { stdio: 'ignore' });
-      } else if (target.manifestDir && existsSync(target.home)) {
+        registry.set(target.registryKey, file);
+        written.add(target.registryKey);
+      } else if (target.manifestDir) {
         mkdirSync(target.manifestDir, { recursive: true });
         writeFileSync(join(target.manifestDir, `${NATIVE_HOST_NAME}.json`), manifest);
-      } else continue;
+      }
       registered.push(target.browser);
     } catch (error) {
       log(`native host: could not register for ${target.browser}: ${String(error)}`);
@@ -186,37 +248,40 @@ function register(targets: HostTarget[], launcher: string, origins: readonly str
   return registered;
 }
 
-export function installNativeHost(cliPath: string, platform: NodeJS.Platform = process.platform): HostInstall {
+export function installNativeHost(cliPath: string, options: HostOptions = {}): HostInstall {
+  const { platform = process.platform } = options;
   const launcher = launcherPath(platform);
   mkdirSync(nativeHostDir, { recursive: true, mode: 0o700 });
   writeFileSync(launcher, launcherScript({ platform, cliPath, nodePath: process.execPath, pathEnv: process.env.PATH ?? '' }));
   if (platform !== 'win32') chmodSync(launcher, 0o755);
-  return { launcher, browsers: register(hostTargets(platform), launcher, allowedOrigins(platform)) };
+  return { launcher, browsers: register(launcher, options) };
 }
 
 /** A newly paired browser has to be let in; the launcher stays as setup wrote it. */
-export function refreshNativeHost(platform: NodeJS.Platform = process.platform): void {
-  const launcher = launcherPath(platform);
+export function refreshNativeHost(options: HostOptions = {}): void {
+  const launcher = launcherPath(options.platform);
   if (!existsSync(launcher)) return;
-  register(hostTargets(platform), launcher, allowedOrigins(platform));
+  register(launcher, options);
 }
 
-export function removeNativeHost(platform: NodeJS.Platform = process.platform): string[] {
+export function removeNativeHost(options: HostOptions = {}): string[] {
+  const { platform, targets, registry } = machine(options);
   const removed: string[] = [];
-  for (const target of hostTargets(platform)) {
-    try {
-      if (target.registryKey) {
-        execFileSync('reg', ['delete', target.registryKey, '/f'], { stdio: 'ignore' });
-        removed.push(target.registryKey);
+  if (platform === 'win32') {
+    for (const key of new Set([...targets.map((target) => target.registryKey!), ...RETIRED_WINDOWS_VENDORS.map(windowsKey)])) {
+      try {
+        registry.remove(key);
+        removed.push(key);
+      } catch {
         continue;
       }
-      const manifest = join(target.manifestDir!, `${NATIVE_HOST_NAME}.json`);
-      if (!existsSync(manifest)) continue;
-      rmSync(manifest, { force: true });
-      removed.push(manifest);
-    } catch {
-      continue;
     }
+  }
+  for (const target of targets.filter((candidate) => candidate.manifestDir)) {
+    const manifest = join(target.manifestDir!, `${NATIVE_HOST_NAME}.json`);
+    if (!existsSync(manifest)) continue;
+    rmSync(manifest, { force: true });
+    removed.push(manifest);
   }
   if (existsSync(nativeHostDir)) {
     rmSync(nativeHostDir, { recursive: true, force: true });
@@ -225,13 +290,19 @@ export function removeNativeHost(platform: NodeJS.Platform = process.platform): 
   return removed;
 }
 
-export function registeredBrowsers(platform: NodeJS.Platform = process.platform): string[] {
+/** The installed browsers that can start the daemon, read back from where each one looks. */
+export function registeredBrowsers(options: HostOptions = {}): string[] {
+  const { platform, targets, exists, registry } = machine(options);
   if (!existsSync(launcherPath(platform))) return [];
-  return hostTargets(platform)
+  const keys = new Map<string, boolean>();
+  const hasKey = (key: string) => {
+    if (!keys.has(key)) keys.set(key, registry.has(key));
+    return keys.get(key)!;
+  };
+  return targets
+    .filter((target) => exists(target.home))
     .filter((target) =>
-      target.registryKey
-        ? existsSync(join(nativeHostDir, `${target.family}.json`))
-        : existsSync(join(target.manifestDir!, `${NATIVE_HOST_NAME}.json`)),
+      target.registryKey ? hasKey(target.registryKey) : existsSync(join(target.manifestDir!, `${NATIVE_HOST_NAME}.json`)),
     )
     .map((target) => target.browser);
 }

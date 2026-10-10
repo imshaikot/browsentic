@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, rmSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { readAgentConfig } from './agent/config';
 import { uploadedSkillsDir } from './agent/skills';
 import { downloadDir } from './downloads';
@@ -13,6 +13,8 @@ export interface Removal {
   holds: string;
   /** Paths under `path` to leave behind, relative to it. */
   keep?: string[];
+  /** The entry under `path` holding the Node this command runs on, which Windows will not delete while it runs. */
+  inUse?: string;
 }
 
 export interface UninstallPlan {
@@ -27,12 +29,24 @@ function contains(root: string, path: string): boolean {
   return !inside.startsWith('..') && !isAbsolute(inside);
 }
 
+function entryHolding(root: string, path: string): string | undefined {
+  const inside = relative(root, path);
+  return inside && contains(root, path) ? inside.split(sep)[0] : undefined;
+}
+
+/** An antivirus scan on Windows holds a file it has just seen for a moment, so a delete is tried again. */
+const RETRY = { maxRetries: 3, retryDelay: 200 };
+
 /**
  * What removing Browsentic means on this machine, resolved rather than assumed: an install can
  * have been pointed elsewhere with `setup --dir`, and skills, screenshots and downloads each
  * take a config override.
  */
-export function planUninstall(options: { keepSkills?: boolean } = {}): UninstallPlan {
+export function planUninstall(
+  options: { keepSkills?: boolean; platform?: NodeJS.Platform; runningOn?: string } = {},
+): UninstallPlan {
+  const { platform = process.platform, runningOn = process.execPath } = options;
+  const inUse = (root: string) => (platform === 'win32' ? entryHolding(root, runningOn) : undefined);
   const config = readAgentConfig();
   const extension = extensionDir(config.extensionDir);
   const roots = [stateDir, userDir];
@@ -46,12 +60,14 @@ export function planUninstall(options: { keepSkills?: boolean } = {}): Uninstall
     path: stateDir,
     holds: 'pairing keys, config, approvals, logs',
     keep: options.keepSkills ? ['skills'] : undefined,
+    inUse: inUse(stateDir),
   });
   removals.push({
     label: 'files',
     path: userDir,
     holds: 'the extension, skills, site maps, screenshots, captured downloads',
     keep: options.keepSkills ? ['skills'] : undefined,
+    inUse: inUse(userDir),
   });
 
   const elsewhere: Removal[] = [];
@@ -80,8 +96,9 @@ export interface RemovalOutcome {
 export function removeAll(removals: Removal[]): RemovalOutcome[] {
   return removals.map((removal) => {
     try {
-      const kept = removal.keep?.length ? keepingSome(removal.path, removal.keep) : [];
-      if (!kept.length) rmSync(removal.path, { recursive: true, force: true });
+      const { kept, refused } = emptying(removal.path, [...(removal.keep ?? []), ...(removal.inUse ? [removal.inUse] : [])]);
+      if (refused.length) return { removal, removed: false, kept, error: refused.join('; ') };
+      if (!kept.length) rmSync(removal.path, { recursive: true, force: true, ...RETRY });
       return { removal, removed: true, kept };
     } catch (error) {
       return { removal, removed: false, kept: [], error: (error as Error).message };
@@ -89,14 +106,25 @@ export function removeAll(removals: Removal[]): RemovalOutcome[] {
   });
 }
 
-/** Empties `dir` apart from `keep`, and reports what survived — nothing means delete the lot. */
-function keepingSome(dir: string, keep: string[]): string[] {
+/**
+ * Empties `dir` apart from `spare`, and reports what survived. One entry that will not go, such as
+ * a program Windows has open, leaves the rest to be deleted anyway: the pairing keys among them.
+ */
+function emptying(dir: string, spare: string[]): { kept: string[]; refused: string[] } {
   const kept: string[] = [];
+  const refused: string[] = [];
   for (const entry of readdirSync(dir)) {
-    if (keep.includes(entry)) kept.push(entry);
-    else rmSync(join(dir, entry), { recursive: true, force: true });
+    if (spare.includes(entry)) {
+      kept.push(entry);
+      continue;
+    }
+    try {
+      rmSync(join(dir, entry), { recursive: true, force: true, ...RETRY });
+    } catch (error) {
+      refused.push((error as Error).message);
+    }
   }
-  return kept;
+  return { kept, refused };
 }
 
 export interface CachePurge {
@@ -116,7 +144,7 @@ export interface CachePurge {
 export function purgeNpxCache(entries: NpxEntry[]): CachePurge[] {
   return entries.map((entry) => {
     try {
-      rmSync(entry.dir, { recursive: true, force: true });
+      rmSync(entry.dir, { recursive: true, force: true, ...RETRY });
       return { entry, removed: true };
     } catch (error) {
       return { entry, removed: false, error: (error as Error).message };

@@ -26,7 +26,8 @@ let selfUpdate: typeof import('./self-update');
 /** Stand-ins for npm, npx and browsentic that note how they were run, then exit with FAKE_<NAME>_EXIT. */
 const bin = join(stateDir, 'fake-bin');
 const ran = join(stateDir, 'ran.log');
-const commandsRun = () => (existsSync(ran) ? readFileSync(ran, 'utf8').split('\n').filter(Boolean) : []);
+const argvsRun = (): string[][] => (existsSync(ran) ? readFileSync(ran, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line)) : []);
+const commandsRun = () => argvsRun().map((argv) => argv.join(' '));
 
 beforeAll(async () => {
   await new Promise<void>((resolve) => registry.listen(0, '127.0.0.1', resolve));
@@ -38,7 +39,7 @@ beforeAll(async () => {
   for (const name of ['npm', 'npx', 'browsentic']) {
     stubCli(
       join(bin, name),
-      `require('node:fs').appendFileSync(${JSON.stringify(ran)}, [${JSON.stringify(name)}, ...process.argv.slice(2)].join(' ') + '\\n');
+      `require('node:fs').appendFileSync(${JSON.stringify(ran)}, JSON.stringify([${JSON.stringify(name)}, ...process.argv.slice(2)]) + '\\n');
 process.exit(Number(process.env.FAKE_${name.toUpperCase()}_EXIT || 0));`,
     );
   }
@@ -160,6 +161,14 @@ describe('updating the command itself', () => {
     expect([await selfUpdate.upgradeCli('0.6.2', ['update']), commandsRun()]).toEqual([
       3,
       ['npm install -g browsentic@0.7.0', 'browsentic update --no-self-update'],
+    ]);
+  });
+
+  test('an argument with a space, an ampersand or a trailing backslash reaches the new command whole', async () => {
+    const dir = 'C:\\Users\\R&D Lab\\my ext\\';
+    expect([await selfUpdate.upgradeCli('0.6.2', ['setup', '--dir', dir]), argvsRun().at(-1)]).toEqual([
+      0,
+      ['browsentic', 'setup', '--dir', dir, '--no-self-update'],
     ]);
   });
 

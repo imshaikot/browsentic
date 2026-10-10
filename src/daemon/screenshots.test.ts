@@ -4,6 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { configPath } from './agent/config';
 import { uploadedSkillsDir } from './agent/skills';
+import { expandHome } from './paths';
 import { saveScreenshot, screenshotDir } from './screenshots';
 import { bits, modeOf } from './test/modes';
 
@@ -77,6 +78,13 @@ describe('where screenshots go', () => {
       return screenshotDir();
     });
     expect(dirs).toEqual([join(homedir(), 'Pictures', 'Browsentic'), join(homedir(), 'Pictures', 'Browsentic'), '/Volumes/Shots', homedir()]);
+  });
+
+  test('on Windows a folder may start with ~\\ as well', () => {
+    expect([expandHome('~\\Pictures', 'win32'), expandHome('~\\Pictures', 'darwin')]).toEqual([
+      join(homedir(), 'Pictures'),
+      join(homedir(), '~\\Pictures'),
+    ]);
   });
 
   test('a blank setting is the default', () => {

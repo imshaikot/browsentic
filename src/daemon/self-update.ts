@@ -88,8 +88,16 @@ export async function upgradeCli(current: string, forward: string[]): Promise<nu
   return run('browsentic', rerun);
 }
 
+/**
+ * One argument as cmd.exe hands it on whole, so `--dir "C:\Users\Jo Doe\ext\"` is not split at its
+ * space: quoted, with the backslashes before the closing quote doubled for the program reading it.
+ */
+const forCmd = (arg: string) => (/^[\w@.:/\\=+-]+$/.test(arg) ? arg : `"${arg.replace(/(\\*)$/, '$1$1')}"`);
+
+/** npm, npx and an npm-installed browsentic are batch files on Windows, which only cmd.exe starts. */
 function run(command: string, args: string[]): number {
-  const result = spawnSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  const windows = process.platform === 'win32';
+  const result = spawnSync(command, windows ? args.map(forCmd) : args, { stdio: 'inherit', shell: windows });
   if (result.error) {
     console.error(`\n  Could not run \`${command}\`: ${result.error.message}\n`);
     return 1;

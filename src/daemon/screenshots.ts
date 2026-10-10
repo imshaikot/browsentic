@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join, resolve, sep } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import { readAgentConfig } from './agent/config';
 import { uploadedSkillsDir } from './agent/skills';
+import { expandHome } from './paths';
 
 export function saveScreenshot(dataUrl: string, opts: { filename?: string; dir?: string } = {}): string {
   const { mime, bytes } = parseDataUrl(dataUrl);
@@ -31,12 +32,6 @@ export function screenshotDir(): string {
   const configured = readAgentConfig().screenshotDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
   return join(homedir(), 'browsentic', 'screenshot');
-}
-
-function expandHome(p: string): string {
-  if (p === '~') return homedir();
-  if (p.startsWith('~/')) return join(homedir(), p.slice(2));
-  return isAbsolute(p) ? p : join(homedir(), p);
 }
 
 function parseDataUrl(dataUrl: string): { mime: string; bytes: Buffer } {
