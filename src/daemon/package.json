@@ -31,7 +31,7 @@
   },
   "bin": {
     "browsentic": "dist/cli.js",
-    "browsentic-mcp": "dist/cli.js",
+    "browsentic-mcp": "dist/mcp.js",
     "browsentic-mcpd": "dist/daemon-main.js"
   },
   "files": [

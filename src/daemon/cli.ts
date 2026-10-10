@@ -7,7 +7,7 @@ import { SOURCE_LABEL } from '@/lib/stores';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { formatWhen } from '@/lib/format-when';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { agentSkills } from './agent/agent-skills';
 import {
@@ -106,12 +106,8 @@ const FOLDER_PICKER: Partial<Record<NodeJS.Platform, string>> = {
   linux: 'In the folder picker press Ctrl+L and paste that path.',
 };
 
-// `browsentic mcp` is the MCP server. The legacy `browsentic-mcp` bin keeps serving on bare
-// invocation, because an MCP client config is literally {"command": "browsentic-mcp"} with no
-// arguments, and those must keep working. The extension strip matters on Windows, where npm
-// writes browsentic-mcp.cmd.
-const invokedAs = basename(process.argv[1] ?? '').replace(/\.(?:js|cjs|mjs|exe|cmd|ps1)$/i, '');
-const servesBare = invokedAs === 'browsentic-mcp' || !!process.env.BROWSENTIC_AGENT_RUN;
+// `browsentic mcp` is the MCP server; `browsentic-mcp` with no arguments reaches it through mcp.ts.
+const servesBare = !!process.env.BROWSENTIC_AGENT_RUN;
 
 const [command] = process.argv.slice(2);
 const wantsJson = process.argv.includes('--json');
