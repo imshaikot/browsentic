@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RunContext } from '@/lib/actions/protocol';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/lib/skills/format';
 import { stateDir } from '../lockfile';
 import { log } from '../log';
+import { expandHome } from '../paths';
 import { readAgentConfig } from './config';
 
 export type SkillSource = 'bundled' | 'user' | 'uploaded';
@@ -36,12 +37,6 @@ export function uploadedSkillsDir(): string {
   const configured = readAgentConfig().skillsDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
   return join(homedir(), 'browsentic', 'skills');
-}
-
-function expandHome(p: string): string {
-  if (p === '~') return homedir();
-  if (p.startsWith('~/')) return join(homedir(), p.slice(2));
-  return isAbsolute(p) ? p : join(homedir(), p);
 }
 
 function skillDirs(): { dir: string; source: SkillSource }[] {

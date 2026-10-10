@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, isAbsolute, join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
   DOWNLOAD_TTL_DAYS,
   MAX_ATTACH_BYTES,
@@ -25,6 +25,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { hostAllowed } from './guardrails';
 import { readAgentConfig } from './agent/config';
 import { stateDir } from './lockfile';
+import { expandHome } from './paths';
 import { log } from './log';
 
 /**
@@ -66,12 +67,6 @@ export function downloadDir(): string {
   const configured = readAgentConfig().downloadDir;
   if (typeof configured === 'string' && configured.trim()) return expandHome(configured.trim());
   return join(homedir(), 'browsentic', 'download');
-}
-
-function expandHome(p: string): string {
-  if (p === '~') return homedir();
-  if (p.startsWith('~/')) return join(homedir(), p.slice(2));
-  return isAbsolute(p) ? p : join(homedir(), p);
 }
 
 function readIndex(): DownloadRecord[] {

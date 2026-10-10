@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -14,6 +14,16 @@ export const stateDir = process.env.BROWSENTIC_HOME ?? join(homedir(), '.browsen
  * are meant to open, read and edit. Deliberately NOT relocatable by BROWSENTIC_HOME.
  */
 export const userDir = join(homedir(), 'browsentic');
+
+/**
+ * A folder named in config.json. `~` is the home folder, and so is the start of `~/…`, or of `~\…` on
+ * Windows, where that is how a path is written; a relative path starts there too.
+ */
+export function expandHome(path: string, platform: NodeJS.Platform = process.platform): string {
+  if (path === '~') return homedir();
+  if (path.startsWith('~/') || (platform === 'win32' && path.startsWith('~\\'))) return join(homedir(), path.slice(2));
+  return isAbsolute(path) ? path : join(homedir(), path);
+}
 
 /**
  * Where `browsentic setup` installs the extension for the browser to load.
