@@ -715,7 +715,7 @@ __metadata:
     zod: "npm:^4.4.3"
   bin:
     browsentic: dist/cli.js
-    browsentic-mcp: dist/cli.js
+    browsentic-mcp: dist/mcp.js
     browsentic-mcpd: dist/daemon-main.js
   languageName: unknown
   linkType: soft
