@@ -94,8 +94,10 @@ end to end yet, so the popup, the docs and the release notes mark them *beta*. I
 
 ## Windows is experimental
 
-The Bridge runs on Windows, and its tests run there on every change. On a Windows 11 desktop it has
-been set up, paired and driven from the side panel by Claude Code. A cancelled run, the other agents
+The Bridge runs on Windows, and its tests run there on every change. So does every `browsentic`
+command, as npm installs it and under a home folder whose name is not ASCII, along with the wake-up
+the browser starts and an MCP client built on the official SDK starting `browsentic mcp`. On a
+Windows 11 desktop it has been set up, paired and driven from the side panel by Claude Code. A cancelled run, the other agents
 and the [Windows app](windows-app.md) have not been through that test yet. Until they have:
 
 - **An agent installed with npm is started through the program its `.cmd` names**, never through

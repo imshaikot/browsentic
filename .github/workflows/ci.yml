@@ -46,9 +46,15 @@ jobs:
           node "$YARN" build
           node "$YARN" daemon:build
 
-  # The daemon on Windows, where an npm-installed agent is a .cmd shim, a path has backslashes, a
-  # kill takes nothing with it and a file has no POSIX mode. The extension's tests do not reach
-  # the platform, so only the daemon project runs here.
+      # The same commands the windows job runs, so one that behaves differently there fails there.
+      - name: Run every command from the packed tarball
+        run: |
+          tarball="$(cd src/daemon && npm pack --silent | tail -1)"
+          node src/daemon/scripts/cli-smoke.ts "src/daemon/$tarball"
+
+  # The daemon and the CLI on Windows, where an npm-installed agent is a .cmd shim, a path has
+  # backslashes, a kill takes nothing with it and a file has no POSIX mode. The extension's tests do
+  # not reach the platform, so only the daemon project runs here.
   windows:
     runs-on: windows-latest
     defaults:
@@ -81,6 +87,15 @@ jobs:
 
       - name: Test the daemon
         run: node "$YARN" vitest run --project daemon
+
+      # What a person types, from what npm installs: a .cmd shim, a wake-up launcher cmd.exe reads in
+      # its own code page, the registry key Chrome finds that launcher by, and an MCP client starting
+      # a .cmd, all under a home folder whose name is not ASCII.
+      - name: Run every command from the packed tarball
+        run: |
+          node "$YARN" build
+          tarball="$(cd src/daemon && npm pack --silent | tail -1)"
+          node src/daemon/scripts/cli-smoke.ts "src/daemon/$tarball"
 
   mac:
     runs-on: macos-15
