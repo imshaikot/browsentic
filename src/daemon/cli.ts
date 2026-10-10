@@ -729,6 +729,7 @@ async function uninstall(argv: string[]): Promise<void> {
   for (const removal of plan.removals) {
     console.log(`    ${removal.label.padEnd(11)} ${removal.path}`);
     console.log(`                ${removal.holds}${removal.keep ? ' — keeping skills/' : ''}`);
+    if (removal.inUse) console.log(`                keeping ${removal.inUse}/, which holds the Node this runs on`);
   }
   for (const entry of plan.npx) {
     const running = entry.running ? ', the copy running right now' : '';
@@ -794,7 +795,7 @@ async function uninstall(argv: string[]): Promise<void> {
 
   for (const outcome of removeAll(plan.removals)) {
     if (!outcome.removed) console.log(`  ✗ ${outcome.removal.path} — ${outcome.error}`);
-    else if (outcome.kept.length) console.log(`  ✓ Emptied    ${outcome.removal.path} — kept ${outcome.kept.join(', ')}/`);
+    else if (outcome.kept.length) console.log(`  ✓ Emptied    ${outcome.removal.path} — kept ${outcome.kept.map((entry) => `${entry}/`).join(', ')}`);
     else console.log(`  ✓ Removed    ${outcome.removal.path}`);
   }
 
