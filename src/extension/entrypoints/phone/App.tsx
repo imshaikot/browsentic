@@ -160,7 +160,7 @@ function PhoneFrame({
             ref={mirror.canvas}
             tabIndex={0}
             aria-label="The phone's screen"
-            className={cn('block h-full w-full touch-none outline-none', (!mirror.image || overlay) && 'opacity-30')}
+            className={cn('block h-full w-full touch-none outline-none', mirror.picking && 'cursor-crosshair', (!mirror.image || overlay) && 'opacity-30')}
           />
           {overlay && <div className="absolute inset-0 flex items-center justify-center p-6">{overlay}</div>}
           {tabsOpen && session && <TabList session={session} mirror={mirror} onClose={() => setTabsOpen(false)} />}

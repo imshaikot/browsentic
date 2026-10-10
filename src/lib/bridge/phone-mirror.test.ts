@@ -157,4 +157,45 @@ describe('the mirror in the background', () => {
     await settle();
     expect(socket.sent.at(-1)).toEqual({ method: 'Page.navigateToHistoryEntry', params: { entryId: 1 }, sessionId: `session-${FRONT}` });
   });
+
+  test('while A-Eye waits, the page is told, its pointer steers the lens with aims collapsed, and the phone is never touched', async () => {
+    const { steerLensFromMirror } = await import('./phone-mirror');
+    const page = connectPage();
+    page.say({ op: 'watch' });
+    await settle();
+    socket.sent.length = 0;
+    const steered: unknown[] = [];
+    const release = steerLensFromMirror(FRONT, async (command) => void steered.push(command));
+    expect(page.received.at(-1)).toEqual({ kind: 'lens', active: true });
+    expect(connectPage().received).toContainEqual({ kind: 'lens', active: true });
+
+    for (let step = 1; step <= 4; step++) page.say({ op: 'lens', lens: { op: 'aim', x: step, y: step } });
+    page.say({ op: 'lens', lens: { op: 'pick', x: 4, y: 4 } });
+    await settle();
+    expect(steered).toEqual([
+      { op: 'aim', x: 1, y: 1 },
+      { op: 'aim', x: 4, y: 4 },
+      { op: 'pick', x: 4, y: 4 },
+    ]);
+    expect(methods().filter((method) => method.startsWith('Input.'))).toEqual([]);
+
+    release();
+    expect(page.received.at(-1)).toEqual({ kind: 'lens', active: false });
+    page.say({ op: 'lens', lens: { op: 'pick', x: 4, y: 4 } });
+    await settle();
+    expect(steered).toHaveLength(3);
+  });
+
+  test('a lens left on a tab the mirror moved away from is only ever cancelled', async () => {
+    const { steerLensFromMirror } = await import('./phone-mirror');
+    const page = connectPage();
+    page.say({ op: 'watch' });
+    await settle();
+    const steered: unknown[] = [];
+    steerLensFromMirror(BACK, async (command) => void steered.push(command));
+    page.say({ op: 'lens', lens: { op: 'pick', x: 4, y: 4 } });
+    page.say({ op: 'lens', lens: { op: 'cancel' } });
+    await settle();
+    expect(steered).toEqual([{ op: 'cancel' }]);
+  });
 });

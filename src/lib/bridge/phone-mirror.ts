@@ -1,4 +1,5 @@
 import { browser, type Browser } from 'wxt/browser';
+import type { LensCommand } from '@/lib/actions/page/lens';
 import { PHONE_PORT, keyEvents, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
 import type { PhoneTarget } from '@/lib/phone/types';
 import { numbered, onPhoneReset, readPhone, updatePhone, type PhoneSession } from './phone';
@@ -7,7 +8,7 @@ import { onCdpEvent, onDaemonClosed, onPhoneClosed, sendCdp, type CdpEvent } fro
 import { hostOf, patchSession, sessionForTab } from './tab-sessions';
 
 type Port = Browser.runtime.Port;
-type InputCommand = Extract<MirrorCommand, { op: 'touch' | 'wheel' | 'text' | 'key' }>;
+type InputCommand = Extract<MirrorCommand, { op: 'touch' | 'wheel' | 'text' | 'key' | 'lens' }>;
 
 /** Discovery also reports a phantom `"1"` beside a restored tab, and every command sent to it hangs (spike Q3). */
 const REAL_TARGET = /^[0-9A-F]{32}$/i;
@@ -30,6 +31,7 @@ let finding: Promise<void> | null = null;
 const inputs: InputCommand[] = [];
 let pumping = false;
 const attachments = new Map<string, Promise<string | null>>();
+let lens: { targetId: string; steer(command: LensCommand): Promise<void> } | null = null;
 
 const broadcast = (message: MirrorMessage) => {
   for (const port of ports) port.postMessage(message);
@@ -219,9 +221,24 @@ function onEvent(event: CdpEvent): void {
   if (event.method === 'Page.navigatedWithinDocument') void publishPage();
 }
 
+/** While an A-Eye pick waits on the phone, the mirror's pointer aims and picks with its lens instead of touching the page. */
+export function steerLensFromMirror(targetId: string, steer: (command: LensCommand) => Promise<void>): () => void {
+  const held = { targetId, steer };
+  lens = held;
+  broadcast({ kind: 'lens', active: true });
+  return () => {
+    if (lens !== held) return;
+    lens = null;
+    broadcast({ kind: 'lens', active: false });
+  };
+}
+
+const isAim = (command: InputCommand | undefined) => command?.op === 'lens' && command.lens.op === 'aim';
+
 function queueInput(command: InputCommand): void {
   const last = inputs.at(-1);
   if (last?.op === 'touch' && command.op === 'touch' && last.type === 'touchMove' && command.type === 'touchMove') inputs[inputs.length - 1] = command;
+  else if (isAim(last) && isAim(command)) inputs[inputs.length - 1] = command;
   else if (last?.op === 'wheel' && command.op === 'wheel') {
     inputs[inputs.length - 1] = { ...command, deltaX: last.deltaX + command.deltaX, deltaY: last.deltaY + command.deltaY };
   } else inputs.push(command);
@@ -239,7 +256,10 @@ async function pump(): Promise<void> {
 }
 
 async function dispatchInput(command: InputCommand): Promise<void> {
-  if (command.op === 'touch') {
+  if (command.op === 'lens') {
+    const held = lens;
+    if (held && (command.lens.op === 'cancel' || held.targetId === followed?.targetId)) await held.steer(command.lens);
+  } else if (command.op === 'touch') {
     const lifted = command.type === 'touchEnd' || command.type === 'touchCancel';
     await call('Input.dispatchTouchEvent', { type: command.type, touchPoints: lifted ? [] : [{ x: command.x, y: command.y }] });
   } else if (command.op === 'wheel') {
@@ -291,6 +311,7 @@ async function handle(port: Port, command: MirrorCommand): Promise<void> {
     case 'wheel':
     case 'text':
     case 'key':
+    case 'lens':
       return queueInput(command);
     case 'go': {
       const refused = await refusalFor(command.url);
@@ -340,6 +361,7 @@ export function servePhoneMirror(): void {
     if (port.name !== PHONE_PORT) return;
     ports.add(port);
     if (page) port.postMessage({ kind: 'page', ...page });
+    if (lens) port.postMessage({ kind: 'lens', active: true });
     port.onMessage.addListener((message) => void handle(port, message as MirrorCommand));
     port.onDisconnect.addListener(() => {
       ports.delete(port);

@@ -82,10 +82,13 @@ phone's tabs, and timers. The differences:
 [Blocked sites](blocked-sites.md) are checked against the phone's own address, and
 [approvals](../approvals.md) work as they do on a desktop tab.
 
-**[A-Eye](a-eye.md)** works on the phone tab too. Press its button in the side panel, and when the
-lens shows on the phone, click the element on the phone tab's picture: that tap picks it rather
-than pressing it, and the pick carries a photograph of the element from the phone. When the agent
-asks you to point at something, it works the same way.
+**[A-Eye](a-eye.md)** works on the phone tab too. Press its button in the side panel and the phone
+tab's picture becomes the lens: the element under your pointer is outlined on the phone, and a click
+picks it without pressing it, so a link is not followed and a field does not open the phone's
+keyboard. Disabled buttons can be picked as well. Dragging still scrolls the page, `↑` widens the
+outline to the element around it, and `Esc` cancels. A tap on the phone itself picks too. The pick
+carries a photograph of the element from the phone. When the agent asks you to point at something,
+it works the same way.
 
 **Live tools** work there as well. With the Live tool switch on, the agent can write code for the
 phone's page; you approve it before it runs, as on a desktop tab. You can keep the result as a

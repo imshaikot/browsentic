@@ -1,3 +1,5 @@
+import type { LensCommand } from '@/lib/actions/page/lens';
+
 export const PHONE_PORT = 'browsentic/phone';
 
 /** `Page.screencastFrame`'s metadata: the phone's visual viewport when the frame was taken. */
@@ -26,6 +28,8 @@ export type MirrorCommand =
   | { op: 'wheel'; x: number; y: number; deltaX: number; deltaY: number }
   | { op: 'text'; text: string }
   | { op: 'key'; key: MirrorKey }
+  /** While A-Eye waits on the phone; points are where a touch would land. */
+  | { op: 'lens'; lens: LensCommand }
   | { op: 'go'; url: string }
   | { op: 'back' }
   | { op: 'forward' }
@@ -45,6 +49,7 @@ export interface PageState {
 export type MirrorMessage =
   | { kind: 'frame'; data: string; metadata: FrameMetadata; frame: number }
   | ({ kind: 'page' } & PageState)
+  | { kind: 'lens'; active: boolean }
   | { kind: 'error'; message: string };
 
 /**

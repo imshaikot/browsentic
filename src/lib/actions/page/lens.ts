@@ -2,6 +2,9 @@ import { isOverlay } from '@/lib/overlay';
 
 export type LensOutcome = { picked: Element } | { cancelled: true } | { timedOut: true };
 
+/** A lens driven from outside the page, points in this document's client coordinates. */
+export type LensCommand = { op: 'aim'; x: number; y: number } | { op: 'pick'; x: number; y: number } | { op: 'wider' } | { op: 'cancel' };
+
 const HOST_ID = 'browsentic-a-eye';
 const CURSOR_ID = 'browsentic-a-eye-cursor';
 
@@ -21,13 +24,14 @@ const CURSOR = `url("data:image/svg+xml,${encodeURIComponent(cursorSvg())}") 14 
 const DEFAULT_HINT = 'Click the element you mean';
 
 let dismissCurrent: (() => void) | null = null;
+let steerCurrent: ((command: LensCommand) => void) | null = null;
 
 /**
  * The page is handed to the user for one click, and the page must not be able to tell the
- * difference between that click and nothing at all. The press sequence is only muted —
- * propagation stopped, default left alone — because preventing `pointerdown` would stop
- * the browser generating the `click` this waits on. `click` itself is the one that is
- * fully cancelled, so picking a link never also follows it.
+ * difference between that click and nothing at all. The press sequence, touch included, is
+ * only muted — propagation stopped, default left alone — because preventing `pointerdown`
+ * or `touchstart` would stop the browser generating the `click` this waits on. `click`
+ * itself is the one that is fully cancelled, so picking a link never also follows it.
  *
  * Only one lens can hold the page: a new pick dismisses one already waiting, whose caller
  * gets a cancellation. A lens whose caller stopped listening must never wedge the next pick.
@@ -73,10 +77,7 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
 
     const onClick = (event: MouseEvent) => {
       swallow(event);
-      const under = document.elementFromPoint(event.clientX, event.clientY);
-      if (under && isOverlay(under)) return;
-      const target = hovered ?? under;
-      if (target && target !== document.documentElement) settle({ picked: target });
+      choose(document.elementFromPoint(event.clientX, event.clientY));
     };
 
     const onKey = (event: KeyboardEvent) => {
@@ -91,12 +92,31 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
       }
     };
 
+    const steer = (command: LensCommand) => {
+      switch (command.op) {
+        case 'cancel':
+          return settle({ cancelled: true });
+        case 'wider':
+          if (hovered?.parentElement) aim(hovered.parentElement);
+          return;
+        case 'aim':
+          return aim(document.elementFromPoint(command.x, command.y));
+        case 'pick':
+          return choose(document.elementFromPoint(command.x, command.y));
+      }
+    };
+    steerCurrent = steer;
+
     const onReflow = () => hovered && draw(hovered);
 
     const listeners: [string, EventListener, AddEventListenerOptions][] = [
       ['pointermove', onMove as EventListener, { capture: true, passive: true }],
       ['pointerdown', mute, { capture: true }],
       ['pointerup', mute, { capture: true }],
+      ['touchstart', mute, { capture: true, passive: true }],
+      ['touchmove', mute, { capture: true, passive: true }],
+      ['touchend', mute, { capture: true, passive: true }],
+      ['touchcancel', mute, { capture: true, passive: true }],
       ['mousedown', mute, { capture: true }],
       ['mouseup', mute, { capture: true }],
       ['dblclick', swallow, { capture: true }],
@@ -108,6 +128,13 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
       ['resize', onReflow, { passive: true }],
     ];
     for (const [type, listener, options] of listeners) window.addEventListener(type, listener, options);
+
+    /** The aimed element wins only when it holds what was pressed, as after ↑; a tap never aimed there picks what it landed on. */
+    function choose(under: Element | null): void {
+      if (under && isOverlay(under)) return;
+      const target = hovered?.contains(under) ? hovered : under;
+      if (target && target !== document.documentElement) settle({ picked: target });
+    }
 
     function aim(target: Element | null): void {
       if (target && isOverlay(target)) {
@@ -139,9 +166,17 @@ export function pickWithLens({ hint, timeoutMs }: { hint?: string; timeoutMs: nu
       host.remove();
       cursor.remove();
       if (dismissCurrent === dismiss) dismissCurrent = null;
+      if (steerCurrent === steer) steerCurrent = null;
       resolve(outcome);
     }
   });
+}
+
+/** Steers the lens waiting in this document, if one is; the phone's mirror aims and picks this way, sending the page no input at all. */
+export function steerLens(command: LensCommand): boolean {
+  if (!steerCurrent) return false;
+  steerCurrent(command);
+  return true;
 }
 
 function label(target: Element, rect: DOMRect): string {

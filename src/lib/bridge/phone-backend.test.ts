@@ -26,7 +26,7 @@ vi.mock('./socket', () => ({
         phone.goneOnce = false;
         return failure('CDP_ERROR', 'Cannot find context with specified id');
       }
-      return success({ result: { value: phone.answer(String(params?.expression)) } });
+      return success({ result: { value: await phone.answer(String(params?.expression)) } });
     }
     if (method === 'Runtime.evaluate' && String(params?.expression).includes('scrollY')) return success({ result: { value: { scrollX: 0, scrollY: 574 } } });
     return success({});
@@ -36,7 +36,15 @@ vi.mock('./socket', () => ({
   onDaemonClosed: () => undefined,
 }));
 
-vi.mock('./phone-mirror', () => ({ attachedSession: async () => 'session-1' }));
+const mirror = vi.hoisted(() => ({ steer: null as ((command: unknown) => Promise<void>) | null }));
+
+vi.mock('./phone-mirror', () => ({
+  attachedSession: async () => 'session-1',
+  steerLensFromMirror: (_targetId: string, steer: (command: unknown) => Promise<void>) => {
+    mirror.steer = steer;
+    return () => (mirror.steer = null);
+  },
+}));
 
 const { pageSideOnPhone, pickClip, shotClip } = await import('./phone-backend');
 
@@ -151,5 +159,20 @@ describe('A-Eye on the phone', () => {
     expect(picked).toMatchObject({ ok: true, data: { element: { selector: '#buy' }, shot: { dataUrl: 'data:image/jpeg;base64,SHOT' } } });
     expect(String(phone.sent.find(({ params }) => String(params?.expression).includes('page.pickElement'))?.params?.expression)).toContain('"timeoutMs":170000');
     expect(phone.sent.find(({ method }) => method === 'Page.captureScreenshot')?.params?.clip).toEqual({ x: 4, y: 384, width: 232, height: 72, scale: 1 });
+  });
+
+  test('while the pick waits, the mirror steers the lens at the page point under a touch, and lets go once it is answered', async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    phone.answer = () => new Promise((resolve) => (answer = resolve));
+    phone.viewport = { offsetX: 30, offsetY: 50, clientWidth: 205, clientHeight: 337 };
+    const picking = pageSideOnPhone('page.pickElement', {}, SESSION);
+    await vi.waitFor(() => expect(mirror.steer).not.toBeNull());
+    await mirror.steer!({ op: 'aim', x: 100, y: 200 });
+    await mirror.steer!({ op: 'wider' });
+    const steered = phone.sent.filter(({ params }) => String(params?.expression).startsWith('__browsenticPhone.lens')).map(({ params }) => params?.expression);
+    expect(steered).toEqual(['__browsenticPhone.lens({"op":"aim","x":130,"y":250})', '__browsenticPhone.lens({"op":"wider"})']);
+    answer(failure('PICK_CANCELLED', 'dismissed'));
+    await picking;
+    expect(mirror.steer).toBeNull();
   });
 });

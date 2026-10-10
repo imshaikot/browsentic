@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { z } from 'zod';
+import type { LensCommand } from '@/lib/actions/page/lens';
 import { PICK_DEFAULT_TIMEOUT_MS } from '@/lib/actions/page/pick-element';
 import { pressKey } from '@/lib/actions/page/press-key';
 import { scrollTo } from '@/lib/actions/page/scroll-to';
@@ -10,7 +11,7 @@ import { PHONE_API } from '@/lib/phone/page-api';
 import { drag, keyPress, onScreen, tap, typing, wheel, type InputStep, type Point, type Viewport } from '@/lib/phone/touch';
 import type { EvaluateReply, ToolkitPlace } from './code-toolkit';
 import { currentTarget, type PhoneSession } from './phone';
-import { attachedSession } from './phone-mirror';
+import { attachedSession, steerLensFromMirror } from './phone-mirror';
 import { refusalFor } from './site-guard';
 import { sendCdp } from './socket';
 
@@ -176,6 +177,14 @@ async function screenPoint(here: Here, point: Point): Promise<Point | null> {
   return viewport && onScreen(await inTopDocument(here, point), viewport);
 }
 
+/** `screenPoint` backwards: where a touch would land, in the client coordinates of the frame actions run in. */
+async function framePoint(here: Here, point: Point): Promise<Point | null> {
+  const viewport = await visualViewport(here);
+  if (!viewport) return null;
+  const frame = await inTopDocument(here, { x: 0, y: 0 });
+  return { x: point.x + viewport.offsetX - frame.x, y: point.y + viewport.offsetY - frame.y };
+}
+
 async function play(here: Here, steps: InputStep[]): Promise<CdpResult | null> {
   for (const step of steps) {
     const sent = await here.cdp(step.method, step.params);
@@ -322,14 +331,24 @@ export function pickClip(corner: Point, capture: PickCapture, layout: LayoutView
   };
 }
 
-/** A-Eye on the phone: the pick's own lens in the page, where a tap picks what is under it, then the element photographed before anything moves it. */
+/**
+ * A-Eye on the phone: the pick's own lens in the page, steered from the mirror tab while it waits
+ * (a tap on the phone itself still picks), then the element photographed before anything moves it.
+ */
 async function pickOn(here: Here, input: Record<string, unknown>): Promise<ActionResult> {
   const timeoutMs = Math.min(Number(input.timeoutMs) || PICK_DEFAULT_TIMEOUT_MS, MAX_PICK_WAIT_MS);
-  const picked = await inPage(here, 'page.pickElement', { ...input, timeoutMs });
+  const { frameId } = await focusedFrame(here);
+  const release = steerLensFromMirror(here.targetId, (command) => steerLensOn(here, frameId, command));
+  const picked = await inPage(here, 'page.pickElement', { ...input, timeoutMs }, frameId).finally(release);
   if (!picked.ok) return picked;
   const { capture, ...data } = picked.data as { capture?: PickCapture } & Record<string, unknown>;
   const shot = capture ? await pickShot(here, capture).catch(() => null) : null;
   return success(shot ? { ...data, shot } : data);
+}
+
+async function steerLensOn(here: Here, frameId: string, command: LensCommand): Promise<void> {
+  const placed = 'x' in command ? await framePoint(here, command) : {};
+  if (placed) await evaluateIn(here, frameId, `${PHONE_API}.lens(${JSON.stringify({ ...command, ...placed })})`);
 }
 
 async function pickShot(here: Here, capture: PickCapture): Promise<{ dataUrl: string; width: number; height: number } | null> {

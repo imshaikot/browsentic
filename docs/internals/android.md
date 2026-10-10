@@ -192,9 +192,16 @@ only.
 
 ## A-Eye on the phone
 
-`page.pickElement` runs its own lens in the bundle's world on the phone. A click on the phone tab's
-picture arrives as a tap, and the lens takes the click that follows it and swallows it, so the page
-never sees it. The wait is capped at 170 s, under the relay's 180 s per command, so the page's own
+`page.pickElement` runs its own lens in the bundle's world on the phone. While it waits, `pickOn`
+hands the mirror the lens (`steerLensFromMirror`), and the mirror tab's pointer steers it instead of
+touching the page: a hover sends `aim`, a press that stays within 6 px sends `pick`, and `↑` and `Esc`
+send `wider` and `cancel`. A press that travels further becomes a touch drag, so the page still
+scrolls. The background turns each point into the lens frame's client coordinates (`framePoint`,
+`screenPoint` backwards) and calls `__browsenticPhone.lens` in the lens's world, and collapses aims
+while one is on its way. The page gets no input at all, so disabled controls, links, fields and
+elements whose touch handlers cancel a tap can all be picked. A tap on the phone itself still picks
+through the lens's `click` listener; the lens mutes touch events along with pointer and mouse ones,
+so the page's own handlers cannot cancel that click. The wait is capped at 170 s, under the relay's 180 s per command, so the page's own
 timeout answers first. `pickOn` then photographs the element: `pickClip` pads its box, keeps it on
 screen, moves it into document coordinates (plus any frame's offset), and asks `Page.captureScreenshot`
 for it at device resolution, up to 1,200 px on the long side. The panel's A-Eye button reaches the

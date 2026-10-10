@@ -1,29 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
-import { PHONE_PORT, isMirrorKey, touchPoint, type FrameMetadata, type MirrorCommand, type MirrorMessage, type PageState, type TouchType } from '@/lib/phone/mirror';
+import type { LensCommand } from '@/lib/actions/page/lens';
+import { PHONE_PORT, isMirrorKey, touchPoint, type FrameMetadata, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
 
 const RECONNECT_MS = 500;
 const ERROR_SHOWN_MS = 5_000;
+/** How far a press travels during A-Eye before it is a drag that scrolls, not a pick. */
+const PICK_SLOP_PX = 6;
 
 export interface Mirror {
   canvas: React.RefObject<HTMLCanvasElement | null>;
   page: PageState | null;
   image: { width: number; height: number } | null;
   error: string | undefined;
+  /** A-Eye is waiting on the phone: hovering the picture aims its lens and a click picks. */
+  picking: boolean;
   send(command: MirrorCommand): void;
 }
 
 const decode = (data: string) => new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: 'image/jpeg' });
 
-/** The page's half of the mirror: frames in and drawn, then acked; touches, wheel and keys out as the phone takes them. */
+/** The page's half of the mirror: frames in and drawn, then acked; touches, wheel and keys out as the phone takes them, or to A-Eye's lens while it waits. */
 export function useMirror(watching: boolean): Mirror {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const port = useRef<Browser.runtime.Port | null>(null);
   const metadata = useRef<FrameMetadata | null>(null);
   const watchingNow = useRef(watching);
+  const pickingNow = useRef(false);
   const [page, setPage] = useState<PageState | null>(null);
   const [image, setImage] = useState<{ width: number; height: number } | null>(null);
   const [error, setError] = useState<string>();
+  const [picking, setPicking] = useState(false);
 
   const send = useCallback((command: MirrorCommand) => port.current?.postMessage(command), []);
 
@@ -45,6 +52,10 @@ export function useMirror(watching: boolean): Mirror {
       metadata.current = message.metadata;
       from.postMessage({ op: 'ack', frame: message.frame } satisfies MirrorCommand);
     };
+    const lensUp = (active: boolean) => {
+      pickingNow.current = active;
+      setPicking(active);
+    };
     const connect = () => {
       const opened = browser.runtime.connect({ name: PHONE_PORT });
       port.current = opened;
@@ -52,10 +63,12 @@ export function useMirror(watching: boolean): Mirror {
         const message = raw as MirrorMessage;
         if (message.kind === 'frame') void draw(message, opened);
         else if (message.kind === 'page') setPage(message);
+        else if (message.kind === 'lens') lensUp(message.active);
         else setError(message.message);
       });
       opened.onDisconnect.addListener(() => {
         if (port.current === opened) port.current = null;
+        lensUp(false);
         if (live) retry = setTimeout(connect, RECONNECT_MS);
       });
       if (watchingNow.current) opened.postMessage({ op: 'watch' } satisfies MirrorCommand);
@@ -82,21 +95,49 @@ export function useMirror(watching: boolean): Mirror {
   useEffect(() => {
     const target = canvas.current;
     if (!target) return;
+    let lensPress: { clientX: number; clientY: number; point: { x: number; y: number }; dragging: boolean } | null = null;
     const at = (event: { clientX: number; clientY: number }) => {
       const frame = metadata.current;
       if (!frame || !target.width) return null;
       const box = target.getBoundingClientRect();
       return touchPoint({ x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height }, frame, target);
     };
-    const touch = (type: TouchType) => (event: PointerEvent) => {
-      if (type !== 'touchStart' && !target.hasPointerCapture(event.pointerId)) return;
-      if (type === 'touchStart') {
-        target.setPointerCapture(event.pointerId);
-        target.focus();
-      }
-      const point = at(event);
-      if (point) send({ op: 'touch', type, ...point });
+    const lens = (command: LensCommand) => send({ op: 'lens', lens: command });
+    const press = (event: PointerEvent) => {
+      target.setPointerCapture(event.pointerId);
+      target.focus();
       event.preventDefault();
+      const point = at(event);
+      if (!point) return;
+      if (pickingNow.current) lensPress = { clientX: event.clientX, clientY: event.clientY, point, dragging: false };
+      else send({ op: 'touch', type: 'touchStart', ...point });
+    };
+    const move = (event: PointerEvent) => {
+      if (!target.hasPointerCapture(event.pointerId)) {
+        const point = pickingNow.current ? at(event) : null;
+        if (point) lens({ op: 'aim', ...point });
+        return;
+      }
+      event.preventDefault();
+      const point = at(event);
+      if (!point) return;
+      if (lensPress && !lensPress.dragging) {
+        if (Math.hypot(event.clientX - lensPress.clientX, event.clientY - lensPress.clientY) < PICK_SLOP_PX) return;
+        lensPress.dragging = true;
+        send({ op: 'touch', type: 'touchStart', ...lensPress.point });
+      }
+      send({ op: 'touch', type: 'touchMove', ...point });
+    };
+    const lift = (type: 'touchEnd' | 'touchCancel') => (event: PointerEvent) => {
+      if (!target.hasPointerCapture(event.pointerId)) return;
+      event.preventDefault();
+      const point = at(event);
+      const pressed = lensPress;
+      lensPress = null;
+      if (!point) return;
+      if (pressed && !pressed.dragging) {
+        if (type === 'touchEnd') lens({ op: 'pick', ...point });
+      } else send({ op: 'touch', type, ...point });
     };
     const wheel = (event: WheelEvent) => {
       const point = at(event);
@@ -105,7 +146,9 @@ export function useMirror(watching: boolean): Mirror {
     };
     const key = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isMirrorKey(event.key)) send({ op: 'key', key: event.key });
+      if (pickingNow.current && event.key === 'Escape') lens({ op: 'cancel' });
+      else if (pickingNow.current && event.key === 'ArrowUp') lens({ op: 'wider' });
+      else if (isMirrorKey(event.key)) send({ op: 'key', key: event.key });
       else if (event.key.length === 1) send({ op: 'text', text: event.key });
       else return;
       event.preventDefault();
@@ -116,10 +159,10 @@ export function useMirror(watching: boolean): Mirror {
       event.preventDefault();
     };
     const listeners = [
-      ['pointerdown', touch('touchStart')],
-      ['pointermove', touch('touchMove')],
-      ['pointerup', touch('touchEnd')],
-      ['pointercancel', touch('touchCancel')],
+      ['pointerdown', press],
+      ['pointermove', move],
+      ['pointerup', lift('touchEnd')],
+      ['pointercancel', lift('touchCancel')],
       ['wheel', wheel],
       ['keydown', key],
       ['paste', paste],
@@ -130,5 +173,5 @@ export function useMirror(watching: boolean): Mirror {
     };
   }, [send]);
 
-  return { canvas, page, image, error, send };
+  return { canvas, page, image, error, picking, send };
 }
