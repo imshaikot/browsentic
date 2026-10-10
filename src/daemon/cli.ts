@@ -100,6 +100,12 @@ const APP_REMOVAL = {
   win32: 'uninstall Browsentic in Settings › Apps › Installed apps',
 } as const;
 
+const FOLDER_PICKER: Partial<Record<NodeJS.Platform, string>> = {
+  darwin: 'In the folder picker press ⇧⌘G and paste that path.',
+  win32: 'In the folder picker paste that path into the address bar, press Enter, then Select Folder.',
+  linux: 'In the folder picker press Ctrl+L and paste that path.',
+};
+
 // `browsentic mcp` is the MCP server. The legacy `browsentic-mcp` bin keeps serving on bare
 // invocation, because an MCP client config is literally {"command": "browsentic-mcp"} with no
 // arguments, and those must keep working. The extension strip matters on Windows, where npm
@@ -648,7 +654,8 @@ function printUnpackedSteps(dir: string, row: BrowserRow | undefined, code?: { c
   console.log(`         ${dir}\n`);
   // Browsers refuse their own pages given on the command line, so there is no opening this for
   // them. The folder picker shortcut is the next best thing, and it is where people stall.
-  if (process.platform === 'darwin') console.log(`       In the folder picker press ⇧⌘G and paste that path.`);
+  const picker = FOLDER_PICKER[process.platform];
+  if (picker) console.log(`       ${picker}`);
   console.log(`    3. Click Browsentic in the toolbar and ${enter}`);
   for (const line of rest) console.log(`       ${line}`);
   console.log();

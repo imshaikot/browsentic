@@ -195,7 +195,8 @@ apps, it is **Load it unpacked instead** under the extension rows.
 1. Open your browser's extensions page (`chrome://extensions`, `brave://extensions`…) and turn on
    **Developer mode** (top right).
 2. Press **Load unpacked** and choose that folder. On macOS, press ⇧⌘G in the folder picker and paste
-   the path; on Linux, Ctrl+L. On Windows it is `%USERPROFILE%\browsentic\extension\chrome-mv3`.
+   the path; on Linux, Ctrl+L. On Windows it is `%USERPROFILE%\browsentic\extension\chrome-mv3`:
+   paste it into the picker's address bar.
 3. Click Browsentic in the toolbar, enter the code and press **Connect**.
 
 Keep the folder where it is: the browser names an unpacked extension after its path, and the pairing
