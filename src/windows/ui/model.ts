@@ -28,8 +28,11 @@ import type {
 
 export type Phase = 'preflight' | 'main';
 export type DaemonPhase = 'off' | 'starting' | 'on' | 'stopping';
-export type Tab = 'overview' | 'browsers' | 'android' | 'agents' | 'skills' | 'activity' | 'logs' | 'settings' | 'about';
-export const TABS: Tab[] = ['overview', 'browsers', 'android', 'agents', 'skills', 'activity', 'logs', 'settings', 'about'];
+export type Tab = 'overview' | 'browsers' | 'android' | 'settings' | 'about';
+export const TABS: Tab[] = ['overview', 'browsers', 'android', 'settings', 'about'];
+export type SettingsSection = 'general' | 'agents' | 'skills' | 'activity' | 'logs';
+export const SETTINGS_SECTIONS: SettingsSection[] = ['general', 'agents', 'skills', 'activity', 'logs'];
+export const isSettingsSection = (value: string): value is SettingsSection => (SETTINGS_SECTIONS as string[]).includes(value);
 
 export type CheckId = 'system' | 'node' | 'command' | 'browser' | 'agent';
 export const CHECKS: CheckId[] = ['system', 'node', 'command', 'browser', 'agent'];
@@ -63,6 +66,7 @@ export interface Notice {
 export interface State {
   phase: Phase;
   tab: Tab;
+  settingsSection: SettingsSection;
   checks: Record<CheckId, CheckState>;
   preflightBusy: boolean;
   fixing: boolean;
@@ -131,7 +135,7 @@ export const isInstalling = (phase: UpdatePhase) => phase.kind === 'downloading'
 
 export function failureOf(output: CliOutput): string {
   const text = (output.stderr.trim() || output.stdout.trim()).slice(-400);
-  return text || 'The browsentic command exited with an error. See the Logs tab.';
+  return text || 'The browsentic command exited with an error. See Settings → Logs.';
 }
 
 /** The CLI's --json output, from its first bracket: a warning printed before it is not part of it. */
@@ -155,6 +159,7 @@ export function short(path: string, info: AppInfo | undefined): string {
 export const initialState = (): State => ({
   phase: 'preflight',
   tab: 'overview',
+  settingsSection: 'general',
   checks: Object.fromEntries(CHECKS.map((id) => [id, { kind: 'waiting' }])) as Record<CheckId, CheckState>,
   preflightBusy: true,
   fixing: false,
@@ -394,6 +399,10 @@ export class Model {
     if (this.state.phase === 'main') this.set({ tab });
   }
 
+  openSettings(settingsSection: SettingsSection) {
+    if (this.state.phase === 'main') this.set({ tab: 'settings', settingsSection });
+  }
+
   // Daemon
 
   private startPolling() {
@@ -505,7 +514,7 @@ export class Model {
     try {
       this.set({ agents: parseJson<AgentListing>(await this.backend.cli(['agent', '--json']), 'agent') });
     } catch {
-      /* The Agents tab shows its own offline hint; a failed background read says nothing. */
+      /* Settings → Agents shows its own offline hint; a failed background read says nothing. */
     }
   }
 

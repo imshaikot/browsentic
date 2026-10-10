@@ -230,4 +230,10 @@ import Testing
         #expect(Tab.allCases.firstIndex(of: .android) == 2)
         #expect(Tab.allCases.last == .about)
     }
+
+    @Test func agentsSkillsActivityAndLogsLiveInSettings() {
+        #expect(Tab.allCases.map(\.rawValue) == ["overview", "browsers", "android", "settings", "about"])
+        #expect(SettingsSection.allCases.map(\.label) == ["General", "Agents", "Skills", "Activity", "Logs"])
+        #expect(Tab.allCases.compactMap(\.badge) == ["Experimental"])
+    }
 }

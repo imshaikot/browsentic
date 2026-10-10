@@ -5,29 +5,17 @@ struct MainView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollView {
-                Group {
-                    switch model.tab {
-                    case .overview: OverviewView()
-                    case .browsers: BrowsersView()
-                    case .android: AndroidView()
-                    case .agents: AgentsView()
-                    case .skills: SkillsView()
-                    case .activity: ActivityView()
-                    case .logs: LogsView()
-                    case .settings: SettingsView()
-                    case .about: AboutView()
-                    }
+            Group {
+                switch model.tab {
+                case .overview: Page { OverviewView() }
+                case .browsers: Page { BrowsersView() }
+                case .android: Page { AndroidView() }
+                case .settings: SettingsScreen()
+                case .about: Page { AboutView() }
                 }
-                .frame(maxWidth: 880)
-                .padding(.horizontal, 28)
-                .padding(.top, 64)
-                .padding(.bottom, 36)
-                .frame(maxWidth: .infinity)
-                .id(model.tab)
-                .transition(.opacity.combined(with: .offset(y: 8)))
             }
-            .scrollIndicators(.never)
+            .id(model.tab)
+            .transition(.opacity.combined(with: .offset(y: 8)))
 
             TabCapsule().padding(.top, 6)
         }
@@ -35,7 +23,23 @@ struct MainView: View {
     }
 }
 
-/// The view switcher floats at the top centre, ⌘1…⌘9.
+private struct Page<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ScrollView {
+            content
+                .frame(maxWidth: 880)
+                .padding(.horizontal, 28)
+                .padding(.top, 64)
+                .padding(.bottom, 36)
+                .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.never)
+    }
+}
+
+/// The view switcher floats at the top centre, ⌘1…⌘5.
 private struct TabCapsule: View {
     @EnvironmentObject private var model: AppModel
     @Namespace private var highlight
@@ -48,6 +52,9 @@ private struct TabCapsule: View {
                     HStack(spacing: 6) {
                         Image(systemName: tab.icon).font(.system(size: 11, weight: .semibold))
                         Text(tab.label).font(.system(size: 12, weight: .medium))
+                        if let badge = tab.badge {
+                            TabBadge(text: badge, selected: selected)
+                        }
                         if tab == .overview, model.update != nil {
                             Circle().fill(selected ? Palette.onBrand : Palette.brand).frame(width: 6, height: 6)
                         }
@@ -68,6 +75,22 @@ private struct TabCapsule: View {
         .overlay(Capsule().strokeBorder(Palette.line))
         .shadow(color: .black.opacity(0.25), radius: 18, y: 6)
         .animation(.spring(duration: 0.35), value: model.tab)
+    }
+}
+
+private struct TabBadge: View {
+    let text: String
+    let selected: Bool
+
+    var body: some View {
+        let tint = selected ? Palette.onBrand : Palette.amber
+        Text(text.uppercased())
+            .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+            .tracking(0.5)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1.5)
+            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).strokeBorder(tint.opacity(0.5)))
     }
 }
 

@@ -6,7 +6,7 @@ enum CLIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .failed(let detail): detail.isEmpty ? "The browsentic command exited with an error — see the Logs tab." : detail
+        case .failed(let detail): detail.isEmpty ? "The browsentic command exited with an error — see Settings → Logs." : detail
         case .unreadable(let command): "“browsentic \(command)” printed something this app cannot read — update the app."
         }
     }

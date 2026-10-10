@@ -113,6 +113,16 @@ describe('the running app', () => {
     return model;
   }
 
+  it('opens Agents, Skills, Activity and Logs as pages of Settings, and only once past the checks', async () => {
+    const model = start(mockBackend({ instant: true }));
+    model.openSettings('logs');
+    expect(model.snapshot()).toMatchObject({ tab: 'overview', settingsSection: 'general' });
+    await model.runPreflight();
+    await until(model, (state) => state.phase === 'main');
+    model.openSettings('agents');
+    expect(model.snapshot()).toMatchObject({ tab: 'settings', settingsSection: 'agents' });
+  });
+
   it('offers the browsers on this computer, each with the store it gets the extension from', async () => {
     const model = await running();
     await until(model, (state) => state.browserRows.length > 0);
@@ -198,10 +208,8 @@ describe('the Android tab', () => {
     };
   }
 
-  it('sits after Browsers, so Ctrl+3 opens it and About is Ctrl+9', () => {
-    expect(TABS.indexOf('android')).toBe(2);
-    expect(TABS.at(-1)).toBe('about');
-    expect(TABS.length).toBeLessThanOrEqual(9);
+  it('sits after Browsers, so Ctrl+3 opens it and About is Ctrl+5', () => {
+    expect(TABS).toEqual(['overview', 'browsers', 'android', 'settings', 'about']);
   });
 
   it('watches for phones only while it shows, and reads the checklist the CLI prints', async () => {

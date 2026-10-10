@@ -57,19 +57,16 @@ its shell commands through.
 
 ## The window
 
-The tabs float at the top; Ctrl+1 to Ctrl+9 switch between them. Ctrl+Shift+D turns the Bridge
-on or off, Ctrl+Shift+R restarts it, and Ctrl+Shift+P gets a new pairing code.
+The tabs float at the top; Ctrl+1 to Ctrl+5 switch between them. Agents, Skills, Activity and Logs are
+pages of **Settings**, picked from its sidebar. Ctrl+Shift+D turns the Bridge on or off, Ctrl+Shift+R
+restarts it, and Ctrl+Shift+P gets a new pairing code.
 
 | Tab | What you do there |
 | --- | --- |
 | **Overview** | Turn Browsentic Bridge on and off with the power button, restart it, see its address and version. One row per browser: where its extension comes from, whether it is connected, and a button that adds it from the store. The unpacked folder sits behind **Load it unpacked instead** |
 | **Browsers** | Get a [pairing code](pair.md) with a live countdown, see every paired browser and the store its extension came from, unpair one or all |
-| **Android** | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each, the same checks `browsentic android` prints. A row that fails says what to do, with **Open Chrome on the phone**, **Get Chrome**, the `winget` command that installs adb, or the page of phone makers' USB drivers, which many phones need before Windows shows them to adb. **Set up your phone** has the steps. The Bridge looks for phones only while this tab is open |
-| **Agents** | See which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs |
-| **Skills** | Every [skill](features/skills.md) the router can see and which folder it came from |
-| **Activity** | Your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured |
-| **Logs** | `%USERPROFILE%\.browsentic\daemon.log`, followed live |
-| **Settings** | Light, dark or system appearance for this window; whether the Bridge starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall |
+| **Android** (experimental) | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each, the same checks `browsentic android` prints. A row that fails says what to do, with **Open Chrome on the phone**, **Get Chrome**, the `winget` command that installs adb, or the page of phone makers' USB drivers, which many phones need before Windows shows them to adb. **Set up your phone** has the steps. The Bridge looks for phones only while this tab is open |
+| **Settings** | Five pages, picked from its sidebar. **General**: light, dark or system appearance for this window; whether the Bridge starts with the app; the **Browser theme** and **Guardrails** every paired browser uses, the same rows as the extension's settings page, kept in step both ways; `browsentic` in your terminal; the line that registers Browsentic with an [MCP client](mcp-clients.md); uninstall. **Agents**: see which agent CLIs are ready, [switch](agents.md) between them, pick a model, install a missing one, or let Browsentic fix what one still needs. **Skills**: every [skill](features/skills.md) the router can see and which folder it came from. **Activity**: your standing [approvals](approvals.md), forgettable per site, and the downloads agents captured. **Logs**: `%USERPROFILE%\.browsentic\daemon.log`, followed live |
 | **About** | Who makes Browsentic, a GitHub star, every version on this computer with a copy button, **Report a bug** (GitHub's issue form with those versions filled in; nothing is sent until you submit it), and links to the guide, this page, [troubleshooting](troubleshooting.md) and the release notes. **Run the checks again** reruns the first-run checks |
 
 The Browsentic icon in the notification area shows the Bridge's state and has the same on, off and
@@ -96,7 +93,7 @@ than the browser has loaded.
 
 ## `browsentic` in your terminal
 
-**Settings → “browsentic” in your terminal** adds `%USERPROFILE%\.browsentic\bin` to your user
+**Settings → General → “browsentic” in your terminal** adds `%USERPROFILE%\.browsentic\bin` to your user
 `PATH`, without administrator rights and without changing anything else in it. Terminals already
 open keep their old `PATH`, so open a new one. Every command in the
 [CLI reference](../reference/cli.md) then works against the install the app manages.
@@ -131,7 +128,7 @@ release.
 
 ## Uninstall
 
-**Settings → Uninstall…** runs [`browsentic uninstall`](../reference/cli.md#uninstall): it unpairs
+**Settings → General → Uninstall…** runs [`browsentic uninstall`](../reference/cli.md#uninstall): it unpairs
 every browser, stops the Bridge and removes `%USERPROFILE%\.browsentic` and `%USERPROFILE%\browsentic`,
 optionally keeping your skills. Remove the extension from each browser first (right-click its
 toolbar icon → **Remove**). Then uninstall the app itself in **Settings › Apps › Installed apps**.
