@@ -108,10 +108,12 @@ function die(problem: string): never {
 /** Where the browser looks for the host: the registry on Windows, its profile's manifest folder elsewhere. */
 function hostManifest(): { path: string; allowed_origins: string[] } {
   if (!windows) return JSON.parse(readFileSync(join(chromeProfile, 'NativeMessagingHosts', `${HOST}.json`), 'utf8'));
+  // reg query prints in the console's code page, which loses a path like hömé; an export is UTF-16.
   const key = `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST}`;
-  const out = spawnSync('reg', ['query', key, '/ve'], { encoding: 'utf8', windowsHide: true }).stdout ?? '';
-  const file = /REG_SZ\s+(.+)$/m.exec(out)?.[1]?.trim();
-  must(file, `${key} is not registered`);
+  const exported = join(scratch, 'host.reg');
+  must(spawnSync('reg', ['export', key, exported, '/y'], { windowsHide: true }).status === 0, `${key} is not registered`);
+  const file = /^@="(.*)"\r?$/m.exec(readFileSync(exported, 'utf16le'))?.[1]?.replace(/\\(.)/g, '$1');
+  must(file, `${key} has no default value`);
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
@@ -208,6 +210,12 @@ try {
   await check('browsers --json', () => {
     const listed = json<{ running: boolean; browsers: unknown[]; unpacked: { version: string } }>(browsentic('browsers', '--json'));
     must(listed.running && listed.browsers.length === 8 && listed.unpacked.version === version, JSON.stringify(listed).slice(0, 300));
+  });
+  await check('setup --browser goes to that browser’s store, with a code to enter', () => {
+    const named = json<{ chosen: { id: string; unpacked: boolean; opened: boolean }; pairingCode?: string }>(
+      browsentic('setup', '--browser', 'edge', '--no-open', '--no-wait', '--json', '--no-self-update'),
+    );
+    must(named.chosen.id === 'edge' && !named.chosen.unpacked && !named.chosen.opened && named.pairingCode, JSON.stringify(named.chosen));
   });
   await check('pair issues a code', () => must(/Pairing code:\s+\S{4}-\S+/.test(browsentic('pair').out), 'no code'));
   await check('sessions', () => says(browsentic('sessions'), 'No paired browsers'));
