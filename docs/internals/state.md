@@ -84,9 +84,9 @@ the page (`browsentic/actionCues`, off when absent).
 **The phone session** is `browsentic/phone` in `storage.session`: the phone's serial, the phone
 tab's id and window, the phone's tabs and which one is in front, and why it ended. A conversation on
 the phone tab is a tab session like any other, marked `phone: { serial }`. Both go when the browser
-closes. Nothing about the phone reaches the Bridge's disk beyond `daemon.log` lines naming its serial,
-its Chrome version and each DevTools method sent, never its parameters; screencast frames are
-never logged or stored. See [Android phones](android.md).
+closes. Nothing about the phone reaches the Bridge's disk beyond `daemon.log` lines naming its
+serial, its Chrome version and each DevTools method sent, never its parameters; screencast frames
+are never logged or stored. See [Android phones](android.md).
 
 **Blocked sites** are `browsentic/blockedSites` in `storage.local`: a list of up to 500 patterns that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.

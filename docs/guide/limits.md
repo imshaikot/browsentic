@@ -184,9 +184,12 @@ and it does nothing but start the Bridge. The trust boundary is unchanged: your 
 and Vivaldi and Arc on Windows, are not registered yet, so there the Bridge starts with the app, a
 command or an MCP client instead.
 
-## Android phones
+## Android is experimental
 
-[Driving a phone](features/android.md) has limits of its own:
+[Driving a phone](features/android.md) has been tested on the Android emulator: every tool it
+offers, unplugging and closing Chrome mid-run, the Bridge restarting, and an older extension or
+Bridge on the other side. Real phones over USB and Wi-Fi, and Windows, have not been through that
+test yet. It also has limits of its own:
 
 - **One phone at a time**, driven by one browser at a time.
 - **Google Chrome only**, the stable app from the Play Store. Chrome Beta, Dev and Canary and other
@@ -197,7 +200,7 @@ command or an MCP client instead.
 - **USB, or Wi-Fi already paired with adb.** Browsentic does not pair a phone over Wi-Fi for you.
 - **Desktop-only tools stay on the desktop**: hover, captchas, downloads, uploading a file to a
   page, a site's own tools, monitors, diagnostics, recordings and scheduling.
-- **Saved tools don't run on every visit on the phone.** They run with `/` on the phone tab; every
+- **Saved tools do not run on every visit on the phone.** They run with `/` on the phone tab; every
   visit needs Browsentic in the page, and nothing of it is installed on the phone.
 - **Page code installs in the top document.** In a frame, the agent steps back out first.
 - **Native pickers are out of reach.** A `<select>` opens the phone's own picker, which is not part

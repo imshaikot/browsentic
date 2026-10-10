@@ -130,7 +130,6 @@ and handed to the agent with the file so it can say why it cannot answer from it
 | `FILE_NOT_FOUND` | failed | The browser no longer holds the file's bytes. Attach it again |
 | `AGENT_FAILED` | failed | The agent could not start, or returned something that was not a report. The message says which |
 
-
 ## Android phones
 
 These come from a conversation on the [phone tab](../guide/features/android.md). The readiness codes
@@ -146,7 +145,7 @@ the apps report; each has a row in [troubleshooting](../guide/troubleshooting.md
 | `NAVIGATION_FAILED` | Extension | Chrome on the phone could not open the address; the message carries Chrome's reason |
 | `CHROME_NOT_RUNNING` | Daemon | Chrome is not open on the phone, so the session could not start. Open it, or run `browsentic android open` |
 | `NOT_OWNER` | Daemon | Another paired browser is already driving this phone. One browser drives a phone at a time |
-| `NOT_CHECKED` | Daemon | `browsentic android` asked before any browser or app was watching for phones, so the Bridge has not looked yet |
+| `NOT_CHECKED` | Daemon | The control socket's `android` op was asked with `peek` before any browser or app was watching for phones, so the Bridge has not looked yet. `browsentic status` shows it as `not checked`; `browsentic android` looks |
 | `CDP_ERROR` | Daemon | Chrome on the phone refused a command. The message carries Chrome's reason |
 
 ---

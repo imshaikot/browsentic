@@ -138,8 +138,8 @@ until a store build that retries has replaced it.
 Protocol 23 adds the frames that let a browser drive Chrome on an Android phone through the Bridge.
 The Bridge keeps the number each extension's `hello` claimed and sends these frames only to an
 extension that speaks 23. The extension keeps the number the `welcome` carried (`daemonSpeaks`) and
-sends them only to a Bridge that speaks 23. An extension that speaks 22 is never sent one, and a phone
-request from it is answered `UNSUPPORTED`. The shapes are in `src/lib/phone/types.ts`.
+sends them only to a Bridge that speaks 23. An extension that speaks 22 is never sent one, and a
+phone request from it is answered `UNSUPPORTED`. The shapes are in `src/lib/phone/types.ts`.
 
 | Frame | From | What it carries |
 | --- | --- | --- |
@@ -158,8 +158,8 @@ showing its Android tab. The control socket has an `android` op that reads the s
 subscribes to `android-changed` with `watch` (and lets go with `watch: false`), answers only what is
 already known with `peek` (`NOT_CHECKED` while nobody watches), and opens Chrome on a phone with
 `launch` and an optional `url` (refused to an agent run's connection). It has no way to send a
-DevTools command. Every action on the phone goes through the extension, which
-is where the blocked-sites list is checked. [Android phones](android.md) follows a tap through all of it.
+DevTools command. Every action on the phone goes through the extension, which is where the
+blocked-sites list is checked. [Android phones](android.md) follows a tap through all of it.
 
 ---
 

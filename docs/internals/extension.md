@@ -434,8 +434,8 @@ Driving a phone (see [Android phones](android.md)) adds two unlisted entrypoints
 The phone session itself is `browsentic/phone` in `storage.session`, written only through
 `phone.ts`, and the side panel and popup read it with `usePhoneSession`. The panel recognises the
 phone tab by its id, not its URL: without the `tabs` permission an extension page's URL is hidden
-from `tabs.query`. The **Android** toggle is hidden on Firefox, and the Firefox build leaves out both entrypoints. No new
-permission was needed.
+from `tabs.query`. The **Android** toggle is hidden on Firefox, and the Firefox build leaves out
+both entrypoints. No new permission was needed.
 
 ## Tab scoping
 

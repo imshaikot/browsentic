@@ -103,10 +103,9 @@ spelling still works and is undocumented.
 | `browsentic android` | Whether a phone is ready to drive from the side panel: adb, the phone, USB debugging, Chrome, Chrome open and the screen, one row each. A row that fails says what to do; when nothing is ready, the setup steps follow |
 | `browsentic android open [url]` | Open Chrome on the phone, at that page if one is given (in a new tab when Chrome is already open). With more than one phone, name it with `--serial <serial>` |
 
-`android` takes `--json`: the state the apps read, with the setup steps as `guide`. Browsentic finds
-adb on `PATH`, under `ANDROID_HOME` or `ANDROID_SDK_ROOT`, in Android Studio's SDK, or where Homebrew
-puts it; `"android": { "adb": "<path>" }` in `config.json` names one, and
-`"android": { "enabled": false }` stops the Bridge using adb at all.
+`android` takes `--json`: the state the apps read, with the setup steps as `guide`. Where the
+Bridge looks for adb, and the keys that name one or stop it using adb at all, are under
+[Android](../guide/configuration.md#android) in the configuration guide.
 
 ## MCP
 

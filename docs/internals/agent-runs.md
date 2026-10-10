@@ -494,8 +494,8 @@ Chrome versions, and the viewport, read when the message is sent. The run change
   desktop tools a phone run is not offered (hover, captchas, downloads, a site's own tools), and
   naming a withheld tool invites the agent to try it. `phone.md` names only `PHONE_TOOLS`, and a
   test holds it to that. Site notes for the phone page's host still ride along, and the
-  page-scripting overlay does with Live tool on, as on desktop. Like `page-scripting`,
-  `phone` is a `general` skill kept out of desktop routing by name.
+  page-scripting overlay does with Live tool on, as on desktop. Like `page-scripting`, `phone` is a
+  `general` skill kept out of desktop routing by name.
 - **Its prompt opens on the phone** (`PHONE_OPENING` in `prompt.ts`): every tool call lands on the
   tab in front on the phone, not on "whichever tab is frontmost". The numbered rules are the same.
 - **An `# Android phone` section** carries `phoneBlock(context.phone)`, such as
@@ -503,8 +503,8 @@ Chrome versions, and the viewport, read when the message is sent. The run change
   tool call to learn the device. It holds no address, so it does not change with every message.
 - **Its tool list is smaller.** `offerFor` withholds every tool off `PHONE_TOOLS`, and the
   page-code tools unless Live tool is on, and `invokeForRun` refuses a call to one with
-  `NOT_ON_PHONE`. The tool list the browser describes
-  is never varied, because it feeds the manifest hash.
+  `NOT_ON_PHONE`. The tool list the browser describes is never varied, because it feeds the
+  manifest hash.
 
 Together these make a phone run's fixed overhead close to 40 % smaller than a desktop run's:
 measured as sent on 10 Oct 2026 with Live tool off, the repository's part of the system prompt was

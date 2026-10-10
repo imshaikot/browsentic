@@ -6,7 +6,7 @@ user sees, read [guide/features/android.md](../guide/features/android.md) first.
 
 ---
 
-## The shape of it
+## How the parts connect
 
 ```
 Phone        Chrome ── debugging socket (localabstract:chrome_devtools_remote)
@@ -43,15 +43,21 @@ WebSocket an extension page opens carries one. Node's `ws` sends none.
 
 ## adb, without spawning adb
 
-`src/daemon/android/adb.ts` finds one adb binary (the configured `android.adb`, then `PATH`,
-`ANDROID_HOME`, `ANDROID_SDK_ROOT`, Android Studio's SDK, Homebrew and winget) and runs it only for
-`adb version` and, when nothing listens on 5037, `adb start-server`. Everything else goes to adb's
-own server over its socket on 127.0.0.1:5037 (`adb-server.ts`): `host:track-devices-l` for the
-phone list, `shell:` for the facts, `forward` and `killforward`.
+`src/daemon/android/adb.ts` finds one adb binary and runs it only for `adb version` and, when
+nothing listens on 5037, `adb start-server`. `adbCandidates` tries, in order: the configured
+`android.adb`, `PATH`, `platform-tools` under `ANDROID_HOME`, `ANDROID_SDK_ROOT` and Android
+Studio's SDK, then Homebrew's two prefixes, or on Windows winget's two package folders, Scoop's
+shims, Chocolatey's `bin` and a platform-tools zip unpacked in `Downloads`. A Bridge keeps the
+`PATH` it started with, so an adb installed after it would otherwise stay unseen.
+
+Everything else goes to adb's own server over its socket on 127.0.0.1:5037 (`adb-server.ts`):
+`host:track-devices-l` for the phone list, `shell:` for the facts, `forward` and `killforward`.
 
 A socket client never kills a server of another version, which running a second adb binary does,
 taking Android Studio's connection with it. For the same reason the Bridge never runs
-`adb kill-server` or removes forwards it did not make.
+`adb kill-server` or removes forwards it did not make. `start-server` runs in adb's own folder with
+its output ignored: the server it forks keeps its working folder and any pipe it inherits for as
+long as it runs, and on Windows a folder in use cannot be deleted, renamed or updated.
 
 `phone-facts.ts` asks for everything in one `shell:` call, each answer under its own marker:
 `getprop` for the model and Android version, `wm size` and `wm density`, `dumpsys power` for the
@@ -183,30 +189,35 @@ the panel.
 
 `code-toolkit.ts` keeps each approved toolkit for a **place** (`ToolkitPlace`): a desktop tab
 (`tabPlace`), or the phone's front tab (`phoneToolkitPlace` in `phone-backend.ts`, keyed
-`phone:<targetId>`). On the phone the installer is evaluated in the top document's main world with a
-plain `Runtime.evaluate` over the relay, which no page CSP can refuse. Calls run `page.runCode`'s own
-page side in the bundle's isolated world, which reaches the toolkit by DOM events exactly as the
-desktop content script does. `toolkitPlaceFor` in `phone-invoke.ts` picks the place for the panel's
-`keepTool` and `/` run. Every-visit tools need `chrome.userScripts` in the page, so they stay desktop
-only.
+`phone:<targetId>`). On the phone the installer is evaluated in the top document's main world with
+a plain `Runtime.evaluate` over the relay, which no page CSP can refuse. Calls run `page.runCode`'s
+own page side in the bundle's isolated world, which reaches the toolkit by DOM events exactly as
+the desktop content script does. `toolkitPlaceFor` in `phone-invoke.ts` picks the place for the
+panel's `keepTool` and `/` run. Every-visit tools need `chrome.userScripts` in the page, so they
+stay desktop only.
 
 ## A-Eye on the phone
 
 `page.pickElement` runs its own lens in the bundle's world on the phone. While it waits, `pickOn`
-hands the mirror the lens (`steerLensFromMirror`), and the mirror tab's pointer steers it instead of
-touching the page: a hover sends `aim`, a press that stays within 6 px sends `pick`, and `↑` and `Esc`
-send `wider` and `cancel`. A press that travels further becomes a touch drag, so the page still
-scrolls. The background turns each point into the lens frame's client coordinates (`framePoint`,
-`screenPoint` backwards) and calls `__browsenticPhone.lens` in the lens's world, and collapses aims
-while one is on its way. The page gets no input at all, so disabled controls, links, fields and
-elements whose touch handlers cancel a tap can all be picked. A tap on the phone itself still picks
-through the lens's `click` listener; the lens mutes touch events along with pointer and mouse ones,
-so the page's own handlers cannot cancel that click. The wait is capped at 170 s, under the relay's 180 s per command, so the page's own
-timeout answers first. `pickOn` then photographs the element: `pickClip` pads its box, keeps it on
-screen, moves it into document coordinates (plus any frame's offset), and asks `Page.captureScreenshot`
-for it at device resolution, up to 1,200 px on the long side. The panel's A-Eye button reaches the
-phone through the background (`pickFocus` in `aeye.ts` sends the `invoke` bridge op), because the
-panel cannot reach the socket.
+hands the mirror the lens (`steerLensFromMirror`), and the phone tab's pointer steers it instead of
+touching the page:
+
+- **Steering.** A hover sends `aim`, a press that stays within 6 px sends `pick`, and `↑` and `Esc`
+  send `wider` and `cancel`. A press that travels further becomes a touch drag, so the page still
+  scrolls. The background turns each point into the lens frame's client coordinates (`framePoint`,
+  `screenPoint` backwards), calls `__browsenticPhone.lens` in the lens's world, and collapses aims
+  while one is on its way.
+- **Nothing reaches the page.** Disabled controls, links, fields and elements whose touch handlers
+  cancel a tap can all be picked. A tap on the phone itself still picks through the lens's `click`
+  listener; the lens mutes touch events along with pointer and mouse ones, so the page's own
+  handlers cannot cancel that click.
+- **The wait** is capped at 170 s, under the relay's 180 s per command, so the page's own timeout
+  answers first.
+- **The photograph.** `pickClip` pads the element's box, keeps it on screen, moves it into document
+  coordinates (plus any frame's offset), and `Page.captureScreenshot` takes it at device
+  resolution, up to 1,200 px on the long side.
+- **The panel's A-Eye button** reaches the phone through the background (`pickFocus` in `aeye.ts`
+  sends the `invoke` bridge op), because the panel cannot reach the socket.
 
 ## The prompt
 

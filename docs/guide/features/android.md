@@ -5,6 +5,8 @@ switch on **Android** in the side panel, and a tab opens showing the phone's Chr
 phone frame. A conversation in that tab works on the phone: the same requests, with real taps and
 swipes on the phone instead of mouse clicks. Nothing is installed on the phone.
 
+Android support is [experimental](../limits.md#android-is-experimental).
+
 ---
 
 ## What you need
@@ -12,11 +14,10 @@ swipes on the phone instead of mouse clicks. Nothing is installed on the phone.
 - A Chromium browser (Chrome, Edge, Brave, Arc and the like) with the Browsentic extension, paired
   to Browsentic Bridge. Firefox has no Android switch.
 - **adb**, Android's debugging tool, from Google's
-  [platform-tools](https://developer.android.com/tools/releases/platform-tools). The Bridge looks
-  for it on your `PATH`, under `ANDROID_HOME` or `ANDROID_SDK_ROOT`, in Android Studio's SDK, where
-  Homebrew puts it, and on Windows where winget, Scoop and Chocolatey put it and in your Downloads
-  folder, where Windows unzips the platform-tools download. If it is somewhere else, name it in
-  [`config.json`](../configuration.md#android).
+  [platform-tools](https://developer.android.com/tools/releases/platform-tools). The Bridge finds
+  it on your `PATH`, in the Android SDK, and where Homebrew, winget, Scoop and Chocolatey put it.
+  The [`android.adb`](../configuration.md#android) setting lists every place it looks, and names
+  your adb when it is somewhere else.
 - An Android phone with Google Chrome, connected by USB, or over Wi-Fi once it has been paired with
   adb.
 
@@ -91,10 +92,10 @@ outline to the element around it, and `Esc` cancels. A tap on the phone itself p
 carries a photograph of the element from the phone. When the agent asks you to point at something,
 it works the same way.
 
-**Live tools** work there as well. With the Live tool switch on, the agent can write code for the
-phone's page; you approve it before it runs, as on a desktop tab. You can keep the result as a
-saved tool and run it with `/` on the phone tab. A saved tool can't run on every visit on the
-phone, because nothing of Browsentic is installed there.
+**Live tools** work there as well. With the composer's **Live tool** switch on, the agent can write
+code for the phone's page; you approve it before it runs, as on a desktop tab. You can keep the
+result as a [saved tool](page-actions.md#keeping-one) and run it with `/` on the phone tab. A saved
+tool cannot run on every visit on the phone, because nothing of Browsentic is installed there.
 
 ## What is off on the phone
 
@@ -104,7 +105,7 @@ While the phone tab is in front, the side panel hides what only works in a deskt
 still work. They all come back when you switch to a desktop tab.
 
 The agent is offered only the tools that work on the phone. Hovering, captchas, downloads,
-uploading a file to a page, a site's own tools, monitors and diagnostics stay on the
+uploading a file to a page, recordings, a site's own tools, monitors and diagnostics stay on the
 desktop. If you ask for one of those, the agent says it is not available on the phone.
 
 ## Privacy and safety
@@ -136,5 +137,5 @@ If you never want the Bridge to use adb at all, set `"android": { "enabled": fal
   value instead.
 - New tabs always open in front on the phone, because Chrome on Android does that.
 
-More in [Limits](../limits.md#android-phones). If a phone will not connect, see
+More in [Limits](../limits.md#android-is-experimental). If a phone will not connect, see
 [Troubleshooting](../troubleshooting.md#android-phones).
