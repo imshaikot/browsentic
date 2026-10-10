@@ -181,8 +181,8 @@ So that a browser can start Browsentic Bridge when it is down, setup registers a
 host with each browser it finds. Only Browsentic's own extension builds may launch it (the Chrome
 Web Store and Edge Add-ons copies by their IDs, the unpacked folder, and the signed Firefox add-on),
 and it does nothing but start the Bridge. The trust boundary is unchanged: your user account. Opera,
-and Vivaldi and Arc on Windows, are not registered yet, so there the Bridge starts with the app, a
-command or an MCP client instead.
+and Arc on Windows, are not registered yet, so there the Bridge starts with the app, a command or an
+MCP client instead.
 
 ## Unpacked extension
 
