@@ -117,18 +117,22 @@ function hostManifest(): { path: string; allowed_origins: string[] } {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-/** What the extension's wake-up gets back, started exactly as Chrome starts a host (launch_context_win.cc). */
+/**
+ * What the extension's wake-up gets back, started exactly as Chrome starts a host (launch_context_win.cc).
+ * npm is offline, so the launcher's npx fallback cannot answer for a CLI path it failed to read.
+ */
 async function wake(): Promise<{ ok: boolean; port?: number; error?: string }> {
   const manifest = hostManifest();
+  const offline = { ...env, npm_config_offline: 'true' };
   must(manifest.allowed_origins.includes(CHROME_WEB_STORE), 'the store copy is not allowed to start the host');
   const host = windows
     ? spawn(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `""${manifest.path}" ${CHROME_WEB_STORE} --parent-window=0"`], {
-        env,
+        env: offline,
         cwd: dirname(manifest.path),
         windowsHide: true,
         windowsVerbatimArguments: true,
       })
-    : spawn(manifest.path, [CHROME_WEB_STORE], { env, cwd: dirname(manifest.path) });
+    : spawn(manifest.path, [CHROME_WEB_STORE], { env: offline, cwd: dirname(manifest.path) });
   const body = Buffer.from(JSON.stringify({ op: 'ensure' }));
   const head = Buffer.alloc(4);
   head.writeUInt32LE(body.length);
