@@ -30,14 +30,24 @@ export const PROBLEMS = {
   }),
   adbMissing: (platform: NodeJS.Platform): AndroidProblem => ({
     code: 'ADB_MISSING',
-    message: `Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from ${PLATFORM_TOOLS_URL}.`,
+    message:
+      platform === 'win32'
+        ? `Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below, or download it from ${PLATFORM_TOOLS_URL} and unzip it in your Downloads folder.`
+        : `Browsentic reaches your phone through adb, from Android's platform-tools, and it is not installed. Install it with the command below or download it from ${PLATFORM_TOOLS_URL}.`,
     fix: INSTALL_ADB[platform] ?? PLATFORM_TOOLS_URL,
   }),
-  adbBroken: (path: string, why: string): AndroidProblem => ({
-    code: 'ADB_BROKEN',
-    message: `adb at ${path} does not run: ${why}. Reinstall platform-tools, or name a working adb in ~/.browsentic/config.json.`,
-    fix: '"android": { "adb": "/path/to/adb" }',
-  }),
+  adbBroken: (path: string, why: string, platform: NodeJS.Platform): AndroidProblem =>
+    platform === 'win32'
+      ? {
+          code: 'ADB_BROKEN',
+          message: `adb at ${path} does not run: ${why}. Reinstall platform-tools, or name a working adb in ~/.browsentic/config.json, with forward slashes in its path.`,
+          fix: '"android": { "adb": "C:/path/to/adb.exe" }',
+        }
+      : {
+          code: 'ADB_BROKEN',
+          message: `adb at ${path} does not run: ${why}. Reinstall platform-tools, or name a working adb in ~/.browsentic/config.json.`,
+          fix: '"android": { "adb": "/path/to/adb" }',
+        },
   noDevice: (platform: NodeJS.Platform): AndroidProblem => ({
     code: 'NO_DEVICE',
     message:
@@ -99,8 +109,8 @@ export function judge(observed: Observed): AndroidState {
 
   if (!enabled) return stopped(PROBLEMS.off());
   if (!adb) return stopped(PROBLEMS.adbMissing(platform), true);
-  if (adb.broken) return stopped(PROBLEMS.adbBroken(adb.path, adb.broken), true);
-  if (serverError) return stopped(PROBLEMS.adbBroken(adb.path, serverError), true);
+  if (adb.broken) return stopped(PROBLEMS.adbBroken(adb.path, adb.broken, platform), true);
+  if (serverError) return stopped(PROBLEMS.adbBroken(adb.path, serverError, platform), true);
 
   const devices = observed.devices.map(({ device, facts }) => describe(device, facts));
   const ready = devices.find(isDrivable);

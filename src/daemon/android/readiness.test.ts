@@ -45,9 +45,10 @@ describe('readiness', () => {
   const rows: [string, Observed, AndroidProblemCode, Partial<{ ready: boolean; says: RegExp; fix: string; action: string }>?][] = [
     ['switched off in config.json', observed([], { enabled: false, adb: undefined }), 'ANDROID_OFF', { says: /config\.json/, fix: '"android": { "enabled": true }' }],
     ['no adb on macOS', observed([], { adb: null }), 'ADB_MISSING', { fix: 'brew install --cask android-platform-tools' }],
-    ['no adb on Windows', observed([], { adb: null, platform: 'win32' }), 'ADB_MISSING', { fix: 'winget install Google.PlatformTools' }],
+    ['no adb on Windows', observed([], { adb: null, platform: 'win32' }), 'ADB_MISSING', { says: /unzip it in your Downloads folder/, fix: 'winget install Google.PlatformTools' }],
     ['no adb on Linux', observed([], { adb: null, platform: 'linux' }), 'ADB_MISSING', { fix: 'sudo apt install adb' }],
     ['an adb that does not run', observed([], { adb: { path: ADB.path, broken: 'Bad CPU type in executable' } }), 'ADB_BROKEN', { says: /Bad CPU type in executable\. Reinstall/ }],
+    ['an adb that does not run on Windows, named with forward slashes, which JSON takes unescaped', observed([], { adb: { path: 'C:\\adb.exe', broken: 'boom' }, platform: 'win32' }), 'ADB_BROKEN', { says: /forward slashes/, fix: '"android": { "adb": "C:/path/to/adb.exe" }' }],
     ['adb\'s server that will not start', observed([], { serverError: 'start-server did not start adb\'s server' }), 'ADB_BROKEN'],
     ['adb with no phone', observed([]), 'NO_DEVICE', { says: /USB debugging/ }],
     ['a phone waiting for Allow', observed([phone({ state: 'unauthorized', adbState: 'unauthorized' })]), 'DEVICE_UNAUTHORIZED', { says: /tap Allow/ }],

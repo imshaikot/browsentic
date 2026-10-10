@@ -19,6 +19,18 @@ export type MirrorKey = (typeof MIRROR_KEYS)[number];
 
 export const isMirrorKey = (key: string): key is MirrorKey => (MIRROR_KEYS as readonly string[]).includes(key);
 
+type KeyPress = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'getModifierState'>;
+
+/**
+ * The character a key press types, or undefined for a shortcut. AltGr reads as Ctrl+Alt on Windows,
+ * and Option alone types on a Mac, so both type: that is how `@`, `€` or `{` come on many layouts.
+ */
+export function typedText(press: KeyPress, mac: boolean): string | undefined {
+  if (press.key.length !== 1 || press.metaKey) return undefined;
+  if (press.getModifierState('AltGraph') || press.ctrlKey === press.altKey) return press.key;
+  return mac && press.altKey ? press.key : undefined;
+}
+
 export type MirrorCommand =
   | { op: 'watch' }
   | { op: 'unwatch' }

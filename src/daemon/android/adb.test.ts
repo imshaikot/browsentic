@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -28,18 +28,23 @@ describe('where adb is looked for', () => {
     ]);
   });
 
-  test('Windows: adb.exe on PATH however the variable is spelled, the SDK under LOCALAPPDATA, then where winget unpacks it', () => {
+  test('Windows: adb.exe on PATH however the variable is spelled, the SDK under LOCALAPPDATA, winget, Scoop, Chocolatey, then a zip unpacked in Downloads', () => {
     expect(
       adbCandidates({
         platform: 'win32',
         home: 'C:\\Users\\me',
-        env: { Path: '"C:\\Tools";C:\\Windows', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' },
+        env: { Path: '"C:\\Tools";C:\\Windows', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local', ProgramFiles: 'D:\\Programs' },
       }),
     ).toEqual([
       'C:\\Tools\\adb.exe',
       'C:\\Windows\\adb.exe',
       'C:\\Users\\me\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe',
       'C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\platform-tools\\adb.exe',
+      'D:\\Programs\\WinGet\\Packages\\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\platform-tools\\adb.exe',
+      'C:\\Users\\me\\scoop\\shims\\adb.exe',
+      'C:\\ProgramData\\chocolatey\\bin\\adb.exe',
+      'C:\\Users\\me\\Downloads\\platform-tools\\adb.exe',
+      'C:\\Users\\me\\Downloads\\platform-tools-latest-windows\\platform-tools\\adb.exe',
     ]);
   });
 
@@ -83,6 +88,13 @@ describe('finding adb', () => {
     expect(isProgram(dir)).toBe(false);
     expect(isProgram(new URL('./fixtures/adb-version.txt', import.meta.url).pathname)).toBe(false);
     expect(isProgram(fake('adb-runs', ''))).toBe(true);
+  });
+
+  // stubCli is a .cmd on Windows, which spawn refuses without a shell; a real adb is an .exe.
+  test.skipIf(process.platform === 'win32')('start-server runs in adb\'s own folder, which the server it forks keeps as its working folder', async () => {
+    const where = join(dir, 'start-server-cwd.txt');
+    expect(await startServer(fake('adb-where', `require('node:fs').writeFileSync(${JSON.stringify(where)}, process.cwd());`))).toBe(true);
+    expect(readFileSync(where, 'utf8')).toBe(realpathSync(dir));
   });
 
   test.skipIf(process.platform === 'win32')('start-server is judged by its exit, not by output a forked server could hold open', async () => {

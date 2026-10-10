@@ -14,7 +14,8 @@ swipes on the phone instead of mouse clicks. Nothing is installed on the phone.
 - **adb**, Android's debugging tool, from Google's
   [platform-tools](https://developer.android.com/tools/releases/platform-tools). The Bridge looks
   for it on your `PATH`, under `ANDROID_HOME` or `ANDROID_SDK_ROOT`, in Android Studio's SDK, where
-  Homebrew puts it, and on Windows where winget unpacks it. If it is somewhere else, name it in
+  Homebrew puts it, and on Windows where winget, Scoop and Chocolatey put it and in your Downloads
+  folder, where Windows unzips the platform-tools download. If it is somewhere else, name it in
   [`config.json`](../configuration.md#android).
 - An Android phone with Google Chrome, connected by USB, or over Wi-Fi once it has been paired with
   adb.

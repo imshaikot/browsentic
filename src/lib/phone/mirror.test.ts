@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addressOf, isMirrorKey, keyEvents, touchPoint } from './mirror';
+import { addressOf, isMirrorKey, keyEvents, touchPoint, typedText } from './mirror';
 
 describe('a click on the mirror', () => {
   test('lands where spike Q8 measured it: the frame is the visual viewport, scaled by the zoom', () => {
@@ -32,6 +32,32 @@ describe('keys on the mirror', () => {
     expect(isMirrorKey('Tab')).toBe(true);
     expect(isMirrorKey('a')).toBe(false);
     expect(isMirrorKey('F5')).toBe(false);
+  });
+
+  const press = (key: string, held: { meta?: boolean; ctrl?: boolean; alt?: boolean; altGraph?: boolean } = {}) => ({
+    key,
+    metaKey: !!held.meta,
+    ctrlKey: !!held.ctrl,
+    altKey: !!held.alt,
+    getModifierState: (name: string) => name === 'AltGraph' && !!held.altGraph,
+  });
+
+  test('AltGr types on Windows, where it reads as Ctrl+Alt, and on Linux, where it is AltGraph alone', () => {
+    expect(typedText(press('@', { ctrl: true, alt: true }), false)).toBe('@');
+    expect(typedText(press('€', { ctrl: true, alt: true, altGraph: true }), false)).toBe('€');
+    expect(typedText(press('{', { altGraph: true }), false)).toBe('{');
+  });
+
+  test('Option types on a Mac; elsewhere Alt alone is a shortcut', () => {
+    expect(typedText(press('@', { alt: true }), true)).toBe('@');
+    expect(typedText(press('f', { alt: true }), false)).toBeUndefined();
+  });
+
+  test('Ctrl, Command and named keys never type', () => {
+    expect(typedText(press('a'), false)).toBe('a');
+    expect(typedText(press('c', { ctrl: true }), false)).toBeUndefined();
+    expect(typedText(press('v', { meta: true }), true)).toBeUndefined();
+    expect(typedText(press('Enter'), false)).toBeUndefined();
   });
 });
 

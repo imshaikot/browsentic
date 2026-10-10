@@ -107,7 +107,7 @@ settings page shows but will not change.
 | Key | Default | Notes |
 | --- | --- | --- |
 | `android.enabled` | `true` | `false` stops the Bridge using adb at all: it never looks for phones, and the side panel shows no Android switch. See [Android phone](features/android.md) |
-| `android.adb` | found | Absolute path to the adb to use. Without it the Bridge looks on `PATH`, under `ANDROID_HOME` and `ANDROID_SDK_ROOT`, in Android Studio's SDK, where Homebrew puts it, and on Windows where winget unpacks it. Name one when you have several, since two adb versions stop each other's server |
+| `android.adb` | found | Absolute path to the adb to use. Without it the Bridge looks on `PATH`, under `ANDROID_HOME` and `ANDROID_SDK_ROOT`, in Android Studio's SDK, where Homebrew puts it, and on Windows where winget, Scoop and Chocolatey put it and in `Downloads`. Name one when you have several, since two adb versions stop each other's server. On Windows write the path with forward slashes, `"C:/platform-tools/adb.exe"`: a single backslash is not valid JSON, and the Bridge then ignores the whole file |
 
 ## Site mapping
 

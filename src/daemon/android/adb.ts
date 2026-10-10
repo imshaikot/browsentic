@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { accessSync, constants, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { posix, win32 } from 'node:path';
+import { dirname, posix, win32 } from 'node:path';
 import { spawnCli, stopTree, variable } from '../agent/runners/command';
 
 const VERSION_TIMEOUT_MS = 5_000;
@@ -23,12 +23,16 @@ export interface Where {
   home?: string;
 }
 
-/** Where adb is looked for, first match first: the user's own setting, PATH, the SDK variables, then where installers put it. */
+/**
+ * Where adb is looked for, first match first: the user's own setting, PATH, the SDK variables, then where installers put it.
+ * A Bridge keeps the PATH it started with, so on Windows that means winget, Scoop, Chocolatey and a platform-tools zip unpacked in Downloads.
+ */
 export function adbCandidates({ configured, env = process.env, platform = process.platform, home = homedir() }: Where = {}): string[] {
   const windows = platform === 'win32';
   const path = windows ? win32 : posix;
   const exe = windows ? 'adb.exe' : 'adb';
   const localAppData = variable(env, 'LOCALAPPDATA') ?? path.join(home, 'AppData', 'Local');
+  const downloads = path.join(home, 'Downloads');
   const sdkRoots = [
     variable(env, 'ANDROID_HOME'),
     variable(env, 'ANDROID_SDK_ROOT'),
@@ -44,7 +48,16 @@ export function adbCandidates({ configured, env = process.env, platform = proces
       .filter(Boolean)
       .map((dir) => path.join(dir, exe)),
     ...sdkRoots.filter((root): root is string => !!root).map((root) => path.join(root, 'platform-tools', exe)),
-    ...(windows ? [path.join(localAppData, 'Microsoft', 'WinGet', 'Packages', WINGET_PLATFORM_TOOLS, 'platform-tools', exe)] : ['/opt/homebrew/bin/adb', '/usr/local/bin/adb']),
+    ...(windows
+      ? [
+          path.join(localAppData, 'Microsoft', 'WinGet', 'Packages', WINGET_PLATFORM_TOOLS, 'platform-tools', exe),
+          path.join(variable(env, 'PROGRAMFILES') ?? 'C:\\Program Files', 'WinGet', 'Packages', WINGET_PLATFORM_TOOLS, 'platform-tools', exe),
+          path.join(variable(env, 'SCOOP') ?? path.join(home, 'scoop'), 'shims', exe),
+          path.join(variable(env, 'CHOCOLATEYINSTALL') ?? 'C:\\ProgramData\\chocolatey', 'bin', exe),
+          path.join(downloads, 'platform-tools', exe),
+          path.join(downloads, 'platform-tools-latest-windows', 'platform-tools', exe),
+        ]
+      : ['/opt/homebrew/bin/adb', '/usr/local/bin/adb']),
   ];
   return [...new Set(candidates.filter((candidate): candidate is string => !!candidate))];
 }
@@ -74,11 +87,12 @@ export function versionOf(output: string): string | undefined {
 /**
  * Started only when no server answers: `adb start-server` against a running server of another
  * version would kill it. Its output is not read, because the server it forks keeps any pipe it
- * inherits open for as long as it runs.
+ * inherits open for as long as it runs. It starts in adb's own folder because the server keeps its
+ * working folder too, and on Windows a folder in use cannot be deleted, renamed or updated.
  */
 export function startServer(path: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const child = spawn(path, ['start-server'], { stdio: 'ignore', windowsHide: true });
+    const child = spawn(path, ['start-server'], { cwd: dirname(path), stdio: 'ignore', windowsHide: true });
     const timer = setTimeout(() => {
       stopTree(child, 'SIGKILL');
       resolve(false);

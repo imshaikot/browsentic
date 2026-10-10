@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browser, type Browser } from 'wxt/browser';
 import type { LensCommand } from '@/lib/actions/page/lens';
-import { PHONE_PORT, isMirrorKey, touchPoint, type FrameMetadata, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
+import { PHONE_PORT, isMirrorKey, touchPoint, typedText, type FrameMetadata, type MirrorCommand, type MirrorMessage, type PageState } from '@/lib/phone/mirror';
 
 const RECONNECT_MS = 500;
 const ERROR_SHOWN_MS = 5_000;
@@ -17,6 +17,8 @@ export interface Mirror {
   picking: boolean;
   send(command: MirrorCommand): void;
 }
+
+const MAC = /mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ?? navigator.platform ?? '');
 
 const decode = (data: string) => new Blob([Uint8Array.from(atob(data), (char) => char.charCodeAt(0))], { type: 'image/jpeg' });
 
@@ -104,6 +106,7 @@ export function useMirror(watching: boolean): Mirror {
     };
     const lens = (command: LensCommand) => send({ op: 'lens', lens: command });
     const press = (event: PointerEvent) => {
+      if (event.button !== 0) return;
       target.setPointerCapture(event.pointerId);
       target.focus();
       event.preventDefault();
@@ -145,11 +148,12 @@ export function useMirror(watching: boolean): Mirror {
       event.preventDefault();
     };
     const key = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const text = typedText(event, MAC);
+      if (text === undefined && (event.metaKey || event.ctrlKey || event.altKey)) return;
       if (pickingNow.current && event.key === 'Escape') lens({ op: 'cancel' });
       else if (pickingNow.current && event.key === 'ArrowUp') lens({ op: 'wider' });
       else if (isMirrorKey(event.key)) send({ op: 'key', key: event.key });
-      else if (event.key.length === 1) send({ op: 'text', text: event.key });
+      else if (text !== undefined) send({ op: 'text', text });
       else return;
       event.preventDefault();
     };

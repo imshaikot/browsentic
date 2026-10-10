@@ -114,7 +114,7 @@ names the one that fails. See [Android phone](features/android.md) for setting a
 | --- | --- | --- |
 | No Android switch in the side panel | The Bridge sees no phone, the Bridge predates Android, or the browser is Firefox | Run `browsentic android`. Update the Bridge if it does not know the command. Firefox has no Android switch |
 | `ANDROID_OFF` | `"android": { "enabled": false }` is set in `config.json` | Set it to `true`, or remove it |
-| `ADB_MISSING` | adb, from Android's platform-tools, is not installed, or not where the Bridge looks | Install platform-tools (the check prints the command for your system), or name your adb with `"android": { "adb": "/path/to/adb" }` |
+| `ADB_MISSING` | adb, from Android's platform-tools, is not installed, or not where the Bridge looks | Install platform-tools (the check prints the command for your system), or name your adb with `"android": { "adb": "/path/to/adb" }`. On Windows, unzip the download in `Downloads`, or name it with forward slashes: `"C:/path/to/adb.exe"` |
 | `ADB_BROKEN` | The adb the Bridge found does not run | Reinstall platform-tools, or name a working adb in `config.json` |
 | `NO_DEVICE` | No phone is connected, USB debugging is off, or the cable only charges | Turn on USB debugging and connect with a data cable. On Windows, see the next row |
 | adb sees nothing on Windows | Many phones need their maker's USB driver, or Google's, before Windows lets adb see them | Install the driver from Android's [OEM USB drivers](https://developer.android.com/studio/run/oem-usb) page, then plug the phone in again |
