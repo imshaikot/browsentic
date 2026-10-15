@@ -10,6 +10,7 @@ import { readAgentConfig } from './agent/config';
 import type { Bridge } from './control';
 import { fence, fenceTag, policyFrom, sealSecrets } from './guardrails';
 import { log } from './log';
+import { GROUPS_NOTE } from './tool-groups';
 import { toolHost } from './tool-host';
 
 const RESOURCES = [
@@ -55,7 +56,8 @@ export function createMcpServer(bridge: Bridge, version: string, opts: { agentRu
         '⟦password:4f2a@example.com⟧; the real value stays in the browser. Pass a placeholder through unchanged as ' +
         'page_fillInput’s value or page_typeText’s text and it becomes the credential at the moment it reaches the field. ' +
         'Anywhere else it is refused, and it is never yours to read, rebuild or repeat. ' +
-        'SITE_BLOCKED means the user has put that site off-limits to Browsentic: do not retry it or reach it another way — tell the user.',
+        'SITE_BLOCKED means the user has put that site off-limits to Browsentic: do not retry it or reach it another way — tell the user.\n\n' +
+        GROUPS_NOTE,
     },
   );
 

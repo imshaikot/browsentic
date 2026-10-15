@@ -1,14 +1,32 @@
+import { TOOL_GROUPS } from '@/lib/actions/groups';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
-import type { ActionResult } from '@/lib/actions/protocol';
+import { failure, type ActionResult } from '@/lib/actions/protocol';
 import { FOCUS_SHOT_ACTION, RESERVED_ACTIONS, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
-import { actionNameFor, assertToolNamesRoundTrip, STATUS_TOOL, toolNameFor } from '@/lib/actions/tool-names';
+import { actionNameFor, assertToolNamesRoundTrip, OPEN_SKILL_TOOL, STATUS_TOOL, toolNameFor, USE_TOOL } from '@/lib/actions/tool-names';
+import { loadSkills } from './agent/skills';
 import type { Bridge } from './control';
 import { IMAGE_NOTE, fence, sealSecrets, shouldFence, type Policy } from './guardrails';
+import { GROUP_INDEX, groupGuide, groupNamed, pageActionNamed } from './tool-groups';
 
-const SCREENSHOT_TOOL = 'page_screenshot';
-const PICK_TOOL = 'page_pickElement';
-const CAPTCHA_TOOL = 'page_solveCaptcha';
-const EXTRACT_TOOL = 'page_extractText';
+const EXTRACT_ACTION = 'page.extractText';
+
+const RENDERERS: Record<string, (result: ActionResult, fenceWith?: string) => ToolReply> = {
+  'page.screenshot': renderScreenshot,
+  'page.pickElement': renderPick,
+  'page.solveCaptcha': renderCaptcha,
+  [FOCUS_SHOT_ACTION]: renderFocusShot,
+};
+
+const OPEN_SKILL = {
+  name: OPEN_SKILL_TOOL,
+  description: `Open the guide to one of these less common capabilities: how to go about it, then its tools with their input schemas.\n${GROUP_INDEX}`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: { name: { type: 'string', enum: Object.keys(TOOL_GROUPS), description: 'The capability whose guide to open.' } },
+    required: ['name'],
+    additionalProperties: false,
+  },
+};
 
 const FOCUS_SHOT_TOOL = {
   name: toolNameFor(FOCUS_SHOT_ACTION),
@@ -132,16 +150,46 @@ interface HostOptions {
 }
 
 export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy, tag }: HostOptions): ToolHost {
+  const invoke = (action: string, args: Record<string, unknown>, signal?: AbortSignal) =>
+    bridge.invoke(action, resultBytes && action === EXTRACT_ACTION ? fitRead(args, resultBytes) : args, signal);
+
+  const present = (action: string, result: ActionResult) =>
+    (RENDERERS[action] ?? render)(result, shouldFence(action, policy) ? tag : undefined);
+
+  const openSkill = async ({ name }: Record<string, unknown>): Promise<ToolReply> => {
+    const group = typeof name === 'string' ? groupNamed(name) : undefined;
+    if (!group) return render(failure('UNKNOWN_SKILL', `There is no guide named "${String(name ?? '')}". The guides are:\n${GROUP_INDEX}`));
+    const guide = groupGuide(group, (await bridge.describe()).tools, loadSkills());
+    return guide.ok ? { content: [{ type: 'text', text: guide.data }] } : render(guide);
+  };
+
+  const withSchema = async (action: string, result: ActionResult): Promise<ActionResult> => {
+    if (result.ok || result.error.code !== 'INVALID_INPUT') return result;
+    const schema = (await bridge.describe()).tools.find((tool) => tool.name === action)?.inputSchema;
+    return schema ? failure('INVALID_INPUT', `${result.error.message}\n${toolNameFor(action)} takes: ${JSON.stringify(schema)}`) : result;
+  };
+
+  const use = async ({ action: named, input, ...flat }: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply> => {
+    const action = typeof named === 'string' ? pageActionNamed(named) : undefined;
+    if (!action) {
+      return render(
+        failure(
+          'UNKNOWN_ACTION',
+          `There is no browser action named "${String(named ?? '')}". Open the guide that covers what you need with ${OPEN_SKILL_TOOL}:\n${GROUP_INDEX}`,
+        ),
+      );
+    }
+    const args = inputFrom(input ?? flat);
+    if (!args) return render(failure('INVALID_INPUT', `input must be an object, or a JSON string of one, holding ${toolNameFor(action)}'s parameters.`));
+    return present(action, await withSchema(action, await invoke(action, args, signal)));
+  };
+
   const answer = async (name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply> => {
     if (name === STATUS_TOOL) return render(await status(bridge));
+    if (name === OPEN_SKILL_TOOL) return openSkill(args);
+    if (name === USE_TOOL) return use(args, signal);
     const action = actionNameFor(name);
-    const result = await bridge.invoke(action, resultBytes && name === EXTRACT_TOOL ? fitRead(args, resultBytes) : args, signal);
-    const fenceWith = shouldFence(action, policy) ? tag : undefined;
-    if (name === SCREENSHOT_TOOL) return renderScreenshot(result);
-    if (name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
-    if (name === PICK_TOOL) return renderPick(result, fenceWith);
-    if (name === CAPTCHA_TOOL) return renderCaptcha(result, fenceWith);
-    return render(result, fenceWith);
+    return present(action, await invoke(action, args, signal));
   };
 
   return {
@@ -157,6 +205,7 @@ export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy
               'Report whether the Browsentic browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
             inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
           },
+          OPEN_SKILL,
           ...RESERVED_TOOLS.filter((tool) => reserved.includes(tool.action)).map((tool) => tool.descriptor),
         ],
         withheld: withheld.map(listed),
@@ -202,6 +251,21 @@ function withinLimit(reply: ToolReply, resultBytes: number): ToolReply {
       },
     ],
   };
+}
+
+/** An action's input as a model sends it: an object, or that object as a JSON string, which some CLIs pass instead. */
+function inputFrom(input: unknown): Record<string, unknown> | undefined {
+  const value = typeof input === 'string' ? parseJson(input) : input;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function parseJson(text: string): unknown {
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 const listed = (action: ToolDescriptor): ListedTool => ({

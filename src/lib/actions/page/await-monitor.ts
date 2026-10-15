@@ -4,6 +4,7 @@ import { ActionError, defineAction } from '../core';
 
 export const awaitMonitor = defineAction({
   name: 'page.awaitMonitor',
+  group: 'monitoring',
   description:
     'Block until a background monitor completes, then return its final state with the full log. ' +
     'A reply with settled: false means the timeout passed while the watch continues — call again to keep waiting; that is normal, not an error. ' +

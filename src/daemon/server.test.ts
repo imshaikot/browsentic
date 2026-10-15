@@ -1,4 +1,5 @@
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -11,6 +12,7 @@ import { toolNameFor } from '@/lib/actions/tool-names';
 import { configPath } from './agent/config';
 import type { Bridge, BridgeStatus } from './control';
 import { FENCE_NOTE, IMAGE_NOTE } from './guardrails';
+import { stateDir } from './lockfile';
 import { createMcpServer } from './server';
 
 const KEY = 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345';
@@ -64,26 +66,55 @@ afterEach(() => {
 });
 
 describe('the tool list', () => {
-  test('mirrors the action registry, plus the status tool', async () => {
+  test('mirrors the action registry, plus the status tool and the guide opener', async () => {
     const { tools } = await (await connect(fakeBridge().bridge)).listTools();
     expect(tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))).toEqual([
       ...describeActions().map((action) => ({ name: toolNameFor(action.name), description: action.description, inputSchema: action.inputSchema })),
       expect.objectContaining({ name: 'browsentic_status' }),
+      expect.objectContaining({ name: 'browsentic_openSkill' }),
     ]);
+  });
+
+  test('the guide opener names every guide, in the words of the need, with a schema that takes only those names', async () => {
+    const { tools } = await (await connect(fakeBridge().bridge)).listTools();
+    const opener = tools.find((tool) => tool.name === 'browsentic_openSkill')!;
+    expect({
+      lines: opener.description!.split('\n').slice(1).map((line) => line.split(':')[0]),
+      captcha: opener.description!.includes('- captcha: get past a “verify you are human” check'),
+      names: (opener.inputSchema.properties as { name: { enum: string[] } }).name.enum,
+    }).toEqual({
+      lines: ['- captcha', '- theming', '- diagnostics', '- monitoring', '- downloads', '- drag'],
+      captcha: true,
+      names: ['captcha', 'theming', 'diagnostics', 'monitoring', 'downloads', 'drag'],
+    });
+  });
+
+  test('the server instructions carry the same index, well inside what a client keeps of them', async () => {
+    const instructions = (await connect(fakeBridge().bridge)).getInstructions() ?? '';
+    expect({
+      opener: instructions.includes('opened with browsentic_openSkill'),
+      chromium: instructions.includes('- diagnostics: read the console errors, exceptions and failed requests behind a page that misbehaves (Chromium browsers only)'),
+      kept: instructions.length < 4_096,
+    }).toEqual({ opener: true, chromium: true, kept: true });
   });
 
   test('a reserved tool is listed only when the daemon offers it to this caller', async () => {
     const offered = (reserved: string[]) => fakeBridge({}, {}, describeActions(), reserved).bridge;
     const names = async (bridge: Bridge) => (await (await connect(bridge, { agentRun: true })).listTools()).tools.slice(-2).map((tool) => tool.name);
     expect([await names(offered([FOCUS_SHOT_ACTION])), await names(offered([]))]).toEqual([
-      ['browsentic_status', toolNameFor(FOCUS_SHOT_ACTION)],
-      [toolNameFor(describeActions().at(-1)!.name), 'browsentic_status'],
+      ['browsentic_openSkill', toolNameFor(FOCUS_SHOT_ACTION)],
+      ['browsentic_status', 'browsentic_openSkill'],
     ]);
   });
 
   test('a daemon too old to say what it offers leaves an agent run with both reserved tools', async () => {
     const { tools } = await (await connect(fakeBridge().bridge, { agentRun: true })).listTools();
-    expect(tools.slice(-3).map((tool) => tool.name)).toEqual(['browsentic_status', toolNameFor(SAVE_SITE_MAP_ACTION), toolNameFor(FOCUS_SHOT_ACTION)]);
+    expect(tools.slice(-4).map((tool) => tool.name)).toEqual([
+      'browsentic_status',
+      'browsentic_openSkill',
+      toolNameFor(SAVE_SITE_MAP_ACTION),
+      toolNameFor(FOCUS_SHOT_ACTION),
+    ]);
   });
 
   test('an extension that describes an action no MCP client could call is refused, not passed on', async () => {
@@ -282,6 +313,147 @@ describe('a picked element', () => {
   test('with no pick attached to the instruction, the focus shot is the failure it returned', async () => {
     const client = await connect(fakeBridge({ [FOCUS_SHOT_ACTION]: failure('NO_FOCUS', 'No element was picked.') }).bridge, { agentRun: true });
     expect(await call(client, toolNameFor(FOCUS_SHOT_ACTION))).toMatchObject({ isError: true });
+  });
+});
+
+describe('a guide', () => {
+  const open = async (name: unknown, tools?: ToolDescriptor[]) => call(await connect(fakeBridge({}, {}, tools).bridge), 'browsentic_openSkill', { name });
+
+  test("opens with its skill, then each of its tools with the description and schema it is listed with", async () => {
+    const [text] = texts(await open('drag'));
+    const drag = describeActions().find((action) => action.name === 'page.dragElement')!;
+    expect(text).toBe(
+      `# The drag guide\n\n## Its tools\n\nCall them by name, as you would any other tool.\n\n` +
+        `### page_dragElement\n${drag.description}\nInput schema: ${JSON.stringify(drag.inputSchema)}`,
+    );
+  });
+
+  test('monitoring teaches watching and timers, in that order, and lists all eight tools', async () => {
+    const [text] = texts(await open('monitoring'));
+    expect({
+      order: text.indexOf('You are setting up a watch') < text.indexOf('The extension keeps the clock'),
+      tools: [...text.matchAll(/^### (\S+)$/gm)].map((match) => match[1]),
+    }).toEqual({
+      order: true,
+      tools: ['page_findProgress', 'page_startMonitor', 'page_monitorStatus', 'page_awaitMonitor', 'page_stopMonitor', 'page_startTimer', 'page_timerStatus', 'page_stopTimer'],
+    });
+  });
+
+  test('a skill the user rewrote is the one the guide opens with', async () => {
+    mkdirSync(join(stateDir, 'skills'), { recursive: true });
+    writeFileSync(join(stateDir, 'skills', 'captcha.md'), '---\nname: captcha\ndescription: mine\n---\nAsk me before any captcha.\n');
+    try {
+      const [text] = texts(await open('captcha'));
+      expect(text.startsWith('# The captcha guide\n\nAsk me before any captcha.\n\n## Its tools')).toBe(true);
+    } finally {
+      rmSync(join(stateDir, 'skills'), { recursive: true, force: true });
+    }
+  });
+
+  test('opens by its skill or any of its tools as well as by its own name', async () => {
+    const heading = async (name: string) => texts(await open(name))[0].split('\n')[0];
+    expect(await Promise.all(['theming', 'page-theming', 'page_applyTheme', 'page.readTheme', 'auditContrast', 'scheduled-jobs'].map(heading))).toEqual([
+      '# The theming guide',
+      '# The theming guide',
+      '# The theming guide',
+      '# The theming guide',
+      '# The theming guide',
+      '# The monitoring guide',
+    ]);
+  });
+
+  test('names what this run is not offered, and refuses a guide with nothing to offer', async () => {
+    const phone = describeActions().filter((action) => ['page.findProgress', 'page.startTimer', 'page.timerStatus', 'page.stopTimer'].includes(action.name));
+    const monitoring = await open('monitoring', phone);
+    const firefox = await open('captcha', describeActions('firefox'));
+    expect({
+      offered: [...texts(monitoring)[0].matchAll(/^### (\S+)$/gm)].map((match) => match[1]),
+      missing: texts(monitoring)[0].endsWith('Not offered in this run: page_startMonitor, page_monitorStatus, page_awaitMonitor, page_stopMonitor.'),
+      firefox: [firefox.isError, texts(firefox)[0]],
+    }).toEqual({
+      offered: ['page_findProgress', 'page_startTimer', 'page_timerStatus', 'page_stopTimer'],
+      missing: true,
+      firefox: [true, 'UNAVAILABLE: None of the captcha tools are offered in this run; they run only in a Chromium browser such as Chrome or Edge, on a computer.'],
+    });
+  });
+
+  test('an unknown name is answered with every guide there is', async () => {
+    const reply = await open('sliders');
+    expect([reply.isError, texts(reply)[0].split('\n').slice(0, 2)]).toEqual([
+      true,
+      ['UNKNOWN_SKILL: There is no guide named "sliders". The guides are:', '- captcha: get past a “verify you are human” check: reCAPTCHA, hCaptcha, Turnstile (Chromium browsers only)'],
+    ]);
+  });
+});
+
+describe('a call through browsentic_use', () => {
+  test('reaches the bridge exactly as the listed tool would, and reads back the same', async () => {
+    const answers = { 'page.dragElement': success({ dropped: true }) };
+    const direct = fakeBridge(answers);
+    const through = fakeBridge(answers);
+    const input = { from: { text: 'Card' }, to: { text: 'Done' } };
+    const replies = [
+      await call(await connect(direct.bridge), 'page_dragElement', input),
+      await call(await connect(through.bridge), 'browsentic_use', { action: 'page_dragElement', input }),
+    ];
+    expect([through.asked, replies[1].content.length, texts(replies[1])[0].replace(/[0-9a-f]{8,}/g, '')]).toEqual([
+      direct.asked,
+      replies[0].content.length,
+      texts(replies[0])[0].replace(/[0-9a-f]{8,}/g, ''),
+    ]);
+  });
+
+  test('takes the action as its tool, its action or bare, and the input as an object, a JSON string or flat', async () => {
+    const { bridge, asked } = fakeBridge({ 'page.solveCaptcha': success({ state: 'solved' }) });
+    const client = await connect(bridge);
+    await call(client, 'browsentic_use', { action: 'page_solveCaptcha', input: { tiles: [1] } });
+    await call(client, 'browsentic_use', { action: 'page.solveCaptcha', input: '{"tiles":[2]}' });
+    await call(client, 'browsentic_use', { action: 'solveCaptcha', tiles: [3] });
+    await call(client, 'browsentic_use', { action: 'solveCaptcha' });
+    expect(asked).toEqual([
+      ['page.solveCaptcha', { tiles: [1] }],
+      ['page.solveCaptcha', { tiles: [2] }],
+      ['page.solveCaptcha', { tiles: [3] }],
+      ['page.solveCaptcha', {}],
+    ]);
+  });
+
+  test("renders a result as its own tool does: an open captcha comes back as its picture", async () => {
+    const challenge = { kind: 'tiles', prompt: 'Select all buses', image: PNG, imageWidth: 300, imageHeight: 300 };
+    const client = await connect(fakeBridge({ 'page.solveCaptcha': success({ state: 'challenge', challenge }) }).bridge);
+    const reply = await call(client, 'browsentic_use', { action: 'solveCaptcha' });
+    expect(reply.content.map((part) => part.type)).toEqual(['text', 'image', 'text']);
+  });
+
+  test('invalid input comes back with the schema to correct it by', async () => {
+    const client = await connect(fakeBridge({ 'page.dragElement': failure('INVALID_INPUT', '✖ Invalid input') }).bridge);
+    const [text] = texts(await call(client, 'browsentic_use', { action: 'dragElement', input: { from: 3 } }));
+    const schema = describeActions().find((action) => action.name === 'page.dragElement')!.inputSchema;
+    expect(text).toBe(`INVALID_INPUT: ✖ Invalid input\npage_dragElement takes: ${JSON.stringify(schema)}`);
+  });
+
+  test('input that is not an object is refused before it reaches the browser', async () => {
+    const { bridge, asked } = fakeBridge();
+    const reply = await call(await connect(bridge), 'browsentic_use', { action: 'dragElement', input: '[1, 2' });
+    expect([reply.isError, texts(reply)[0], asked]).toEqual([
+      true,
+      "INVALID_INPUT: input must be an object, or a JSON string of one, holding page_dragElement's parameters.",
+      [],
+    ]);
+  });
+
+  test('an action that does not exist, or is not a page action, is answered with the guides and never invoked', async () => {
+    const { bridge, asked } = fakeBridge();
+    const client = await connect(bridge);
+    const replies = await Promise.all(['page_sliders', 'browsentic_status', 'browsentic_use'].map((action) => call(client, 'browsentic_use', { action })));
+    expect([replies.map((reply) => texts(reply)[0].split('\n')[0]), asked]).toEqual([
+      [
+        'UNKNOWN_ACTION: There is no browser action named "page_sliders". Open the guide that covers what you need with browsentic_openSkill:',
+        'UNKNOWN_ACTION: There is no browser action named "browsentic_status". Open the guide that covers what you need with browsentic_openSkill:',
+        'UNKNOWN_ACTION: There is no browser action named "browsentic_use". Open the guide that covers what you need with browsentic_openSkill:',
+      ],
+      [],
+    ]);
   });
 });
 

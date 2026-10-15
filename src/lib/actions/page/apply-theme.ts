@@ -30,6 +30,7 @@ const UNINVERT = 'invert(1) hue-rotate(180deg)';
 
 export const applyTheme = defineAction({
   name: 'page.applyTheme',
+  group: 'theming',
   description:
     'Retheme the page, or put it back. Prefers the page’s own terms — it switches on the dark/light hook its stylesheets ' +
     'already define (a ".dark" class, a [data-theme] attribute), sets color-scheme, and overrides the design tokens you name. ' +

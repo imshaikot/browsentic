@@ -119,6 +119,7 @@ async function nativeDrag(source: HTMLElement, plan: DragPath) {
 
 export const dragElement = defineAction({
   name: 'page.dragElement',
+  group: 'drag',
   description:
     'Drag one thing onto another — reorder a list, move a card between columns, pull a slider handle, draw on a canvas. Give a "from" element (or "fromPoint") to pick up and a "to" element (or "toPoint") to drop on. Both ends must be on screen at the same moment, because nothing auto-scrolls mid-drag. The web has two unrelated drag mechanisms and "auto" chooses between them by reading the grabbed element: "pointer" presses, moves and releases a pointer, which is what dnd-kit, react-beautiful-dnd, sliders and canvases listen for; "native" fires the HTML5 dragstart/dragover/drop sequence with a DataTransfer, which is what an element carrying draggable="true" expects. The drop point is measured before the drag starts, so a list that reflows as you pass over it can land a slot out — raise "steps" and "settleMs", then read the result back. Set "trusted" when the page ignores synthetic events; that path is pointer-only, Chrome-only, and shows the “Browsentic is debugging this browser” bar. If nothing moved, check "accepted" and try the other mode.',
   input: z.object({

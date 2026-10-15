@@ -49,6 +49,9 @@ surprise here.
 - **`browsentic_status`**: whether the extension is connected, its version, the active tab, any
   running monitors, and a `hint` naming the fix when something is wrong. Call it first when a page
   tool fails.
+- **`browsentic_openSkill`**: the guide to a less common capability (captcha, theming,
+  diagnostics, monitoring, downloads, drag) and the tools for it. The server's instructions list
+  the guides, so the agent knows what to open.
 - **Three read-only resources**, which return page context without spending a tool call:
 
 | Resource | Use when |

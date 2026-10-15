@@ -18,6 +18,7 @@ interface Candidate {
 
 export const findProgress = defineAction({
   name: 'page.findProgress',
+  group: 'monitoring',
   description:
     'Scan the page for progress signals worth monitoring: progress bars, percent readouts, spinners and busy regions, each with a selector for page.startMonitor. ' +
     'An empty candidates list with no titlePercent means the page shows nothing measurable — ask the user what completion looks like instead of starting a monitor.',

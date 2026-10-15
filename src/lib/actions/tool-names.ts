@@ -8,10 +8,19 @@ export function toolNameFor(actionName: string): string {
 }
 
 export const STATUS_TOOL = toolNameFor(`${RESERVED_PREFIX}status`);
+export const OPEN_SKILL_TOOL = toolNameFor(`${RESERVED_PREFIX}openSkill`);
+export const USE_TOOL = toolNameFor(`${RESERVED_PREFIX}use`);
 
 /** Every tool a side-panel run is offered, for a CLI that has to be told each one by name. */
 export function agentRunToolNames(actionNames: Iterable<string>): string[] {
-  return [...[...actionNames].map(toolNameFor), STATUS_TOOL, toolNameFor(SAVE_SITE_MAP_ACTION), toolNameFor(FOCUS_SHOT_ACTION)];
+  return [
+    ...[...actionNames].map(toolNameFor),
+    STATUS_TOOL,
+    OPEN_SKILL_TOOL,
+    USE_TOOL,
+    toolNameFor(SAVE_SITE_MAP_ACTION),
+    toolNameFor(FOCUS_SHOT_ACTION),
+  ];
 }
 
 export function actionNameFor(toolName: string): string {

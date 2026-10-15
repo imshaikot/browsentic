@@ -24,6 +24,12 @@ export const clickElement = defineAction({
 });
 ```
 
+An action that only some tasks need also names its `group`: `captcha`, `theming`, `diagnostics`,
+`monitoring`, `downloads` or `drag`. [`src/lib/actions/groups.ts`](../../src/lib/actions/groups.ts)
+gives each group its line in the index and the skills that teach it, and `browsentic_openSkill`
+opens a group as one guide. Ungrouped actions are the core. The group never leaves the daemon's
+own copy of the registry, so it changes neither the descriptors nor the manifest hash.
+
 `describeActions()` turns that array into tool descriptors by converting each zod schema to JSON
 Schema. The daemon serves those descriptors to MCP clients, so **a tool cannot describe a capability
 the browser does not have**: both are generated from the same source.
@@ -75,7 +81,9 @@ ordinary MCP client. `browsentic_saveSiteMap` is published as a tool **only** to
 spawned inside an agent run.
 
 `browsentic_status` is not in the registry either: the MCP server answers it directly by combining
-daemon state with a one-element `page.getPageInfo` and the current monitor list.
+daemon state with a one-element `page.getPageInfo` and the current monitor list. Nor is
+`browsentic_openSkill`, which the MCP server answers from the groups, the skills in effect (a
+user's own copy of a skill wins) and the tools this caller is offered.
 
 ---
 

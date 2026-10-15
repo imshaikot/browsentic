@@ -15,14 +15,14 @@ human-readable copy; `yarn daemon:manifest` prints the machine listing (see
 **Names.** An action is namespaced with dots, a tool with underscores: action `page.fillInput` is
 published as tool `page_fillInput`. The mapping is mechanical, so this page names each tool once
 and the action is implied. Actions under the reserved `browsentic.` prefix are daemon verbs, not
-registry actions. Of those, only `browsentic_status` (always) and `browsentic_saveSiteMap`
-(mapping runs only) become tools.
+registry actions. Of those, `browsentic_status` and `browsentic_openSkill` are always tools, and
+`browsentic_saveSiteMap` becomes one in mapping runs only.
 
 Tools by group:
 
 | Group | Tools |
 | --- | --- |
-| [Status](#status) | `browsentic_status` |
+| [Status and guides](#status-and-guides) | `browsentic_status`, `browsentic_openSkill` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_pickElement`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
@@ -61,13 +61,26 @@ Below, a parameter typed *[target](#element-targets)* is exactly this object.
 
 ---
 
-## Status
+## Status and guides
 
 ### browsentic_status
 
 Report whether the extension is connected, its version, the active tab, any running monitors, and
 a `hint` naming the fix when something is wrong. Call it first when a page tool fails. No
 parameters.
+
+### browsentic_openSkill
+
+Open the guide to a less common capability: the skill that teaches it, then each of its tools with
+its description and input schema. The guides are `captcha`, `theming`, `diagnostics`, `monitoring`
+(monitors and timers), `downloads` and `drag`. Each has a one-line entry in the tool's description
+and in the server's instructions, so an agent can tell which one the page calls for. A guide lists
+only the tools this caller is offered and names the rest; one with nothing to offer, such as
+`captcha` in Firefox, is refused with `UNAVAILABLE`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `name` | string | required | The guide to open. The name of its skill (`page-theming`) or of one of its tools (`page_applyTheme`) opens it too |
 
 ---
 

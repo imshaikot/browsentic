@@ -3,6 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const timerStatus = defineAction({
   name: 'page.timerStatus',
+  group: 'monitoring',
   description:
     'Report on scheduled jobs started with page.startTimer: how many times each has fired, how many fires were skipped because the conversation was still busy, when the next one is due, and the latest log lines.',
   input: z.object({
