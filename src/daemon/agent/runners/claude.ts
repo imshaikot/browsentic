@@ -95,7 +95,7 @@ export const claudeRunner: Runner = {
   // resume, whatever --append-system-prompt says (`--system-prompt-snapshot`, on by default in 2.1.283).
   keepsFirstPrompt: true,
   // ToolSearch is denied, so every listed schema rides along on every turn.
-  delivery: 'on-demand',
+  delivery: () => 'on-demand',
 
   workspace: () => stateDir,
 

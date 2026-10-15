@@ -4,6 +4,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { actions } from '@/lib/actions/registry';
 import { OPEN_SKILL_TOOL, toolNameFor, USE_TOOL } from '@/lib/actions/tool-names';
 import type { Skill } from './agent/skills';
+import type { Described, ToolDelivery } from './control';
 
 const GROUP_NAMES = Object.keys(TOOL_GROUPS) as ToolGroupName[];
 
@@ -39,18 +40,33 @@ export function groupNamed(name: string): ToolGroupName | undefined {
   );
 }
 
-/**
- * The group's skills, then each of its tools this caller is offered, with the schema to call it by,
- * and how: by name, or through browsentic_use for tools left off this caller's list.
- */
-export function groupGuide(
-  group: ToolGroupName,
-  offered: readonly ToolDescriptor[],
-  onDemand: readonly string[],
-  skills: readonly Skill[],
-): ActionResult<string> {
+export interface GroupListing {
+  name: ToolGroupName;
+  /** Its index line, led by its name, which is what a search for it matches. */
+  description: string;
+  tools: ToolDescriptor[];
+}
+
+/** These tools by the group each belongs to, in index order; ungrouped ones are left out. */
+export function groupsOf(tools: readonly ToolDescriptor[]): GroupListing[] {
+  return GROUP_NAMES.map((group) => ({
+    name: group,
+    description: `${group}: ${TOOL_GROUPS[group].index}`,
+    tools: tools.filter((tool) => actions.get(tool.name)?.group === group),
+  })).filter((group) => group.tools.length);
+}
+
+const howToCall = (group: ToolGroupName, first: string, delivery: ToolDelivery) =>
+  ({
+    listed: 'Call them by name, as you would any other tool.',
+    'on-demand': `They are not in your tool list. Call each through ${USE_TOOL}, its name as action and its parameters as input: {"action": "${first}", "input": {...}}.`,
+    namespaced: `They load when you search for them: tool_search with "${group}" loads them all, then call each by name. Inside exec they are tools.${group}__<tool>, such as tools.${group}__${first}.`,
+  })[delivery];
+
+/** The group's skills, then each of its tools this caller is offered, with the schema to call it by, and how to call it. */
+export function groupGuide(group: ToolGroupName, offer: Described, skills: readonly Skill[]): ActionResult<string> {
   const members = membersOf(group).map((action) => action.name);
-  const tools = offered.filter((tool) => members.includes(tool.name));
+  const tools = offer.tools.filter((tool) => members.includes(tool.name));
   const missing = members.filter((name) => !tools.some((tool) => tool.name === name)).map(toolNameFor);
   if (!tools.length) {
     return failure(
@@ -65,10 +81,7 @@ export function groupGuide(
       `# The ${group} guide`,
       ...bodies,
       '## Its tools',
-      tools.some((tool) => onDemand.includes(tool.name))
-        ? `They are not in your tool list. Call each through ${USE_TOOL}, its name as action and its parameters as input: ` +
-          `{"action": "${toolNameFor(tools[0].name)}", "input": {...}}.`
-        : 'Call them by name, as you would any other tool.',
+      howToCall(group, toolNameFor(tools[0].name), tools.some((tool) => offer.onDemand?.includes(tool.name)) ? (offer.delivery ?? 'on-demand') : 'listed'),
       ...tools.map((tool) => `### ${toolNameFor(tool.name)}\n${tool.description}\nInput schema: ${JSON.stringify(tool.inputSchema)}`),
       ...(missing.length ? [`Not offered in this run: ${missing.join(', ')}.`] : []),
     ].join('\n\n'),

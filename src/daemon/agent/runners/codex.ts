@@ -32,6 +32,8 @@ const SANDBOX_CONFIG = ['-c', 'sandbox_mode="read-only"', '-c', 'approval_policy
 /** A Codex whose app-server turned a conversation down, so later turns go straight to `exec`. */
 const noConversation = new Set<string>();
 
+const heldOverStdin = (settings: AgentSettings) => settings.transport !== 'exec' && !noConversation.has(settings.bin);
+
 /**
  * The shell and the image viewer read the machine, and a run has the page for that. A code-mode
  * model keeps its `exec` and reaches the browser tools from inside it, and the sub-agents it can
@@ -111,7 +113,7 @@ ${keepToThePage(research)}`;
  */
 const holdingTheBrowser = (research: boolean) => `# Your browser tools in Codex
 
-Your browsentic tools — \`page_getPageInfo\`, \`page_clickElement\` and the rest — are in your tool list. If the only way you can call a tool is \`exec\`, they are there as \`tools.page_getPageInfo({ ... })\` and the like; a result that holds a picture comes back as text whose first line is a \`data:image/\` URL, and passing that line to \`image()\` is how you see it.
+Your browsentic tools — \`page_getPageInfo\`, \`page_clickElement\` and the rest — are in your tool list. If the only way you can call a tool is \`exec\`, they are there as \`tools.page_getPageInfo({ ... })\` and the like; a result that holds a picture comes back as text whose first line is a \`data:image/\` URL, and passing that line to \`image()\` is how you see it. The less common ones, under the guides \`browsentic_openSkill\` names, load on demand: \`tool_search\` for the guide's name loads them, and inside \`exec\` they are \`tools.<guide>__<tool>\`, such as \`tools.captcha__page_solveCaptcha\`.
 
 ${keepToThePage(research)}`;
 
@@ -173,6 +175,8 @@ export const codexRunner: Runner = {
   efforts: ['low', 'medium', 'high', 'xhigh'],
   opens: ['text', 'image'],
   keepsFirstPrompt: true,
+  // `exec` defers every MCP tool behind Codex's own search already.
+  delivery: (settings) => (heldOverStdin(settings) ? 'namespaced' : 'listed'),
 
   workspace: () => stateDir,
 
@@ -191,7 +195,7 @@ export const codexRunner: Runner = {
    */
   converse(context: StreamContext): Conversation | null {
     const { settings, research } = context;
-    if (settings.transport === 'exec' || noConversation.has(settings.bin)) return null;
+    if (!heldOverStdin(settings)) return null;
     return appServerTurn(context, {
       plan: {
         cwd: this.workspace('run'),

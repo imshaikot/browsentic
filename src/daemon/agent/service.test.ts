@@ -72,7 +72,12 @@ describe('what a phone run is offered', () => {
   });
 
   test('a desktop run beside it is offered what it always was', async () => {
-    expect(await offerTo('d', { sessionId: 's2' })).toEqual({ withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION], onDemand: names.filter(grouped) });
+    expect(await offerTo('d', { sessionId: 's2' })).toEqual({
+      withheld: CODE_TOOLS,
+      reserved: [FOCUS_SHOT_ACTION],
+      onDemand: names.filter(grouped),
+      delivery: 'on-demand',
+    });
   });
 
   test('a phone run leaves the tool list the browser describes, and so its hash, as it was', async () => {
@@ -103,8 +108,8 @@ describe("what a run's tool list holds", () => {
 
   test('the page-code tools only with Live tool on, and the pick’s screenshot either way', async () => {
     expect([await offerTo('a', { sessionId: 's1' }), await offerTo('b', { sessionId: 's2', liveTools: true })]).toEqual([
-      { withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION], onDemand: [] },
-      { withheld: [], reserved: [FOCUS_SHOT_ACTION], onDemand: [] },
+      { withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION], onDemand: [], delivery: 'on-demand' },
+      { withheld: [], reserved: [FOCUS_SHOT_ACTION], onDemand: [], delivery: 'on-demand' },
     ]);
   });
 
@@ -135,9 +140,26 @@ describe('the tools a run reaches on demand', () => {
     expect([first?.onDemand, next?.onDemand]).toEqual([names.filter(grouped), names.filter(grouped)]);
   });
 
-  test('are none on a CLI that looks a schema up only when it needs one', async () => {
+  test('are none on a CLI that looks a schema up only when it needs one, Codex on exec among them', async () => {
+    const offered = async (runId: string, config: object) => {
+      writeFileSync(configPath, JSON.stringify(config));
+      const { onDemand, delivery } = (await offerTo(runId, { sessionId: runId }))!;
+      return { onDemand, delivery };
+    };
+    const codex = onlyAgent('codex', '/nonexistent/codex');
+    expect([
+      await offered('cursor', onlyAgent('cursor', '/nonexistent/cursor')),
+      await offered('exec', { ...codex, agents: { ...codex.agents, codex: { bin: '/nonexistent/codex', transport: 'exec' } } }),
+    ]).toEqual([
+      { onDemand: [], delivery: 'listed' },
+      { onDemand: [], delivery: 'listed' },
+    ]);
+  });
+
+  test("are namespaced on Codex held over stdin, for its own search to load", async () => {
     writeFileSync(configPath, JSON.stringify(onlyAgent('codex', '/nonexistent/codex')));
-    expect((await offerTo('c', { sessionId: 's1' }))?.onDemand).toEqual([]);
+    const offer = await offerTo('c', { sessionId: 's1' });
+    expect([offer?.onDemand, offer?.delivery]).toEqual([names.filter(grouped), 'namespaced']);
   });
 
   test('on the phone, are only the grouped ones the phone runs', async () => {

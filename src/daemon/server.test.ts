@@ -10,13 +10,17 @@ import { describeActions } from '@/lib/actions/registry';
 import { FOCUS_SHOT_ACTION, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
 import { toolNameFor } from '@/lib/actions/tool-names';
 import { configPath } from './agent/config';
-import type { Bridge, BridgeStatus } from './control';
-import { FENCE_NOTE, IMAGE_NOTE } from './guardrails';
+import type { Bridge, BridgeStatus, Described } from './control';
+import { FENCE_NOTE, IMAGE_NOTE, policyFrom } from './guardrails';
 import { stateDir } from './lockfile';
 import { grouped } from './tool-groups';
 import { createMcpServer } from './server';
+import { toolHost } from './tool-host';
 
 const KEY = 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+const GROUPED = describeActions()
+  .filter((action) => grouped(action.name))
+  .map((action) => action.name);
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 
 type Answer = (action: string, input: unknown) => ActionResult;
@@ -26,14 +30,13 @@ function fakeBridge(
   answers: Record<string, ActionResult> | Answer = {},
   status: Partial<BridgeStatus> = {},
   tools: ToolDescriptor[] = describeActions(),
-  reserved?: string[],
-  onDemand?: string[],
+  offer: Omit<Described, 'tools'> = {},
 ) {
   const asked: [string, unknown][] = [];
   const listeners: (() => void)[] = [];
   const answer: Answer = typeof answers === 'function' ? answers : (action) => answers[action] ?? failure('UNKNOWN_ACTION', action);
   const bridge: Bridge = {
-    describe: async () => ({ tools, reserved, onDemand }),
+    describe: async () => ({ tools, ...offer }),
     invoke: async (action, input) => {
       asked.push([action, input]);
       return answer(action, input);
@@ -106,8 +109,8 @@ describe('the tool list', () => {
   });
 
   test('a run that reaches the grouped tools on demand lists the rest, then the tool that runs those', async () => {
-    const onDemand = describeActions().filter((action) => grouped(action.name)).map((action) => action.name);
-    const { tools } = await (await connect(fakeBridge({}, {}, describeActions(), [], onDemand).bridge, { agentRun: true })).listTools();
+    const onDemand = GROUPED;
+    const { tools } = await (await connect(fakeBridge({}, {}, describeActions(), { reserved: [], onDemand, delivery: 'on-demand' }).bridge, { agentRun: true })).listTools();
     expect(tools.map((tool) => tool.name)).toEqual([
       ...describeActions().filter((action) => !onDemand.includes(action.name)).map((action) => toolNameFor(action.name)),
       'browsentic_status',
@@ -116,8 +119,50 @@ describe('the tool list', () => {
     ]);
   });
 
+  test('a namespaced run lists every tool to an MCP client, which takes no namespaces, and its guides say to call them by name', async () => {
+    const offer = { reserved: [], onDemand: GROUPED, delivery: 'namespaced' as const };
+    const client = await connect(fakeBridge({}, {}, describeActions(), offer).bridge, { agentRun: true });
+    const { tools } = await client.listTools();
+    const [guide] = texts(await call(client, 'browsentic_openSkill', { name: 'drag' }));
+    expect([tools.length, tools.some((tool) => tool.name === 'browsentic_use'), guide.split('\n\n')[2]]).toEqual([
+      describeActions().length + 2,
+      false,
+      'Call them by name, as you would any other tool.',
+    ]);
+  });
+
+  test("a namespaced run hands a CLI that takes namespaces each group apart, named and described by its index line, for the CLI's own search", async () => {
+    const offer = { reserved: [], onDemand: GROUPED, delivery: 'namespaced' as const };
+    const host = toolHost(fakeBridge({}, {}, describeActions(), offer).bridge, { agentRun: true, namespaces: true, policy: policyFrom(undefined), tag: 'tag' });
+    const { tools, groups } = await host.list();
+    const [guide] = texts((await host.call('browsentic_openSkill', { name: 'captcha' })) as Awaited<ReturnType<typeof call>>);
+    expect({
+      listed: tools.map((tool) => tool.name).filter((name) => GROUPED.map(toolNameFor).includes(name) || name === 'browsentic_use'),
+      groups: groups.map((group) => [group.description.split(':')[0], group.name, group.tools.map((tool) => tool.name)]),
+      captcha: groups[0].description,
+      guide: guide.split('\n\n').find((part) => part.startsWith('They load')),
+    }).toEqual({
+      listed: [],
+      groups: [
+        ['captcha', 'captcha', ['page_findCaptcha', 'page_solveCaptcha']],
+        ['theming', 'theming', ['page_readTheme', 'page_auditContrast', 'page_applyTheme']],
+        ['diagnostics', 'diagnostics', ['page_startDiagnostics', 'page_readConsole', 'page_readNetwork', 'page_stopDiagnostics']],
+        [
+          'monitoring',
+          'monitoring',
+          ['page_findProgress', 'page_startMonitor', 'page_monitorStatus', 'page_awaitMonitor', 'page_stopMonitor', 'page_startTimer', 'page_timerStatus', 'page_stopTimer'],
+        ],
+        ['downloads', 'downloads', ['page_captureDownload', 'page_listDownloads']],
+        ['drag', 'drag', ['page_dragElement']],
+      ],
+      captcha: 'captcha: get past a “verify you are human” check: reCAPTCHA, hCaptcha, Turnstile',
+      guide:
+        'They load when you search for them: tool_search with "captcha" loads them all, then call each by name. Inside exec they are tools.captcha__<tool>, such as tools.captcha__page_findCaptcha.',
+    });
+  });
+
   test('a reserved tool is listed only when the daemon offers it to this caller', async () => {
-    const offered = (reserved: string[]) => fakeBridge({}, {}, describeActions(), reserved).bridge;
+    const offered = (reserved: string[]) => fakeBridge({}, {}, describeActions(), { reserved }).bridge;
     const names = async (bridge: Bridge) => (await (await connect(bridge, { agentRun: true })).listTools()).tools.slice(-2).map((tool) => tool.name);
     expect([await names(offered([FOCUS_SHOT_ACTION])), await names(offered([]))]).toEqual([
       ['browsentic_openSkill', toolNameFor(FOCUS_SHOT_ACTION)],
@@ -347,8 +392,8 @@ describe('a guide', () => {
   });
 
   test('tells a run that reaches its tools on demand to call them through browsentic_use', async () => {
-    const onDemand = describeActions().filter((action) => grouped(action.name)).map((action) => action.name);
-    const client = await connect(fakeBridge({}, {}, describeActions(), [], onDemand).bridge);
+    const onDemand = GROUPED;
+    const client = await connect(fakeBridge({}, {}, describeActions(), { reserved: [], onDemand, delivery: 'on-demand' }).bridge);
     const [text] = texts(await call(client, 'browsentic_openSkill', { name: 'drag' }));
     expect(text.split('\n\n')[2]).toBe(
       'They are not in your tool list. Call each through browsentic_use, its name as action and its parameters as input: {"action": "page_dragElement", "input": {...}}.',

@@ -2,6 +2,7 @@ import type { TokenUsage } from '@/lib/actions/protocol';
 import type { AgentKind, AgentProblem } from '@/lib/agents/catalog';
 import type { FileKind } from '@/lib/files/report';
 import type { AgentSettings } from '../config';
+import type { ToolDelivery } from '../../control';
 import type { ToolHost } from '../../tool-host';
 
 /** `run` drives the browser and resumes conversations; `task` is a one-shot with no browser. */
@@ -32,13 +33,6 @@ export interface Plan {
    */
   prepare?: string[][];
 }
-
-/**
- * `listed`: every tool in the run's list, for a CLI that keeps schemas out of the model's context
- * until it looks one up. `on-demand`: the grouped tools are left off the list and called through
- * browsentic_use, for a CLI that sends every schema it is given on every turn.
- */
-export type ToolDelivery = 'listed' | 'on-demand';
 
 /** What a CLI does to every tool call, which the daemon has to work inside of. */
 export interface CallLimits {
@@ -151,8 +145,8 @@ export interface Runner {
   keepsFirstPrompt?: boolean;
   /** Limits this CLI puts on a browser tool call; unset where it waits and takes whatever comes. */
   limits?: CallLimits;
-  /** How a run's less common browser tools reach the model; `listed` when unsaid. */
-  delivery?: ToolDelivery;
+  /** How a run's grouped browser tools reach the model with these settings; `listed` when unsaid. */
+  delivery?(settings: AgentSettings): ToolDelivery;
   json(context: JsonContext): Plan;
   /** What a one-shot of this CLI is known to open when handed a file. Text alone when unsaid. */
   opens?: readonly FileKind[];

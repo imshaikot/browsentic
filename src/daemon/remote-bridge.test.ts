@@ -66,8 +66,9 @@ describe('asking the daemon', () => {
       { name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} },
       { name: 'page.dragElement', description: 'Drag', inputSchema: {} },
     ];
-    answer = ({ id }) => ({ id, op: 'describe', tools, reserved: ['browsentic.focusShot'], onDemand: ['page.dragElement'] });
-    expect(await bridge.describe()).toEqual({ tools, reserved: ['browsentic.focusShot'], onDemand: ['page.dragElement'] });
+    const offer = { reserved: ['browsentic.focusShot'], onDemand: ['page.dragElement'], delivery: 'namespaced' as const };
+    answer = ({ id }) => ({ id, op: 'describe', tools, ...offer });
+    expect(await bridge.describe()).toStrictEqual({ tools, ...offer, withheld: undefined });
   });
 
   test('an action, stamped with the run it belongs to', async () => {

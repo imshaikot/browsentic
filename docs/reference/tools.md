@@ -90,7 +90,9 @@ OpenCode or Mistral Vibe lists only the core tools, because those CLIs send the 
 tool they are given on every turn. The tools of the guides above are left off its list, and the
 agent calls them through `browsentic_use` once a guide, a skill or a result has named one. The call
 goes the way the tool's own call would: the same approvals, guardrails, blocked sites and steps in
-the panel, and the same result. Every other caller lists every tool and is not offered this one.
+the panel, and the same result. A run on Codex's app-server gets each guide's tools as a namespace
+that Codex's own `tool_search` loads, and every other caller lists every tool. Neither is offered
+this one.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |

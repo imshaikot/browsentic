@@ -15,6 +15,7 @@ const host = () => {
         { name: 'page_shot', description: 'Shot', inputSchema: schema },
       ],
       withheld: [{ name: 'page_runCode', description: 'Run page code', inputSchema: schema }],
+      groups: [{ name: 'drag', description: 'drag: drag one thing onto another', tools: [{ name: 'page_dragElement', description: 'Drag', inputSchema: schema }] }],
     })),
     call: vi.fn(async (name: string) =>
       name === 'page_shot'
@@ -62,7 +63,7 @@ const response = (id: number) => recorded.find((line) => JSON.parse(line).id ===
 const sent = (written: Record<string, unknown>[], method: string) => written.find((message) => message.method === method);
 
 describe('the handshake', () => {
-  test("starts a thread with the browser tools as its own, the withheld ones out of sight, and every server of the user's switched off", async () => {
+  test("starts a thread with the browser tools as its own, each group and the withheld ones out of sight, and every server of the user's switched off", async () => {
     const { written, feed } = hold({ bin: 'codex-handshake' });
     expect(written[0]).toMatchObject({ id: 1, method: 'initialize', params: { capabilities: { experimentalApi: true } } });
     await feed(response(1), response(2));
@@ -83,6 +84,12 @@ describe('the handshake', () => {
       tools: [
         { type: 'function', name: 'page_echo', description: 'Echo', inputSchema: schema, deferLoading: false },
         { type: 'function', name: 'page_shot', description: 'Shot', inputSchema: schema, deferLoading: false },
+        {
+          type: 'namespace',
+          name: 'drag',
+          description: 'drag: drag one thing onto another',
+          tools: [{ type: 'function', name: 'page_dragElement', description: 'Drag', inputSchema: schema, deferLoading: true }],
+        },
         {
           type: 'namespace',
           name: 'browsentic',
@@ -138,6 +145,17 @@ describe('a recorded turn', () => {
       ],
       end: ['done', 'end_turn'],
     });
+  });
+
+  test('a tool its search loaded from a group is answered by its name, with no row for the search itself', async () => {
+    const { written, tools, calls, feed } = hold({ bin: 'codex-searched' });
+    await feed(...transcript('codex', '0.155.1-tool-search.jsonl'));
+    expect({
+      called: vi.mocked(tools.call).mock.calls.map(([name]) => name),
+      answered: written.filter((message) => 'result' in message && !('method' in message)).map((message) => message.id),
+      rows: calls.filter(([signal]) => signal === 'tool' || signal === 'toolResult'),
+      end: calls.at(-1),
+    }).toEqual({ called: ['page_solveCaptcha'], answered: [0], rows: [], end: ['done', 'end_turn'] });
   });
 
   test('a message that came whole, without deltas, is said once when it completes', async () => {

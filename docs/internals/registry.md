@@ -28,7 +28,8 @@ An action that only some tasks need also names its `group`: `captcha`, `theming`
 `monitoring`, `downloads` or `drag`. [`src/lib/actions/groups.ts`](../../src/lib/actions/groups.ts)
 gives each group its line in the index and the skills that teach it, and `browsentic_openSkill`
 opens a group as one guide. Ungrouped actions are the core. A side-panel run on a CLI that sends
-every schema on every turn lists only the core and calls the grouped ones through `browsentic_use`
+every schema on every turn lists only the core, and calls the grouped ones through `browsentic_use`
+or, on Codex's app-server, loads them by its own search, each group a namespace
 ([Agent runs](agent-runs.md#runners)). The group never leaves the daemon's
 own copy of the registry, so it changes neither the descriptors nor the manifest hash.
 

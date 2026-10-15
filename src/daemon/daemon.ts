@@ -788,6 +788,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         reserved: offer.reserved,
         withheld: running[0].tools.filter(({ name }) => withheld(name)),
         onDemand: offer.onDemand,
+        delivery: offer.delivery,
       };
     }
 
