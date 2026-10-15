@@ -15,14 +15,15 @@ human-readable copy; `yarn daemon:manifest` prints the machine listing (see
 **Names.** An action is namespaced with dots, a tool with underscores: action `page.fillInput` is
 published as tool `page_fillInput`. The mapping is mechanical, so this page names each tool once
 and the action is implied. Actions under the reserved `browsentic.` prefix are daemon verbs, not
-registry actions. Of those, `browsentic_status` and `browsentic_openSkill` are always tools, and
+registry actions. Of those, `browsentic_status` and `browsentic_openSkill` are always tools,
+`browsentic_use` is one in the side-panel runs that reach the less common tools on demand, and
 `browsentic_saveSiteMap` becomes one in mapping runs only.
 
 Tools by group:
 
 | Group | Tools |
 | --- | --- |
-| [Status and guides](#status-and-guides) | `browsentic_status`, `browsentic_openSkill` |
+| [Status and guides](#status-and-guides) | `browsentic_status`, `browsentic_openSkill`, `browsentic_use` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_pickElement`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
@@ -81,6 +82,20 @@ only the tools this caller is offered and names the rest; one with nothing to of
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
 | `name` | string | required | The guide to open. The name of its skill (`page-theming`) or of one of its tools (`page_applyTheme`) opens it too |
+
+### browsentic_use
+
+Run a page tool that is not in this caller's tool list, by name. A side-panel run on Claude Code,
+OpenCode or Mistral Vibe lists only the core tools, because those CLIs send the description of every
+tool they are given on every turn. The tools of the guides above are left off its list, and the
+agent calls them through `browsentic_use` once a guide, a skill or a result has named one. The call
+goes the way the tool's own call would: the same approvals, guardrails, blocked sites and steps in
+the panel, and the same result. Every other caller lists every tool and is not offered this one.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `action` | string | required | The tool to run: `page_dragElement`, `page.dragElement` and `dragElement` all name it. Anything that is not a page tool is answered with `UNKNOWN_ACTION` and the list of guides |
+| `input` | object | `{}` | Its parameters, as its own schema has them. A JSON string of the object is taken too. Input the tool refuses comes back as `INVALID_INPUT` with its schema |
 
 ---
 

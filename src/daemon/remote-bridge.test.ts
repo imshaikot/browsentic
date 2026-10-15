@@ -62,9 +62,12 @@ describe('connecting to the daemon', () => {
 
 describe('asking the daemon', () => {
   test('the tools it describes', async () => {
-    const tools = [{ name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} }];
-    answer = ({ id }) => ({ id, op: 'describe', tools, reserved: ['browsentic.focusShot'] });
-    expect(await bridge.describe()).toEqual({ tools, reserved: ['browsentic.focusShot'] });
+    const tools = [
+      { name: 'page.getPageInfo', description: 'Read the page', inputSchema: {} },
+      { name: 'page.dragElement', description: 'Drag', inputSchema: {} },
+    ];
+    answer = ({ id }) => ({ id, op: 'describe', tools, reserved: ['browsentic.focusShot'], onDemand: ['page.dragElement'] });
+    expect(await bridge.describe()).toEqual({ tools, reserved: ['browsentic.focusShot'], onDemand: ['page.dragElement'] });
   });
 
   test('an action, stamped with the run it belongs to', async () => {

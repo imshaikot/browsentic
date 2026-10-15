@@ -59,7 +59,7 @@ export type ControlRequest =
   | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
 
 export type ControlMessage =
-  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
+  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[]; onDemand?: string[] }
   | { id: string; op: 'status'; status: BridgeStatus }
   | { id: string; op: 'invoke'; result: ActionResult }
   | { id: string; op: 'working' }
@@ -84,6 +84,11 @@ export interface Described {
    * them out of sight up front; a call to one while it is withheld is refused.
    */
   withheld?: ToolDescriptor[];
+  /**
+   * Actions in `tools` this run calls through browsentic_use rather than from its tool list, found
+   * through the guides. A caller that does not know the field lists them as it always has.
+   */
+  onDemand?: string[];
 }
 
 export interface Bridge {

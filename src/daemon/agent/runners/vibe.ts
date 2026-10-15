@@ -38,6 +38,7 @@ export const vibeRunner: Runner = {
   versionArgs: ['--version'],
   efforts: [],
   endsOnExit: true,
+  delivery: 'on-demand',
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'vibe', mode),
 

@@ -118,6 +118,20 @@ Codex also cuts any tool result at 10,000 tokens by default, a limit its model c
 `// @exec: {"max_output_tokens": 25000}`; only the prompt can ask for that, so it does. It also
 asks for page reads in pieces.
 
+**Three CLIs send every tool they are given on every turn, so their runs list only the core.**
+Claude Code (whose own `ToolSearch` is denied), Mistral Vibe and OpenCode declare
+`Runner.delivery: 'on-demand'`. For their runs `offerFor` names every
+[grouped action](registry.md) in `onDemand`, which the describe reply carries beside `withheld`, and
+the tool host leaves those off the list and adds `browsentic_use`. The agent finds them through
+`browsentic_openSkill`, whose description and the server's instructions carry one line per group,
+and the guide it opens says to call them through `browsentic_use`. That call reaches
+`invokeForRun()` with the action itself, so its approval, guardrails, phone gate, step in the panel
+and rendered result are the ones the tool's own call would get. The set depends only on the runner,
+the browser's actions and the phone, never on the message, so a conversation's list stays the same
+from one turn to the next. Vibe and OpenCode are not granted the grouped tools by name, since they
+never see them. Every other CLI is `listed`: it already keeps schemas out of the model's context
+until they are looked up, and a second level of lookup would only lose the schema-checked call.
+
 **A CLI with limits on a tool call declares them** (`Runner.limits`), and the daemon works inside
 them so the run does not have to discover them. Cursor abandons a call at 60 s (the MCP SDK's
 default request timeout, which it never overrides) and puts text over 40,000 bytes in a file the run
@@ -169,7 +183,7 @@ Code 2.1.283) with a stand-in model endpoint
 
 | | Claude Code | Codex (app-server, the default) | Codex (`exec`) |
 | --- | --- | --- | --- |
-| Browser tools in the model's list | all of them | all of them, from the first request; a code-mode model gets each declared inside `exec` | deferred behind `tool_search`; a code-mode model reaches them only inside `exec`, and the prompt says so |
+| Browser tools in the model's list | the core, with the rest through `browsentic_openSkill` and `browsentic_use` | all of them, from the first request; a code-mode model gets each declared inside `exec` | deferred behind `tool_search`; a code-mode model reaches them only inside `exec`, and the prompt says so |
 | The user's own MCP servers | kept out by `--strict-mcp-config` | switched off one by one in the thread's config, from the list `config/read` gives; one that starts anyway stops the run | kept out by `--ignore-user-config`: a `-c` merges into `config.toml`, so `mcp_servers={}` cleared nothing, and keys on the user's own `browsentic` entry (an `enabled_tools` list) landed on the run's |
 | The user's defaults | `settings.json` applies | the whole of `config.toml` except its MCP servers: model, provider, profile | the `model` and `model_reasoning_effort` at the top of `config.toml`, carried over by hand; nothing else in the file |
 | Shell and disk | denied by name | `features.shell_tool=false` and `features.view_image=false` on its argv; `apply_patch` as on `exec` | `features.shell_tool=false` and `features.view_image=false`, which remove the tools from every model and every sub-agent; `apply_patch` has no switch and the read-only sandbox refuses its writes |

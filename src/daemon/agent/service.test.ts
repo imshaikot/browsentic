@@ -5,15 +5,23 @@ import { FOCUS_SHOT_ACTION } from '@/lib/actions/reserved';
 import type { RunEvent } from '@/lib/actions/protocol';
 import { failure, success } from '@/lib/actions/protocol';
 import { profilePath } from '../profile';
+import { grouped } from '../tool-groups';
 import { configPath } from './config';
 import { stubCli } from './runners/fixtures/support';
 import { AgentSession } from './service';
 import { hashManifest } from '@/lib/actions/manifest';
 import { describeActions } from '@/lib/actions/registry';
-import { PHONE_TOOLS } from '@/lib/phone/features';
+import { PHONE_TOOLS, phoneOffers } from '@/lib/phone/features';
 import type { PhoneContext } from '@/lib/phone/types';
+import { AGENT_KINDS, type AgentKind } from '@/lib/agents/catalog';
 
 const CODE_TOOLS = ['page.injectCode', 'page.runCode'];
+
+/** Only the named agent can be found, so the readiness probe starts none of the CLIs installed on this machine. */
+const onlyAgent = (agent: AgentKind, bin: string) => ({
+  agent,
+  agents: Object.fromEntries(AGENT_KINDS.map((kind) => [kind, { bin: kind === agent ? bin : `/nonexistent/${kind}` }])),
+});
 
 let session: AgentSession;
 let ended: string[];
@@ -21,7 +29,7 @@ let ended: string[];
 beforeEach(() => {
   // No agent to find, so every run is refused once it has been admitted — after its offer can be read.
   mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, JSON.stringify({ claudeBin: '/nonexistent/claude' }));
+  writeFileSync(configPath, JSON.stringify(onlyAgent('claude', '/nonexistent/claude')));
   ended = [];
   session = new AgentSession({
     invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
@@ -64,7 +72,7 @@ describe('what a phone run is offered', () => {
   });
 
   test('a desktop run beside it is offered what it always was', async () => {
-    expect(await offerTo('d', { sessionId: 's2' })).toEqual({ withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION] });
+    expect(await offerTo('d', { sessionId: 's2' })).toEqual({ withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION], onDemand: names.filter(grouped) });
   });
 
   test('a phone run leaves the tool list the browser describes, and so its hash, as it was', async () => {
@@ -95,8 +103,8 @@ describe("what a run's tool list holds", () => {
 
   test('the page-code tools only with Live tool on, and the pick’s screenshot either way', async () => {
     expect([await offerTo('a', { sessionId: 's1' }), await offerTo('b', { sessionId: 's2', liveTools: true })]).toEqual([
-      { withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION] },
-      { withheld: [], reserved: [FOCUS_SHOT_ACTION] },
+      { withheld: CODE_TOOLS, reserved: [FOCUS_SHOT_ACTION], onDemand: [] },
+      { withheld: [], reserved: [FOCUS_SHOT_ACTION], onDemand: [] },
     ]);
   });
 
@@ -109,10 +117,74 @@ describe("what a run's tool list holds", () => {
   });
 });
 
+describe('the tools a run reaches on demand', () => {
+  const names = describeActions('chromium').map(({ name }) => name);
+
+  beforeEach(() => {
+    session = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void (event.kind === 'error' && ended.push(runId)),
+      draft: () => {},
+      actionNames: () => names,
+    });
+  });
+
+  test('are the grouped ones, on a CLI that sends every schema it is given on every turn, and the same for every message', async () => {
+    const first = await offerTo('a', { sessionId: 's1' });
+    const next = await offerTo('b', { sessionId: 's1', liveTools: true });
+    expect([first?.onDemand, next?.onDemand]).toEqual([names.filter(grouped), names.filter(grouped)]);
+  });
+
+  test('are none on a CLI that looks a schema up only when it needs one', async () => {
+    writeFileSync(configPath, JSON.stringify(onlyAgent('codex', '/nonexistent/codex')));
+    expect((await offerTo('c', { sessionId: 's1' }))?.onDemand).toEqual([]);
+  });
+
+  test('on the phone, are only the grouped ones the phone runs', async () => {
+    const offer = await offerTo('p', { sessionId: 's1', phone: PHONE });
+    expect([offer?.onDemand, offer?.onDemand.filter((name) => offer.withheld.includes(name))]).toEqual([
+      names.filter((name) => grouped(name) && phoneOffers(name)),
+      [],
+    ]);
+  });
+
+  test('are not granted by name to a CLI that is told every tool it may call, and the tool that runs them is', async () => {
+    const dir = `${dirname(configPath)}/vibe-grants`;
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const vibe = stubCli(
+      join(dir, 'vibe'),
+      `const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log('2.25.5');
+  process.exit(0);
+}
+fs.copyFileSync('.vibe/config.toml', ${JSON.stringify(`${dir}/config.toml`)});`,
+    );
+    writeFileSync(configPath, JSON.stringify(onlyAgent('vibe', vibe)));
+    const done: string[] = [];
+    const granting = new AgentSession({
+      invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
+      emit: (runId: string, event: RunEvent) => void ((event.kind === 'done' || event.kind === 'error') && done.push(runId)),
+      draft: () => {},
+      actionNames: () => names,
+    });
+    granting.handle({ t: 'instruct', id: 'v', text: 'click Sign in', context: { sessionId: 's1' } });
+    await vi.waitFor(() => expect(done).toContain('v'), { timeout: 5_000 });
+    granting.dispose();
+
+    const granted = [...readFileSync(`${dir}/config.toml`, 'utf8').matchAll(/^\[tools\."browsentic_(.+)"\]$/gm)].map((match) => match[1]);
+    expect({
+      grouped: granted.filter((tool) => grouped(tool.replace('_', '.'))),
+      own: ['page_clickElement', 'browsentic_openSkill', 'browsentic_use'].filter((tool) => granted.includes(tool)),
+    }).toEqual({ grouped: [], own: ['page_clickElement', 'browsentic_openSkill', 'browsentic_use'] });
+  });
+});
+
 describe('answering a captcha', () => {
   test('asks once, then lets the rest of that run’s rounds through without asking again', async () => {
     const agent = stubCli(join(dirname(configPath), 'agent-that-waits'), 'setTimeout(() => {}, 30_000);');
-    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
     const events: RunEvent[] = [];
     const invoked: string[] = [];
     const waiting = new AgentSession({
@@ -146,7 +218,7 @@ describe('answering a captcha', () => {
 describe('an approval, on an agent that abandons a call before the user answers', () => {
   const tracked = async (agent: 'cursor' | 'claude') => {
     const bin = stubCli(join(dirname(configPath), `${agent}-that-waits`), 'setTimeout(() => {}, 30_000);');
-    writeFileSync(configPath, JSON.stringify(agent === 'cursor' ? { agent, agents: { cursor: { bin } } } : { claudeBin: bin }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent(agent, bin)));
     const events: RunEvent[] = [];
     const invoked: [string, unknown][] = [];
     const running = new AgentSession({
@@ -242,7 +314,7 @@ describe('an approval, on an agent that abandons a call before the user answers'
 describe('a wait inside a call, on an agent that abandons a call at 60 s', () => {
   const invokedWith = async (agent: 'cursor' | 'claude', action: string, input: unknown) => {
     const bin = stubCli(join(dirname(configPath), `${agent}-that-waits`), 'setTimeout(() => {}, 30_000);');
-    writeFileSync(configPath, JSON.stringify(agent === 'cursor' ? { agent, agents: { cursor: { bin } } } : { claudeBin: bin }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent(agent, bin)));
     let seen: unknown;
     const running = new AgentSession({
       invoke: async (_action, given) => {
@@ -299,7 +371,7 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
   console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
 });`,
     );
-    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
     const done: string[] = [];
     const turns = new AgentSession({
       invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),
@@ -349,7 +421,7 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
   console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
 });`,
     );
-    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
     const saveProfile = (email: string) =>
       writeFileSync(profilePath, JSON.stringify({ fields: { email }, details: [], instructions: 'Always choose the cheapest shipping.' }));
     const done: string[] = [];
@@ -410,7 +482,7 @@ process.stdin.on('data', (chunk) => (heard += chunk)).on('end', () => {
   console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, stop_reason: 'end_turn', result: 'ok' }));
 });`,
     );
-    writeFileSync(configPath, JSON.stringify({ claudeBin: agent }));
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
     const done: string[] = [];
     const turns = new AgentSession({
       invoke: async () => failure('EXTENSION_OFFLINE', 'no browser'),

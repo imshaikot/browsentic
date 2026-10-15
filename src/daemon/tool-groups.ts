@@ -2,7 +2,7 @@ import { TOOL_GROUPS, type ToolGroupName } from '@/lib/actions/groups';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { actions } from '@/lib/actions/registry';
-import { OPEN_SKILL_TOOL, toolNameFor } from '@/lib/actions/tool-names';
+import { OPEN_SKILL_TOOL, toolNameFor, USE_TOOL } from '@/lib/actions/tool-names';
 import type { Skill } from './agent/skills';
 
 const GROUP_NAMES = Object.keys(TOOL_GROUPS) as ToolGroupName[];
@@ -18,6 +18,8 @@ export const GROUP_INDEX = GROUP_NAMES.map(
 export const GROUPS_NOTE =
   `Less common capabilities each have a guide, opened with ${OPEN_SKILL_TOOL}: how to go about it, then its tools with their ` +
   `input schemas. Open one when the page calls for it:\n${GROUP_INDEX}`;
+
+export const grouped = (action: string) => actions.get(action)?.group !== undefined;
 
 /** A page action the registry knows, named as an action, as its tool, or bare: page.dragElement, page_dragElement, dragElement. */
 export function pageActionNamed(name: string): string | undefined {
@@ -37,8 +39,16 @@ export function groupNamed(name: string): ToolGroupName | undefined {
   );
 }
 
-/** The group's skills, then each of its tools this caller is offered, with the schema to call it by. */
-export function groupGuide(group: ToolGroupName, offered: readonly ToolDescriptor[], skills: readonly Skill[]): ActionResult<string> {
+/**
+ * The group's skills, then each of its tools this caller is offered, with the schema to call it by,
+ * and how: by name, or through browsentic_use for tools left off this caller's list.
+ */
+export function groupGuide(
+  group: ToolGroupName,
+  offered: readonly ToolDescriptor[],
+  onDemand: readonly string[],
+  skills: readonly Skill[],
+): ActionResult<string> {
   const members = membersOf(group).map((action) => action.name);
   const tools = offered.filter((tool) => members.includes(tool.name));
   const missing = members.filter((name) => !tools.some((tool) => tool.name === name)).map(toolNameFor);
@@ -55,7 +65,10 @@ export function groupGuide(group: ToolGroupName, offered: readonly ToolDescripto
       `# The ${group} guide`,
       ...bodies,
       '## Its tools',
-      'Call them by name, as you would any other tool.',
+      tools.some((tool) => onDemand.includes(tool.name))
+        ? `They are not in your tool list. Call each through ${USE_TOOL}, its name as action and its parameters as input: ` +
+          `{"action": "${toolNameFor(tools[0].name)}", "input": {...}}.`
+        : 'Call them by name, as you would any other tool.',
       ...tools.map((tool) => `### ${toolNameFor(tool.name)}\n${tool.description}\nInput schema: ${JSON.stringify(tool.inputSchema)}`),
       ...(missing.length ? [`Not offered in this run: ${missing.join(', ')}.`] : []),
     ].join('\n\n'),

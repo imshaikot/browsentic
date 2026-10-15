@@ -36,7 +36,9 @@ run, and the message carries the *fix*. In the **Origin** column, Daemon is Brow
 | `ACTION_FAILED` | Action | `execute()` threw, e.g. `back` with no history |
 | `PICK_CANCELLED` | Content script | The user dismissed A-Eye without pointing at anything, or a newer pick took over the lens. **Terminal**: ask in words rather than asking them to point again |
 | `NO_FOCUS_SHOT` | Daemon | `browsentic_focusShot` was called on a run whose instruction carried no A-Eye pick, so there is no picture to show |
-| `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, or a reserved action reached from outside |
+| `UNKNOWN_ACTION` | Registry / daemon | Tool-registry skew, a reserved action reached from outside, or a `browsentic_use` call naming no page tool, answered with the list of guides |
+| `UNKNOWN_SKILL` | Daemon | `browsentic_openSkill` was given a name no guide answers to. The message lists the guides |
+| `UNAVAILABLE` | Daemon | None of a guide's tools are offered to this caller: captcha and diagnostics outside a Chromium browser on a computer, or a guide the phone cannot run |
 
 ## Diagnostics
 

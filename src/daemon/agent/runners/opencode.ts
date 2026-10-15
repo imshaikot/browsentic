@@ -74,6 +74,7 @@ export const opencodeRunner: Runner = {
   // Passed as --variant, whose names each model defines; a model ignores one it lacks.
   efforts: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   endsOnExit: true,
+  delivery: 'on-demand',
 
   workspace: (mode: RunMode) => join(stateDir, 'agents', 'opencode', mode),
 

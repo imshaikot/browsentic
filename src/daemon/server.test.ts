@@ -13,6 +13,7 @@ import { configPath } from './agent/config';
 import type { Bridge, BridgeStatus } from './control';
 import { FENCE_NOTE, IMAGE_NOTE } from './guardrails';
 import { stateDir } from './lockfile';
+import { grouped } from './tool-groups';
 import { createMcpServer } from './server';
 
 const KEY = 'sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz012345';
@@ -21,12 +22,18 @@ const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 type Answer = (action: string, input: unknown) => ActionResult;
 
 /** A bridge that answers each action from a table, and remembers what it was asked. */
-function fakeBridge(answers: Record<string, ActionResult> | Answer = {}, status: Partial<BridgeStatus> = {}, tools: ToolDescriptor[] = describeActions(), reserved?: string[]) {
+function fakeBridge(
+  answers: Record<string, ActionResult> | Answer = {},
+  status: Partial<BridgeStatus> = {},
+  tools: ToolDescriptor[] = describeActions(),
+  reserved?: string[],
+  onDemand?: string[],
+) {
   const asked: [string, unknown][] = [];
   const listeners: (() => void)[] = [];
   const answer: Answer = typeof answers === 'function' ? answers : (action) => answers[action] ?? failure('UNKNOWN_ACTION', action);
   const bridge: Bridge = {
-    describe: async () => ({ tools, reserved }),
+    describe: async () => ({ tools, reserved, onDemand }),
     invoke: async (action, input) => {
       asked.push([action, input]);
       return answer(action, input);
@@ -96,6 +103,17 @@ describe('the tool list', () => {
       chromium: instructions.includes('- diagnostics: read the console errors, exceptions and failed requests behind a page that misbehaves (Chromium browsers only)'),
       kept: instructions.length < 4_096,
     }).toEqual({ opener: true, chromium: true, kept: true });
+  });
+
+  test('a run that reaches the grouped tools on demand lists the rest, then the tool that runs those', async () => {
+    const onDemand = describeActions().filter((action) => grouped(action.name)).map((action) => action.name);
+    const { tools } = await (await connect(fakeBridge({}, {}, describeActions(), [], onDemand).bridge, { agentRun: true })).listTools();
+    expect(tools.map((tool) => tool.name)).toEqual([
+      ...describeActions().filter((action) => !onDemand.includes(action.name)).map((action) => toolNameFor(action.name)),
+      'browsentic_status',
+      'browsentic_openSkill',
+      'browsentic_use',
+    ]);
   });
 
   test('a reserved tool is listed only when the daemon offers it to this caller', async () => {
@@ -325,6 +343,15 @@ describe('a guide', () => {
     expect(text).toBe(
       `# The drag guide\n\n## Its tools\n\nCall them by name, as you would any other tool.\n\n` +
         `### page_dragElement\n${drag.description}\nInput schema: ${JSON.stringify(drag.inputSchema)}`,
+    );
+  });
+
+  test('tells a run that reaches its tools on demand to call them through browsentic_use', async () => {
+    const onDemand = describeActions().filter((action) => grouped(action.name)).map((action) => action.name);
+    const client = await connect(fakeBridge({}, {}, describeActions(), [], onDemand).bridge);
+    const [text] = texts(await call(client, 'browsentic_openSkill', { name: 'drag' }));
+    expect(text.split('\n\n')[2]).toBe(
+      'They are not in your tool list. Call each through browsentic_use, its name as action and its parameters as input: {"action": "page_dragElement", "input": {...}}.',
     );
   });
 

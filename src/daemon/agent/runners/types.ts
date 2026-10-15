@@ -33,6 +33,13 @@ export interface Plan {
   prepare?: string[][];
 }
 
+/**
+ * `listed`: every tool in the run's list, for a CLI that keeps schemas out of the model's context
+ * until it looks one up. `on-demand`: the grouped tools are left off the list and called through
+ * browsentic_use, for a CLI that sends every schema it is given on every turn.
+ */
+export type ToolDelivery = 'listed' | 'on-demand';
+
 /** What a CLI does to every tool call, which the daemon has to work inside of. */
 export interface CallLimits {
   /** The CLI abandons a call that takes longer than this, whatever it is waiting on. */
@@ -144,6 +151,8 @@ export interface Runner {
   keepsFirstPrompt?: boolean;
   /** Limits this CLI puts on a browser tool call; unset where it waits and takes whatever comes. */
   limits?: CallLimits;
+  /** How a run's less common browser tools reach the model; `listed` when unsaid. */
+  delivery?: ToolDelivery;
   json(context: JsonContext): Plan;
   /** What a one-shot of this CLI is known to open when handed a file. Text alone when unsaid. */
   opens?: readonly FileKind[];

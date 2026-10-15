@@ -28,6 +28,22 @@ const OPEN_SKILL = {
   },
 };
 
+const USE = {
+  name: USE_TOOL,
+  description:
+    `Run a browser action that is not in your tool list. A guide from ${OPEN_SKILL_TOOL} gives each one with its input schema, ` +
+    'and a skill or a result may name one, as page.solveCaptcha or page_dragElement: call it here, with that name as action and ' +
+    'its parameters as input. It runs and answers exactly as a tool of its own would.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      action: { type: 'string', description: 'The action to run, e.g. page_dragElement.' },
+      input: { type: 'object', description: 'Its parameters, as its input schema lays them out. Leave it out when there are none.' },
+    },
+    required: ['action'],
+  },
+};
+
 const FOCUS_SHOT_TOOL = {
   name: toolNameFor(FOCUS_SHOT_ACTION),
   description:
@@ -159,7 +175,8 @@ export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy
   const openSkill = async ({ name }: Record<string, unknown>): Promise<ToolReply> => {
     const group = typeof name === 'string' ? groupNamed(name) : undefined;
     if (!group) return render(failure('UNKNOWN_SKILL', `There is no guide named "${String(name ?? '')}". The guides are:\n${GROUP_INDEX}`));
-    const guide = groupGuide(group, (await bridge.describe()).tools, loadSkills());
+    const { tools, onDemand = [] } = await bridge.describe();
+    const guide = groupGuide(group, tools, onDemand, loadSkills());
     return guide.ok ? { content: [{ type: 'text', text: guide.data }] } : render(guide);
   };
 
@@ -194,11 +211,16 @@ export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy
 
   return {
     async list() {
-      const { tools: actions, reserved = agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [], withheld = [] } = await bridge.describe();
+      const {
+        tools: actions,
+        reserved = agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [],
+        withheld = [],
+        onDemand = [],
+      } = await bridge.describe();
       assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
       return {
         tools: [
-          ...actions.map(listed),
+          ...actions.filter((action) => !onDemand.includes(action.name)).map(listed),
           {
             name: STATUS_TOOL,
             description:
@@ -206,6 +228,7 @@ export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy
             inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
           },
           OPEN_SKILL,
+          ...(onDemand.length ? [USE] : []),
           ...RESERVED_TOOLS.filter((tool) => reserved.includes(tool.action)).map((tool) => tool.descriptor),
         ],
         withheld: withheld.map(listed),

@@ -44,6 +44,7 @@ import {
 } from '../guardrails';
 import { log } from '../log';
 import { readProfile } from '../profile';
+import { grouped } from '../tool-groups';
 import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
@@ -199,21 +200,29 @@ export class AgentSession {
    * What a run's tool list should hold. A tool the run would only be refused is left
    * out: its schema is re-sent on every turn, and listing it invites the call.
    */
-  offerFor(runId: string): { withheld: string[]; reserved: string[] } | null {
+  offerFor(runId: string): { withheld: string[]; reserved: string[]; onDemand: string[] } | null {
     const run = this.runs.get(runId);
     if (!run) return null;
     const codeListed = run.liveTools || (run.sessionId !== undefined && this.codeListed.has(run.sessionId));
     const codeWithheld = codeListed ? [] : [INJECT_ACTION, RUN_CODE_ACTION];
+    const offered = (withheld: string[]) => this.onDemand(run).filter((name) => !withheld.includes(name));
     if (run.phone) {
       const offPhone = this.deps.actionNames().filter((name) => !phoneOffers(name));
-      return { withheld: [...new Set([...offPhone, ...codeWithheld])], reserved: [FOCUS_SHOT_ACTION] };
+      const withheld = [...new Set([...offPhone, ...codeWithheld])];
+      return { withheld, reserved: [FOCUS_SHOT_ACTION], onDemand: offered(withheld) };
     }
     return {
       withheld: codeWithheld,
       // A mapping run never resumes a conversation, so its tool can come and go. A pick
       // comes and goes between the messages of one, so the tool that shows it stays.
       reserved: [...(run.map ? [SAVE_SITE_MAP_ACTION] : []), FOCUS_SHOT_ACTION],
+      onDemand: offered(codeWithheld),
     };
+  }
+
+  /** The grouped actions a run calls through browsentic_use, when its CLI would send their schemas on every turn. */
+  private onDemand(run: ActiveRun): string[] {
+    return RUNNERS[run.config.agent].delivery === 'on-demand' ? this.deps.actionNames().filter(grouped) : [];
   }
 
   /** `signal` aborts when the caller stops waiting for this call, so nothing it asked for outlives it. */
@@ -566,6 +575,7 @@ export class AgentSession {
 
     const allowance = run.map ? run.map.settings.timeoutMs : run.scheduled ? TASK_RUN_MAX_MS : undefined;
     const budget = allowance ? setTimeout(() => run.abort.abort(), allowance) : undefined;
+    const onDemand = this.onDemand(run);
 
     try {
       const outcome = await runInstruction({
@@ -576,7 +586,7 @@ export class AgentSession {
         research: run.map ? run.map.settings.research : false,
         config: run.config,
         sessionId: resuming,
-        mcpTools: agentRunToolNames(this.deps.actionNames()),
+        mcpTools: agentRunToolNames(this.deps.actionNames().filter((name) => !onDemand.includes(name))),
         signal: run.abort.signal,
         emit,
       });

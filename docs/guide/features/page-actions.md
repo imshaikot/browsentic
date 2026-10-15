@@ -4,6 +4,11 @@ The 52 page tools the agent uses to read, click, type, move between tabs and scr
 not name them in an instruction, since the agent picks the tool, but knowing what exists tells you
 what is worth asking for.
 
+On Claude Code, OpenCode and Mistral Vibe, the less common ones (captchas, theming, diagnostics,
+monitors and timers, downloads, dragging) stay out of the agent's tool list until a page calls for
+them, because those agents send the model every tool's description on every turn. The agent opens their
+guide when it needs one, and they then work exactly as the others do.
+
 Every parameter is in [reference/tools.md](../../reference/tools.md).
 
 ---
