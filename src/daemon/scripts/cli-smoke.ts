@@ -214,7 +214,7 @@ try {
   await check('status with the Bridge up', () => {
     const status = browsentic('status');
     says(status, 'bridge:    running on 127.0.0.1:');
-    says(status, 'Chrome can start the Bridge');
+    must(/wake-up: +(.*, )?Chrome(, .*)? can start the Bridge/.test(status.out), 'Chrome cannot start the Bridge', status);
     says(status, 'browsers:  none paired');
   });
   await check('browsers --json', () => {
