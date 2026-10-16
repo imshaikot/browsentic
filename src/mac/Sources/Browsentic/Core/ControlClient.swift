@@ -64,12 +64,53 @@ actor ControlClient {
     }
 
     func revoke(_ session: BrowserSession?) async throws -> Int {
+        try await revoke(session: session?.sessionId, origin: session?.origin)
+    }
+
+    func revoke(session: String?, origin: String? = nil) async throws -> Int {
         var frame: [String: Any] = ["op": "revoke"]
-        if let session {
-            frame["origin"] = session.origin
-            if let id = session.sessionId { frame["session"] = id }
-        }
+        if let origin { frame["origin"] = origin }
+        if let session { frame["session"] = session }
         return try await request(frame, as: Reply<Int>.self, key: "revoked")
+    }
+
+    /// `watch` makes this socket an approver, sent `pair-requests-changed` whenever the list changes.
+    func pairRequests(watch: Bool = true) async throws -> [PairRequest] {
+        try await request(["op": "pairRequests", "watch": watch, "as": "app"], as: Reply<[PairRequest]>.self, key: "requests")
+    }
+
+    /// `request` is a request id, or an install id, which also lets a kept-out browser back in.
+    func decide(_ request: String, allow: Bool, label: String? = nil) async throws {
+        var frame: [String: Any] = ["op": "decide", "request": request, "allow": allow]
+        if let label { frame["label"] = label }
+        try await acknowledged(frame)
+    }
+
+    func pairing(set mode: PairingMode? = nil) async throws -> PairingSetting {
+        var frame: [String: Any] = ["op": "pairing"]
+        if let mode { frame["set"] = mode.rawValue }
+        let setting = try await whole(frame, as: PairingSetting.self)
+        if let error = setting.error { throw BridgeRefusal(message: error) }
+        return setting
+    }
+
+    func blocked() async throws -> [BlockedBrowser] {
+        try await request(["op": "blocked"], as: Reply<[BlockedBrowser]>.self, key: "blocked")
+    }
+
+    /// An empty label goes back to the browser's own name.
+    func label(session: String, _ label: String) async throws {
+        try await acknowledged(["op": "label", "session": session, "label": label])
+    }
+
+    private func acknowledged(_ frame: [String: Any]) async throws {
+        let answer = try await whole(frame, as: Acknowledgement.self)
+        if !answer.ok { throw BridgeRefusal(message: answer.error ?? "Browsentic Bridge said no.") }
+    }
+
+    private func whole<Value: Decodable>(_ frame: [String: Any], as _: Value.Type) async throws -> Value {
+        let data = try await send(frame)
+        do { return try JSONDecoder().decode(Value.self, from: data) } catch { throw ControlError.malformed }
     }
 
     func agent(set: String? = nil, grant: String? = nil) async throws -> AgentState {

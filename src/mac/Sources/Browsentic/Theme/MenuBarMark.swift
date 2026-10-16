@@ -1,11 +1,13 @@
 import AppKit
 
-/// The brand mark for the menu bar, a template so macOS tints it for the bar. Its centre node is hollow while the Bridge is off.
+/// The brand mark for the menu bar, a template so macOS tints it for the bar. Its centre node is hollow while the Bridge is off,
+/// and a dot in the corner says a browser is waiting to be let in.
 enum MenuBarMark {
     static let on = draw(running: true)
     static let off = draw(running: false)
+    static let asking = draw(running: true, asking: true)
 
-    private static func draw(running: Bool) -> NSImage {
+    private static func draw(running: Bool, asking: Bool = false) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { rect in
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             let unit = rect.width / 32
@@ -41,6 +43,14 @@ enum MenuBarMark {
                 if filled { context.fillEllipse(in: circle(x, y, r + 0.3)) }
                 context.setLineWidth(2 * unit)
                 context.strokeEllipse(in: circle(x, y, r))
+            }
+
+            if asking {
+                context.setBlendMode(.clear)
+                context.fillEllipse(in: circle(26.5, 6.5, 7.5))
+                context.setBlendMode(.normal)
+                context.setFillColor(ink)
+                context.fillEllipse(in: circle(26.5, 6.5, 5))
             }
             return true
         }

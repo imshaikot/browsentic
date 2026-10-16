@@ -83,9 +83,17 @@ struct OverviewView: View {
         case .on:
             model.status?.connected == true
                 ? "Open the side panel in your browser and say what you want. This window can close — Browsentic Bridge keeps running."
-                : "Browsentic Bridge is running. Add the extension to your browser below and pair it once, and the side panel comes alive."
+                : "Browsentic Bridge is running. \(addAndConnect)"
         case .off: "Turn it on and the side panel in your browser can reach the agent you already run."
         case .starting, .stopping: "One moment."
+        }
+    }
+
+    private var addAndConnect: String {
+        switch model.pairingMode {
+        case .auto: "Add the extension to your browser below and it connects by itself."
+        case .ask: "Add the extension to your browser below and allow it here when it asks to connect."
+        default: "Add the extension to your browser below and pair it once, and the side panel comes alive."
         }
     }
 }
@@ -174,20 +182,37 @@ struct ConnectCard: View {
 
     var body: some View {
         Card {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionTitle(
-                    title: "Pair a browser",
-                    subtitle: "Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes."
-                )
-                if let pairing = model.pairing {
-                    PairingCodeView(pairing: pairing)
-                } else {
-                    Button { Task { await model.newPairingCode() } } label: { Label("Get a pairing code", systemImage: "key.horizontal") }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(model.busy.contains("pair"))
+            if let mode = model.pairingMode, mode.pairsByItself, model.pairing == nil {
+                HStack(spacing: 16) {
+                    SectionTitle(title: "Connect a browser", subtitle: note(mode))
+                    Spacer(minLength: 0)
+                    codeButton.buttonStyle(QuietButtonStyle())
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    SectionTitle(
+                        title: "Pair a browser",
+                        subtitle: "Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes."
+                    )
+                    if let pairing = model.pairing {
+                        PairingCodeView(pairing: pairing)
+                    } else {
+                        codeButton.buttonStyle(PrimaryButtonStyle())
+                    }
                 }
             }
         }
+    }
+
+    private var codeButton: some View {
+        Button { Task { await model.newPairingCode() } } label: { Label("Get a pairing code", systemImage: "key.horizontal") }
+            .disabled(model.busy.contains("pair"))
+    }
+
+    private func note(_ mode: PairingMode) -> String {
+        mode == .ask
+            ? "Browsers with Browsentic connect by themselves once you allow them here. Need a code instead?"
+            : "Browsers with Browsentic connect by themselves. Need a code instead?"
     }
 }
 
@@ -253,9 +278,12 @@ struct ExtensionCard: View {
     private var unpacked: Bool { showUnpacked ?? (model.stamp != nil) }
 
     private var subtitle: String {
-        model.sessions.contains(where: \.connected)
-            ? "In your browser and talking to Browsentic Bridge. Store copies update themselves."
-            : "Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once."
+        if model.sessions.contains(where: \.connected) { return "In your browser and talking to Browsentic Bridge. Store copies update themselves." }
+        switch model.pairingMode {
+        case .auto: return "Add it from your browser’s store and it connects to Browsentic Bridge by itself."
+        case .ask: return "Add it from your browser’s store, then allow it here when it asks to connect."
+        default: return "Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once."
+        }
     }
 }
 

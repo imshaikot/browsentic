@@ -31,6 +31,8 @@ struct SettingsView: View {
                 }
             }
 
+            PairingCard()
+
             BrowserSettings()
 
             Card {
@@ -102,6 +104,63 @@ struct SettingsView: View {
             .frame(width: 440)
             .background(Palette.ground)
         }
+    }
+}
+
+private struct PairingCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionTitle(title: "Pairing", subtitle: subtitle)
+                VStack(spacing: 6) {
+                    ForEach(PairingMode.allCases) { mode in
+                        PairingOption(mode: mode, selected: model.pairingMode == mode) {
+                            Task { await model.setPairingMode(mode) }
+                        }
+                    }
+                }
+                .disabled(model.pairingMode == nil || model.busy.contains("pairing"))
+            }
+        }
+    }
+
+    private var subtitle: String {
+        if model.daemon != .on { return "Turn Browsentic Bridge on to choose how browsers connect to it." }
+        if model.status != nil, !model.bridgePairs { return "Restart Browsentic Bridge to choose how browsers connect to it." }
+        return "How a browser with Browsentic connects to Browsentic Bridge on this Mac."
+    }
+}
+
+private struct PairingOption: View {
+    let mode: PairingMode
+    let selected: Bool
+    let choose: () -> Void
+    @Environment(\.isEnabled) private var enabled
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 11, style: .continuous)
+        Button(action: choose) {
+            HStack(spacing: 12) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 14))
+                    .foregroundStyle(selected ? Palette.brand : Palette.inkFaint)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(mode.label).font(.system(size: 13, weight: .medium)).foregroundStyle(Palette.ink)
+                    Text(mode.detail).font(.system(size: 11.5)).foregroundStyle(Palette.inkDim)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(selected ? Palette.brand.opacity(0.1) : Palette.ground2, in: shape)
+            .overlay(shape.strokeBorder(selected ? Palette.brand.opacity(0.45) : Palette.line))
+            .opacity(enabled ? 1 : 0.55)
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
