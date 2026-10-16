@@ -11,7 +11,7 @@ import { FOCUS_SHOT_ACTION, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved'
 import { toolNameFor } from '@/lib/actions/tool-names';
 import { configPath } from './agent/config';
 import type { Bridge, BridgeStatus, Described } from './control';
-import { FENCE_NOTE, IMAGE_NOTE, policyFrom } from './guardrails';
+import { FENCE_NOTE, IMAGE_NOTE, INJECT_ACTION, policyFrom } from './guardrails';
 import { stateDir } from './lockfile';
 import { grouped } from './tool-groups';
 import { createMcpServer } from './server';
@@ -159,6 +159,23 @@ describe('the tool list', () => {
       guide:
         'They load when you search for them: tool_search with "captcha" loads them all, then call each by name. Inside exec they are tools.captcha__<tool>, such as tools.captcha__page_findCaptcha.',
     });
+  });
+
+  test('a namespaced run keeps a grouped tool it withholds, as on the phone, in its own group, so exec names it alike on every turn', async () => {
+    const off = ['page.findCaptcha', 'page.solveCaptcha', INJECT_ACTION];
+    const all = describeActions();
+    const offer = {
+      reserved: [],
+      withheld: all.filter((tool) => off.includes(tool.name)),
+      onDemand: GROUPED.filter((name) => !off.includes(name)),
+      delivery: 'namespaced' as const,
+    };
+    const bridge = fakeBridge({}, {}, all.filter((tool) => !off.includes(tool.name)), offer).bridge;
+    const { withheld, groups } = await toolHost(bridge, { agentRun: true, namespaces: true, policy: policyFrom(undefined), tag: 'tag' }).list();
+    expect({
+      withheld: withheld.map((tool) => tool.name),
+      captcha: groups.find((group) => group.name === 'captcha')?.tools.map((tool) => tool.name),
+    }).toEqual({ withheld: [toolNameFor(INJECT_ACTION)], captcha: ['page_findCaptcha', 'page_solveCaptcha'] });
   });
 
   test('a reserved tool is listed only when the daemon offers it to this caller', async () => {
@@ -473,6 +490,15 @@ describe('a call through browsentic_use', () => {
       replies[0].content.length,
       texts(replies[0])[0].replace(/[0-9a-f]{8,}/g, ''),
     ]);
+  });
+
+  test('takes the action as an agent CLI shows its tool', async () => {
+    const { bridge, asked } = fakeBridge({ 'page.dragElement': success({ dragged: true }) });
+    const client = await connect(bridge);
+    for (const action of ['mcp__browsentic__page_dragElement', 'browsentic__page_dragElement', 'browsentic_page_dragElement']) {
+      await call(client, 'browsentic_use', { action, input: { from: 1 } });
+    }
+    expect(asked.map(([action]) => action)).toEqual(['page.dragElement', 'page.dragElement', 'page.dragElement']);
   });
 
   test('takes the action as its tool, its action or bare, and the input as an object, a JSON string or flat', async () => {

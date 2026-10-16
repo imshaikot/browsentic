@@ -81,7 +81,7 @@ only the tools this caller is offered and names the rest; one with nothing to of
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `name` | string | required | The guide to open. The name of its skill (`page-theming`) or of one of its tools (`page_applyTheme`) opens it too |
+| `name` | string | required | The guide to open, one of the six above |
 
 ### browsentic_use
 
@@ -96,7 +96,7 @@ this one.
 
 | Parameter | Type | Default | Purpose |
 | --- | --- | --- | --- |
-| `action` | string | required | The tool to run: `page_dragElement`, `page.dragElement` and `dragElement` all name it. Anything that is not a page tool is answered with `UNKNOWN_ACTION` and the list of guides |
+| `action` | string | required | The tool to run: `page_dragElement`, `page.dragElement`, `dragElement` and the name an agent's CLI shows, such as `mcp__browsentic__page_dragElement`, all name it. Anything that is not a page tool is answered with `UNKNOWN_ACTION` and the list of guides |
 | `input` | object | `{}` | Its parameters, as its own schema has them. A JSON string of the object is taken too. Input the tool refuses comes back as `INVALID_INPUT` with its schema |
 
 ---

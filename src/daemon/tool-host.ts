@@ -6,7 +6,7 @@ import { actionNameFor, assertToolNamesRoundTrip, OPEN_SKILL_TOOL, STATUS_TOOL, 
 import { loadSkills } from './agent/skills';
 import type { Bridge, Described } from './control';
 import { IMAGE_NOTE, fence, sealSecrets, shouldFence, type Policy } from './guardrails';
-import { GROUP_INDEX, groupGuide, groupNamed, groupsOf, pageActionNamed } from './tool-groups';
+import { GROUP_INDEX, groupGuide, grouped, groupNamed, groupsOf, pageActionNamed } from './tool-groups';
 
 const EXTRACT_ACTION = 'page.extractText';
 
@@ -234,6 +234,7 @@ export function toolHost(bridge: Bridge, { agentRun = false, namespaces = false,
       } = await offer();
       assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
       const namespaced = delivery === 'namespaced';
+      const inItsGroup = (tool: ToolDescriptor) => namespaced && grouped(tool.name);
       return {
         tools: [
           ...actions.filter((action) => !onDemand.includes(action.name)).map(listed),
@@ -247,9 +248,12 @@ export function toolHost(bridge: Bridge, { agentRun = false, namespaces = false,
           ...(onDemand.length && !namespaced ? [USE] : []),
           ...RESERVED_TOOLS.filter((tool) => reserved.includes(tool.action)).map((tool) => tool.descriptor),
         ],
-        withheld: withheld.map(listed),
+        withheld: withheld.filter((tool) => !inItsGroup(tool)).map(listed),
         groups: namespaced
-          ? groupsOf(actions.filter((action) => onDemand.includes(action.name))).map((group) => ({ ...group, tools: group.tools.map(listed) }))
+          ? groupsOf([...actions.filter((action) => onDemand.includes(action.name)), ...withheld.filter(inItsGroup)]).map((group) => ({
+              ...group,
+              tools: group.tools.map(listed),
+            }))
           : [],
       };
     },

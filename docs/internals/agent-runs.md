@@ -126,10 +126,10 @@ with the delivery, and the tool host leaves those off the list and adds `browsen
 `browsentic_openSkill`, whose description and the server's instructions carry one line per group,
 and the guide it opens says to call them through `browsentic_use`. That call reaches
 `invokeForRun()` with the action itself, so its approval, guardrails, phone gate, step in the panel
-and rendered result are the ones the tool's own call would get. The set depends only on the runner,
-the browser's actions and the phone, never on the message, so a conversation's list stays the same
-from one turn to the next. Vibe and OpenCode are not granted the grouped tools by name, since they
-never see them.
+and rendered result are the ones the tool's own call would get. The set depends only on the runner
+and the browser's actions, so a conversation's list stays the same from one turn to the next; a
+message on the phone withholds the grouped tools the phone lacks, as it withholds every other tool
+it lacks. Vibe and OpenCode are not granted the grouped tools by name, since they never see them.
 
 Codex held over stdin answers `namespaced`: the tool host hands its runner each group apart, and
 `thread/start` declares every one as a namespace of deferred tools, named after the group and
@@ -239,7 +239,8 @@ runner ──initialize {experimentalApi}──────────► app-s
   lists what the run is offered now, each group goes in a namespace of its own (see
   [Runners](#runners)), and what it withholds (the page-code tools, until the user turns Live tool
   on) goes in a `browsentic` namespace, all with `deferLoading`, which Codex offers only through its
-  search. `Described.withheld` carries those from the daemon. A call to one while it is
+  search. A grouped tool withheld on the phone stays in its group's namespace, so `exec` names it
+  the same on every turn. `Described.withheld` carries those from the daemon. A call to one while it is
   still withheld is refused by `invokeForRun()` as `LIVE_TOOLS_OFF`, as on any other runner.
 - **Only the run's own thread speaks.** A code-mode model's sub-agents run on threads of their own;
   their tool calls are answered, their words are not forwarded.

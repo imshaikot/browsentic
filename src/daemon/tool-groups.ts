@@ -22,9 +22,15 @@ export const GROUPS_NOTE =
 
 export const grouped = (action: string) => actions.get(action)?.group !== undefined;
 
-/** A page action the registry knows, named as an action, as its tool, or bare: page.dragElement, page_dragElement, dragElement. */
+/**
+ * A page action the registry knows, named as an action, as its tool, bare, or as an agent CLI shows
+ * its tool: page.dragElement, page_dragElement, dragElement, mcp__browsentic__page_dragElement.
+ */
 export function pageActionNamed(name: string): string | undefined {
-  const action = `page.${name.trim().replace(/^page[._]/, '')}`;
+  const action = `page.${name
+    .trim()
+    .replace(/^(?:mcp__)?browsentic_{1,2}/, '')
+    .replace(/^page[._]/, '')}`;
   return actions.has(action) ? action : undefined;
 }
 
