@@ -197,15 +197,18 @@ async fn install_update(app: AppHandle) -> Result<()> {
     update::install(&app).await
 }
 
-/// Run by the uninstaller before the app's files go: stop the daemon and take browsentic off the PATH.
+/// Run by the uninstaller before the app's files go: take the browsers' way of starting the daemon
+/// away first, so none starts it again, then stop it and take browsentic off the PATH.
 fn prepare_uninstall() {
     let paths = paths::Paths::from_env();
     if paths.shim().is_file() {
-        let mut stop = std::process::Command::new(paths.shim());
-        stop.arg("stop").current_dir(&paths.home);
-        #[cfg(windows)]
-        std::os::windows::process::CommandExt::creation_flags(&mut stop, 0x0800_0000);
-        let _ = stop.status();
+        for command in ["unregister-host", "stop"] {
+            let mut run = std::process::Command::new(paths.shim());
+            run.arg(command).current_dir(&paths.home);
+            #[cfg(windows)]
+            std::os::windows::process::CommandExt::creation_flags(&mut run, 0x0800_0000);
+            let _ = run.status();
+        }
     }
     let _ = path_env::unlink(&paths.bin());
 }

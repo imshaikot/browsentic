@@ -36,7 +36,8 @@ import { install, InstallError, readStamp } from './install';
 import { logPath, readLockfile, wakeHeld } from './lockfile';
 import { log } from './log';
 import { installKind } from './npx';
-import { installNativeHost, registeredBrowsers, removeNativeHost, serveNativeHost } from './native-host';
+import { installNativeHost, registeredBrowsers, registrationCurrent, removeNativeHost } from './native-host';
+import { serveNativeHost } from './native-messaging';
 import { extensionDir } from './paths';
 import { RELEASES_PAGE, signedAddonAttached } from './firefox-addon';
 import { RemoteBridge } from './remote-bridge';
@@ -137,7 +138,10 @@ switch (command) {
     await uninstall(process.argv.slice(3));
     break;
   case 'native-host':
-    await serveNativeHost(ensureDaemon, wakeHeld);
+    await serveNativeHost({ ensure: (caller) => ensureDaemon({ outsideJob: caller?.family === 'firefox' }), held: wakeHeld });
+    break;
+  case 'unregister-host':
+    unregisterHost();
     break;
   case 'pair':
     await pair();
@@ -283,12 +287,13 @@ function printSkills(): void {
 async function showStatus(): Promise<void> {
   const lock = await probeExisting();
   const waking = registeredBrowsers();
+  const outdated = waking.length && !registrationCurrent() ? ' (an older Bridge registered it: run "browsentic setup")' : '';
   const wake = `wake-up:   ${
     !waking.length
       ? 'not registered — run "browsentic setup"'
       : wakeHeld()
         ? `held since "browsentic stop" — "browsentic start" lets ${waking.join(', ')} start it again`
-        : `${waking.join(', ')} can start the Bridge`
+        : `${waking.join(', ')} can start the Bridge${outdated}`
   }`;
   if (!lock) {
     console.log('bridge:    not running');
@@ -487,7 +492,7 @@ async function setup(argv: string[]): Promise<void> {
     if (!json) {
       console.log(`\n  Browsentic ${pkg.version} — your browser's superpower\n`);
       console.log(`  ✓ Browsentic Bridge  running on 127.0.0.1:${lock.port} (pid ${lock.pid})`);
-      console.log(`  ${wakeLine(wake.browsers)}`);
+      console.log(`  ${wakeLine(wake)}`);
       for (const line of agentLines(await bridge.agent())) console.log(`  ${line}`);
       console.log();
     }
@@ -563,10 +568,17 @@ async function setup(argv: string[]): Promise<void> {
   }
 }
 
-function wakeLine(browsers: string[]): string {
+function wakeLine({ browsers, skipped }: { browsers: string[]; skipped?: string }): string {
+  if (skipped) return `· Wake-up            not registered: ${skipped}`;
   return browsers.length
     ? `✓ Wake-up            ${browsers.join(', ')} can start the Bridge when it is down`
     : '· Wake-up            no supported browser found, so start the Bridge yourself after a reboot';
+}
+
+/** For the Windows app's uninstaller, which leaves the Bridge's files but must not leave browsers able to start it. */
+function unregisterHost(): void {
+  const removed = removeNativeHost();
+  console.log(removed.length ? `Unregistered from ${removed.length} place${removed.length === 1 ? '' : 's'}.` : 'Nothing was registered.');
 }
 
 function agentLines(state: AgentState): string[] {

@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
@@ -76,6 +77,7 @@ import {
 import { ExtensionLink } from './extension-link';
 import { startScheduler } from './schedules/scheduler';
 import { refreshNativeHost } from './native-host';
+import { daemonMainPath } from './ensure-daemon';
 import {
   ANYWHERE,
   INJECT_ACTION,
@@ -108,6 +110,7 @@ function phoneReply(request: PhoneRequest, result: ActionResult<never>): SocketF
 }
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
+const REREGISTER_MS = 60 * 60 * 1000;
 const BINDING_IDLE_MS = 2 * 60 * 1000;
 const BROWSER_LABEL_MAX = 40;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -266,8 +269,12 @@ export async function startDaemon({ version, idleExit = true, android = androidO
   lock.port = port;
   writeLockfile(lock);
   releaseWake();
-  // A registration an older daemon wrote lets in only what it knew, which leaves the store copies out.
-  refreshNativeHost();
+  // A registration an older daemon wrote lets in only what it knew, which leaves the store copies out,
+  // and a browser installed since needs its own; both are put right now and every hour.
+  const reregister = () => refreshNativeHost({ cliPath: join(dirname(daemonMainPath()), 'cli.js') });
+  reregister();
+  const reregistering = setInterval(reregister, REREGISTER_MS);
+  reregistering.unref();
   log(`daemon ${version} listening on 127.0.0.1:${port} (pid ${process.pid})`);
   scheduleIdleExit();
 
@@ -1047,6 +1054,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
 
   async function stop(): Promise<void> {
     if (idleTimer) clearTimeout(idleTimer);
+    clearInterval(reregistering);
     scheduler.stop();
     unwatchConfig();
     for (const watcher of [...androidWatches.keys()]) unwatchAndroid(watcher);
