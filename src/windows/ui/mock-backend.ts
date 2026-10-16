@@ -8,7 +8,7 @@ import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
 import { EMPTY_PROFILE } from '@/lib/settings/profile';
 import type { Source } from '@/lib/stores';
-import type { AgentListing, Backend, BlockedBrowser, CliOutput, InstallStamp, Lockfile, NodeInstall, PairRequestSummary, PairedBy, PairingMode, Preferences } from './backend';
+import type { AgentListing, Backend, BlockedBrowser, CliOutput, InstallStamp, Lockfile, NodeInstall, PairRequestSummary, PairedBy, PairingMode, Preferences, QueuedNotice } from './backend';
 
 /**
  * How the stand-in machine pairs, picked by the address's hash: #ask has two browsers waiting to be
@@ -19,10 +19,12 @@ export type Scenario = 'ask' | 'kept' | 'arrives' | 'code' | 'auto';
 const SCENARIOS: Scenario[] = ['ask', 'kept', 'arrives', 'code', 'auto'];
 const scenarioOf = (hash: string): Scenario => SCENARIOS.find((scenario) => `#${scenario}` === hash) ?? 'auto';
 
-/** The stand-in, with the hands a test needs: a browser asking, and one pairing by itself. */
+/** The stand-in, with the hands a test needs: a browser asking, one pairing by itself, a notice arriving, and Windows turning toasts on or off. */
 export interface MockBackend extends Backend {
   ask(request: PairRequestSummary): void;
   arrive(): void;
+  notify(notice: QueuedNotice): void;
+  allowNotices(allowed: boolean): void;
 }
 
 /**
@@ -51,6 +53,8 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
   let blocked: BlockedBrowser[] = scenario === 'kept' ? [...KEPT_OUT] : [];
   let sessions: PairedSession[] = SESSIONS.map(({ pairedAgo, ...session }) => ({ ...session, pairedAt: ago(pairedAgo) }));
   let sessionReads = 0;
+  let noticesAllowed = true;
+  let notices: QueuedNotice[] = [];
   const announce = (event: string) => listeners.forEach((listener) => listener(event));
   const arrive = () => void sessions.push({ ...ARRIVING, pairedAt: ago(0) });
 
@@ -72,7 +76,7 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       status: {
         connected: true,
         daemonVersion: version,
-        protocolVersion: 22,
+        protocolVersion: 24,
         port: 8765,
         manifestInSync: true,
         extensionVersion: version,
@@ -116,6 +120,13 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       return { mode, approver: 'app' };
     },
     blocked: () => ({ blocked }),
+    notices: () => ({ ok: true }),
+    takeNotices: () => {
+      const taken = notices;
+      notices = [];
+      return { notices: taken };
+    },
+    openNotice: () => ({ ok: true }),
     label: ({ session, label }) => {
       const named = sessions.find((held) => held.id === session);
       if (named) named.label = String(label).trim() || undefined;
@@ -218,12 +229,16 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
     trayStatus: () => later(undefined, 0),
     pairRequests: () => later(undefined, 0),
     announcePaired: () => later(undefined, 0),
+    noticesAllowed: () => later(noticesAllowed, 0),
+    postNotices: () => later(undefined, 0),
     checkUpdate: () => later(null),
     installUpdate: () => later(undefined),
     onControlEvent: (listener) => (listeners.add(listener), () => listeners.delete(listener)),
     onTray: () => () => undefined,
     onPairLink: () => () => undefined,
     onPairingLaunch: () => () => undefined,
+    onNoticeLink: () => () => undefined,
+    onWindowFocus: () => () => undefined,
     openUrl: async (url) => void window.open(url, '_blank'),
     reveal: async () => undefined,
     setWindowTheme: async () => undefined,
@@ -232,6 +247,11 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       announce('pair-requests-changed');
     },
     arrive,
+    notify: (notice) => {
+      notices = [...notices.filter((queued) => queued.id !== notice.id), notice];
+      announce('notices-changed');
+    },
+    allowNotices: (allowed) => void (noticesAllowed = allowed),
   };
 }
 

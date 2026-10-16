@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { AGENT_LIST, type AgentDescriptor, type AgentKind } from '@/lib/agents/catalog';
+import { NOTICE_PROTOCOL } from '@/lib/notices';
 import { isPairingMode } from '@/lib/pairing';
 import type { GuardrailValue } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
@@ -28,6 +29,7 @@ import type {
   Preferences,
   Release,
   SessionSummary,
+  ShownNotice,
   SkillListing,
 } from './backend';
 
@@ -202,6 +204,8 @@ export class Model {
   private started = false;
   /** Every session seen since the app opened, so one that is new can be told apart from the ones it found. */
   private seenSessions?: Set<string>;
+  /** Whether this socket told the Bridge toasts show; unset on a new socket, which has said nothing yet. */
+  private noticesSaid?: boolean;
 
   constructor(
     private readonly backend: Backend,
@@ -215,6 +219,8 @@ export class Model {
     backend.onPairingLaunch(() => {
       if (this.state.phase === 'main') void this.refresh().then(() => this.watchPairRequests());
     });
+    backend.onNoticeLink((notice) => void this.openNotice(notice));
+    backend.onWindowFocus(() => void this.offerNotices());
   }
 
   subscribe = (listener: () => void) => {
@@ -438,6 +444,7 @@ export class Model {
         void this.loadBlocked();
         return;
       }
+      if (event === 'notices-changed') return void this.takeNotices();
       if (event !== 'settings-changed') return;
       void this.loadPreferences();
       void this.loadAgents();
@@ -464,6 +471,7 @@ export class Model {
     if (!lock) return this.markOff();
     try {
       if (await this.backend.controlConnect()) {
+        this.noticesSaid = undefined;
         void this.loadPreferences(true);
         void this.watchPairRequests();
         if (this.watchingAndroid) void this.watchAndroid(true);
@@ -482,6 +490,7 @@ export class Model {
         pairing: state.pairing && status.pairingPending && state.pairing.expiresAt > Date.now() ? state.pairing : undefined,
       }));
       this.announceArrivals(sessions);
+      void this.offerNotices();
       if (!this.state.agents) await this.loadAgents();
       if (changed) void this.loadBrowsers();
     } catch {
@@ -621,6 +630,40 @@ export class Model {
       accepted(await this.control({ op: 'label', session: session.id, label: label.trim() }), 'Browsentic Bridge could not rename that browser.');
       await this.refresh();
     });
+  }
+
+  // Notices
+
+  /**
+   * Tells the Bridge on each new socket, and again whenever it changes, whether a toast would show, so a
+   * browser hands this app its notices only when Windows will display them. A Bridge before notices is never asked.
+   */
+  async offerNotices() {
+    if ((this.state.status?.protocolVersion ?? 0) < NOTICE_PROTOCOL) return;
+    const allowed = await this.backend.noticesAllowed().catch(() => false);
+    if (allowed === this.noticesSaid) return;
+    const fresh = this.noticesSaid === undefined;
+    this.noticesSaid = allowed;
+    try {
+      accepted(await this.control({ op: 'notices', watch: true, allowed }), 'Browsentic Bridge would not hand this app its notices.');
+      if (fresh && allowed) await this.takeNotices();
+    } catch {
+      this.noticesSaid = undefined;
+    }
+  }
+
+  async takeNotices() {
+    try {
+      const notices = shownNotices((await this.control({ op: 'takeNotices' })).notices);
+      if (notices.length) await this.backend.postNotices(notices);
+    } catch {
+      /* What was not taken stays with the Bridge for the next notices-changed. */
+    }
+  }
+
+  /** The browser brings the notice's tab to the front; this window stays where it is. */
+  async openNotice(notice: string) {
+    await this.control({ op: 'openNotice', notice }).catch(() => undefined);
   }
 
   /** The sessions read first are the ones the app found; any after that are new, and one that paired by itself is announced once. */
@@ -996,6 +1039,24 @@ interface SetupResult {
 export const browserName = (request: Pick<PairRequestSummary, 'browser'>) => request.browser ?? 'A browser';
 
 export const sessionName = (session: Pick<SessionSummary, 'label' | 'browser'>) => session.label ?? session.browser ?? 'A browser';
+
+/** What `takeNotices` handed over, read leniently: one notice a toast cannot show is skipped, not the batch. */
+export function shownNotices(value: unknown): ShownNotice[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item: unknown) => {
+    const notice = item as Partial<Record<keyof ShownNotice, unknown>> | null;
+    if (typeof notice?.id !== 'string' || !notice.id || typeof notice.title !== 'string') return [];
+    return [
+      {
+        id: notice.id,
+        title: notice.title,
+        body: typeof notice.body === 'string' ? notice.body : '',
+        tone: notice.tone === 'warn' ? 'warn' : 'live',
+        ...(typeof notice.browser === 'string' && notice.browser ? { browser: notice.browser } : {}),
+      } satisfies ShownNotice,
+    ];
+  });
+}
 
 /** The pairing ops answer `{ok, error}` or `{mode, error}`, a refusal in words rather than an ActionResult. */
 function accepted(reply: Record<string, unknown>, fallback: string) {

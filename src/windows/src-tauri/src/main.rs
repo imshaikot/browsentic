@@ -2,12 +2,14 @@
 
 mod control;
 mod node;
+mod notices;
 mod pairing;
 mod path_env;
 mod paths;
 mod payload;
 mod process;
 mod system;
+mod toast;
 mod tray;
 mod update;
 
@@ -221,11 +223,33 @@ fn announce_paired(app: AppHandle, held: State<'_, pairing::Pairing>, session: S
     Ok(())
 }
 
+/// Whether a toast posted now would show, which is what the Bridge is told before it hands this app a notice.
+#[tauri::command]
+fn notices_allowed(app: AppHandle) -> Result<bool> {
+    Ok(toast::enabled(&app.config().identifier))
+}
+
+/// Shown even while this window has the focus: the browser they came from is what is out of sight.
+#[tauri::command]
+fn post_notices(app: AppHandle, held: State<'_, notices::Notices>, queued: Vec<notices::Notice>) -> Result<()> {
+    for notice in &queued {
+        notices::post(&app.config().identifier, notice, &held.hold(&notice.id)?);
+    }
+    Ok(())
+}
+
 fn focused(app: &AppHandle) -> bool {
     app.get_webview_window("main").and_then(|window| window.is_focused().ok()).unwrap_or(false)
 }
 
+/// A notice's toast brings the browser's tab forward, never this window, and only with its own nonce.
 fn follow(app: &AppHandle, address: &str) {
+    if let Some(link) = notices::parse(address) {
+        if let Some(notice) = app.state::<notices::Notices>().judge(&link) {
+            let _ = app.emit("notice-link", notice);
+        }
+        return;
+    }
     match pairing::parse(address).and_then(|link| app.state::<pairing::Pairing>().judge(link)) {
         Some(act) => perform(app, act),
         None => tray::show(app),
@@ -242,7 +266,7 @@ fn perform(app: &AppHandle, act: pairing::Act) {
 /// A second copy hands its arguments here: a link was already followed, and a start for pairing only
 /// makes sure the window is watching, without taking the keyboard from the browser that asked.
 fn second_launch(app: &AppHandle, args: Vec<String>) {
-    let scheme = format!("{}:", pairing::SCHEME);
+    let scheme = format!("{}:", toast::SCHEME);
     if args.iter().any(|arg| arg == PAIRING_LAUNCH) {
         let _ = app.emit("pairing-launch", ());
     } else if !args.iter().any(|arg| arg.to_ascii_lowercase().starts_with(&scheme)) {
@@ -287,6 +311,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(App { paths: paths::Paths::from_env(), control: control::Control::default(), node: Mutex::default() })
         .manage(pairing::Pairing::default())
+        .manage(notices::Notices::default())
         .setup(|app| {
             let tray = tray::build(app.handle())?;
             app.manage(tray);
@@ -320,9 +345,11 @@ fn main() {
             install_update,
             locate_node,
             log_tail,
+            notices_allowed,
             npm_install,
             open_extensions_page,
             pair_requests,
+            post_notices,
             read_lock,
             set_command_link,
             tray_status,

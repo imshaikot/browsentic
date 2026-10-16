@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { Backend, PairLinkAct, PairRequestSummary, TrayStatus } from './backend';
+import type { Backend, PairLinkAct, PairRequestSummary, ShownNotice, TrayStatus } from './backend';
 import { mockBackend, type MockBackend, type Scenario } from './mock-backend';
-import { Model, TABS, outcome, parseJson, short, type State } from './model';
+import { Model, TABS, outcome, parseJson, shownNotices, short, type State } from './model';
 import { splitLine } from './views/logs';
 
 const instantly = () => Promise.resolve();
@@ -418,5 +418,107 @@ describe('pairing', () => {
 
     follow({ kind: 'unpair', session: 's2' });
     await until(model, (state) => !state.sessions.some((session) => session.id === 's2'));
+  });
+});
+
+describe('notices', () => {
+  /** The mock, with a record of what reached the control socket and the toasts, and hands on a toast click and the window's focus. */
+  function noticeBackend(protocolVersion = 24) {
+    const backend = mockBackend({ instant: true });
+    const frames: Record<string, unknown>[] = [];
+    const posted: ShownNotice[][] = [];
+    let click: (notice: string) => void = () => undefined;
+    let focus: () => void = () => undefined;
+    return {
+      frames,
+      posted,
+      click: (notice: string) => click(notice),
+      focus: () => focus(),
+      backend: {
+        ...backend,
+        controlRequest: async (frame: Record<string, unknown>, timeoutMs?: number) => {
+          frames.push(frame);
+          const reply = await backend.controlRequest(frame, timeoutMs);
+          return frame.op === 'status' ? { ...reply, status: { ...(reply.status as object), protocolVersion } } : reply;
+        },
+        postNotices: async (notices: ShownNotice[]) => void posted.push(notices),
+        onNoticeLink: (listener: (notice: string) => void) => ((click = listener), () => undefined),
+        onWindowFocus: (listener: () => void) => ((focus = listener), () => undefined),
+      } satisfies MockBackend,
+    };
+  }
+
+  const said = (frames: Record<string, unknown>[]) => frames.filter((frame) => frame.op === 'notices');
+
+  async function opened(backend: Backend) {
+    const model = start(backend);
+    await model.runPreflight();
+    await until(model, (state) => state.daemon === 'on');
+    return model;
+  }
+
+  it('offers to show notices on a new socket, saying whether Windows will, and only once while nothing changes', async () => {
+    const { backend, frames } = noticeBackend();
+    const model = await opened(backend);
+    await until(model, () => said(frames).length === 1);
+    await model.refresh();
+    await model.refresh();
+    expect(said(frames)).toEqual([{ op: 'notices', watch: true, allowed: true }]);
+  });
+
+  it('says so again when Windows stops or starts showing them, on the poll and on focus', async () => {
+    const { backend, frames, focus } = noticeBackend();
+    const model = await opened(backend);
+    await until(model, () => said(frames).length === 1);
+    backend.allowNotices(false);
+    await model.refresh();
+    await until(model, () => said(frames).length === 2);
+    backend.allowNotices(true);
+    focus();
+    await until(model, () => said(frames).length === 3);
+    expect(said(frames).map((frame) => frame.allowed)).toEqual([true, false, true]);
+  });
+
+  it('takes the waiting notices when the Bridge says there are some, and posts each as a toast', async () => {
+    const { backend, posted } = noticeBackend();
+    const model = await opened(backend);
+    backend.notify({ id: 'monitor:42', kind: 'monitor', title: 'Price dropped', body: 'The jacket is £84 now.', tone: 'live', browser: 'Google Chrome', at: Date.now() });
+    await until(model, () => posted.length === 1);
+    expect(posted[0]).toEqual([{ id: 'monitor:42', title: 'Price dropped', body: 'The jacket is £84 now.', tone: 'live', browser: 'Google Chrome' }]);
+  });
+
+  it('asks the browser to bring a notice’s tab forward when its toast is clicked, and leaves the window alone', async () => {
+    const { backend, frames, click } = noticeBackend();
+    const model = await opened(backend);
+    const tab = model.snapshot().tab;
+    click('monitor:42');
+    await until(model, () => frames.some((frame) => frame.op === 'openNotice'));
+    expect(frames.filter((frame) => frame.op === 'openNotice')).toEqual([{ op: 'openNotice', notice: 'monitor:42' }]);
+    expect(model.snapshot().tab).toBe(tab);
+  });
+
+  it('never asks a Bridge from before notices', async () => {
+    const { backend, frames, focus } = noticeBackend(23);
+    const model = await opened(backend);
+    await model.refresh();
+    focus();
+    await model.offerNotices();
+    expect(frames.filter((frame) => ['notices', 'takeNotices', 'openNotice'].includes(String(frame.op)))).toEqual([]);
+  });
+
+  it('reads notices leniently, skipping only the ones a toast cannot show', () => {
+    expect(
+      shownNotices([
+        { id: 't1', kind: 'timer', title: 'Timer done', body: 'Tea', tone: 'warn', browser: 'Brave', at: 1 },
+        { id: 'm1', title: 'Changed', kind: 'something-new' },
+        { id: '', title: 'No id' },
+        { id: 'x' },
+        null,
+      ]),
+    ).toEqual([
+      { id: 't1', title: 'Timer done', body: 'Tea', tone: 'warn', browser: 'Brave' },
+      { id: 'm1', title: 'Changed', body: '', tone: 'live' },
+    ]);
+    expect(shownNotices(undefined)).toEqual([]);
   });
 });

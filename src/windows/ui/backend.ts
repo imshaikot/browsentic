@@ -1,9 +1,13 @@
 import type { BridgeStatus, SessionSummary } from '@/daemon/control';
 import type { AgentDescriptor, AgentState } from '@/lib/agents/catalog';
+import type { QueuedNotice } from '@/lib/notices';
 import type { BlockedBrowser, PairRequestSummary, PairedBy, PairingMode } from '@/lib/pairing';
 import type { Preferences } from '@/lib/settings/preferences';
 
-export type { BlockedBrowser, BridgeStatus, PairRequestSummary, PairedBy, PairingMode, SessionSummary };
+export type { BlockedBrowser, BridgeStatus, PairRequestSummary, PairedBy, PairingMode, QueuedNotice, SessionSummary };
+
+/** As much of a notice as its toast shows. */
+export type ShownNotice = Pick<QueuedNotice, 'id' | 'title' | 'body' | 'tone' | 'browser'>;
 
 export interface NodeInstall {
   path: string;
@@ -163,6 +167,10 @@ export interface Backend {
   pairRequests(requests: PairRequestSummary[]): Promise<void>;
   /** A toast with an Unpair button, for a browser that paired by itself. */
   announcePaired(session: string, name: string): Promise<void>;
+  /** Whether a toast posted now would show: false in a build Windows does not know by its identity, or with its notifications off. */
+  noticesAllowed(): Promise<boolean>;
+  /** One toast per notice; clicking it hands back the notice's id through `onNoticeLink`. */
+  postNotices(notices: ShownNotice[]): Promise<void>;
   checkUpdate(): Promise<Release | null>;
   installUpdate(onProgress: (fraction: number) => void): Promise<void>;
   onControlEvent(listener: (event: string) => void): () => void;
@@ -170,6 +178,9 @@ export interface Backend {
   onPairLink(listener: (act: PairLinkAct) => void): () => void;
   /** Browsentic Bridge started a second copy because a browser asked to pair and this window was not watching. */
   onPairingLaunch(listener: () => void): () => void;
+  /** Someone clicked a notice's toast, and the Rust side matched the nonce it minted for it. */
+  onNoticeLink(listener: (notice: string) => void): () => void;
+  onWindowFocus(listener: () => void): () => void;
   openUrl(url: string): Promise<void>;
   reveal(path: string): Promise<void>;
   setWindowTheme(theme: 'light' | 'dark' | null): Promise<void>;
@@ -211,6 +222,8 @@ export async function tauriBackend(): Promise<Backend> {
     trayStatus: (status) => invoke('tray_status', { status }),
     pairRequests: (requests) => invoke('pair_requests', { requests }),
     announcePaired: (session, name) => invoke('announce_paired', { session, name }),
+    noticesAllowed: () => invoke('notices_allowed'),
+    postNotices: (notices) => invoke('post_notices', { queued: notices }),
     checkUpdate: () => invoke('check_update'),
     installUpdate: async (onProgress) => {
       const stop = await listen<{ received: number; total: number | null }>('update-progress', ({ payload }) =>
@@ -226,6 +239,8 @@ export async function tauriBackend(): Promise<Backend> {
     onTray: (listener) => unlisten(listen<string>('tray', (event) => listener(event.payload))),
     onPairLink: (listener) => unlisten(listen<PairLinkAct>('pair-link', (event) => listener(event.payload))),
     onPairingLaunch: (listener) => unlisten(listen('pairing-launch', () => listener())),
+    onNoticeLink: (listener) => unlisten(listen<string>('notice-link', (event) => listener(event.payload))),
+    onWindowFocus: (listener) => unlisten(getCurrentWindow().onFocusChanged(({ payload: focused }) => focused && listener())),
     openUrl: (url) => opener.openUrl(url),
     reveal: (path) => opener.revealItemInDir(path),
     setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),

@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use url::Url;
 
-/// Registered by the installer, so a toast's buttons reach this app whether it is running or not.
-pub const SCHEME: &str = "browsentic";
+use crate::toast::{self, escape, same_secret, SCHEME};
+
+const GROUP: &str = "pair";
 
 /// What a `browsentic://pair/…` link asks for. Any web page can open one, so none of this is trusted
 /// until [`Held::act`] has matched its nonce.
@@ -82,12 +83,6 @@ impl Held {
     }
 }
 
-fn same_secret(held: Option<&String>, offered: &str) -> bool {
-    held.is_some_and(|held| {
-        !held.is_empty() && held.len() == offered.len() && held.bytes().zip(offered.bytes()).fold(0, |differs, (a, b)| differs | (a ^ b)) == 0
-    })
-}
-
 /// What changed since the last list: toasts to post and to take back, and links that were waiting for it.
 #[derive(Debug, Default, PartialEq)]
 pub struct Change {
@@ -128,28 +123,14 @@ impl Pairing {
     }
 
     pub fn vouch_for(&self, session: &str) -> Result<String, String> {
-        let nonce = mint()?;
+        let nonce = toast::mint()?;
         self.held.lock().unwrap().sessions.insert(session.to_string(), nonce.clone());
         Ok(nonce)
     }
 }
 
-fn mint() -> Result<String, String> {
-    let mut bytes = [0u8; 16];
-    getrandom::fill(&mut bytes).map_err(|_| "Windows gave no random numbers to secure the notification with.".to_string())?;
-    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
-}
-
 fn link(path: &str, query: &[(&str, &str)]) -> String {
-    let mut address = Url::parse(&format!("{SCHEME}://pair/{path}")).expect("a pair link is a valid address");
-    if !query.is_empty() {
-        address.query_pairs_mut().extend_pairs(query);
-    }
-    address.into()
-}
-
-fn escape(text: &str) -> String {
-    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&apos;")
+    toast::link("pair", path, query)
 }
 
 fn toast(launch: &str, title: &str, body: &str, buttons: &[(&str, String)]) -> String {
@@ -186,47 +167,14 @@ pub fn paired_toast(session: &str, name: &str, nonce: &str) -> String {
     )
 }
 
-#[cfg(windows)]
-mod toasts {
-    use windows::core::HSTRING;
-    use windows::Data::Xml::Dom::XmlDocument;
-    use windows::UI::Notifications::{ToastNotification, ToastNotificationManager};
-
-    const GROUP: &str = "pair";
-
-    pub fn post(app_id: &str, xml: &str, tag: Option<&str>) -> windows::core::Result<()> {
-        let content = XmlDocument::new()?;
-        content.LoadXml(&HSTRING::from(xml))?;
-        let toast = ToastNotification::CreateToastNotification(&content)?;
-        if let Some(tag) = tag {
-            toast.SetTag(&HSTRING::from(tag))?;
-            toast.SetGroup(&HSTRING::from(GROUP))?;
-        }
-        ToastNotificationManager::CreateToastNotifierWithId(&HSTRING::from(app_id))?.Show(&toast)
-    }
-
-    pub fn withdraw(app_id: &str, tag: &str) -> windows::core::Result<()> {
-        ToastNotificationManager::History()?.RemoveGroupedTagWithId(&HSTRING::from(tag), &HSTRING::from(GROUP), &HSTRING::from(app_id))
-    }
+/// A request's toast is tagged with its id, so the one for a decided request can be taken back.
+pub fn post(app_id: &str, xml: &str, request: Option<&str>) {
+    toast::post(app_id, xml, request.map(|request| (GROUP, request)));
 }
 
-/// Toasts go to the identity the installer stamps on the Start menu shortcut; without that shortcut, as
-/// in a development build, Windows drops them and the tray item and the window carry the request alone.
-#[cfg(windows)]
-pub fn post(app_id: &str, xml: &str, tag: Option<&str>) {
-    let _ = toasts::post(app_id, xml, tag);
+pub fn withdraw(app_id: &str, request: &str) {
+    toast::withdraw(app_id, GROUP, request);
 }
-
-#[cfg(windows)]
-pub fn withdraw(app_id: &str, tag: &str) {
-    let _ = toasts::withdraw(app_id, tag);
-}
-
-#[cfg(not(windows))]
-pub fn post(_: &str, _: &str, _: Option<&str>) {}
-
-#[cfg(not(windows))]
-pub fn withdraw(_: &str, _: &str) {}
 
 #[cfg(test)]
 mod tests {
