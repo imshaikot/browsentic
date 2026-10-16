@@ -78,7 +78,7 @@ describe('hostTargets', () => {
   it('finds Firefox on macOS by its own profile folder, and writes to Mozilla’s', () => {
     expect(mac('Firefox')).toMatchObject({
       family: 'firefox',
-      installs: expect.arrayContaining([`${support}/Firefox`, '/Applications/Firefox.app']),
+      installs: expect.arrayContaining([`${support}/Firefox/profiles.ini`, '/Applications/Firefox.app']),
       manifestDirs: [`${support}/Mozilla/NativeMessagingHosts`],
       baseline: true,
     });
@@ -299,10 +299,18 @@ describe('registering the host on macOS', () => {
   });
 
   it('registers Firefox on a Mac that never made a Mozilla folder', () => {
-    const machine = mac([posix.join(support, 'Firefox')]);
+    const machine = mac([posix.join(support, 'Firefox', 'profiles.ini')]);
 
     expect(installNativeHost('/opt/browsentic/dist/cli.js', machine).browsers).toEqual(['Firefox']);
     expect(existsSync(manifestIn('Mozilla'))).toBe(true);
+  });
+
+  it('does not take the Chrome folder its own baseline made for Chrome being installed', () => {
+    const onDisk = (path: string) => path.startsWith(support) && existsSync(path);
+    const machine = { ...mac(['/Applications/Brave Browser.app']), exists: (path: string) => path === '/Applications/Brave Browser.app' || onDisk(path) };
+
+    expect(installNativeHost('/opt/browsentic/dist/cli.js', machine).browsers).toEqual(['Brave']);
+    expect([existsSync(posix.join(support, 'Google/Chrome')), registeredBrowsers(machine)]).toEqual([true, ['Brave']]);
   });
 
   it('registers a fork in the data folder its Info.plist names', () => {
@@ -377,6 +385,7 @@ describe('registering the host on Windows', () => {
     register: (file) => void scheduled.push(`register ${readFileSync(file).subarray(2).toString('utf16le').includes('daemon-main.js')}`),
     run: () => void scheduled.push('run'),
     remove: () => void scheduled.push('remove'),
+    exists: () => scheduled.lastIndexOf('register true') > scheduled.lastIndexOf('remove'),
   };
   const windows = (installed: string[]) =>
     ({ platform: 'win32', home, env: {}, registry, tasks, state: 'C:\\Users\\me\\.browsentic', exists: (path: string) => installed.includes(path) }) as const;
@@ -418,6 +427,16 @@ describe('registering the host on Windows', () => {
 
     removeNativeHost(windows([]));
     expect(scheduled).toContain('remove');
+  });
+
+  it('registers the task again when it has gone missing, and leaves one that is there alone', () => {
+    installNativeHost('C:\\b\\dist\\cli.js', windows([]));
+    refreshNativeHost(windows([]));
+    expect(scheduled).toEqual(['register true']);
+
+    scheduled.push('remove');
+    refreshNativeHost(windows([]));
+    expect(scheduled).toEqual(['register true', 'remove', 'register true']);
   });
 
   it('removes every key on uninstall, the one written for Brave before it was known to read Chrome’s too', () => {

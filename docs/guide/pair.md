@@ -147,8 +147,9 @@ browsentic approve <id>             # let a revoked or denied browser back in
 ```
 
 Revoking a browser also keeps it from pairing again by itself, so it does not come back a minute
-later. It returns when you press **Reconnect** in that browser (in `auto` mode), allow it in the app
-or with `browsentic approve <id>`, or pair it with a code. **Disconnect** in the extension does the
+later. It returns when you press **Reconnect** in that browser (in `auto` mode), or pair it with a
+code. In `ask` mode, allow it in the app or with `browsentic approve <id>` as well; either way the
+browser connects once you press **Reconnect** in it. **Disconnect** in the extension does the
 same from the browser's side: it stays unpaired until you press **Connect** there.
 
 Several browsers can be paired **and connected at once**: Chrome beside Brave, or two Chrome
@@ -181,8 +182,8 @@ The side panel's **Connection** sheet and the welcome page say why. The usual re
 ## 6. Browsers it registers with
 
 `setup`, the apps and every Bridge start register the native host where each installed browser
-reads it, plus Chrome's and Mozilla's locations always, since Brave, Opera and other forks read
-Chrome's. On macOS, a Chromium fork no list names is found from its app's `Info.plist`.
+reads it. On macOS and Windows they also always register it in Chrome's and Mozilla's locations,
+since Brave, Opera and other forks read Chrome's. On macOS, a Chromium fork no list names is found from its app's `Info.plist`.
 
 Registered: Chrome and its Beta, Dev and Canary channels, Edge and its channels, Brave, Vivaldi,
 Arc, Opera, Opera GX, Comet, Thorium, Chromium, Firefox and its channels, Zen, LibreWolf, Waterfox

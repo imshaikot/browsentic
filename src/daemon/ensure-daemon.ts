@@ -11,7 +11,6 @@ const SPAWN_TIMEOUT_MS = 8_000;
 const POLL_INTERVAL_MS = 150;
 const START_LOCK = join(stateDir, 'daemon.start.lock');
 const STALE_START_MS = SPAWN_TIMEOUT_MS * 2;
-const TASK_GRACE_MS = 4_000;
 
 export const daemonMainPath = () => join(dirname(fileURLToPath(import.meta.url)), 'daemon-main.js');
 
@@ -67,15 +66,13 @@ function readStartLock(): [number, number] {
   }
 }
 
+/** One the task started is waited for, never doubled by one spawned in the job that is about to die. */
 async function spawnDaemon({ outsideJob = false }: EnsureOptions): Promise<Lockfile> {
   if (outsideJob && process.platform === 'win32' && runBridgeTask()) {
     log('no daemon reachable; starting one through Task Scheduler');
-    const started = await waitForDaemon(TASK_GRACE_MS);
-    if (started) return started;
-    log('the Task Scheduler start never came up; spawning one directly');
-  } else {
-    log('no daemon reachable; spawning one');
+    return cameUp();
   }
+  log('no daemon reachable; spawning one');
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.BROWSENTIC_AGENT_RUN;
   delete env.CLAUDECODE;
@@ -88,6 +85,10 @@ async function spawnDaemon({ outsideJob = false }: EnsureOptions): Promise<Lockf
     windowsHide: true,
   });
   child.unref();
+  return cameUp();
+}
+
+async function cameUp(): Promise<Lockfile> {
   const started = await waitForDaemon(SPAWN_TIMEOUT_MS);
   if (started) return started;
   throw new Error(`The Browsentic daemon did not come up within ${SPAWN_TIMEOUT_MS}ms — see the log with "browsentic logs"`);

@@ -60,6 +60,7 @@ export interface PairingDesk {
   pending(): PairRequestSummary[];
   /** The live grant that browser may redeem from that socket origin. */
   grantFor(installId: string, origin: string): HeldGrant | undefined;
+  /** That browser paired, by its grant or a typed code: the grant is spent and its request answered. */
   consume(installId: string): void;
 }
 
@@ -206,6 +207,11 @@ export function pairingDesk(options: DeskOptions): PairingDesk {
       log(`a grant for ${installId.slice(0, 8)} was offered from ${origin}, not the origin it was given to; refused`);
       return undefined;
     },
-    consume: (installId) => void grants.delete(installId),
+    consume: (installId) => {
+      grants.delete(installId);
+      if (!requests.delete(installId)) return;
+      wake(installId);
+      options.changed();
+    },
   };
 }

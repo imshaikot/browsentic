@@ -398,9 +398,8 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         consumePairing(matched.code);
         // Typing a code is consent enough, so ask mode lets this browser back in by itself from now on.
         approveInstall({ installId: install.installId, origin: install.origin, browser: install.browser });
-      } else {
-        desk.consume(install.installId);
       }
+      desk.consume(install.installId);
       secret = matched.secret;
       const session = createSession(install, matched.pairedBy);
       sealedSessionKey = await sealSessionKey(secret, transcript, session.key);

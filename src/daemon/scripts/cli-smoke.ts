@@ -26,6 +26,7 @@ const PORTS = [47811, 47812];
 const CHROME_WEB_STORE = 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/';
 const COMMANDS = 'setup update uninstall browsers pair pairing requests approve deny status sessions rename revoke agent skills approvals tasks downloads tools logs start stop restart token mcp'.split(' ');
 const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version as string;
+const TASK = `Browsentic Bridge for ${process.env.USERNAME || 'this user'}`;
 
 const scratch = mkdtempSync(join(tmpdir(), 'browsentic-smoke-'));
 const home = join(scratch, 'hömé José');
@@ -283,7 +284,7 @@ try {
     must(!asked.ok && asked.wait?.request, JSON.stringify(asked));
     const listed = json<{ requests: { id: string }[] }>(browsentic('requests', '--json'));
     must(listed.requests.some((request) => request.id === asked.wait!.request), JSON.stringify(listed));
-    says(browsentic('approve', asked.wait!.request), 'Allowed.');
+    says(browsentic('approve', '--name', 'Smoke Chrome'), 'Allowed. It connects within a few seconds');
     must((await askHost<{ ok: boolean }>(PAIR)).ok, 'still not granted after approve');
     says(browsentic('pairing', 'code'), 'Pairing: code only');
     must(JSON.stringify(await askHost(PAIR)).includes('"refused":"off"'), 'code mode still paired');
@@ -291,7 +292,7 @@ try {
   });
   if (windows) {
     await check('setup registered the task that starts the Bridge for Firefox', () =>
-      must(spawnSync('schtasks', ['/Query', '/TN', 'Browsentic\\Bridge'], { windowsHide: true }).status === 0, 'no Browsentic\\Bridge task'),
+      must(spawnSync('schtasks', ['/Query', '/TN', TASK], { windowsHide: true }).status === 0, `no "${TASK}" task`),
     );
   }
   await check('stop', async () => {
@@ -319,7 +320,7 @@ try {
     must((await answering()).length === 0, 'the Bridge still answers');
     says(browsentic('status'), 'not registered');
     if (windows) must(spawnSync('reg', ['query', `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST}`]).status !== 0, 'the key is left');
-    if (windows) must(spawnSync('schtasks', ['/Query', '/TN', 'Browsentic\\Bridge'], { windowsHide: true }).status !== 0, 'the task is left');
+    if (windows) must(spawnSync('schtasks', ['/Query', '/TN', TASK], { windowsHide: true }).status !== 0, 'the task is left');
   });
 } finally {
   if (await answering().then((ports) => ports.length)) browsentic('stop');

@@ -11,12 +11,17 @@ import { join } from 'node:path';
 import { stateDir } from './lockfile';
 import { log } from './log';
 
-export const BRIDGE_TASK = 'Browsentic\\Bridge';
+/**
+ * In the root folder, named for the user: without elevation Windows lets a user create tasks there but
+ * not a folder of their own, and every user of the computer needs a task of their own.
+ */
+export const BRIDGE_TASK = `Browsentic Bridge for ${process.env.USERNAME || 'this user'}`;
 
 export interface TaskScheduler {
   register(xmlFile: string): void;
   run(): void;
   remove(): void;
+  exists(): boolean;
 }
 
 const schtasks = (args: string[]) => execFileSync('schtasks', args, { stdio: 'ignore', windowsHide: true });
@@ -25,6 +30,14 @@ export const windowsTasks: TaskScheduler = {
   register: (xmlFile) => schtasks(['/Create', '/TN', BRIDGE_TASK, '/XML', xmlFile, '/F']),
   run: () => schtasks(['/Run', '/TN', BRIDGE_TASK]),
   remove: () => schtasks(['/Delete', '/TN', BRIDGE_TASK, '/F']),
+  exists: () => {
+    try {
+      schtasks(['/Query', '/TN', BRIDGE_TASK]);
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 const escapeXml = (value: string) =>
@@ -44,6 +57,7 @@ export function bridgeTaskXml(nodePath: string, daemonMain: string): string {
     '    <AllowStartOnDemand>true</AllowStartOnDemand>',
     '    <Hidden>true</Hidden>',
     '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>',
+    '    <Priority>5</Priority>',
     '  </Settings>',
     '  <Actions Context="Author">',
     '    <Exec>',

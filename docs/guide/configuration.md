@@ -8,7 +8,9 @@ without a restart. It also watches the file, so the settings page and the Mac ap
 as soon as you save it.
 
 `BROWSENTIC_HOME` moves the whole state directory somewhere other than `~/.browsentic`.
-[internals/state.md](../internals/state.md) has the full disk layout.
+[internals/state.md](../internals/state.md) has the full disk layout. A Bridge whose state lives
+outside your home folder leaves your browsers registered with the one inside it, so a scratch copy
+never takes them over; set `BROWSENTIC_REGISTER_HOST=1` to register it anyway.
 
 ---
 

@@ -21,7 +21,7 @@ import { readAgentConfig } from './agent/config';
 import { stateDir } from './lockfile';
 import { log } from './log';
 import { extensionDir } from './paths';
-import { registerBridgeTask, removeBridgeTask, windowsTasks, type TaskScheduler } from './windows-task';
+import { BRIDGE_TASK, registerBridgeTask, removeBridgeTask, windowsTasks, type TaskScheduler } from './windows-task';
 
 export { NATIVE_HOST_NAME };
 
@@ -53,6 +53,9 @@ interface MacBrowser {
 
 const CHROME = 'Google/Chrome';
 const MOZILLA = 'Mozilla';
+
+/** A file the browser itself writes into its profile folder, which a baseline manifest written there does not make. */
+const PROFILE_MARK: Record<Family, string> = { chromium: 'Local State', firefox: 'profiles.ini' };
 
 const MAC_BROWSERS: MacBrowser[] = [
   { browser: 'Chrome', profile: CHROME, apps: ['Google Chrome.app'], reads: [CHROME], baseline: true },
@@ -170,7 +173,7 @@ export function hostTargets(
     const known = MAC_BROWSERS.map(({ browser, family = 'chromium', profile, apps, reads, baseline }) => ({
       browser,
       family,
-      installs: [posix.join(support, profile), ...apps.flatMap((app) => macApps(home).map((root) => posix.join(root, app)))],
+      installs: [posix.join(support, profile, PROFILE_MARK[family]), ...apps.flatMap((app) => macApps(home).map((root) => posix.join(root, app)))],
       manifestDirs: reads.map(hostsIn),
       baseline,
     }));
@@ -505,10 +508,9 @@ export function refreshNativeHost(options: Refresh = {}): void {
   } catch (error) {
     log(`native host: could not rewrite the launcher: ${String(error)}`);
   }
-  if (healed && (healed.cliPath !== pinned.cliPath || healed.nodePath !== pinned.nodePath)) {
-    log(`native host: repinned the launcher to ${healed.nodePath} ${healed.cliPath}`);
-    if (platform === 'win32') registerBridgeTask(healed.nodePath, daemonMainBeside(healed.cliPath), tasks);
-  }
+  const repinned = !!healed && (healed.cliPath !== pinned.cliPath || healed.nodePath !== pinned.nodePath);
+  if (repinned) log(`native host: repinned the launcher to ${healed.nodePath} ${healed.cliPath}`);
+  if (platform === 'win32' && healed && (repinned || !tasks.exists())) registerBridgeTask(healed.nodePath, daemonMainBeside(healed.cliPath), tasks);
   register(launcher, options);
 }
 
@@ -516,7 +518,7 @@ export function removeNativeHost(options: HostOptions = {}): string[] {
   if (!registersHosts(options)) return [];
   const { platform, targets, registry } = machine(options);
   const removed: string[] = [];
-  if (platform === 'win32' && removeBridgeTask(options.tasks)) removed.push('the Browsentic\\Bridge task');
+  if (platform === 'win32' && removeBridgeTask(options.tasks)) removed.push(`the ${BRIDGE_TASK} task`);
   if (platform === 'win32') {
     const keys = new Set([...targets.map((target) => target.registryKey!), ...RETIRED_WINDOWS_VENDORS.map(windowsKey)]);
     for (const key of keys) {

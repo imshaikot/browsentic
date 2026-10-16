@@ -5,12 +5,14 @@ import {
   activeAgent,
   configPath,
   maxConcurrentRuns,
+  pairingMode,
   readAgentConfig,
   rememberExtensionDir,
   siteMapSettings,
   writeActiveAgent,
   writeAgentModel,
   writeGuardrailSetting,
+  writePairingMode,
   writeTheme,
   type AgentConfig,
 } from './config';
@@ -49,6 +51,23 @@ describe('reading config.json', () => {
   test('a corrupt file reads as the defaults rather than stopping the daemon', () => {
     store('{"agent": "codex",');
     expect(readAgentConfig()).toEqual(DEFAULTS);
+  });
+
+  test('a pairing setting of the wrong shape pairs only by code, unless it names a mode', () => {
+    const read = (pairing: unknown) => {
+      store({ pairing });
+      return pairingMode();
+    };
+    expect([undefined, {}, { mode: 'ask' }, 'ask', 7, null, [], { mode: 'sometimes' }].map(read)).toEqual([
+      'auto',
+      'auto',
+      'ask',
+      'ask',
+      'code',
+      'code',
+      'code',
+      'code',
+    ]);
   });
 
   test('a file that is not an object reads as the defaults', () => {
@@ -111,6 +130,15 @@ describe('limits', () => {
 });
 
 describe('writing config.json', () => {
+  test('setting how browsers pair keeps the rest of its key, and replaces one of the wrong shape', () => {
+    store({ pairing: { mode: 'ask', note: 'kept' } });
+    writePairingMode('code');
+    const kept = stored();
+    store({ pairing: 'ask' });
+    writePairingMode('auto');
+    expect([kept, stored()]).toEqual([{ pairing: { mode: 'code', note: 'kept' } }, { pairing: { mode: 'auto' } }]);
+  });
+
   test('switching agents changes that one key and leaves everything else as it was written', () => {
     store({ agents: { claude: { bin: 'claude' } }, custom: { keep: true } });
     writeActiveAgent('antigravity');

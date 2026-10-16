@@ -112,6 +112,16 @@ describe('ask mode', () => {
     await expect(settled).resolves.toBeUndefined();
   });
 
+  it('answers a request once its browser pairs some other way, as with a typed code', async () => {
+    const { desk: built, changed } = desk('ask');
+    built.ask(chrome);
+    const settled = built.settled(chrome.installId, 60_000);
+    built.consume(chrome.installId);
+    await expect(settled).resolves.toBeUndefined();
+    expect(built.pending()).toEqual([]);
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
   it('decides a blocked browser by its install id even with no request', () => {
     const { desk: built } = desk('ask');
     blockInstall({ installId: chrome.installId, origin: chrome.caller }, 'revoked');

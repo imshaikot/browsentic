@@ -132,7 +132,8 @@ const servesBare = !!process.env.BROWSENTIC_AGENT_RUN;
 
 const [command] = process.argv.slice(2);
 const wantsJson = process.argv.includes('--json');
-const positional = process.argv.slice(3).filter((arg) => !arg.startsWith('--'));
+const VALUE_FLAGS = new Set(['--name']);
+const positional = process.argv.slice(3).filter((arg, at, args) => !arg.startsWith('--') && !VALUE_FLAGS.has(args[at - 1]));
 
 switch (command) {
   case undefined:
@@ -987,7 +988,7 @@ async function revoke(browser?: string): Promise<void> {
   await bridge.close();
   if (!revoked) return console.log(browser ? `No session for ${browser}.` : 'Nothing to revoke.');
   console.log(`Revoked ${revoked} session(s). They will not pair again by themselves.`);
-  console.log('Reconnect one from its extension, with "browsentic approve <id>", or with a code from "browsentic pair".');
+  console.log('Reconnect one from its extension, or pair it with a code from "browsentic pair".');
 }
 
 async function setPairing(mode?: string): Promise<void> {
@@ -1047,7 +1048,12 @@ async function approve(id?: string): Promise<void> {
       console.error(error ?? `Nothing is waiting under ${chosen}.`);
       process.exit(1);
     }
-    console.log('Allowed. It connects within a few seconds; "browsentic status" shows it.');
+    const waiting = requests.some((request) => request.id === chosen || request.installId === chosen);
+    console.log(
+      waiting
+        ? 'Allowed. It connects within a few seconds; "browsentic status" shows it.'
+        : 'Allowed. It connects once you press Reconnect in its Browsentic side panel.',
+    );
   } finally {
     await bridge.close();
   }
@@ -1094,7 +1100,7 @@ async function showBlocked(): Promise<void> {
   for (const browser of blocked) {
     console.log(`  ${browser.browser ?? browser.origin}  ${browser.installId}  ${browser.reason} ${browser.at}`);
   }
-  console.log('Let one back in with "browsentic approve <id>".');
+  console.log('Let one back in with "browsentic approve <id>", then press Reconnect in its Browsentic side panel.');
 }
 
 function valueAfter(flag: string): string | undefined {
