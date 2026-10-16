@@ -20,6 +20,8 @@ interface Shown {
   busy?: boolean;
   /** Show the command that installs the Bridge, and the install guide. */
   install?: boolean;
+  /** The Bridge refused this browser's key, and says why. */
+  alert?: boolean;
 }
 
 const Command = ({ children }: { children: ReactNode }) => (
@@ -36,6 +38,7 @@ export function describePairing(daemon: DaemonState | null, unpacked: boolean): 
   }
   if (pairing?.blocked === 'revoked') return { text: 'This computer disconnected this browser.', retry: 'Reconnect' };
   if (pairing?.blocked === 'denied') return { text: 'This computer turned this browser down.', retry: 'Ask again' };
+  if (!pairing && daemon?.error) return { text: daemon.error, codeFirst: true, alert: true };
   switch (daemon?.bridge) {
     case 'missing':
       return {
@@ -90,10 +93,14 @@ export function PairingStatus({ daemon, onConnect }: { daemon: DaemonState | nul
 
   return (
     <div className="space-y-2">
-      <p className="flex gap-1.5 text-[11px] leading-relaxed text-ink-dim">
-        {shown.busy && <Loader2 className="mt-0.5 size-3 shrink-0 animate-spin text-brand" />}
-        <span>{shown.text}</span>
-      </p>
+      {shown.alert ? (
+        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">{shown.text}</p>
+      ) : (
+        <p className="flex gap-1.5 text-[11px] leading-relaxed text-ink-dim">
+          {shown.busy && <Loader2 className="mt-0.5 size-3 shrink-0 animate-spin text-brand" />}
+          <span>{shown.text}</span>
+        </p>
+      )}
 
       {shown.install && <InstallSteps />}
 

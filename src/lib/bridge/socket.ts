@@ -518,7 +518,7 @@ function pairWith(code: string, ports: readonly number[]): Promise<{ ok: boolean
   return new Promise((resolve) => {
     pairingResult = resolve;
     dial({ kind: 'pair', secret: code }, ports, 0);
-    setTimeout(
+    pairingTimer = setTimeout(
       () => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic pair".' }),
       PAIRING_TIMEOUT_MS,
     );
@@ -547,8 +547,10 @@ export const reportPairing = (bridge: BridgeReach | undefined, pairing: PairingS
   setState({ bridge, pairing, lastChangeAt: Date.now() });
 
 let pairingResult: ((result: { ok: boolean; error?: string }) => void) | null = null;
+let pairingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function settlePairing(result: { ok: boolean; error?: string }): void {
+  clearTimeout(pairingTimer);
   pairingResult?.(result);
   pairingResult = null;
 }
@@ -759,6 +761,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
         protocolVersion: frame.protocolVersion,
         manifestInSync: frame.manifestInSync,
         error: undefined,
+        bridge: undefined,
         pairing: undefined,
         lastChangeAt: Date.now(),
       });

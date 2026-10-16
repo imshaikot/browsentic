@@ -6,7 +6,7 @@ import { AgentPicker } from '@/extension/components/agent-picker';
 import { Logo } from '@/extension/components/brand';
 import { PairingStatus } from '@/extension/components/pairing-status';
 import { Button } from '@/extension/components/ui/button';
-import { openSidePanel } from '@/lib/bridge/side-panel';
+import { hasSidePanel, openSidePanel } from '@/lib/bridge/side-panel';
 import { useAutoPair } from '@/lib/bridge/use-auto-pair';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { cn } from '@/lib/utils';
@@ -49,11 +49,17 @@ export default function App() {
 
         {connected && (
           <section className="panel-card space-y-3 rounded-xl p-5">
-            <p className="text-sm text-ink">You’re set. Open the side panel and tell it what to do on any page.</p>
+            {hasSidePanel() ? (
+              <p className="text-sm text-ink">You’re set. Open the side panel and tell it what to do on any page.</p>
+            ) : (
+              <p className="text-sm text-ink">You’re set. Click Browsentic in the toolbar and tell it what to do on any page.</p>
+            )}
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={() => windowId !== null && void openSidePanel(windowId)} disabled={windowId === null}>
-                <PanelRight /> Open the side panel
-              </Button>
+              {hasSidePanel() && (
+                <Button onClick={() => windowId !== null && void openSidePanel(windowId)} disabled={windowId === null}>
+                  <PanelRight /> Open the side panel
+                </Button>
+              )}
               <span className="inline-flex items-center gap-1.5 text-xs text-ink-faint">
                 <Pin className="size-3.5" /> Pin Browsentic from the puzzle piece in the toolbar to keep it one click away.
               </span>

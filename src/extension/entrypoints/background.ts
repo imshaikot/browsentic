@@ -26,7 +26,7 @@ import { endPhone, openChromeOnPhone, servePhone, startPhone } from '@/lib/bridg
 import { servePhoneMirror } from '@/lib/bridge/phone-mirror';
 import { servePhoneBackend } from '@/lib/bridge/phone-backend';
 import { serveExtensionUpdates } from '@/lib/bridge/extension-update';
-import { autoPair, holdAutoPair, serveAutoPair } from '@/lib/bridge/auto-pair';
+import { autoPair, holdAutoPair, releaseAutoPair, serveAutoPair } from '@/lib/bridge/auto-pair';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
@@ -184,9 +184,10 @@ export default defineBackground(() => {
     }
     if (message.op === 'pair' && typeof message.token === 'string') {
       pairDaemon(message.token)
-        .then((result) =>
-          sendResponse(result.ok ? success(true) : failure('PAIRING_FAILED', result.error ?? 'Pairing failed')),
-        )
+        .then(async (result) => {
+          if (result.ok) await releaseAutoPair();
+          sendResponse(result.ok ? success(true) : failure('PAIRING_FAILED', result.error ?? 'Pairing failed'));
+        })
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
     }

@@ -125,6 +125,40 @@ describe('pairing by itself', () => {
     await online();
   }, TEST_TIMEOUT_MS);
 
+  test('a browser start during an alarm that was not due still gets its own look', async () => {
+    await fakeBrowser.storage.local.set({ 'browsentic/pairLast': { at: Date.now() - 2 * 60_000, outcome: 'stopped', failures: 0 } });
+
+    await Promise.all([pairing.autoPair('alarm'), pairing.autoPair('startup')]);
+
+    expect(host).toHaveBeenCalledOnce();
+    await online();
+  }, TEST_TIMEOUT_MS);
+
+  test('looks for a missing Bridge every minute again once the browser starts again', async () => {
+    host.mockRejectedValue(new Error('Specified native messaging host not found.'));
+    const longAgo = Date.now() - 60 * 60_000;
+    await fakeBrowser.storage.local.set({ 'browsentic/pairLast': { at: Date.now() - 6_000, outcome: 'missing', missingSince: longAgo, failures: 0 } });
+
+    await pairing.autoPair('startup');
+
+    const { 'browsentic/pairLast': last } = await fakeBrowser.storage.local.get('browsentic/pairLast');
+    expect((last as { missingSince: number }).missingSince).toBeGreaterThan(longAgo);
+  }, TEST_TIMEOUT_MS);
+
+  test('keeps the key a typed code gave it while the host was answering, rather than redeeming the grant', async () => {
+    host.mockImplementationOnce(async (_name: string, message: Record<string, unknown>) => {
+      const bridge = await control();
+      const { code } = await bridge.pair();
+      bridge.close();
+      expect(await socket!.pairDaemon(code)).toEqual({ ok: true });
+      return answerNativeMessage(message, context, { family: 'chromium', origin: `${ORIGIN}/` });
+    });
+
+    await pairing.autoPair('install');
+
+    expect(listSessions()).toEqual([expect.objectContaining({ pairedBy: 'code' })]);
+  }, TEST_TIMEOUT_MS);
+
   test('says when automatic pairing is off, and leaves the code to the user', async () => {
     const bridge = await control();
     await bridge.pairing('code');

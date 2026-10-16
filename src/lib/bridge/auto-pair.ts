@@ -17,6 +17,8 @@ const MINUTE = 60_000;
 /** However it is asked for, an attempt waits this long after the last one, unless someone clicked. */
 const FLOOR_MS = 5_000;
 const MISSING_EARLY_MS = 10 * MINUTE;
+/** The browser starting, or this extension arriving, begins the frequent looks for a missing Bridge again. */
+const FRESH_STARTS: ReadonlySet<PairReason> = new Set(['install', 'update', 'startup']);
 
 interface LastAttempt {
   at: number;
@@ -65,9 +67,9 @@ export interface PairOptions {
 
 let inflight: Promise<void> | null = null;
 
-/** One attempt at a time; a click that arrives during one is answered by another right after it. */
+/** One attempt at a time; anything but the alarm that arrives during one is answered by another right after it. */
 export function autoPair(reason: PairReason, options: PairOptions = {}): Promise<void> {
-  if (inflight) return options.gesture ? inflight.then(() => autoPair(reason, options)) : inflight;
+  if (inflight) return options.gesture || reason !== 'alarm' ? inflight.then(() => autoPair(reason, options)) : inflight;
   inflight = attempt(reason, options).finally(() => (inflight = null));
   return inflight;
 }
@@ -83,17 +85,20 @@ async function attempt(reason: PairReason, { gesture = false, wait = false }: Pa
 
   const answer = await askHost(reason, { gesture, waitMs: wait ? MAX_PAIR_WAIT_MS : 0 });
   if (answer.kind === 'grant') {
+    if (await sessionKeyUsable()) return;
     await reportPairing('ready', { mode: answer.mode });
     const redeemed = await redeemGrant(answer.grant.code, answer.grant.port);
     if (redeemed.ok) return;
-    const failed: PairingState = { mode: answer.mode, error: redeemed.error };
-    await remember(last, 'failed', 'ready', failed);
+    const failed: PairingState = { mode: answer.mode, error: GRANT_REFUSED };
+    await remember(last, 'failed', 'ready', failed, reason);
     return reportPairing('ready', failed);
   }
   const [reach, pairing, outcome] = settled(answer);
-  await remember(last, outcome, reach, pairing);
+  await remember(last, outcome, reach, pairing, reason);
   await reportPairing(reach, pairing);
 }
+
+const GRANT_REFUSED = 'Browsentic Bridge didn’t let this browser in. Try again.';
 
 function settled(answer: Exclude<PairAttempt, { kind: 'grant' }>): [BridgeReach, PairingState, LastAttempt['outcome']] {
   if (answer.kind === 'wait') return ['ready', { mode: answer.mode, wait: { approver: answer.approver } }, 'wait'];
@@ -102,15 +107,22 @@ function settled(answer: Exclude<PairAttempt, { kind: 'grant' }>): [BridgeReach,
   if (refusal === 'revoked' || refusal === 'denied') return ['ready', { mode, blocked: refusal, error: message }, refusal];
   if (refusal === 'off') return ['off', { mode: 'code', error: message }, 'off'];
   if (refusal === 'stopped') return ['stopped', { mode, error: message }, 'stopped'];
-  return ['failed', { mode, error: message }, 'failed'];
+  return ['ready', { mode, error: message }, 'failed'];
 }
 
-async function remember(last: LastAttempt | undefined, outcome: LastAttempt['outcome'], reach: BridgeReach, pairing: PairingState): Promise<void> {
+async function remember(
+  last: LastAttempt | undefined,
+  outcome: LastAttempt['outcome'],
+  reach: BridgeReach,
+  pairing: PairingState,
+  reason: PairReason,
+): Promise<void> {
   const now = Date.now();
+  const stillMissing = last?.outcome === 'missing' && !FRESH_STARTS.has(reason);
   const next: LastAttempt = {
     at: now,
     outcome,
-    missingSince: outcome === 'missing' ? (last?.outcome === 'missing' ? last.missingSince ?? last.at : now) : undefined,
+    missingSince: outcome === 'missing' ? (stillMissing ? last.missingSince ?? last.at : now) : undefined,
     failures: outcome === 'failed' ? (last?.outcome === 'failed' ? last.failures + 1 : 1) : 0,
     reach,
     pairing,
@@ -127,6 +139,11 @@ export async function holdAutoPair(): Promise<void> {
 /** A browser coming back after a restart, an update or a Bridge that forgot it starts over, not where an old failure left it. */
 async function forgetLast(): Promise<void> {
   await browser.storage.local.remove(LAST_KEY);
+}
+
+/** A typed code connected it again after a Disconnect, which is as deliberate as pressing Connect. */
+export async function releaseAutoPair(): Promise<void> {
+  await browser.storage.local.remove(MANUAL_KEY);
 }
 
 export function serveAutoPair(): void {

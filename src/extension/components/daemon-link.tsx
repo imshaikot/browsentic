@@ -56,10 +56,6 @@ export function DaemonLink() {
       ) : (
         <PairingStatus daemon={daemon} onConnect={connect} />
       )}
-
-      {daemon?.error && !paired && !daemon.pairing && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">{daemon.error}</p>
-      )}
     </section>
   );
 }
