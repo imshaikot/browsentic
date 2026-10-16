@@ -587,7 +587,7 @@ final class AppModel: ObservableObject {
     private func afterAdding(_ row: BrowserRow) -> String {
         switch pairingMode {
         case .auto: "It connects by itself. If it asks for a code, use the one below."
-        case .ask: "Allow it here when it asks to connect."
+        case .ask: "Allow it here when it asks to connect. If it asks for a code instead, use the one below."
         default: "Then click Browsentic in \(row.label)’s toolbar and enter the code below."
         }
     }

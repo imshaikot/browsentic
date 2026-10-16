@@ -52,7 +52,7 @@ export function BrowsersView({ model, state }: { model: Model; state: State }) {
                 key={session.id}
                 session={session}
                 busy={state.busy.includes('revoke') || state.busy.includes(`label:${session.id}`)}
-                onRename={() => setAsking({ kind: 'rename', session })}
+                onRename={state.status?.pairing ? () => setAsking({ kind: 'rename', session }) : undefined}
                 onUnpair={() => setAsking({ kind: 'unpair', session })}
               />
             ))
@@ -89,9 +89,9 @@ export function BrowsersView({ model, state }: { model: Model; state: State }) {
   );
 }
 
-function SessionRow({ session, busy, onRename, onUnpair }: { session: SessionSummary; busy: boolean; onRename: () => void; onUnpair: () => void }) {
+function SessionRow({ session, busy, onRename, onUnpair }: { session: SessionSummary; busy: boolean; onRename?: () => void; onUnpair: () => void }) {
   const name = session.label ?? session.browser;
-  const paired = `${PAIRED_BY[session.pairedBy ?? 'code']} ${ago(session.pairedAt)}`;
+  const paired = `${PAIRED_BY[session.pairedBy ?? 'code'] ?? 'Paired'} ${ago(session.pairedAt)}`;
   return (
     <div className="flex items-center gap-3 rounded-xl bg-ground-2 p-3">
       <GlowDot tint={session.connected ? 'lime' : 'faint'} pulsing={session.connected} />
@@ -106,9 +106,11 @@ function SessionRow({ session, busy, onRename, onUnpair }: { session: SessionSum
         </p>
       </div>
       <Pill text={session.connected ? 'Connected' : 'Away'} tint={session.connected ? 'lime' : 'dim'} />
-      <QuietButton icon={PencilLine} disabled={busy} onClick={onRename}>
-        Rename
-      </QuietButton>
+      {onRename && (
+        <QuietButton icon={PencilLine} disabled={busy} onClick={onRename}>
+          Rename
+        </QuietButton>
+      )}
       <QuietButton tint="danger" disabled={busy} onClick={onUnpair}>
         Unpair
       </QuietButton>

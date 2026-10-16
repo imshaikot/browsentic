@@ -35,7 +35,7 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
             UNNotificationCategory(
                 identifier: Category.request,
                 actions: [
-                    UNNotificationAction(identifier: Action.allow, title: "Allow"),
+                    UNNotificationAction(identifier: Action.allow, title: "Allow", options: .authenticationRequired),
                     UNNotificationAction(identifier: Action.deny, title: "Deny", options: .destructive),
                 ],
                 intentIdentifiers: []

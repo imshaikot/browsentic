@@ -134,13 +134,13 @@ describe('the running app', () => {
     ]);
   });
 
-  it('adds the extension to a browser by opening its store page, and says it connects by itself', async () => {
+  it('adds the extension to a browser by opening its store page, says it connects by itself, and keeps a code for a copy that asks', async () => {
     const model = await running();
     await until(model, (state) => state.browserRows.length > 0);
     await model.addExtension(model.offeredBrowsers.find((row) => row.id === 'edge')!);
-    expect([model.snapshot().pairing, model.snapshot().notice?.text]).toEqual([
-      undefined,
-      'Press “Allow extensions from other stores” if Edge shows it at the top of the page, confirm, and press “Add to Chrome”. It connects to Browsentic Bridge by itself.',
+    expect([model.snapshot().pairing?.code, model.snapshot().notice?.text]).toEqual([
+      'R4TW7KXE',
+      'Press “Allow extensions from other stores” if Edge shows it at the top of the page, confirm, and press “Add to Chrome”. It connects by itself. If it asks for a code, use the one below.',
     ]);
   });
 

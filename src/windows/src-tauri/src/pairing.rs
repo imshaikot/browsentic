@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use url::Url;
 
@@ -98,11 +98,14 @@ pub struct Change {
 
 /// Links that arrive before the pending list are kept for it, but only a few: any web page can send them.
 const MOST_WAITING: usize = 8;
+/// Requests already announced, so one that is listed again after the Bridge dropped away is not.
+const MOST_ANNOUNCED: usize = 50;
 
 #[derive(Default)]
 pub struct Pairing {
     held: Mutex<Held>,
     waiting: Mutex<Vec<Link>>,
+    announced: Mutex<VecDeque<String>>,
 }
 
 impl Pairing {
@@ -110,7 +113,11 @@ impl Pairing {
         let mut held = self.held.lock().unwrap();
         let before = held.requests.take().unwrap_or_default();
         let now: HashMap<String, String> = requests.iter().map(|request| (request.id.clone(), request.nonce.clone())).collect();
-        let added = requests.iter().filter(|request| !before.contains_key(&request.id)).cloned().collect();
+        let mut announced = self.announced.lock().unwrap();
+        let added: Vec<Request> = requests.iter().filter(|request| !before.contains_key(&request.id) && !announced.contains(&request.id)).cloned().collect();
+        announced.extend(added.iter().map(|request| request.id.clone()));
+        let excess = announced.len().saturating_sub(MOST_ANNOUNCED);
+        announced.drain(..excess);
         let removed = before.keys().filter(|id| !now.contains_key(*id)).cloned().collect();
         held.requests = Some(now);
         let released = self.waiting.lock().unwrap().drain(..).filter_map(|link| held.act(&link)).collect();
@@ -289,6 +296,16 @@ mod tests {
         assert_eq!(change.added, [request("r1", "secret-one"), request("r2", "secret-two")]);
         assert_eq!(change.released, [Act::Decide { request: "r1".into(), allow: true }, Act::Show { request: Some("r1".into()) }]);
         assert_eq!(pairing.list(&[request("r2", "secret-two")]), Change { added: vec![], removed: vec!["r1".into()], released: vec![] });
+    }
+
+    #[test]
+    fn a_request_listed_again_after_the_bridge_dropped_away_is_not_announced_twice() {
+        let pairing = Pairing::default();
+        assert_eq!(pairing.list(&[request("r1", "secret-one")]).added, [request("r1", "secret-one")]);
+        assert_eq!(pairing.list(&[]).removed, ["r1".to_string()]);
+        let again = pairing.list(&[request("r1", "secret-one"), request("r2", "secret-two")]);
+        assert_eq!(again.added, [request("r2", "secret-two")]);
+        assert_eq!(pairing.judge(parse("browsentic://pair/allow?r=r1&n=secret-one").unwrap()), Some(Act::Decide { request: "r1".into(), allow: true }));
     }
 
     #[test]

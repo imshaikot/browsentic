@@ -115,6 +115,13 @@ export interface State {
 }
 
 const MINIMUM_NODE = 20;
+
+/** What to do once the store has added the extension; the code is there for a copy that asks for one. */
+const AFTER_ADDING: Record<PairingMode, (browser: string) => string> = {
+  auto: () => 'It connects by itself. If it asks for a code, use the one below.',
+  ask: () => 'Allow it here when it asks to connect. If it asks for a code instead, use the one below.',
+  code: (browser) => `Then click Browsentic in ${browser}’s toolbar and enter the code below.`,
+};
 const FINISH_UPDATE = 'browsentic/finishUpdateOnLaunch';
 const APPEARANCE = 'browsentic/appearance';
 const START_ON_LAUNCH = 'browsentic/startDaemonOnLaunch';
@@ -477,11 +484,12 @@ export class Model {
         status,
         sessions,
         stamp,
-        pairingMode: status.pairing?.mode,
+        pairingMode: isPairingMode(status.pairing?.mode) ? status.pairing.mode : undefined,
         daemon: state.daemon === 'stopping' ? 'stopping' : 'on',
         pairing: state.pairing && status.pairingPending && state.pairing.expiresAt > Date.now() ? state.pairing : undefined,
       }));
       this.announceArrivals(sessions);
+      if (status.pairing) void this.loadPairRequests();
       if (!this.state.agents) await this.loadAgents();
       if (changed) void this.loadBrowsers();
     } catch {
@@ -793,10 +801,8 @@ export class Model {
     return this.perform(`add:${row.id}`, async () => {
       const result = parseJson<SetupResult>(await this.backend.cli(['setup', '--browser', row.id, '--no-wait', '--no-self-update', '--json'], 120), 'setup');
       if (!result.chosen?.opened) await this.backend.openUrl(row.storeUrl);
-      if (this.state.pairingMode === 'auto') return this.say(`${row.steps[0]} It connects to Browsentic Bridge by itself.`);
-      if (this.state.pairingMode === 'ask') return this.say(`${row.steps[0]} Then allow it here when it asks to connect.`);
       if (result.pairingCode && result.expiresAt) this.set({ pairing: { code: result.pairingCode, expiresAt: result.expiresAt } });
-      this.say(`${row.steps[0]} Then click Browsentic in ${row.label}’s toolbar and enter the code below.`);
+      this.say(`${row.steps[0]} ${AFTER_ADDING[this.state.pairingMode ?? 'code'](row.label)}`);
     });
   }
 
