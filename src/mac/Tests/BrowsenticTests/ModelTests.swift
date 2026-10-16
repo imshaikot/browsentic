@@ -384,3 +384,97 @@ import Testing
         #expect(PairingWatch.answerable("a", nonce: "", in: [request("a", at: 1, nonce: "")]) == nil)
     }
 }
+
+@Suite struct NoticeTests {
+    private func decode<Value: Decodable>(_ type: Value.Type, _ json: String) throws -> Value {
+        try JSONDecoder().decode(type, from: Data(json.utf8))
+    }
+
+    private func status(protocolVersion: Int) throws -> BridgeStatus {
+        try decode(BridgeStatus.self, #"{"connected":true,"daemonVersion":"0.9.0","protocolVersion":\#(protocolVersion),"port":8765,"manifestInSync":true,"pairedBrowsers":1,"pairingPending":false}"#)
+    }
+
+    @Test func aNoticeCarriesWhatTheNotificationShows() throws {
+        let notice = try decode(QueuedNotice.self, #"{"id":"monitor:42:3","kind":"monitor","title":"Price dropped","body":"The jacket is now $80.","tone":"live","browser":"Work Chrome","at":1790000000000}"#)
+        #expect(notice.title == "Price dropped")
+        #expect(notice.body == "The jacket is now $80.")
+        #expect(notice.browser == "Work Chrome")
+        #expect(notice.kind == "monitor" && notice.tone == "live")
+    }
+
+    @Test func aKindOrToneThisAppDoesNotKnowKeepsTheNotice() throws {
+        let notice = try decode(QueuedNotice.self, #"{"id":"n1","kind":"reminder","title":"T","body":"B","tone":"loud","at":1}"#)
+        #expect(notice.kind == "reminder" && notice.tone == "loud")
+        let bare = try decode(QueuedNotice.self, #"{"id":"n2","title":"T","body":"B"}"#)
+        #expect(bare.kind == nil && bare.tone == nil && bare.browser == nil)
+    }
+
+    @Test func oneMalformedNoticeNeverCostsTheOthers() throws {
+        let list = try decode(LossyList<QueuedNotice>.self, #"""
+        [{"id":"a","kind":"task","title":"Done","body":"x","tone":"warn","at":1},
+         {"kind":"timer","body":"no id or title"},
+         "not even an object",
+         {"id":"b","kind":"timer","title":"Time's up","body":"y","tone":"live","at":2}]
+        """#)
+        #expect(list.items.map(\.id) == ["a", "b"])
+        #expect(try decode(LossyList<QueuedNotice>.self, "[]").items.isEmpty)
+    }
+
+    @Test func onlyABridgeThatKnowsNoticesIsAskedAboutThem() throws {
+        #expect(!NoticeWatch.supported(by: nil))
+        #expect(!NoticeWatch.supported(by: try status(protocolVersion: 23)))
+        #expect(NoticeWatch.supported(by: try status(protocolVersion: 24)))
+        #expect(NoticeWatch.supported(by: try status(protocolVersion: 25)))
+    }
+
+    @Test func theBridgeHearsAboutPermissionOnANewSocketAndWhenItChanges() {
+        #expect(NoticeWatch.needsReport(allowed: false, reported: nil))
+        #expect(NoticeWatch.needsReport(allowed: true, reported: nil))
+        #expect(!NoticeWatch.needsReport(allowed: true, reported: true))
+        #expect(!NoticeWatch.needsReport(allowed: false, reported: false))
+        #expect(NoticeWatch.needsReport(allowed: true, reported: false))
+        #expect(NoticeWatch.needsReport(allowed: false, reported: true))
+    }
+
+    @Test func onlyAGrantedPermissionLetsTheAppShowNotices() {
+        #expect(NoticeWatch.allows(.authorized))
+        #expect(NoticeWatch.allows(.provisional))
+        #expect(!NoticeWatch.allows(.denied))
+        #expect(!NoticeWatch.allows(.notDetermined))
+    }
+
+    @Test func aRepeatOfTheSameEventReplacesItsNotification() {
+        #expect(NoticeWatch.identifier(for: "monitor:42:3") == "notice:monitor:42:3")
+        #expect(NoticeWatch.identifier(for: "monitor:42:3") == NoticeWatch.identifier(for: "monitor:42:3"))
+        #expect(NoticeWatch.identifier(for: "a") != "a")
+    }
+}
+
+@Suite struct BrowserAppsTests {
+    @Test func everyBrandTheExtensionReportsNamesItsApps() {
+        let brands = ["Google Chrome", "Chromium", "Microsoft Edge", "Brave", "Opera", "Vivaldi", "Arc", "Firefox"]
+        #expect(brands.allSatisfy { !BrowserApps.candidates(for: $0).isEmpty })
+        #expect(BrowserApps.candidates(for: "Google Chrome").first == "com.google.Chrome")
+        #expect(BrowserApps.candidates(for: "Microsoft Edge").first == "com.microsoft.edgemac")
+        #expect(BrowserApps.candidates(for: "Arc") == ["company.thebrowser.Browser"])
+        #expect(BrowserApps.candidates(for: "Firefox").first == "org.mozilla.firefox")
+    }
+
+    @Test func noBundleIdBelongsToTwoBrands() {
+        let ids = BrowserApps.bundleIds.values.flatMap { $0 }
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test func theRunningChannelIsTheOneThatComesForward() {
+        #expect(BrowserApps.running(for: "Google Chrome", among: ["com.google.Chrome.canary", "com.apple.Safari"]) == "com.google.Chrome.canary")
+        #expect(BrowserApps.running(for: "Google Chrome", among: ["com.google.Chrome", "com.google.Chrome.beta"]) == "com.google.Chrome")
+        #expect(BrowserApps.running(for: "microsoft edge", among: ["com.microsoft.edgemac.Dev"]) == "com.microsoft.edgemac.Dev")
+    }
+
+    @Test func anUnknownBrandOrABrowserNotRunningYieldsToNothing() {
+        #expect(BrowserApps.running(for: "Netscape", among: ["com.google.Chrome"]) == nil)
+        #expect(BrowserApps.running(for: nil, among: ["com.google.Chrome"]) == nil)
+        #expect(BrowserApps.running(for: "chrome-extension://abc", among: ["com.google.Chrome"]) == nil)
+        #expect(BrowserApps.running(for: "Brave", among: ["com.google.Chrome"]) == nil)
+    }
+}

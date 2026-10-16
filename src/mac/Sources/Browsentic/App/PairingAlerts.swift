@@ -1,14 +1,16 @@
 import AppKit
 import UserNotifications
 
-/// Pairing notifications. They are a convenience only: an ad-hoc signed build may never be allowed to
-/// post, so the approval sheet, the menu bar dot and the Dock bounce carry the flow without them.
+/// The app's notifications: pairing, and the notices a browser hands over while it is out of sight.
+/// Pairing ones are a convenience only: an ad-hoc signed build may never be allowed to post, so the
+/// approval sheet, the menu bar dot and the Dock bounce carry that flow without them.
 final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
     static let shared = PairingAlerts()
 
     private enum Category {
         static let request = "PAIR_REQUEST"
         static let connected = "PAIR_CONNECTED"
+        static let notice = "BROWSER_NOTICE"
     }
 
     private enum Action {
@@ -21,7 +23,11 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
         static let request = "request"
         static let nonce = "nonce"
         static let session = "session"
+        static let notice = "notice"
+        static let browser = "browser"
     }
+
+    @MainActor private var askedForPermission = false
 
     /// Outside an app bundle, as under `swift run` or `swift test`, the notification center traps.
     private var center: UNUserNotificationCenter? {
@@ -45,6 +51,7 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
                 actions: [UNNotificationAction(identifier: Action.unpair, title: "Unpair", options: .destructive)],
                 intentIdentifiers: []
             ),
+            UNNotificationCategory(identifier: Category.notice, actions: [], intentIdentifiers: []),
         ])
     }
 
@@ -68,6 +75,29 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
         await post(content, as: "connected:\(session.pairing)")
     }
 
+    func show(_ notice: QueuedNotice) async {
+        let content = UNMutableNotificationContent()
+        content.title = notice.title
+        if let browser = notice.browser { content.subtitle = browser }
+        content.body = notice.body
+        content.categoryIdentifier = Category.notice
+        content.threadIdentifier = Category.notice
+        var info = [Key.notice: notice.id]
+        info[Key.browser] = notice.browser
+        content.userInfo = info
+        content.sound = .default
+        await post(content, as: NoticeWatch.identifier(for: notice.id))
+    }
+
+    /// Whether the app can post right now, asking once if nobody has decided yet. Never true outside an app bundle.
+    @MainActor func mayNotify() async -> Bool {
+        guard let center else { return false }
+        let status = await center.notificationSettings().authorizationStatus
+        guard status == .notDetermined, !askedForPermission else { return NoticeWatch.allows(status) }
+        askedForPermission = true
+        return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+    }
+
     func withdraw(_ requests: Set<String>) {
         guard let center, !requests.isEmpty else { return }
         center.removeDeliveredNotifications(withIdentifiers: Array(requests))
@@ -88,8 +118,10 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    func userNotificationCenter(_: UNUserNotificationCenter, willPresent _: UNNotification) async -> UNNotificationPresentationOptions {
-        await AppModel.shared.mainWindowVisible ? [.list] : [.banner, .list, .sound]
+    /// A browser notice shows even over this app: whoever reads it is not in the browser.
+    func userNotificationCenter(_: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        if notification.request.content.categoryIdentifier == Category.notice { return [.banner, .list, .sound] }
+        return await AppModel.shared.mainWindowVisible ? [.list] : [.banner, .list, .sound]
     }
 
     func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
@@ -97,6 +129,12 @@ final class PairingAlerts: NSObject, UNUserNotificationCenterDelegate {
         let request = info[Key.request] as? String
         let nonce = info[Key.nonce] as? String
         let session = info[Key.session] as? String
+        if let notice = info[Key.notice] as? String {
+            if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+                await AppModel.shared.openNotice(notice, from: info[Key.browser] as? String)
+            }
+            return
+        }
         switch response.actionIdentifier {
         case Action.allow, Action.deny:
             await AppModel.shared.answer(request: request, nonce: nonce, allow: response.actionIdentifier == Action.allow)

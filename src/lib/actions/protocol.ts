@@ -10,11 +10,12 @@ import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
 import type { RefusalCode } from '@/lib/pairing';
+import type { DeviceNotice } from '@/lib/notices';
 
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 23;
+export const SOCKET_PROTOCOL_VERSION = 24;
 
 /** The first protocol with the Android frames: `androidInfo`, the phone requests, `cdpEvent` and `phoneClosed`. */
 export const ANDROID_PROTOCOL = 23;
@@ -243,6 +244,12 @@ export type SocketFrame =
   | { t: 'ping'; id: string }
   | { t: 'pong'; id: string }
   | { t: 'focus' }
+  /** A finished monitor, task or timer for the Browsentic app to show while the browser is behind. Protocol 24. */
+  | { t: 'notice'; id: string; notice: DeviceNotice }
+  /** Whether an app that may show notifications took it; false sends the browser back to its own card. */
+  | { t: 'noticeAck'; id: string; delivered: boolean }
+  /** Someone clicked that notice: bring its tab to the front. */
+  | { t: 'openNotice'; noticeId: string }
   | { t: 'instruct'; id: string; text: string; context?: RunContext }
   | { t: 'cancel'; id: string }
   | { t: 'decision'; id: string; toolId: string; allow: boolean; remember?: boolean }
@@ -342,6 +349,7 @@ export const EXTENSION_REQUEST_FRAMES = [
   'phoneClose',
   'phoneLaunch',
   'cdp',
+  'notice',
 ] as const;
 
 export type ExtensionRequest = Extract<SocketFrame, { t: (typeof EXTENSION_REQUEST_FRAMES)[number] }>;

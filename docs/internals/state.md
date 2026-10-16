@@ -95,6 +95,9 @@ last attempt found and when, which spaces the next one, and `browsentic/staleKey
 `storage.session` once the Bridge has said it holds no session for the stored key. The key itself
 stays until a new one replaces it.
 
+**Notices the app showed** are `browsentic/noticeTabs` in `storage.session`: each notice's id and the
+tab a click brings back, the newest 30, gone with the browser.
+
 **Blocked sites** are `browsentic/blockedSites` in `storage.local`: a list of up to 500 patterns that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.
 

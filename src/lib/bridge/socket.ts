@@ -34,6 +34,7 @@ import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
 import type { Approver, PairingMode, RefusalCode } from '@/lib/pairing';
+import { NOTICE_PROTOCOL, type DeviceNotice } from '@/lib/notices';
 import { identify } from './identity';
 import type { BridgeReach } from './native-pair';
 import { invokeForHarness } from './invoke';
@@ -130,6 +131,10 @@ export type CdpEvent = Extract<SocketFrame, { t: 'cdpEvent' }>;
 const cdpListeners = new Set<(event: CdpEvent) => void>();
 const phoneClosedListeners = new Set<(serial: string, reason: PhoneClosedReason) => void>();
 const closedListeners = new Set<() => void>();
+const openNoticeListeners = new Set<(noticeId: string) => void>();
+const pendingNotices = new Map<string, (delivered: boolean) => void>();
+/** The Bridge answers at once; past this the browser shows its own card instead. */
+const NOTICE_TIMEOUT_MS = 3_000;
 
 const listen = <T>(listeners: Set<T>, listener: T): (() => void) => {
   listeners.add(listener);
@@ -224,6 +229,25 @@ export function analyzeRecording(recording: RecordingPayload): Promise<ActionRes
 }
 
 const TITLE_TIMEOUT_MS = 20_000;
+
+/** Someone clicked a notice the Browsentic app showed for this browser. */
+export const onOpenNotice = (listener: (noticeId: string) => void) => listen(openNoticeListeners, listener);
+
+/** True when the Browsentic app took the notice to show as the computer's own; false sends the caller to its own card. */
+export function sendNotice(notice: DeviceNotice): Promise<boolean> {
+  const id = crypto.randomUUID();
+  if (!daemonSpeaks(NOTICE_PROTOCOL) || !post({ t: 'notice', id, notice })) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingNotices.delete(id);
+      resolve(false);
+    }, NOTICE_TIMEOUT_MS);
+    pendingNotices.set(id, (delivered) => {
+      clearTimeout(timer);
+      resolve(delivered);
+    });
+  });
+}
 
 const pendingSessionNames = new Map<string, (result: ActionResult<{ title: string }>) => void>();
 
@@ -790,6 +814,16 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       pendingSkillOps.delete(frame.id);
       return;
     }
+
+    case 'noticeAck': {
+      pendingNotices.get(frame.id)?.(frame.delivered === true);
+      pendingNotices.delete(frame.id);
+      return;
+    }
+
+    case 'openNotice':
+      for (const listener of openNoticeListeners) listener(frame.noticeId);
+      return;
 
     case 'sessionName': {
       pendingSessionNames.get(frame.id)?.(frame.result);

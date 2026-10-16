@@ -103,6 +103,21 @@ actor ControlClient {
         try await acknowledged(["op": "label", "session": session, "label": label])
     }
 
+    /// Makes this socket the one that shows browser notices; `allowed` says whether this Mac lets the app post them.
+    func notices(allowed: Bool) async throws {
+        try await acknowledged(["op": "notices", "watch": true, "allowed": allowed])
+    }
+
+    /// Hands over every notice waiting to be shown; the Bridge forgets them.
+    func takeNotices() async throws -> [QueuedNotice] {
+        try await request(["op": "takeNotices"], as: Reply<LossyList<QueuedNotice>>.self, key: "notices").items
+    }
+
+    /// The browser the notice came from brings its tab to the front.
+    func openNotice(_ notice: String) async throws {
+        try await acknowledged(["op": "openNotice", "notice": notice])
+    }
+
     private func acknowledged(_ frame: [String: Any]) async throws {
         let answer = try await whole(frame, as: Acknowledgement.self)
         if !answer.ok { throw BridgeRefusal(message: answer.error ?? "Browsentic Bridge said no.") }

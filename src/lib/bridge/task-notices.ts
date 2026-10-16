@@ -3,6 +3,8 @@ import { TASK_APPROVAL_WAIT_MS, type RunOutcome, type TaskResult } from '@/lib/s
 import type { ToastTone } from '@/lib/toast/events';
 import type { TaskTag } from './tab-sessions';
 import { goToTab, hideToast, showToast, showToastOn } from './toast';
+import { noticeOnDevice } from './device-notices';
+import type { NoticeTone } from '@/lib/notices';
 
 const NOTIFICATION_PREFIX = 'browsentic-task:';
 const DETAIL_CHARS = 90;
@@ -34,6 +36,8 @@ export function taskNoticeFor(tag: Pick<TaskTag, 'name' | 'notify'>, result: Tas
 export async function announceTask(tag: TaskTag, result: TaskResult, tabId?: number): Promise<void> {
   const notice = taskNoticeFor(tag, result);
   if (!notice) return;
+  const tone: NoticeTone = notice.tone === 'warn' ? 'warn' : 'live';
+  if (await noticeOnDevice({ id: `task:${tag.id}`, kind: 'task', title: notice.title, body: notice.body, tone }, tag.keepTab ? tabId : undefined)) return;
   const shown = await showToast({ toastId: `task:${tag.id}:${Date.now()}`, ...notice, tabId: tag.keepTab ? tabId : undefined }, tabId);
   if (!shown) await notify(`${NOTIFICATION_PREFIX}${tag.id}`, notice.title, notice.body);
 }

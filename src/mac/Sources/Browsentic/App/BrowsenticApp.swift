@@ -64,6 +64,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CommandLine.arguments.contains("--pairing") { AppModel.shared.startPolling() }
     }
 
+    /// Notification permission can change in System Settings while the app is away.
+    func applicationDidBecomeActive(_: Notification) {
+        Task { await AppModel.shared.reportNotices() }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { false }
 
     func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows visible: Bool) -> Bool {

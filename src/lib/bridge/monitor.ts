@@ -28,6 +28,8 @@ import {
 } from '@/lib/monitor/events';
 import { hostOf, originOf } from '@/lib/recordings/events';
 import { showToast } from '@/lib/bridge/toast';
+import { noticeOnDevice } from '@/lib/bridge/device-notices';
+import type { NoticeTone } from '@/lib/notices';
 import { onBlockedSitesChange, refusalFor, siteBlocked, tabUrls } from '@/lib/bridge/site-guard';
 
 const MONITORS_KEY = 'browsentic/monitors';
@@ -516,21 +518,25 @@ function pathOf(url: string): string {
 }
 
 /**
- * A card drawn onto the page the user is on, which is the only surface they are certainly
- * looking at. The OS notification stays as the fallback for when no page will take one —
- * every tab is a chrome:// page, or the window has nothing open.
+ * The computer's own notification, through the Browsentic app, while the browser is behind or minimized;
+ * otherwise a card drawn onto the page the user is on. The browser's notification stays as the fallback
+ * for when no page will take one: every tab is a chrome:// page, or the window has nothing open.
  */
 async function announce(state: MonitorState): Promise<void> {
   const content = copyFor(state);
   if (!content) return;
+  const tone: NoticeTone = state.phase === 'done' ? 'live' : 'warn';
+  const tabId = state.phase === 'tab-closed' ? undefined : state.tabId;
+  const notice = { id: `monitor:${state.monitorId}`, kind: 'monitor' as const, title: content.title, body: content.message, tone };
+  if (await noticeOnDevice(notice, tabId)) return;
 
   const shown = await showToast(
     {
       toastId: state.monitorId,
-      tone: state.phase === 'done' ? 'live' : 'warn',
+      tone,
       title: content.title,
       body: content.message,
-      tabId: state.phase === 'tab-closed' ? undefined : state.tabId,
+      tabId,
     },
     state.tabId,
   );

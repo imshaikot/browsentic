@@ -45,10 +45,23 @@ given a watch on nothing.
 | Default duration | 30 minutes |
 | Maximum duration | 4 hours |
 | While it runs | The tab is pinned; you can work anywhere else |
-| On completion | A browser notification, plus the run's own report |
+| On completion | A card on the page you are on, plus the run's own report. While the browser is behind other windows or minimized, the Browsentic app shows it as your computer's own notification instead; clicking it brings the tab back (see [Where a finished notice shows](#where-a-finished-notice-shows)) |
 
 Sampling is debounced and rate-limited, with a five-second backstop tick so a page that stops
 changing still gets checked.
+
+---
+
+## Where a finished notice shows
+
+| The browser | The Browsentic app | Where it shows |
+| --- | --- | --- |
+| In front | Any | A card on the page you are on |
+| Behind other windows, or minimized | Running, with notifications allowed | Your computer's own notification, from the app. Click it to bring the tab back |
+| Behind, or minimized | Not running, or notifications off | A card on the page, or the browser's notification when no page can show one |
+
+The same goes for a scheduled task finishing and for a reminder. On a Mac, allow notifications for
+Browsentic in System Settings › Notifications; on Windows, in Settings › System › Notifications.
 
 ---
 
