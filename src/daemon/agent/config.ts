@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { AGENTS, AGENT_KINDS, DEFAULT_AGENT, isAgentKind, isModelId, type AgentKind } from '@/lib/agents/catalog';
 import { FENCE_SETTING, UNATTENDED_SETTING, type GuardrailValue, type RuleEffect } from '@/lib/settings/guardrails';
 import { isThemeId, type ThemeId } from '@/lib/settings/theme';
+import { DEFAULT_PAIRING_MODE, isPairingMode, type PairingMode } from '@/lib/pairing';
 import type { GuardrailConfig } from '../guardrails';
 import { stateDir } from '../lockfile';
 import { log } from '../log';
@@ -47,6 +48,24 @@ export interface AgentConfig {
   };
   /** Driving Chrome on an Android phone. Off stops every use of adb; `adb` names the binary to use. */
   android?: { enabled?: boolean; adb?: string };
+  /** How a browser pairs through the native host: by itself, once someone allows it, or only with a code. */
+  pairing?: { mode?: unknown };
+}
+
+/** A hand edit naming a mode Browsentic does not know pairs nothing by itself: whoever wrote it meant something stricter than the default, or made a typo worth noticing. */
+export function pairingMode(config: AgentConfig = readAgentConfig()): PairingMode {
+  const mode = config.pairing?.mode;
+  if (mode === undefined) return DEFAULT_PAIRING_MODE;
+  if (isPairingMode(mode)) return mode;
+  log(`pairing mode ${JSON.stringify(mode)} is not auto, ask or code; pairing by code only`);
+  return 'code';
+}
+
+/** Sets how browsers pair, leaving every other key in config.json untouched. */
+export function writePairingMode(mode: PairingMode): void {
+  const stored = readStored();
+  const pairing = { ...((stored.pairing as Record<string, unknown> | undefined) ?? {}), mode };
+  write({ ...stored, pairing });
 }
 
 export interface AndroidSettings {

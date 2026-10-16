@@ -12,7 +12,7 @@ import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import { findSecrets } from '@/lib/secrets';
 import { isPreferenceChange, type Preferences } from '@/lib/settings/preferences';
 import { normalizeProfile, PROFILE_FIELDS, sameProfile, type UserProfile } from '@/lib/settings/profile';
-import { configPath, readAgentConfig, writeGuardrailSetting, writeTheme } from './agent/config';
+import { configPath, pairingMode, readAgentConfig, writeGuardrailSetting, writeTheme } from './agent/config';
 import { guardrailSettings, settingWritable } from './guardrails';
 import { log } from './log';
 import { stateDir } from './paths';
@@ -27,6 +27,7 @@ export function preferencesNow(): Preferences {
     theme: config.theme ?? null,
     guardrails: guardrailSettings(config.guardrails ?? {}, config.requireApproval, configPath),
     profile: readProfile(),
+    pairing: { mode: pairingMode(config) },
   };
 }
 

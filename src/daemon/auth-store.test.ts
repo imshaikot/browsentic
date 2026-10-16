@@ -2,6 +2,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  approveInstall,
+  blockInstall,
+  blockOf,
+  isApproved,
+  labelSession,
+  listBlocked,
+  mintGrantCode,
+  unblockInstall,
   claimSession,
   clearAuth,
   consumePairing,
@@ -132,12 +140,73 @@ describe('the file', () => {
   test('a damaged file pairs nothing, and the next write replaces it', () => {
     writeFileSync(authPath, '{"sessions": [');
     const session = createSession(chrome);
-    expect(JSON.parse(readFileSync(authPath, 'utf8'))).toEqual({ pairings: [], sessions: [session] });
+    expect(JSON.parse(readFileSync(authPath, 'utf8'))).toEqual({ pairings: [], sessions: [session], approved: [], blocked: [] });
   });
 
   test('clearing it forgets every browser', () => {
     createSession(chrome);
     clearAuth();
     expect([existsSync(authPath), listSessions()]).toEqual([false, []]);
+  });
+});
+
+describe('automatic pairing', () => {
+  test('a grant is a long code in the typed alphabet', () => {
+    expect(mintGrantCode()).toMatch(/^[ABCDEFGHJKMNPQRSTWXYZ23456789]{26}$/);
+  });
+
+  test('a session says how it was paired, by code unless told otherwise', () => {
+    expect(createSession(chrome).pairedBy).toBe('code');
+    expect(createSession(brave, 'auto').pairedBy).toBe('auto');
+  });
+
+  test('revoking keeps a browser out and forgets that it was allowed', () => {
+    approveInstall(chrome);
+    createSession(chrome);
+    revokeSessions((session) => session.installId === chrome.installId);
+
+    expect(blockOf(chrome.installId)).toMatchObject({ reason: 'revoked', origin: extension, browser: 'Google Chrome' });
+    expect(isApproved(chrome.installId)).toBe(false);
+  });
+
+  test('a session paired before install ids is revoked without leaving a block nobody can name', () => {
+    pairedBeforeInstallIds(extension);
+    revokeSessions(() => true);
+    expect(listBlocked()).toEqual([]);
+  });
+
+  test('pairing again, or allowing it, lifts a block', () => {
+    blockInstall(chrome, 'denied');
+    createSession(chrome);
+    expect(blockOf(chrome.installId)).toBeUndefined();
+
+    blockInstall(brave, 'revoked');
+    approveInstall(brave);
+    expect([blockOf(brave.installId), isApproved(brave.installId)]).toEqual([undefined, true]);
+  });
+
+  test('unblocking says whether there was a block', () => {
+    blockInstall(chrome, 'revoked');
+    expect([unblockInstall(chrome.installId), unblockInstall(chrome.installId)]).toEqual([true, false]);
+  });
+
+  test('keeps the newest two hundred blocks', () => {
+    for (let index = 0; index < 205; index++) blockInstall({ ...chrome, installId: `install-block-${String(index).padStart(5, '0')}` }, 'revoked');
+    const blocked = listBlocked();
+    expect([blocked.length, blocked[0].installId]).toEqual([200, 'install-block-00005']);
+  });
+
+  test('a name chosen when allowing a browser is the name its session takes', () => {
+    approveInstall({ ...chrome, label: 'Work Chrome' });
+    expect(createSession(chrome).label).toBe('Work Chrome');
+  });
+
+  test('a paired browser can be named and the name cleared', () => {
+    createSession(chrome);
+    expect(labelSession(chrome.installId, '  Home\u0007 laptop ')).toBe(true);
+    expect(listSessions()[0].label).toBe('Home laptop');
+    expect(labelSession(chrome.installId, '')).toBe(true);
+    expect(listSessions()[0].label).toBeUndefined();
+    expect(labelSession('nobody', 'x')).toBe(false);
   });
 });

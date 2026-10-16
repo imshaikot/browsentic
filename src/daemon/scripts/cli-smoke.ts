@@ -24,7 +24,7 @@ if (windows && !process.env.CI) die('On Windows this rewrites the registry keys 
 const HOST = 'com.browsentic.daemon';
 const PORTS = [47811, 47812];
 const CHROME_WEB_STORE = 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/';
-const COMMANDS = 'setup update uninstall browsers pair status sessions revoke agent skills approvals tasks downloads tools logs start stop restart token mcp'.split(' ');
+const COMMANDS = 'setup update uninstall browsers pair pairing requests approve deny status sessions rename revoke agent skills approvals tasks downloads tools logs start stop restart token mcp'.split(' ');
 const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version as string;
 
 const scratch = mkdtempSync(join(tmpdir(), 'browsentic-smoke-'));
@@ -122,6 +122,12 @@ function hostManifest(): { path: string; allowed_origins: string[] } {
  * npm is offline, so the launcher's npx fallback cannot answer for a CLI path it failed to read.
  */
 async function wake(): Promise<{ ok: boolean; port?: number; error?: string }> {
+  return askHost({ op: 'ensure' });
+}
+
+const PAIR = { op: 'pair', installId: 'install-cli-smoke-0001', browser: 'Google Chrome', extensionVersion: version, protocolVersion: 23, reason: 'install' };
+
+async function askHost<T = { ok: boolean; port?: number; error?: string }>(message: object): Promise<T> {
   const manifest = hostManifest();
   const offline = { ...env, npm_config_offline: 'true' };
   must(manifest.allowed_origins.includes(CHROME_WEB_STORE), 'the store copy is not allowed to start the host');
@@ -133,7 +139,7 @@ async function wake(): Promise<{ ok: boolean; port?: number; error?: string }> {
         windowsVerbatimArguments: true,
       })
     : spawn(manifest.path, [CHROME_WEB_STORE], { env: offline, cwd: dirname(manifest.path) });
-  const body = Buffer.from(JSON.stringify({ op: 'ensure' }));
+  const body = Buffer.from(JSON.stringify(message));
   const head = Buffer.alloc(4);
   head.writeUInt32LE(body.length);
   host.stdin.end(Buffer.concat([head, body]));
@@ -263,6 +269,31 @@ try {
     const reply = await wake();
     must(reply.ok && reply.port && PORTS.includes(reply.port), JSON.stringify(reply));
   });
+  await check('the host says what it can do', async () => {
+    const hello = await askHost<{ ok: boolean; ops: string[]; mode: string }>({ op: 'hello' });
+    must(hello.ok && hello.ops.includes('pair') && hello.mode === 'auto', JSON.stringify(hello));
+  });
+  await check('the host pairs the store copy with no code', async () => {
+    const reply = await askHost<{ ok: boolean; grant?: { code: string; port: number } }>(PAIR);
+    must(reply.ok && reply.grant?.code.length === 26 && PORTS.includes(reply.grant.port), JSON.stringify(reply));
+  });
+  await check('ask mode waits for approve, and code mode pairs nothing', async () => {
+    says(browsentic('pairing', 'ask'), 'Pairing: ask');
+    const asked = await askHost<{ ok: boolean; wait?: { request: string } }>(PAIR);
+    must(!asked.ok && asked.wait?.request, JSON.stringify(asked));
+    const listed = json<{ requests: { id: string }[] }>(browsentic('requests', '--json'));
+    must(listed.requests.some((request) => request.id === asked.wait!.request), JSON.stringify(listed));
+    says(browsentic('approve', asked.wait!.request), 'Allowed.');
+    must((await askHost<{ ok: boolean }>(PAIR)).ok, 'still not granted after approve');
+    says(browsentic('pairing', 'code'), 'Pairing: code only');
+    must(JSON.stringify(await askHost(PAIR)).includes('"refused":"off"'), 'code mode still paired');
+    says(browsentic('pairing', 'auto'), 'Pairing: automatic');
+  });
+  if (windows) {
+    await check('setup registered the task that starts the Bridge for Firefox', () =>
+      must(spawnSync('schtasks', ['/Query', '/TN', 'Browsentic\\Bridge'], { windowsHide: true }).status === 0, 'no Browsentic\\Bridge task'),
+    );
+  }
   await check('stop', async () => {
     says(browsentic('stop'), 'Stopped the Bridge (pid');
     must((await answering()).length === 0, 'still answering');
@@ -288,6 +319,7 @@ try {
     must((await answering()).length === 0, 'the Bridge still answers');
     says(browsentic('status'), 'not registered');
     if (windows) must(spawnSync('reg', ['query', `HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\${HOST}`]).status !== 0, 'the key is left');
+    if (windows) must(spawnSync('schtasks', ['/Query', '/TN', 'Browsentic\\Bridge'], { windowsHide: true }).status !== 0, 'the task is left');
   });
 } finally {
   if (await answering().then((ports) => ports.length)) browsentic('stop');
