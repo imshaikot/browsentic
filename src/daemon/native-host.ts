@@ -394,13 +394,17 @@ export interface HostOptions {
  * folder, a scratch BROWSENTIC_HOME above all, must not point them at its own launcher, or the user's
  * browsers would wake and pair with a throwaway Bridge.
  */
-export function registersHosts({ state = stateDir, home = homedir(), env = process.env, platform = process.platform }: HostOptions = {}): boolean {
+export function registersHosts({ state = stateDir, home = homedir(), env = process.env }: HostOptions = {}): boolean {
   if (env.BROWSENTIC_REGISTER_HOST === '1') return true;
-  const path = platform === 'win32' ? win32 : posix;
-  const fold = (value: string) => (platform === 'win32' || platform === 'darwin' ? value.toLowerCase() : value);
+  // The two are paths on this machine, whichever browsers' layout a caller is working out, so their own spelling decides.
+  const windowsPaths = WINDOWS_PATH.test(home) || WINDOWS_PATH.test(state);
+  const path = windowsPaths ? win32 : posix;
+  const fold = (value: string) => (windowsPaths || process.platform === 'darwin' ? value.toLowerCase() : value);
   const inside = path.relative(fold(home), fold(state));
   return !!inside && !inside.startsWith('..') && !path.isAbsolute(inside);
 }
+
+const WINDOWS_PATH = /^(?:[A-Za-z]:[\\/]|\\\\)/;
 
 const machine = ({
   platform = process.platform,

@@ -199,6 +199,13 @@ describe('registersHosts', () => {
     expect(registersHosts({ state: '/Users/meet/.browsentic', home: '/Users/me', env: {}, platform: 'darwin' })).toBe(false);
   });
 
+  it('reads Windows paths as Windows paths, whichever browsers’ layout is being worked out', () => {
+    const windows = { state: 'C:\\Users\\RUNNER~1\\Temp\\t\\.browsentic', home: 'C:\\Users\\RUNNER~1\\Temp\\t', env: {} };
+    expect(registersHosts({ ...windows, platform: 'linux' })).toBe(true);
+    expect(registersHosts({ ...windows, platform: 'darwin' })).toBe(true);
+    expect(registersHosts({ ...windows, state: 'D:\\scratch\\.browsentic', platform: 'linux' })).toBe(false);
+  });
+
   it('lets someone who really keeps it elsewhere say so', () => {
     expect(registersHosts({ state: '/Volumes/x/.browsentic', home: '/Users/me', env: { BROWSENTIC_REGISTER_HOST: '1' }, platform: 'darwin' })).toBe(true);
   });
