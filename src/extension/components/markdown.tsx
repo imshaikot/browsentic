@@ -1,12 +1,15 @@
-import { memo, useMemo, useRef, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import { paced, wordEnd } from '@/lib/reveal';
 import { cn } from '@/lib/utils';
 
 /*
- * `streaming` marks the reply that is still arriving: every word mounts with a
- * blur-in and a caret trails the last block. The marker stays on as `done`
- * afterwards so the words still in flight when the run ends finish settling
- * rather than snapping. A reply read back from a transcript never gets it.
+ * `streaming` marks the reply that is still arriving. However the agent chunks
+ * it, the words are let in at a steady pace, each with a blur-in, and a caret
+ * trails the last block; a reply that ends with words still held back keeps
+ * flowing until it has shown them all. The marker stays on as `done` afterwards
+ * so the last words finish settling rather than snapping. A reply read back
+ * from a transcript never gets it.
  *
  * Blocks are memoized on their own shape, so a delta only re-renders the block
  * it lands in.
@@ -23,13 +26,17 @@ export function Markdown({
   const arrivedLive = useRef(false);
   if (streaming) arrivedLive.current = true;
 
+  const shown = useReveal(text, Boolean(streaming));
+  const visible = text.slice(0, shown);
+  const flowing = streaming || shown < text.length;
+
   const blocks = useMemo(
-    () => parseBlocks(text).map((block) => ({ block, sig: JSON.stringify(block) })),
-    [text],
+    () => parseBlocks(visible).map((block) => ({ block, sig: JSON.stringify(block) })),
+    [visible],
   );
   return (
     <div
-      data-stream={streaming ? 'live' : arrivedLive.current ? 'done' : undefined}
+      data-stream={flowing ? 'live' : arrivedLive.current ? 'done' : undefined}
       className={cn('flex min-w-0 flex-col gap-2', className)}
     >
       {blocks.map(({ block, sig }, index) => (
@@ -37,6 +44,35 @@ export function Markdown({
       ))}
     </div>
   );
+}
+
+function useReveal(text: string, streaming: boolean): number {
+  const progress = useRef(streaming ? 0 : text.length);
+  const latest = useRef(text);
+  latest.current = text;
+  const [shown, setShown] = useState(() => (streaming ? wordEnd(text, 0) : text.length));
+  const behind = shown < text.length;
+
+  useEffect(() => {
+    if (!behind) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(latest.current.length);
+      return;
+    }
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const full = latest.current;
+      progress.current = paced(full, progress.current, (now - last) / 1000);
+      last = now;
+      setShown(wordEnd(full, progress.current));
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [behind]);
+
+  return Math.min(shown, text.length);
 }
 
 const MemoBlock = memo(
