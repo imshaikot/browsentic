@@ -27,6 +27,7 @@ import { servePhoneMirror } from '@/lib/bridge/phone-mirror';
 import { servePhoneBackend } from '@/lib/bridge/phone-backend';
 import { serveExtensionUpdates } from '@/lib/bridge/extension-update';
 import { autoPair, holdAutoPair, serveAutoPair } from '@/lib/bridge/auto-pair';
+import { serveDeviceNotices } from '@/lib/bridge/device-notices';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
@@ -265,6 +266,7 @@ export default defineBackground(() => {
   void sweepFiles();
 
   serveAutoPair();
+  serveDeviceNotices();
   void connectDaemon().then(() => autoPair('alarm'));
   browser.runtime.onStartup.addListener(() => void connectDaemon().then(() => autoPair('startup')));
 

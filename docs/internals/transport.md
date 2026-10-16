@@ -173,7 +173,7 @@ dialling. It never deletes the stored key; only pairing again or `disconnect` re
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **23**). They used to have to match
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **24**). They used to have to match
 exactly. A store copy updates when its browser decides to, not when the daemon does, so the
 extension and the daemon are routinely a version apart, and the daemon accepts a **window**:
 
@@ -192,6 +192,25 @@ bumps `SOCKET_PROTOCOL_VERSION`, and the new frame is sent only to a peer whose 
 a change neither side can do without raises a minimum. A refusal must never strand a browser: the
 v0.8.0 store build unpairs on any refusal and does not retry, so no daemon may refuse protocol 22
 until a store build that retries has replaced it.
+
+### Protocol 24: notices for the desktop app
+
+Protocol 24 lets a browser hand a finished monitor, scheduled task or reminder to the Browsentic app,
+which shows it as the computer's own notification. The extension does this only while no browser
+window is focused and un-minimized (`browserInFront()` in `device-notices.ts`), and only to a Bridge
+that speaks 24; the Bridge sends `openNotice` only to an extension that speaks 24.
+
+| Frame | From | What it carries |
+| --- | --- | --- |
+| `notice` | extension | `id` for the answer and the notice: its own `id`, `kind` (`monitor`, `task`, `timer`), `title`, `body` and `tone`. It does not count as the user being in that browser |
+| `noticeAck` | Bridge | `delivered`: whether an app that may show notifications took it. False, or no answer within 3 s, and the extension shows its own card or notification |
+| `openNotice` | Bridge | `noticeId`: someone clicked it in the app, so the extension brings that notice's tab to the front |
+
+The app sends `/control` `notices {watch:true, allowed}` on every socket and again when the
+computer starts or stops letting it notify; `notices-changed` tells it to call `takeNotices`, which
+hands over and forgets what is waiting (a notice nobody takes within five minutes is dropped). A click
+sends `openNotice`, which reaches the browser the notice came from. Agent-run connections are refused
+all three. Nothing about a notice is written to disk.
 
 ### Protocol 23: Android
 

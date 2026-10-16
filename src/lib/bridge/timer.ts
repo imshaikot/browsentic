@@ -1,4 +1,6 @@
 import { browser } from 'wxt/browser';
+import type { NoticeTone } from '@/lib/notices';
+import { noticeOnDevice } from './device-notices';
 import { failure, success, type ActionResult } from '@/lib/actions/protocol';
 import {
   BUSY_RETRY_MS,
@@ -255,6 +257,7 @@ export async function finishTimer(
       timerId,
       `Timer ended: ${closed.label ?? 'scheduled job'}`,
       'The conversation it was set in has closed, so it was cancelled.',
+      'warn',
     );
   }
   return closed;
@@ -329,7 +332,8 @@ export function serveTimers(): void {
   });
 }
 
-async function notify(timerId: string, title: string, message: string): Promise<void> {
+async function notify(timerId: string, title: string, message: string, tone: NoticeTone = 'live'): Promise<void> {
+  if (await noticeOnDevice({ id: `timer:${timerId}`, kind: 'timer', title, body: message, tone })) return;
   await browser.notifications
     ?.create(`${NOTIFICATION_PREFIX}${timerId}`, {
       type: 'basic',

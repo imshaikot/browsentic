@@ -137,8 +137,10 @@ If you only want to be told something at a set time, no agent is needed:
 remind me to check the oven in twenty minutes
 ```
 
-That schedules a browser notification with the text and starts no agent. It works with the side
-panel closed.
+That schedules a notification with the text and starts no agent. It works with the side panel
+closed. While the browser is behind or minimized and the Browsentic app is running with
+notifications allowed, it comes from the app as your computer's own notification; see
+[Where a finished notice shows](monitoring.md#where-a-finished-notice-shows).
 
 ---
 

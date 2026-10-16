@@ -583,6 +583,16 @@ loaded. If that is newer, it is held the same way, and **Update** reloads the ex
 folder. `browsentic update` and the apps restart the Bridge before they rewrite the folder, so the
 welcome often comes too early; the panel reads the manifest again whenever it opens or gets focus.
 
+## Notices while the browser is behind
+
+A finished monitor, scheduled task or reminder first asks `noticeOnDevice()` in `device-notices.ts`.
+While no browser window is focused and un-minimized, it sends the notice to the Bridge for the
+Browsentic app to show as the computer's own notification; a card on a page nobody is looking at
+helps no one. When the app takes it, the notice's tab is remembered in `storage.session` under
+`browsentic/noticeTabs` (the newest 30), and a click in the app brings that tab to the front. When
+it does not (the browser in front, no app, notifications off, a Bridge before protocol 24), the
+caller goes on to its card or the browser's own notification, as before.
+
 ## Pairing by itself
 
 `auto-pair.ts` pairs the extension with Browsentic Bridge through the native host, with no code.
