@@ -1,103 +1,64 @@
 import { useState } from 'react';
-import { Link2, Link2Off, Loader2 } from 'lucide-react';
+import { Link2Off, Loader2 } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
+import { PairingStatus } from '@/extension/components/pairing-status';
 import { Button } from '@/extension/components/ui/button';
-import { Input } from '@/extension/components/ui/input';
-import { LINKS } from '@/lib/about';
-import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
+import { BRIDGE_CHANNEL } from '@/lib/actions/protocol';
+import type { PairingMode } from '@/lib/pairing';
+import { useAutoPair } from '@/lib/bridge/use-auto-pair';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
+
+const MODE_LINE: Record<PairingMode, string> = {
+  auto: 'Browsers with Browsentic connect to this computer by themselves.',
+  ask: 'This computer asks you to allow each new browser.',
+  code: 'Browsers connect to this computer only with a code.',
+};
 
 export function DaemonLink() {
   const daemon = useDaemonState();
-  const [code, setCode] = useState('');
+  const { connect } = useAutoPair(daemon);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const connected = daemon?.connected ?? false;
   const paired = daemon?.paired ?? false;
-
-  async function pair() {
-    setBusy(true);
-    setError(null);
-    const result = (await browser.runtime.sendMessage({
-      channel: BRIDGE_CHANNEL,
-      op: 'pair',
-      token: code,
-    })) as ActionResult;
-    setBusy(false);
-    if (result?.ok) setCode('');
-    else setError(result?.error.message ?? 'Pairing failed');
-  }
+  const mode = daemon?.preferences?.pairing?.mode;
 
   async function disconnect() {
     setBusy(true);
     await browser.runtime.sendMessage({ channel: BRIDGE_CHANNEL, op: 'disconnect' });
     setBusy(false);
-    setError(null);
   }
 
   return (
     <section className="space-y-2">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="font-mono text-[10px] tracking-[0.14em] text-ink-faint uppercase">Browser link</h2>
-        {connected && (
-          <span className="font-mono text-[10px] text-ink-faint">127.0.0.1:{daemon?.port}</span>
-        )}
+        {connected && <span className="font-mono text-[10px] text-ink-faint">127.0.0.1:{daemon?.port}</span>}
       </div>
 
       {paired ? (
         <>
           <p className="text-[11px] leading-relaxed text-ink-dim">
             {connected
-              ? 'The daemon is driving this browser. Disconnecting revokes the key — you will need a new pairing code.'
-              : 'Paired, but the daemon is not answering. Start it with browsentic, or disconnect to pair again.'}
+              ? 'Browsentic Bridge is driving this browser. Disconnecting stops it until you connect again here.'
+              : 'Paired, but Browsentic Bridge is not answering. Start it with browsentic start, or disconnect.'}
           </p>
+          {connected && mode && (
+            <p className="text-[11px] leading-relaxed text-ink-faint">
+              {MODE_LINE[mode]} Change it in the app, or with <code className="font-mono">browsentic pairing</code>.
+            </p>
+          )}
           <Button variant="outline" size="sm" className="w-full" onClick={disconnect} disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <Link2Off />} Disconnect
           </Button>
         </>
       ) : (
-        <>
-          <p className="text-[11px] leading-relaxed text-ink-dim">
-            Run <code className="rounded bg-surface px-1 py-px font-mono text-ink">browsentic pair</code> in a
-            terminal and paste the code it prints.{' '}
-            <a
-              href={LINKS.pairing}
-              target="_blank"
-              rel="noreferrer"
-              className="text-ink underline decoration-line-strong underline-offset-2 transition-colors hover:text-brand"
-            >
-              Learn more
-            </a>
-          </p>
-          <form
-            className="flex gap-1.5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void pair();
-            }}
-          >
-            <Input
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Pairing code"
-              aria-label="Pairing code from browsentic pair"
-              className="h-8 font-mono text-xs tracking-widest uppercase"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Button type="submit" size="sm" disabled={busy || !code.trim()}>
-              {busy ? <Loader2 className="animate-spin" /> : <Link2 />} Connect
-            </Button>
-          </form>
-        </>
+        <PairingStatus daemon={daemon} onConnect={connect} />
       )}
 
-      {error && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">
-          {error}
-        </p>
+      {daemon?.error && !paired && !daemon.pairing && (
+        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">{daemon.error}</p>
       )}
     </section>
   );

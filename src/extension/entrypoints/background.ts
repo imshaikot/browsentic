@@ -26,6 +26,7 @@ import { endPhone, openChromeOnPhone, servePhone, startPhone } from '@/lib/bridg
 import { servePhoneMirror } from '@/lib/bridge/phone-mirror';
 import { servePhoneBackend } from '@/lib/bridge/phone-backend';
 import { serveExtensionUpdates } from '@/lib/bridge/extension-update';
+import { autoPair, holdAutoPair, serveAutoPair } from '@/lib/bridge/auto-pair';
 import { isAgentKind } from '@/lib/agents/catalog';
 import { isPreferenceChange } from '@/lib/settings/preferences';
 import {
@@ -33,6 +34,7 @@ import {
   chooseAgent,
   chooseAgentModel,
   connectDaemon,
+  retryAfterUpdate,
   disconnectDaemon,
   onWelcome,
   pairDaemon,
@@ -196,6 +198,14 @@ export default defineBackground(() => {
     }
     if (message.op === 'disconnect') {
       disconnectDaemon()
+        .then(holdAutoPair)
+        .then(() => sendResponse(success(true)))
+        .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
+      return true;
+    }
+    if (message.op === 'autoPair') {
+      const gesture = message.gesture === true;
+      autoPair(gesture ? 'gesture' : 'open', { gesture, wait: message.wait === true })
         .then(() => sendResponse(success(true)))
         .catch((error) => sendResponse(failure('BRIDGE_ERROR', String(error))));
       return true;
@@ -203,18 +213,23 @@ export default defineBackground(() => {
     sendResponse(
       failure(
         'INVALID_REQUEST',
-        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"preferences"|"setPreference"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"panelOpened"|"disconnect"|"phoneStart"|"phoneEnd"|"phoneOpenChrome"}',
+        'Expected {op:"describe"|"invoke"|"saveSkill"|"removeSkill"|"nameSession"|"recordEvents"|"recordingState"|"analyzeRecording"|"monitorSample"|"monitorState"|"listSkills"|"agentState"|"setAgent"|"setAgentModel"|"grantAgent"|"preferences"|"setPreference"|"tasks"|"saveTask"|"deleteTask"|"runTaskNow"|"pauseTasks"|"pair"|"autoPair"|"panelOpened"|"disconnect"|"phoneStart"|"phoneEnd"|"phoneOpenChrome"}',
       ),
     );
     return;
   });
 
-  browser.runtime.onInstalled.addListener(() => {
+  browser.runtime.onInstalled.addListener(({ reason }) => {
     void browser.tabs.query({}).then((tabs) => {
       for (const tab of tabs) {
         if (tab.id != null && !tab.discarded) void injectContentScript(tab.id);
       }
     });
+    if (reason === 'install') {
+      void browser.tabs.create({ url: browser.runtime.getURL('/welcome.html') });
+      void autoPair('install');
+    }
+    if (reason === 'update') void retryAfterUpdate().then(() => autoPair('update'));
   });
 
   onPanelPresence((open) => {
@@ -249,8 +264,9 @@ export default defineBackground(() => {
   });
   void sweepFiles();
 
-  void connectDaemon();
-  browser.runtime.onStartup.addListener(() => void connectDaemon());
+  serveAutoPair();
+  void connectDaemon().then(() => autoPair('alarm'));
+  browser.runtime.onStartup.addListener(() => void connectDaemon().then(() => autoPair('startup')));
 
   // With several browsers connected, a caller outside any of them reaches the one last in front.
   browser.windows?.onFocusChanged.addListener((windowId) => {
@@ -259,6 +275,6 @@ export default defineBackground(() => {
 
   browser.alarms.create(RECONNECT_ALARM, { periodInMinutes: 1 });
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === RECONNECT_ALARM) void connectDaemon();
+    if (alarm.name === RECONNECT_ALARM) void connectDaemon().then(() => autoPair('alarm'));
   });
 });
