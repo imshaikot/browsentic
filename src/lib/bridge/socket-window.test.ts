@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import { fakeBrowser } from 'wxt/testing';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { newNonce, serverProof, type Transcript } from '@/lib/actions/handshake';
-import { ANDROID_PROTOCOL, parseFrame, type SocketFrame } from '@/lib/actions/protocol';
+import { ANDROID_PROTOCOL, SOCKET_PROTOCOL_VERSION, parseFrame, type SocketFrame } from '@/lib/actions/protocol';
 import type { DaemonState } from './socket';
 
 const ports = vi.hoisted(() => [] as number[]);
@@ -79,7 +79,7 @@ describe('an extension against a Bridge from before Android', () => {
     expect(await daemonState()).toMatchObject({ connected: true, ...RELEASED_BRIDGE });
     expect(worker.daemonSpeaks(RELEASED_BRIDGE.protocolVersion)).toBe(true);
     expect(worker.daemonSpeaks(ANDROID_PROTOCOL)).toBe(false);
-    expect(heard.find((frame) => frame.t === 'hello')).toMatchObject({ protocolVersion: ANDROID_PROTOCOL });
+    expect(heard.find((frame) => frame.t === 'hello')).toMatchObject({ protocolVersion: SOCKET_PROTOCOL_VERSION });
 
     expect(await worker.openPhone('emulator-5554')).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED' } });
     expect(await worker.sendCdp('emulator-5554', 'Runtime.evaluate')).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED' } });
