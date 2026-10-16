@@ -24,7 +24,9 @@ export function OverviewView({ model, state }: { model: Model; state: State }) {
   const subtitle = {
     on: connected
       ? 'Open the side panel in your browser and say what you want. This window can close: Browsentic Bridge keeps running.'
-      : 'Browsentic Bridge is running. Add the extension to your browser below and pair it once, and the side panel comes alive.',
+      : model.pairsByItself
+        ? 'Browsentic Bridge is running. Add the extension to your browser below, and the side panel comes alive.'
+        : 'Browsentic Bridge is running. Add the extension to your browser below and pair it once, and the side panel comes alive.',
     off: 'Turn it on and the side panel in your browser can reach the agent you already run.',
     starting: 'One moment.',
     stopping: 'One moment.',
@@ -137,18 +139,33 @@ function Stat({ label, value, detail, icon: Icon, tint = 'brand' }: { label: str
   );
 }
 
+const CODE_STEPS = 'Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes.';
+
+/** The code always works; once browsers connect by themselves it waits, secondary, until someone asks for one. */
 export function ConnectCard({ model, state }: { model: Model; state: State }) {
+  const asking = state.busy.includes('pair');
+  if (model.pairsByItself && !state.pairing) {
+    return (
+      <Card>
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <SectionTitle title="Pair with a code" subtitle="Browsers with Browsentic connect by themselves. Need a code instead?" />
+          </div>
+          <QuietButton icon={KeyRound} disabled={asking} onClick={() => void model.newPairingCode()}>
+            Get a pairing code
+          </QuietButton>
+        </div>
+      </Card>
+    );
+  }
   return (
     <Card>
       <div className="space-y-4">
-        <SectionTitle
-          title="Pair a browser"
-          subtitle="Click Browsentic in your browser’s toolbar (the puzzle piece lists it), enter the code, and press Connect. It works once and expires in ten minutes."
-        />
+        <SectionTitle title={model.pairsByItself ? 'Pair with a code' : 'Pair a browser'} subtitle={CODE_STEPS} />
         {state.pairing ? (
           <PairingCodeView pairing={state.pairing} model={model} />
         ) : (
-          <PrimaryButton icon={KeyRound} disabled={state.busy.includes('pair')} onClick={() => void model.newPairingCode()}>
+          <PrimaryButton icon={KeyRound} disabled={asking} onClick={() => void model.newPairingCode()}>
             Get a pairing code
           </PrimaryButton>
         )}
@@ -203,7 +220,11 @@ function ExtensionCard({ model, state }: { model: Model; state: State }) {
   const unpacked = shown ?? !!state.stamp;
   const subtitle = state.sessions.some((session) => session.connected)
     ? 'In your browser and talking to Browsentic Bridge. Store copies update themselves.'
-    : 'Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once.';
+    : {
+        auto: 'Add it from your browser’s store, and it connects to Browsentic Bridge by itself.',
+        ask: 'Add it from your browser’s store, then allow it here when it asks to connect.',
+        code: 'Add it from your browser’s store, then click Browsentic in the toolbar and enter the pairing code once.',
+      }[state.pairingMode ?? 'code'];
 
   return (
     <Card>
@@ -231,7 +252,7 @@ function ExtensionCard({ model, state }: { model: Model; state: State }) {
             <div className="space-y-2">
               <Step number={1}>Open chrome://extensions and turn on Developer mode.</Step>
               <Step number={2}>Press “Load unpacked”, then paste the folder above into the picker’s address bar.</Step>
-              <Step number={3}>Click Browsentic in the toolbar and enter a pairing code.</Step>
+              <Step number={3}>{model.pairsByItself ? 'It connects by itself, or with a pairing code from the Browsers tab.' : 'Click Browsentic in the toolbar and enter a pairing code.'}</Step>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {state.browsers

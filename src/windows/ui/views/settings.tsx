@@ -5,8 +5,10 @@ import { GuardrailPolicy } from '@/extension/components/guardrail-policy';
 import { ThemePicker } from '@/extension/components/theme-picker';
 import { Switch } from '@/extension/components/ui/switch';
 import { DEFAULT_THEME } from '@/lib/settings/theme';
+import { cn } from '@/lib/utils';
 import { Card, ConfirmDialog, CopyButton, OfflineHint, PathRow, PrimaryButton, QuietButton, SectionTitle, Segmented, Spinner } from '../components';
 import { short, type Appearance, type Model, type State } from '../model';
+import type { PairingMode } from '../backend';
 import { UpdateCard } from './update-card';
 
 export function SettingsView({ model, state }: { model: Model; state: State }) {
@@ -41,6 +43,8 @@ export function SettingsView({ model, state }: { model: Model; state: State }) {
           />
         </div>
       </Card>
+
+      <PairingSettings model={model} state={state} />
 
       <BrowserSettings model={model} state={state} />
 
@@ -132,6 +136,55 @@ function SwitchRow({ title, subtitle, checked, onChange }: { title: string; subt
       </div>
       <Switch checked={checked} label={title} onChange={onChange} />
     </div>
+  );
+}
+
+const PAIRING: { mode: PairingMode; title: string; detail: string }[] = [
+  { mode: 'auto', title: 'Automatic', detail: 'A browser with Browsentic connects by itself.' },
+  { mode: 'ask', title: 'Ask me', detail: 'You allow each new browser here first.' },
+  { mode: 'code', title: 'Code only', detail: 'A browser connects only with a code you type into it.' },
+];
+
+/** How a browser with the extension gets in, kept by Browsentic Bridge in config.json; `browsentic pairing` changes the same setting. */
+function PairingSettings({ model, state }: { model: Model; state: State }) {
+  if (state.daemon !== 'on') return null;
+  return (
+    <Card>
+      <div className="space-y-3.5">
+        <SectionTitle title="Pairing" subtitle="How a browser with the extension connects to Browsentic Bridge. Browsers already paired stay paired." />
+        {state.pairingMode ? (
+          <div role="radiogroup" aria-label="Pairing" className="grid grid-cols-3 gap-2">
+            {PAIRING.map(({ mode, title, detail }) => {
+              const chosen = state.pairingMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen}
+                  disabled={state.busy.includes('pairing')}
+                  onClick={() => void model.setPairingMode(mode)}
+                  className={cn(
+                    'space-y-1 rounded-xl border px-3.5 py-3 text-left transition-colors disabled:opacity-60',
+                    chosen ? 'border-brand/50 bg-brand/10' : 'border-line bg-ground-2 hover:border-line-strong',
+                  )}
+                >
+                  <span className={cn('block text-[13px] font-semibold', chosen ? 'text-brand' : 'text-ink')}>{title}</span>
+                  <span className="block text-[11.5px] leading-snug text-ink-dim">{detail}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3.5">
+            <p className="min-w-0 flex-1 text-xs text-ink-dim">
+              This Browsentic Bridge started before browsers could connect by themselves, so it pairs only with a code. Restart it to choose.
+            </p>
+            <PrimaryButton onClick={() => void model.restartDaemon()}>Restart it</PrimaryButton>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 

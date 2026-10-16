@@ -2,6 +2,7 @@
 
 mod control;
 mod node;
+mod pairing;
 mod path_env;
 mod paths;
 mod payload;
@@ -16,6 +17,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tokio::sync::Mutex;
 
 use node::NodeInstall;
@@ -29,6 +31,9 @@ struct App {
 type Result<T> = std::result::Result<T, String>;
 
 const LOG_TAIL: u64 = 96_000;
+
+/// How Browsentic Bridge starts the app when a browser asks to pair and no app is watching.
+const PAIRING_LAUNCH: &str = "--pairing";
 
 fn bundle(app: &AppHandle) -> Option<payload::Bundle> {
     let resources = app.path().resource_dir().ok()?;
@@ -187,6 +192,64 @@ fn tray_status(tray: State<'_, tray::Tray>, status: tray::Status) -> Result<()> 
     tray.apply(&status).map_err(|error| error.to_string())
 }
 
+/// Mirrors the Bridge's pending list: a toast for each new request while the window is out of sight,
+/// the toasts of decided ones taken back, and any link that was waiting for the list judged now.
+#[tauri::command]
+fn pair_requests(app: AppHandle, held: State<'_, pairing::Pairing>, requests: Vec<pairing::Request>) -> Result<()> {
+    let change = held.list(&requests);
+    let app_id = &app.config().identifier;
+    if !focused(&app) {
+        for request in &change.added {
+            pairing::post(app_id, &pairing::request_toast(request), Some(&request.id));
+        }
+    }
+    for id in &change.removed {
+        pairing::withdraw(app_id, id);
+    }
+    for act in change.released {
+        perform(&app, act);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn announce_paired(app: AppHandle, held: State<'_, pairing::Pairing>, session: String, name: String) -> Result<()> {
+    let nonce = held.vouch_for(&session)?;
+    if !focused(&app) {
+        pairing::post(&app.config().identifier, &pairing::paired_toast(&session, &name, &nonce), None);
+    }
+    Ok(())
+}
+
+fn focused(app: &AppHandle) -> bool {
+    app.get_webview_window("main").and_then(|window| window.is_focused().ok()).unwrap_or(false)
+}
+
+fn follow(app: &AppHandle, address: &str) {
+    match pairing::parse(address).and_then(|link| app.state::<pairing::Pairing>().judge(link)) {
+        Some(act) => perform(app, act),
+        None => tray::show(app),
+    }
+}
+
+fn perform(app: &AppHandle, act: pairing::Act) {
+    if act.opens_window() {
+        tray::show(app);
+    }
+    let _ = app.emit("pair-link", act);
+}
+
+/// A second copy hands its arguments here: a link was already followed, and a start for pairing only
+/// makes sure the window is watching, without taking the keyboard from the browser that asked.
+fn second_launch(app: &AppHandle, args: Vec<String>) {
+    let scheme = format!("{}:", pairing::SCHEME);
+    if args.iter().any(|arg| arg == PAIRING_LAUNCH) {
+        let _ = app.emit("pairing-launch", ());
+    } else if !args.iter().any(|arg| arg.to_ascii_lowercase().starts_with(&scheme)) {
+        tray::show(app);
+    }
+}
+
 #[tauri::command]
 async fn check_update(app: AppHandle) -> Result<Option<update::Release>> {
     update::check(&app).await
@@ -218,13 +281,20 @@ fn main() {
         return prepare_uninstall();
     }
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| tray::show(app)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| second_launch(app, args)))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(App { paths: paths::Paths::from_env(), control: control::Control::default(), node: Mutex::default() })
+        .manage(pairing::Pairing::default())
         .setup(|app| {
             let tray = tray::build(app.handle())?;
             app.manage(tray);
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| event.urls().iter().for_each(|url| follow(&handle, url.as_str())));
+            for url in app.deep_link().get_current().ok().flatten().unwrap_or_default() {
+                follow(app.handle(), url.as_str());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -235,6 +305,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             agents_on_path,
+            announce_paired,
             app_info,
             browsers,
             check_update,
@@ -251,6 +322,7 @@ fn main() {
             log_tail,
             npm_install,
             open_extensions_page,
+            pair_requests,
             read_lock,
             set_command_link,
             tray_status,

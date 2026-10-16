@@ -1,8 +1,9 @@
 import type { BridgeStatus, SessionSummary } from '@/daemon/control';
 import type { AgentDescriptor, AgentState } from '@/lib/agents/catalog';
+import type { BlockedBrowser, PairRequestSummary, PairedBy, PairingMode } from '@/lib/pairing';
 import type { Preferences } from '@/lib/settings/preferences';
 
-export type { BridgeStatus, SessionSummary };
+export type { BlockedBrowser, BridgeStatus, PairRequestSummary, PairedBy, PairingMode, SessionSummary };
 
 export interface NodeInstall {
   path: string;
@@ -68,7 +69,19 @@ export interface TrayStatus {
   toggle: string;
   canToggle: boolean;
   canRestart: boolean;
+  /** The tray item for the first browser waiting to be let in; null when none is. */
+  waiting: string | null;
 }
+
+/**
+ * What a `browsentic://pair/…` link comes to once the Rust side has checked its nonce: a decision or an
+ * unpairing only when the link carried the nonce held for it, and otherwise just the window.
+ */
+export type PairLinkAct =
+  | { kind: 'decide'; request: string; allow: boolean }
+  | { kind: 'unpair'; session: string }
+  | { kind: 'show'; request: string | null }
+  | { kind: 'browsers' };
 
 export interface Progress {
   fraction: number;
@@ -146,10 +159,17 @@ export interface Backend {
   controlRequest(frame: Record<string, unknown>, timeoutMs?: number): Promise<Record<string, unknown>>;
   controlClose(): Promise<void>;
   trayStatus(status: TrayStatus): Promise<void>;
+  /** Hands the Bridge's pending list to the Rust side, which posts and withdraws the toasts and holds their nonces. */
+  pairRequests(requests: PairRequestSummary[]): Promise<void>;
+  /** A toast with an Unpair button, for a browser that paired by itself. */
+  announcePaired(session: string, name: string): Promise<void>;
   checkUpdate(): Promise<Release | null>;
   installUpdate(onProgress: (fraction: number) => void): Promise<void>;
   onControlEvent(listener: (event: string) => void): () => void;
   onTray(listener: (action: string) => void): () => void;
+  onPairLink(listener: (act: PairLinkAct) => void): () => void;
+  /** Browsentic Bridge started a second copy because a browser asked to pair and this window was not watching. */
+  onPairingLaunch(listener: () => void): () => void;
   openUrl(url: string): Promise<void>;
   reveal(path: string): Promise<void>;
   setWindowTheme(theme: 'light' | 'dark' | null): Promise<void>;
@@ -189,6 +209,8 @@ export async function tauriBackend(): Promise<Backend> {
     controlRequest: (frame, timeoutMs) => invoke('control_request', { frame, timeoutMs }),
     controlClose: () => invoke('control_close'),
     trayStatus: (status) => invoke('tray_status', { status }),
+    pairRequests: (requests) => invoke('pair_requests', { requests }),
+    announcePaired: (session, name) => invoke('announce_paired', { session, name }),
     checkUpdate: () => invoke('check_update'),
     installUpdate: async (onProgress) => {
       const stop = await listen<{ received: number; total: number | null }>('update-progress', ({ payload }) =>
@@ -202,6 +224,8 @@ export async function tauriBackend(): Promise<Backend> {
     },
     onControlEvent: (listener) => unlisten(listen<string>('control-event', (event) => listener(event.payload))),
     onTray: (listener) => unlisten(listen<string>('tray', (event) => listener(event.payload))),
+    onPairLink: (listener) => unlisten(listen<PairLinkAct>('pair-link', (event) => listener(event.payload))),
+    onPairingLaunch: (listener) => unlisten(listen('pairing-launch', () => listener())),
     openUrl: (url) => opener.openUrl(url),
     reveal: (path) => opener.revealItemInDir(path),
     setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),

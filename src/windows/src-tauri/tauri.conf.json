@@ -51,6 +51,9 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["browsentic"] }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0MDRFRkQ2RjcyMUUzNzEKUldSeDR5SDMxdThFTkkxZXVFa0Y1OVhpTTVaTGdIQmdXV0RpMXliclZnRi81QVJFVEl6dDkwSzUK",
       "endpoints": ["https://github.com/imshaikot/browsentic/releases/latest/download/latest.json"],

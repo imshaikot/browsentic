@@ -100,8 +100,24 @@ and sets it up without a press, as `finishUpdateOnLaunch` does on macOS.
 
 The installer is NSIS, per user, into `%LOCALAPPDATA%\Browsentic`.
 [installer-hooks.nsh](../../src/windows/src-tauri/installer-hooks.nsh) runs `Browsentic.exe
---uninstall` before a real uninstall, which stops the daemon and takes `bin` off the `PATH`; an update
+--uninstall` before a real uninstall, which unregisters the browsers' native host, stops the daemon and
+takes `bin` off the `PATH`; an update
 also runs the old uninstaller, with `/UPDATE`, and the hook skips it then.
+
+## Approving a browser
+
+The app watches `pairRequests` on every control socket, so it is the approver the Bridge names while
+it runs. A browser asking to pair in ask mode shows as a dialog in the window (oldest first, with a
+name field), a tray item and a dot on the tray icon, and a toast when the window does not have
+focus. The toast is built in Rust (`pairing.rs`) and posted under the AUMID the NSIS installer puts
+on the Start-menu shortcut, `com.imshaikot.browsentic`. Its buttons are `browsentic://pair/…` links:
+the `deep-link` plugin registers the scheme and the single-instance plugin hands a link to the
+running copy, so a button works from Action Center and with the app closed. Any web page can open
+such a link, so `Held::act` lets one decide or unpair only with the exact nonce the app holds for
+that request (the Bridge's) or session (the app's own); anything else just opens the window. Links
+that start the app wait for the first pending list, at most eight. When no app is watching, the
+Bridge starts it with `--pairing`, which re-subscribes a running copy without showing its window.
+The NSIS uninstall hook runs `browsentic unregister-host` before `stop`.
 
 ## Build and test
 

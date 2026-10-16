@@ -240,6 +240,10 @@ export function Segmented<T extends string>({
   );
 }
 
+/**
+ * A question the window waits on. A destructive one confirms in red and closes from the backdrop; one
+ * that must be answered, such as a browser asking to connect, passes `dismissible={false}`.
+ */
 export function ConfirmDialog({
   title,
   message,
@@ -247,6 +251,10 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   children,
+  tint = 'danger',
+  cancel = 'Cancel',
+  dismissible = true,
+  busy = false,
 }: {
   title: string;
   message: string;
@@ -254,20 +262,56 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   children?: ReactNode;
+  tint?: 'danger' | 'brand';
+  cancel?: string;
+  dismissible?: boolean;
+  busy?: boolean;
 }) {
   return (
-    <div role="dialog" aria-modal aria-label={title} className="fixed inset-0 z-50 flex items-center justify-center bg-ground/60 backdrop-blur-sm" onClick={onCancel}>
-      <div className="enter w-[440px] space-y-3.5 rounded-2xl border border-line-strong bg-ground p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div
+      role="dialog"
+      aria-modal
+      aria-label={title}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ground/60 backdrop-blur-sm"
+      onClick={dismissible ? onCancel : undefined}
+    >
+      <form
+        className="enter w-[440px] space-y-3.5 rounded-2xl border border-line-strong bg-ground p-6 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onConfirm();
+        }}
+      >
         <h2 className="font-display text-lg font-semibold text-ink">{title}</h2>
         <p className="text-[12.5px] leading-relaxed whitespace-pre-line text-ink-dim">{message}</p>
         {children}
         <div className="flex justify-end gap-2 pt-1">
-          <QuietButton onClick={onCancel}>Cancel</QuietButton>
-          <PrimaryButton tint="danger" onClick={onConfirm}>
+          <QuietButton disabled={busy} onClick={onCancel}>
+            {cancel}
+          </QuietButton>
+          <PrimaryButton type="submit" tint={tint} disabled={busy} autoFocus={tint !== 'danger'}>
             {action}
           </PrimaryButton>
         </div>
-      </div>
+      </form>
     </div>
+  );
+}
+
+export function TextField({ label, value, onChange, placeholder, maxLength }: { label: string; value: string; onChange: (next: string) => void; placeholder?: string; maxLength?: number }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-ink-dim">{label}</span>
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-[10px] border border-line bg-ground-2 px-3 py-2 text-[13px] text-ink outline-none placeholder:text-ink-faint focus:border-brand/60"
+      />
+    </label>
   );
 }
