@@ -7,6 +7,7 @@ import { DaemonLink } from '@/extension/components/daemon-link';
 import { StatusPill, describeStatus, type StatusBlocker } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import { Input } from '@/extension/components/ui/input';
+import { useAutoPair } from '@/lib/bridge/use-auto-pair';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { startHandsFree } from '@/lib/bridge/panel-view';
 import { useMirroredPhone } from '@/lib/bridge/phone-client';
@@ -24,6 +25,7 @@ const BLOCKED: Record<StatusBlocker, string> = {
 
 export default function App() {
   const daemon = useDaemonState();
+  useAutoPair(daemon);
   const run = useRun();
   const [micOn, setMicOn] = useState(false);
   const onPhone = useMirroredPhone() !== null;
