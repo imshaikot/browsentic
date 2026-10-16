@@ -20,9 +20,15 @@ const done: DeviceNotice = { id: 'monitor:build', kind: 'monitor', title: 'Done:
 
 type Window = { id: number; focused: boolean; state: string };
 
-function windows(list: Window[]): void {
+function windows(list: Window[], tabs: { id: number; windowId: number }[] = []): void {
   (fakeBrowser.windows as unknown as { getAll: () => Promise<Window[]> }).getAll = async () => list;
+  (fakeBrowser.windows as unknown as { get: (id: number) => Promise<Window | undefined> }).get = async (id) => list.find((window) => window.id === id);
   (fakeBrowser.windows as unknown as { update: (id: number, change: object) => Promise<object> }).update = vi.fn(async () => ({}));
+  (fakeBrowser.tabs as unknown as { get: (id: number) => Promise<object> }).get = async (id) => {
+    const tab = tabs.find((candidate) => candidate.id === id);
+    if (!tab) throw new Error('No tab');
+    return tab;
+  };
 }
 
 beforeEach(() => {
@@ -58,16 +64,27 @@ describe('noticeOnDevice', () => {
     expect(await noticeOnDevice({ ...done, id: 'monitor:other' }, 8)).toBe(false);
   });
 
-  it('brings the notice’s own tab forward when it is clicked, or a window when it had none', async () => {
-    windows([{ id: 4, focused: false, state: 'minimized' }]);
+  it('brings the notice’s own tab forward when it is clicked, restoring a minimized window first', async () => {
+    windows([{ id: 4, focused: false, state: 'minimized' }, { id: 5, focused: false, state: 'minimized' }], [{ id: 7, windowId: 5 }]);
     serveDeviceNotices();
     socket.sendNotice.mockResolvedValue(true);
     await noticeOnDevice(done, 7);
-    await noticeOnDevice({ ...done, id: 'task:t1' });
 
     socket.opened!(done.id);
     await vi.waitFor(() => expect(toast.goToTab).toHaveBeenCalledWith(7));
+    expect(fakeBrowser.windows.update).toHaveBeenNthCalledWith(1, 5, { state: 'normal' });
+    expect(fakeBrowser.windows.update).toHaveBeenNthCalledWith(2, 5, { focused: true });
+  });
+
+  it('brings a window forward for a notice that had no tab', async () => {
+    windows([{ id: 4, focused: false, state: 'normal' }]);
+    serveDeviceNotices();
+    socket.sendNotice.mockResolvedValue(true);
+    await noticeOnDevice({ ...done, id: 'task:t1' });
+
     socket.opened!('task:t1');
     await vi.waitFor(() => expect(fakeBrowser.windows.update).toHaveBeenCalledWith(4, { focused: true }));
+    expect(fakeBrowser.windows.update).not.toHaveBeenCalledWith(4, { state: 'normal' });
+    expect(toast.goToTab).not.toHaveBeenCalled();
   });
 });

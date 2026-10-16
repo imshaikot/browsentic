@@ -35,11 +35,20 @@ async function rememberTab(noticeId: string, tabId: number): Promise<void> {
   await browser.storage.session.set({ [NOTICE_TABS_KEY]: Object.fromEntries(kept) });
 }
 
+/** Focus alone leaves a minimized window in the Dock or the taskbar, so it is restored first. */
+async function restore(windowId: number): Promise<void> {
+  const window = await browser.windows.get(windowId).catch(() => null);
+  if (window?.state === 'minimized') await browser.windows.update(windowId, { state: 'normal' }).catch(() => undefined);
+  await browser.windows.update(windowId, { focused: true }).catch(() => undefined);
+}
+
 async function bringForward(noticeId: string): Promise<void> {
   const tabId = (await noticeTabs())[noticeId];
-  if (tabId != null) return goToTab(tabId);
-  const [window] = await browser.windows.getAll({ windowTypes: ['normal'] }).catch(() => []);
-  if (window?.id != null) await browser.windows.update(window.id, { focused: true }).catch(() => undefined);
+  const tab = tabId != null ? await browser.tabs.get(tabId).catch(() => null) : null;
+  const [first] = await browser.windows.getAll({ windowTypes: ['normal'] }).catch(() => []);
+  const windowId = tab?.windowId ?? first?.id;
+  if (windowId != null) await restore(windowId);
+  if (tab?.id != null) await goToTab(tab.id);
 }
 
 export function serveDeviceNotices(): void {
