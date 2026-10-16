@@ -82,8 +82,8 @@ export const STYLES = `
   .face.dots i:nth-child(2) { animation-delay: 0.16s; }
   .face.dots i:nth-child(3) { animation-delay: 0.32s; }
 
-  .wrap[data-tone="listen"] { --accent: var(--magenta); }
-  .wrap[data-tone="listen"] .orb { color: var(--magenta); animation: orb-breathe 2.6s ease-in-out infinite; }
+  .wrap[data-tone="listen"] { --accent: var(--brand); }
+  .wrap[data-tone="listen"] .orb { color: var(--brand); animation: orb-breathe 2.6s ease-in-out infinite; }
   .wrap[data-tone="work"] { --accent: var(--brand); }
   .wrap[data-tone="work"] .orb { color: var(--brand); animation: orb-glow 1.6s ease-in-out infinite; }
   .wrap[data-tone="ask"] { --accent: var(--ember); }
@@ -97,17 +97,17 @@ export const STYLES = `
     inset: 0;
     border-radius: 999px;
     pointer-events: none;
-    background: color-mix(in oklch, var(--accent, var(--magenta)) 30%, transparent);
+    background: color-mix(in oklch, var(--accent, var(--brand)) 30%, transparent);
     opacity: 0;
   }
   .wrap.speaking .ping { animation: orb-ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
   .wrap.speaking .ping2 { animation: orb-ping 1s cubic-bezier(0, 0, 0.2, 1) 0.5s infinite; }
   .wrap.speaking .orb {
-    border-color: color-mix(in oklch, var(--magenta) 70%, transparent);
+    border-color: color-mix(in oklch, var(--brand) 70%, transparent);
     box-shadow:
       0 16px 40px -14px var(--shade),
-      0 0 0 3px color-mix(in oklch, var(--magenta) 22%, transparent),
-      0 0 26px 2px color-mix(in oklch, var(--magenta) 45%, transparent);
+      0 0 0 3px color-mix(in oklch, var(--brand) 22%, transparent),
+      0 0 26px 2px color-mix(in oklch, var(--brand) 45%, transparent);
   }
   .wrap[data-tone="ask"] .ping { animation: orb-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
@@ -169,13 +169,13 @@ export const STYLES = `
   .wrap.push-to-talk .face { translate: 0 -4px; }
   .wrap.holding .orb {
     transform: scale(1.06);
-    border-color: color-mix(in oklch, var(--magenta) 75%, transparent);
+    border-color: color-mix(in oklch, var(--brand) 75%, transparent);
     box-shadow:
       0 16px 40px -14px var(--shade),
-      0 0 0 3px color-mix(in oklch, var(--magenta) 25%, transparent),
-      0 0 26px 2px color-mix(in oklch, var(--magenta) 45%, transparent);
+      0 0 0 3px color-mix(in oklch, var(--brand) 25%, transparent),
+      0 0 26px 2px color-mix(in oklch, var(--brand) 45%, transparent);
   }
-  .wrap.holding .keycap { background: var(--magenta); border-color: var(--magenta); color: var(--ground); }
+  .wrap.holding .keycap { background: var(--brand); border-color: var(--brand); color: var(--ground); }
 
   .halo {
     position: absolute;
@@ -308,7 +308,7 @@ export const STYLES = `
     box-shadow: 0 0 8px 1px color-mix(in oklch, currentColor 70%, transparent);
   }
   .label:empty { display: none; }
-  .caption[data-kind="speech"] { --tone: var(--magenta); }
+  .caption[data-kind="speech"] { --tone: var(--brand); }
   .caption[data-kind="sent"], .caption[data-kind="reply"] { --tone: var(--brand); }
   .caption[data-kind="error"] { --tone: var(--amber); }
   .caption[data-kind="ask"] { --tone: var(--ember); border-color: color-mix(in oklch, var(--ember) 40%, var(--line)); }
@@ -447,8 +447,8 @@ export const STYLES = `
   @keyframes orb-drain { to { stroke-dashoffset: ${RING}; } }
   @keyframes orb-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
   @keyframes orb-breathe {
-    0%, 100% { border-color: color-mix(in oklch, var(--magenta) 22%, var(--line)); }
-    50% { border-color: color-mix(in oklch, var(--magenta) 55%, var(--line)); }
+    0%, 100% { border-color: color-mix(in oklch, var(--brand) 22%, var(--line)); }
+    50% { border-color: color-mix(in oklch, var(--brand) 55%, var(--line)); }
   }
   @keyframes orb-glow {
     0%, 100% { box-shadow: 0 16px 40px -14px var(--shade), 0 0 0 1px rgb(0 0 0 / 22%), 0 6px 26px -10px color-mix(in oklch, var(--brand) 55%, transparent); }

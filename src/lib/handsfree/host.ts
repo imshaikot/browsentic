@@ -350,7 +350,6 @@ function mountOrb(first: OrbView): Orb | null {
     const palette = RAIL_PALETTES[view.theme];
     const tones = RAIL_TONES[view.theme];
     for (const [key, value] of Object.entries(palette)) layer.style.setProperty(`--${key}`, value);
-    layer.style.setProperty('--magenta', tones.listening);
     layer.style.setProperty('--ember', tones.warn);
     layer.style.setProperty('--amber', tones.pending);
     layer.style.setProperty('--lime', tones.live);
