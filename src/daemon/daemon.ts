@@ -59,6 +59,8 @@ import {
 } from './auth-store';
 import { MAX_PAIR_WAIT_MS, isPairingMode, type Approver, type GrantOutcome, type PairedBy, type RefusalCode } from '@/lib/pairing';
 import { pairingDesk } from './pairing-desk';
+import { noticeDesk } from './notice-desk';
+import { NOTICE_PROTOCOL, asDeviceNotice } from '@/lib/notices';
 import { desktopApp, launchDesktopApp } from './desktop-app';
 import { AgentSession } from './agent/service';
 import { androidOff, type Android } from './android/service';
@@ -260,6 +262,12 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     launchApp: () => launchDesktopApp(),
     changed: () => {
       for (const ws of approvers.keys()) send(ws, { event: 'pair-requests-changed' });
+    },
+  });
+
+  const notices = noticeDesk({
+    changed: () => {
+      for (const ws of notices.watchers()) send(ws as WebSocket, { event: 'notices-changed' });
     },
   });
 
@@ -482,6 +490,12 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         settleOffer();
       },
       (request, source) => {
+        if (request.t === 'notice') {
+          const notice = asDeviceNotice(request.notice);
+          const delivered = !!notice && notices.offer(notice, { id: source.id, browser: source.label });
+          if (notice) log(`notice ${notice.id} from ${source.label}: ${delivered ? 'handed to the app' : 'no app to show it'}`);
+          return source.send({ t: 'noticeAck', id: request.id, delivered });
+        }
         if (request.t === 'analyzeFile') {
           void analyses
             .start(request, readAgentConfig(), source)
@@ -997,6 +1011,23 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         const ok = typeof request.session === 'string' && typeof request.label === 'string' && labelSession(request.session, request.label);
         return send(ws, { id: request.id, op: 'label', ok });
       }
+      if (request.op === 'notices' || request.op === 'takeNotices' || request.op === 'openNotice') {
+        if (speaksForRun) {
+          log(`control ${client} tried to handle notices from inside an agent run; refused`);
+          if (request.op === 'takeNotices') return send(ws, { id: request.id, op: 'takeNotices', notices: [] });
+          return send(ws, { id: request.id, op: request.op, ok: false });
+        }
+        if (request.op === 'notices') {
+          if (request.watch) notices.watch(ws, request.allowed === true);
+          return send(ws, { id: request.id, op: 'notices', ok: true });
+        }
+        if (request.op === 'takeNotices') return send(ws, { id: request.id, op: 'takeNotices', notices: notices.take() });
+        const route = typeof request.notice === 'string' ? notices.routeOf(request.notice) : undefined;
+        const link = route ? links.get(route) : undefined;
+        const ok = !!link?.isOpen && link.speaks(NOTICE_PROTOCOL);
+        if (ok) link!.send({ t: 'openNotice', noticeId: request.notice });
+        return send(ws, { id: request.id, op: 'openNotice', ok });
+      }
       if (request.op === 'revoke') {
         const { session: id, origin } = request;
         const revoked = revokeSessions((session) => (id ? sessionId(session) === id : !origin || session.origin === origin));
@@ -1013,6 +1044,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
       controls.delete(ws);
       settingsWatchers.delete(ws);
       approvers.delete(ws);
+      notices.unwatch(ws);
       unwatchAndroid(ws);
       scheduleIdleExit();
     };

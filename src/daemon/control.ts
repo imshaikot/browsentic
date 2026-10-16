@@ -5,6 +5,7 @@ import type { AndroidState } from '@/lib/phone/types';
 import type { Preferences } from '@/lib/settings/preferences';
 import type { Source } from '@/lib/stores';
 import type { Approver, BlockedBrowser, GrantOutcome, PairRequestSummary, PairedBy, PairingMode } from '@/lib/pairing';
+import type { QueuedNotice } from '@/lib/notices';
 
 export interface BridgeStatus {
   connected: boolean;
@@ -72,7 +73,13 @@ export type ControlRequest =
   | { id: string; op: 'decide'; request: string; allow: boolean; label?: string }
   | { id: string; op: 'pairing'; set?: PairingMode }
   | { id: string; op: 'blocked' }
-  | { id: string; op: 'label'; session: string; label: string };
+  | { id: string; op: 'label'; session: string; label: string }
+  /** The desktop app: `watch` makes it the one that shows notices, `allowed` whether the computer lets it. Sent again when that changes. */
+  | { id: string; op: 'notices'; watch?: boolean; allowed?: boolean }
+  /** Hands over every notice waiting to be shown, and forgets them. */
+  | { id: string; op: 'takeNotices' }
+  /** Someone clicked a notice: the browser it came from brings its tab to the front. */
+  | { id: string; op: 'openNotice'; notice: string };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
@@ -91,9 +98,14 @@ export type ControlMessage =
   | { id: string; op: 'pairing'; mode: PairingMode; approver: Approver; error?: string }
   | { id: string; op: 'blocked'; blocked: BlockedBrowser[] }
   | { id: string; op: 'label'; ok: boolean; error?: string }
+  | { id: string; op: 'notices'; ok: boolean; error?: string }
+  | { id: string; op: 'takeNotices'; notices: QueuedNotice[] }
+  | { id: string; op: 'openNotice'; ok: boolean }
   | { event: 'manifest-changed' }
   /** A browser asked to pair, or a request was decided or expired: read `pairRequests` again. */
   | { event: 'pair-requests-changed' }
+  /** A notice is waiting: call `takeNotices`. */
+  | { event: 'notices-changed' }
   /** config.json changed, from any side: read the preferences and the agent state again. */
   | { event: 'settings-changed' }
   | { event: 'android-changed'; state: AndroidState };

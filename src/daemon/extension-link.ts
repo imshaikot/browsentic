@@ -142,7 +142,8 @@ export class ExtensionLink {
     if (frame.t === 'pong') return;
     if (frame.t === 'focus') return void (this.lastActive = touched());
     if (isExtensionRequest(frame)) {
-      this.lastActive = touched();
+      // A notice is sent because nobody is looking at this browser, so it says nothing about where the user is.
+      if (frame.t !== 'notice') this.lastActive = touched();
       return this.onRequest?.(frame, this);
     }
 

@@ -9,6 +9,7 @@ import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { AndroidState } from '@/lib/phone/types';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
 import type { Approver, BlockedBrowser, GrantOutcome, PairRequestSummary, PairingMode } from '@/lib/pairing';
+import type { QueuedNotice } from '@/lib/notices';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -18,6 +19,7 @@ export class RemoteBridge implements Bridge {
   private readonly manifestListeners = new Set<() => void>();
   private readonly androidListeners = new Set<(state: AndroidState) => void>();
   private readonly pairRequestListeners = new Set<() => void>();
+  private readonly noticeListeners = new Set<() => void>();
 
   private constructor(
     private readonly socket: WebSocket,
@@ -92,6 +94,26 @@ export class RemoteBridge implements Bridge {
 
   onPairRequestsChanged(listener: () => void): void {
     this.pairRequestListeners.add(listener);
+  }
+
+  /** Shows the browsers' notices from now on, while `allowed` says notifications will appear. */
+  async watchNotices(allowed: boolean): Promise<boolean> {
+    const reply = await this.request({ id: randomUUID(), op: 'notices', watch: true, allowed }, 5_000);
+    return !!reply && 'op' in reply && reply.op === 'notices' && reply.ok;
+  }
+
+  async takeNotices(): Promise<QueuedNotice[]> {
+    const reply = await this.request({ id: randomUUID(), op: 'takeNotices' }, 5_000);
+    return reply && 'notices' in reply ? reply.notices : [];
+  }
+
+  async openNotice(notice: string): Promise<boolean> {
+    const reply = await this.request({ id: randomUUID(), op: 'openNotice', notice }, 5_000);
+    return !!reply && 'op' in reply && reply.op === 'openNotice' && reply.ok;
+  }
+
+  onNoticesChanged(listener: () => void): void {
+    this.noticeListeners.add(listener);
   }
 
   async pair(): Promise<{ code: string; expiresAt: number }> {
@@ -180,6 +202,7 @@ export class RemoteBridge implements Bridge {
       if (message.event === 'manifest-changed') for (const listener of this.manifestListeners) listener();
       if (message.event === 'android-changed') for (const listener of this.androidListeners) listener(message.state);
       if (message.event === 'pair-requests-changed') for (const listener of this.pairRequestListeners) listener();
+      if (message.event === 'notices-changed') for (const listener of this.noticeListeners) listener();
       return;
     }
     this.pending.get(message.id)?.(message);
