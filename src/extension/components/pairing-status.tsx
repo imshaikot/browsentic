@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Download, Link2, Loader2, RefreshCw } from 'lucide-react';
+import { BookOpen, Check, Copy, Link2, Loader2, RefreshCw } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
 import { Button } from '@/extension/components/ui/button';
@@ -8,7 +8,8 @@ import { LINKS } from '@/lib/about';
 import { BRIDGE_CHANNEL, type ActionResult } from '@/lib/actions/protocol';
 import type { DaemonState } from '@/lib/bridge/socket';
 
-type Platform = 'mac' | 'win' | 'linux' | 'other';
+/** One line that installs Browsentic Bridge on any computer, and walks the person through the rest. */
+const SETUP_COMMAND = 'npx browsentic@latest setup';
 
 interface Shown {
   text: ReactNode;
@@ -17,7 +18,8 @@ interface Shown {
   /** Lead with the code form: nothing automatic will connect this browser. */
   codeFirst?: boolean;
   busy?: boolean;
-  download?: boolean;
+  /** Show the command that installs the Bridge, and the install guide. */
+  install?: boolean;
 }
 
 const Command = ({ children }: { children: ReactNode }) => (
@@ -37,15 +39,9 @@ export function describePairing(daemon: DaemonState | null, unpacked: boolean): 
   switch (daemon?.bridge) {
     case 'missing':
       return {
-        text: (
-          <>
-            Browsentic Bridge isn’t on this computer yet. Install it and this browser connects by itself. Already installed?
-            Open the Browsentic app, or run <Command>browsentic setup</Command>. On a work computer, your organization’s
-            browser policy may block it.
-          </>
-        ),
+        text: 'Browsentic Bridge isn’t on this computer yet. Install it with this command in a terminal, and this browser connects by itself.',
         retry: 'Try again',
-        download: true,
+        install: true,
       };
     case 'old':
       return {
@@ -74,31 +70,17 @@ export function describePairing(daemon: DaemonState | null, unpacked: boolean): 
   }
 }
 
-function downloadFor(platform: Platform, arch: string): { href: string; label: string } | null {
-  if (platform === 'mac') return { href: LINKS.downloadMac, label: 'Get Browsentic for Mac' };
-  if (platform === 'win') {
-    return { href: arch === 'arm64' ? LINKS.downloadWindowsArm64 : LINKS.downloadWindowsX64, label: 'Get Browsentic for Windows' };
-  }
-  return null;
-}
-
 /** What this browser needs to connect while it is not paired, with a code as the way that always works. */
 export function PairingStatus({ daemon, onConnect }: { daemon: DaemonState | null; onConnect: () => Promise<void> }) {
   const [unpacked, setUnpacked] = useState(false);
-  const [platform, setPlatform] = useState<{ os: Platform; arch: string }>({ os: 'other', arch: '' });
   const [pressing, setPressing] = useState(false);
   const [showCode, setShowCode] = useState(false);
 
   useEffect(() => {
     void browser.management.getSelf().then((self) => setUnpacked(self.installType === 'development')).catch(() => undefined);
-    void browser.runtime
-      .getPlatformInfo()
-      .then(({ os, arch }) => setPlatform({ os: os === 'mac' || os === 'win' || os === 'linux' ? os : 'other', arch }))
-      .catch(() => undefined);
   }, []);
 
   const shown = describePairing(daemon, unpacked);
-  const download = shown.download ? downloadFor(platform.os, platform.arch) : null;
 
   async function press() {
     setPressing(true);
@@ -113,23 +95,19 @@ export function PairingStatus({ daemon, onConnect }: { daemon: DaemonState | nul
         <span>{shown.text}</span>
       </p>
 
-      {shown.download && platform.os === 'linux' && (
-        <p className="text-[11px] text-ink-dim">
-          Run <Command>npx browsentic@latest setup</Command> in a terminal.
-        </p>
-      )}
+      {shown.install && <InstallSteps />}
 
-      {(download || shown.retry) && (
+      {(shown.install || shown.retry) && (
         <div className="flex flex-wrap gap-1.5">
-          {download && (
-            <Button asChild size="sm">
-              <a href={download.href} target="_blank" rel="noreferrer">
-                <Download /> {download.label}
+          {shown.install && (
+            <Button asChild variant="outline" size="sm">
+              <a href={LINKS.installGuide} target="_blank" rel="noreferrer">
+                <BookOpen /> Install guide
               </a>
             </Button>
           )}
           {shown.retry && (
-            <Button variant={download ? 'outline' : 'default'} size="sm" onClick={() => void press()} disabled={pressing}>
+            <Button variant={shown.install ? 'outline' : 'default'} size="sm" onClick={() => void press()} disabled={pressing}>
               {pressing ? <Loader2 className="animate-spin" /> : <RefreshCw />} {shown.retry}
             </Button>
           )}
@@ -147,6 +125,32 @@ export function PairingStatus({ daemon, onConnect }: { daemon: DaemonState | nul
           Pair with a code instead
         </button>
       )}
+    </div>
+  );
+}
+
+function InstallSteps() {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    await navigator.clipboard.writeText(SETUP_COMMAND);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1_500);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5 rounded-lg border border-line bg-ground/60 py-1 pr-1 pl-2.5">
+        <code className="min-w-0 flex-1 truncate font-mono text-xs text-ink">{SETUP_COMMAND}</code>
+        <Button variant="ghost" size="icon-sm" aria-label="Copy the command" onClick={() => void copy()}>
+          {copied ? <Check className="text-lime" /> : <Copy />}
+        </Button>
+      </div>
+      <p className="text-[11px] leading-relaxed text-ink-faint">
+        It needs Node.js 20 or newer; the install guide also has the Mac and Windows apps. Already installed? Open the
+        Browsentic app, or run <Command>browsentic setup</Command>. On a work computer, your organization’s browser policy may
+        block it.
+      </p>
     </div>
   );
 }

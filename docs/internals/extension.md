@@ -607,7 +607,8 @@ carries the mode, a wait and its approver, a block, or **Disconnect**. `PairingS
 with its own message, and the code form one click away (leading when nothing automatic can work).
 
 **The welcome page.** `entrypoints/welcome/` opens once, on install: the three pieces (the extension,
-the Bridge, an agent), a download for this OS while the Bridge is missing, and once connected the
+the Bridge, an agent), the one-line setup command (with Copy) and the install guide while the Bridge
+is missing, and once connected the
 agent picker and **Open the side panel**. The window id is read ahead of the click, because opening
 the panel needs the gesture and an `await` spends it.
 
