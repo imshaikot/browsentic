@@ -31,7 +31,9 @@ The full write-up lives in the docs and is the authority:
 
 Three of those boundaries matter enough to repeat here. **Pairing controls which browser, not
 which local process**: anything running as your user can drive an already-paired browser, so
-your user account is the trust boundary. **Prompt injection is mitigated, not solved**: an
+your user account is the trust boundary. Automatic pairing keeps to it: the grant comes through
+the browser's native messaging host, which only Browsentic's own extension IDs can launch, and
+`browsentic pairing ask` shows you every new browser first. **Prompt injection is mitigated, not solved**: an
 agent reading a hostile page can be influenced by it, and the design goal is to leave a
 successful injection nowhere to act or send data, not to make injection impossible. And
 **secret detection is a filter, not a proof**: the sanitizer is deterministic and errs toward

@@ -8,14 +8,15 @@ the browser's own storage for what never reaches disk. Nothing is kept in the re
 ```
 ~/.browsentic/                 (mode 0700, override with BROWSENTIC_HOME)
 ├── daemon.json    0600        lockfile: pid, port, control token, protocol + daemon version
-├── auth.json      0600        outstanding pairing code, session keys per browser
+├── auth.json      0600        outstanding pairing codes, session keys per browser, allowed and blocked browsers
 ├── config.json                optional, hand-written
 ├── profile.json   0600        the settings page's Profile: your details and standing instructions
 ├── approvals.json 0600        "always on this site" grants, one action + host per entry
 ├── models.json    0600        each agent CLI's own model list, as last read
 ├── schedules.json 0600        scheduled tasks and the last twenty runs of each
-├── native-host/               the helper a browser launches to start the daemon
+├── native-host/               the helper a browser launches to start the daemon and pair
 ├── stopped                    only after `browsentic stop`: the helper leaves the daemon down
+├── daemon.start.lock          only while a daemon is being started: the one starter others wait for
 ├── daemon.log                 run starts, routed skills, every tool call and its outcome
 ├── skills/                    hand-written skill overrides
 ├── cli/                       desktop apps only: the command, the daemon, bundled skills, the extension payload
@@ -33,13 +34,13 @@ the browser's own storage for what never reaches disk. Nothing is kept in the re
 | File | Written by | Notes |
 | --- | --- | --- |
 | `daemon.json` | Each daemon at startup | The control token dies with the daemon that minted it. Read it with `browsentic token` |
-| `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts. Cleared by `browsentic revoke` |
+| `auth.json` | Pairing | Session keys are per browser profile, keyed by its install id, and survive restarts, each with how it paired (`pairedBy`) and any name given to it. `approved` lists the browsers allowed in ask mode; `blocked` the ones revoked or denied, which do not pair again by themselves (the newest 200 kept). Grants are never written here: they live in the daemon's memory for two minutes. `browsentic revoke` deletes a session and blocks it |
 | `config.json` | You, the agent picker, and the settings page and desktop app for `theme` and `guardrails` | Re-read before every run (no restart needed) and watched, so a hand edit reaches every open settings screen. [Reference](../guide/configuration.md) |
 | `profile.json` | The settings page's **Profile** section | Only exists while something is filled in: clearing every field deletes it. Re-read before every run and watched like `config.json`; kept apart from it so the config never holds personal details. [Reference](../guide/configuration.md#profile) |
 | `approvals.json` | **Always on ‹host›** | One action + host per entry. Only short-circuits a `confirm` |
 | `models.json` | The daemon, reading each agent CLI's model list | A cache: deleting it only means the lists are read again. A failed read keeps the last list that read cleanly |
 | `schedules.json` | The Schedules tab, `browsentic tasks` | At most 25 tasks. The daemon re-reads it every minute, so an edit from the CLI lands without a restart. Transcripts stay in the extension: the last three runs of each task |
-| `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw. Each browser gets a manifest in its own `NativeMessagingHosts` folder (a registry key on Windows) naming the extension origins allowed to use it: both store listings always, the unpacked folder, and each paired browser. Pairing adds the new one, and the Bridge rewrites them every time it starts. `browsentic uninstall` removes both |
+| `native-host/` | `browsentic setup` | A launcher that runs this CLI with the `PATH` setup saw and Node's warnings off, since a host must write nothing to stderr. Each browser gets a manifest where it reads one (a registry key on Windows) naming the extension origins allowed to use it: both store listings always, the unpacked folder, and each paired browser. Chrome's and Mozilla's locations are written whether or not those browsers are installed, because Brave, Opera and other forks read Chrome's. The Bridge rewrites them on every start and every hour, only where something changed and never half-written, and repins a launcher whose Node or CLI has gone. A Bridge whose state lives outside the home folder registers nothing. On Windows, setup also registers the `Browsentic\Bridge` scheduled task Firefox's host starts the Bridge through. `browsentic uninstall`, and the Windows app's uninstaller, remove all of it |
 | `stopped` | `browsentic stop` and `restart` | While it exists the helper starts no daemon, so a paired browser cannot undo a stop. The next daemon to start removes it |
 | `cli/`, `bin/`, `runtime/` | The [macOS](../guide/mac-app.md) or [Windows](../guide/windows-app.md) app | Replaced whole on every app update. `cli/.browsentic-app.json` is what makes `installKind()` answer `app`, which turns the npm self-update off |
 | `daemon.log` | The daemon | `browsentic logs`. Local [instant commands](../guide/features/instant-commands.md) never appear here, by design |
@@ -87,6 +88,12 @@ the phone tab is a tab session like any other, marked `phone: { serial }`. Both 
 closes. Nothing about the phone reaches the Bridge's disk beyond `daemon.log` lines naming its
 serial, its Chrome version and each DevTools method sent, never its parameters; screencast frames
 are never logged or stored. See [Android phones](android.md).
+
+**Pairing by itself** keeps three values: `browsentic/pairManual` in `storage.local` while the user
+has pressed Disconnect (only Connect clears it), `browsentic/pairLast` in `storage.local` with what the
+last attempt found and when, which spaces the next one, and `browsentic/staleKey` in
+`storage.session` once the Bridge has said it holds no session for the stored key. The key itself
+stays until a new one replaces it.
 
 **Blocked sites** are `browsentic/blockedSites` in `storage.local`: a list of up to 500 patterns that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.

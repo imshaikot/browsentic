@@ -61,7 +61,8 @@ Read it with `browsentic token`.
 
 ## Pairing and sessions
 
-The extension connects to nothing until you pair it.
+The extension connects to nothing until it is paired, by a code someone types or by a grant the
+native host hands over (next section). Both go through the same handshake.
 
 1. `browsentic pair` asks the daemon for a code: 8 characters from an alphabet with the
    ambiguous glyphs removed, valid **10 minutes**, single use.
@@ -89,6 +90,65 @@ The extension connects to nothing until you pair it.
    origin and claimed by whichever browser proves its key. The daemon returns the key XORed with a
    keystream derived from the same secret, so the long-lived credential never crosses the wire in
    the clear. It survives browser and daemon restarts and dies only when you `browsentic revoke`.
+
+### Pairing by itself: grants
+
+`answerNativeMessage()` in `native-messaging.ts` answers three ops, one message per launch:
+
+| Op | Answer |
+| --- | --- |
+| `ensure` | Starts the Bridge. Byte for byte what 0.8.x answered, because shipped extensions read it |
+| `hello` | The host version, its ops, `pairing.mode`, whether the Bridge is held, whether a desktop app is installed. Read from disk; never starts the Bridge |
+| `pair` | A grant, a `wait`, a refusal (`off`, `revoked`, `denied`, `stopped`, `origin`, `restart`) or an error |
+
+Anything else gets `Expected {"op":"ensure"}.`, which is how a new extension recognises a host that
+predates pairing.
+
+1. The browser launches the host only for the extension IDs its registration lists, and passes the
+   caller: `chrome-extension://<id>/` from Chromium (with `--parent-window` on Windows), the add-on
+   ID from Firefox. `callerOf()` reads it from anywhere in argv; a caller it cannot name gets
+   `origin` and nothing else.
+2. The host asks the Bridge over `/control` (`grant`). `pairing-desk.ts` answers by
+   `pairing.mode`: `code` refuses, a blocked install id is refused unless the request was a click
+   (`gesture`), `ask` holds a request until an approver allows it, and otherwise it mints a
+   **grant**: 26 characters from the code alphabet, valid **120 s**, single use, bound to the
+   install id and the caller (the exact origin for Chromium; the `moz-extension://` scheme for
+   Firefox, whose socket origin is a random UUID per install). Grants live in memory only. A second
+   ask hands back the same grant while more than 30 s of it remains, and never takes a slot from
+   the three typed codes.
+3. The extension redeems the grant with the same `pair` hello and PBKDF2 proof a typed code uses,
+   dialling the grant's port first. `greet()` tries the grant held for that install id from that
+   origin before the typed codes, and checks it again then: a mode switched to `code`, a revoke or a
+   withdrawn approval since it was handed out takes it back.
+4. The session records `pairedBy`: `auto`, `approved` or `code`.
+
+**Ask mode.** A request is one per install id, kept in memory for 10 minutes after its last ask,
+with a nonce the app checks before a `browsentic://` link may act on it. Control clients that send
+`pairRequests {watch:true}` are approvers and hear `pair-requests-changed`. If no app is watching but
+the app marker names one, the Bridge starts it in the background, once per request. `decide` allows
+(which also lifts a block and is remembered in `auth.json`'s `approved`) or denies (a `denied`
+block). A host may hold a `pair` open for up to 25 s (`waitMs`) so an open page hears the decision
+at once: a pending `sendNativeMessage` keeps a Chromium service worker alive and blocks a Firefox
+background page's suspension.
+
+**Blocks.** `revoke` deletes the session and blocks the install id (`auth.json`'s `blocked`, the newest
+200 kept), so the extension's next automatic attempt is refused rather than re-pairing it. A click
+in that browser (in `auto` mode), `decide`, or a typed code lifts it. Agent-run connections
+(`speaksForRun`) are refused `grant`, `decide`, `pairing` changes and `label`.
+
+**A Bridge older than grants** never answers an op it does not know, so the host reads `status`
+first: one without `pairing` gets a plain code from `pair` in `auto` mode, and `restart` in `ask`
+mode, where nobody could be asked.
+
+### Refusal codes
+
+An `unauthorized` frame carries `code` beside the `reason` text, which stays as shipped:
+
+| Code | Meaning | What the extension does |
+| --- | --- | --- |
+| `bad-code` | A code or grant that matched nothing | Reports it |
+| `unknown` | A session key the Bridge holds no session for, and the install is not blocked: a wiped or reinstalled Bridge | Marks the key stale and pairs again through the host, keeping the old key until a new one is stored |
+| `revoked` | A key for a browser this computer revoked | Marks the key stale and waits for **Reconnect** |
 
 ### Why the daemon proves itself too
 

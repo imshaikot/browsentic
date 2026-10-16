@@ -36,6 +36,12 @@ Pairing binds a browser. It does not authenticate local programs: anything runni
 read `~/.browsentic/daemon.json` and drive an already-paired browser through the control port.
 **Browsentic assumes your user account is the trust boundary.**
 
+Automatic pairing keeps to the same boundary. Its grant comes through the browser's native messaging
+host, which only Browsentic's own extension IDs can launch, in a browser running as you. Someone at
+your keyboard who loads a copy of the extension claiming that ID (Developer mode in Chromium, a
+temporary add-on in Firefox) is paired by itself in `auto` mode; `browsentic pairing ask` shows you
+each new browser first, and `browsentic pairing code` turns automatic pairing off.
+
 ## Prompt injection is a real risk
 
 An agent reading a hostile page can follow instructions embedded in that page. No prompt makes a
