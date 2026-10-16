@@ -1,4 +1,5 @@
 import AppKit
+import os
 import SwiftUI
 
 enum Phase { case preflight, main }
@@ -107,6 +108,8 @@ final class AppModel: ObservableObject {
     private var watchingAndroid = false
     private var announcedRequests: Set<String> = []
     private var seenPairings: Set<String>?
+    /// What this socket was last told about notification permission; nil until it is told.
+    private var noticesReported: Bool?
 
     var cli: CLI? { node.map(CLI.init) }
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? Payload.bundledVersion ?? "dev" }
@@ -270,6 +273,8 @@ final class AppModel: ObservableObject {
                         await self?.loadAndroid()
                     case "pair-requests-changed":
                         await self?.loadPairRequests()
+                    case "notices-changed":
+                        await self?.takeNotices()
                     default:
                         break
                     }
@@ -288,6 +293,7 @@ final class AppModel: ObservableObject {
     func refresh() async {
         guard let lock = Self.readLock() else { return markOff() }
         if await control.connect(lock) {
+            noticesReported = nil
             Task { await self.loadPreferences(watch: true) }
             if watchingAndroid { Task { await self.watchAndroid(true) } }
         }
@@ -306,6 +312,7 @@ final class AppModel: ObservableObject {
             stamp = ExtensionFiles.stamp()
             if changed { Task { await loadBrowsers() } }
             if status.pairing != nil { await loadPairRequests() }
+            await reportNotices()
         } catch {
             await control.close()
             markOff()
@@ -323,6 +330,7 @@ final class AppModel: ObservableObject {
         pairingMode = nil
         blocked = []
         seenPairings = nil
+        noticesReported = nil
         PairingAlerts.shared.withdraw(Set(pendingRequests.map(\.id)))
         pendingRequests = []
     }
@@ -452,6 +460,42 @@ final class AppModel: ObservableObject {
 
     func setPairingMode(_ mode: PairingMode) async {
         await onBridge("pairing") { control in self.pairingMode = try await control.pairing(set: mode).kind }
+    }
+
+    // MARK: Browser notices
+
+    /// Tells the Bridge whether this app can show a browser's notices, again only when that changes.
+    func reportNotices() async {
+        guard NoticeWatch.supported(by: status) else { return }
+        let allowed = await PairingAlerts.shared.mayNotify()
+        guard NoticeWatch.needsReport(allowed: allowed, reported: noticesReported),
+              (try? await control.notices(allowed: allowed)) != nil
+        else { return }
+        noticesReported = allowed
+        if allowed { await takeNotices() }
+    }
+
+    func takeNotices() async {
+        guard let notices = try? await control.takeNotices() else { return }
+        for notice in notices { await PairingAlerts.shared.show(notice) }
+    }
+
+    /// The browser brings the notice's tab to the front; this app's window stays where it is. A click makes
+    /// this app active, and since macOS 14 another app comes forward only when the active one yields to it.
+    func openNotice(_ id: String, from browser: String?) async {
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        if let app = BrowserApps.running(for: browser, among: running) {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: app)
+        }
+        if status == nil {
+            startPolling()
+            await refresh()
+        }
+        do {
+            try await control.openNotice(id)
+        } catch {
+            Self.log.notice("openNotice \(id, privacy: .public) from \(browser ?? "an unnamed browser", privacy: .public) was not delivered: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func showMainWindow(on tab: Tab? = nil) {
@@ -730,6 +774,8 @@ final class AppModel: ObservableObject {
             if self.notice == notice { withAnimation { self.notice = nil } }
         }
     }
+
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "com.imshaikot.browsentic", category: "notices")
 
     private static func pause(_ seconds: Double) async {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
