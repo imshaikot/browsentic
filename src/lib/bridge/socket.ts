@@ -644,7 +644,8 @@ function dial(credential: Credential, ports: readonly number[], portIndex: numbe
     void setState({ connected: false, paired: true, error: undefined, android: undefined, lastChangeAt: Date.now() });
     for (const [id] of pendingPhoneOps) settlePhoneOp(id, failure('PHONE_GONE', 'The link to Browsentic Bridge went down.'));
     for (const listener of closedListeners) listener();
-    if (credential.kind === 'session') scheduleRetry();
+    // A link opened by a code or a grant was welcomed with a session key, so it comes back on that key like any other.
+    scheduleRetry();
   };
 }
 
