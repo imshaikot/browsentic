@@ -4,7 +4,7 @@ import { Mic } from 'lucide-react';
 export function DetachVeil() {
   return (
     <div data-detach-veil className="pointer-events-none absolute inset-0 z-50 flex items-end justify-center pb-6">
-      <span className="detach-orb glow-brand flex size-14 items-center justify-center rounded-full border border-magenta/50 bg-ground-2 text-magenta">
+      <span className="detach-orb glow-brand flex size-14 items-center justify-center rounded-full border border-brand/50 bg-ground-2 text-brand">
         <Mic className="size-5" />
       </span>
     </div>
