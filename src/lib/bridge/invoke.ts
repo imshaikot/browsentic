@@ -253,7 +253,7 @@ async function routeInTab(
   runId: string | undefined,
   owner: TabSession | null,
 ): Promise<ActionResult> {
-  if (action === navigate.name) return navigateTab(tab.id, input);
+  if (action === navigate.name) return isWebPage(tab.url) ? navigateTab(tab.id, input) : navigateViaTabsApi(tab.id, input);
   if (action === searchSite.name) return searchTab(tab.id, input);
   if (action === switchTab.name) return switchSessionTab({ id: tab.id, windowId: tab.windowId }, input, owner);
   if (action === switchFrame.name) return switchFrameInTab(tab.id, tab.url, input);
