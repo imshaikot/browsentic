@@ -1,0 +1,2 @@
+{"type":"step_start","timestamp":1792236626003,"sessionID":"ses_eb65f6048ffeEBcJWXYi1KZz7m","part":{"id":"prt_149a0a053001Day3ABxW9VimNK","sessionID":"ses_eb65f6048ffeEBcJWXYi1KZz7m","messageID":"msg_149a0a046001k8QZ22wBFsQFXg","type":"step-start"}}
+{"type":"error","timestamp":1792236626004,"sessionID":"ses_eb65f6048ffeEBcJWXYi1KZz7m","error":{"type":"provider.auth","message":"Invalid API key provided","status":401,"response":{"body":"{\"error\":{\"message\":\"Invalid API key provided\",\"type\":\"invalid_request_error\"}}"}}}

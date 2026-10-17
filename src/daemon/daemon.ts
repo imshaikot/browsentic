@@ -781,7 +781,8 @@ export async function startDaemon({ version, idleExit = true, android = androidO
   function describeFor(runId: string | undefined, binding: Binding): Described {
     const running = runId ? [...agents].find(([, agent]) => agent.owns(runId)) : undefined;
     const offer = running && runId ? running[1].offerFor(runId) : null;
-    if (offer && running) {
+    if (offer && running && runId) {
+      running[1].described(runId);
       const withheld = (name: string) => offer.withheld.includes(name);
       return {
         tools: running[0].tools.filter(({ name }) => !withheld(name)),

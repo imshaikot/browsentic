@@ -86,9 +86,13 @@ Those three answer most questions. The Bridge's log is at `~/.browsentic/daemon.
 | Qwen Code fails with *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier ended on 2026-04-15 | Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL` |
 | Qwen Code cannot see an API key you exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; the rest are sealed away | Point Qwen at one of those four providers |
 | `AGENT_UNSAFE`: *Qwen Code registered …* / *loaded the MCP server …* | Qwen's own startup line named a tool or a server Browsentic denied, so the run was stopped before the model saw it | Update Qwen Code and Browsentic, and report it if it persists |
-| OpenCode fails with *free models refuse a run whose tools Browsentic has narrowed to the browser* | OpenCode Zen's free tier serves only requests carrying OpenCode's own built-in tools | Run `opencode auth login`, then pick that provider's model in the side panel's agent picker |
+| OpenCode fails with *free models refuse a run whose tools Browsentic has narrowed to the browser* | OpenCode Zen's free tier serves only requests carrying OpenCode's own built-in tools | Sign in to a provider: `opencode auth login` on OpenCode 1, the line in the message on OpenCode 2. Then pick that provider's model in the side panel's agent picker |
+| OpenCode 2 needs setup though you are signed in to OpenCode | Browsentic's runs keep an OpenCode database of their own, apart from yours, and OpenCode 2 keeps sign-ins in it | Run the line the agent picker shows, which signs that database in |
+| OpenCode 2 fails with *no model "…" here* | OpenCode 2 does not offer that model to Browsentic's sign-in | Pick one of the models the message lists, `provider/model` |
+| OpenCode 2 fails with *could not start Browsentic's browser tools* | The run's browser tools did not reach OpenCode within 20 seconds | Run `browsentic restart`, then send the message again |
+| OpenCode fails with *changed version since Browsentic last checked it* | OpenCode 1 and 2 refuse each other's flags, which is what swapping one for the other while Browsentic runs looks like | Send the message again |
 | OpenCode fails with *could not start this turn* | Usually a model OpenCode does not know | Pick a model exactly as `opencode models` lists it, `provider/model` |
-| OpenCode cannot see an API key you exported | Only `OPENCODE_*` reaches a run; the rest are sealed away | Run `opencode auth login`, which keeps the key in OpenCode's own file |
+| OpenCode cannot see an API key you exported | Only `OPENCODE_*` reaches a run; the rest are sealed away | Sign in instead (`opencode auth login` on OpenCode 1, the agent picker's line on OpenCode 2), which keeps the key in OpenCode's own store |
 | `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped | Update OpenCode and Browsentic, and report it |
 
 ## Pages and tabs

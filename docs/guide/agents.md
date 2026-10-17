@@ -268,39 +268,68 @@ and please report them.
 
 ### OpenCode is in beta
 
-The OpenCode runner was checked against `opencode` 1.18.32 with a stand-in model provider: every
+OpenCode ships in two lines, which both install an `opencode` command: OpenCode 1 (`npm i -g
+opencode-ai`, what OpenCode's own docs install) and OpenCode 2 (`npm i -g @opencode/cli`, which also
+installs `opencode2`). Browsentic reads which one it has from `opencode --version` and runs each its
+own way. The runner was checked against 1.18.32 and 2.0.32 with a stand-in model provider: every
 flag and setting it passes, the containment under a user config written to break it, the browser
 tools reaching a run, a follow-up turn resuming, and each error OpenCode reports. A real model
 driving a real page has not been tried yet, because OpenCode Zen's free models refuse a contained
 run and no paid provider was signed in where it was built. Expect rough edges, and please report
 them.
 
-- **Sign in to a provider first.** Run `opencode auth login`. Zen's free models answer only
-  requests that carry OpenCode's own built-in tools. A Browsentic run carries only the browser's, so
-  they refuse it with *free tier can only be used from within OpenCode*. Until OpenCode has a login,
-  or a provider in its config such as a local model, the agent picker shows *needs setup*.
+What both lines share:
+
+- **Zen's free models refuse a Browsentic run.** They answer only requests that carry OpenCode's
+  own built-in tools. A Browsentic run carries only the browser's, so they refuse it with *free tier
+  can only be used from within OpenCode*. Sign in to a provider first; until then the agent picker
+  shows *needs setup*.
 - **Models are `provider/model`**, spelled as `opencode models` lists them.
 - **A key in the environment does not reach a run.** Only `OPENCODE_*` does; `ANTHROPIC_API_KEY`
-  and the like are sealed away. `opencode auth login` keeps the key in OpenCode's own file instead,
-  which a run reads as usual.
+  and the like are sealed away. Sign in instead, which keeps the key in OpenCode's own store.
 - **Your OpenCode settings are read, and cannot widen a run.** Your providers, models and
   `~/.config/opencode/AGENTS.md` apply. The run uses an agent Browsentic defines, whose rules deny
   every tool not named for it, so your permission rules, custom tools and the MCP servers you set up
-  in OpenCode itself are hidden from the model (those servers still start). External plugins and
-  project config are off for the run.
+  in OpenCode itself are hidden from the model. Project config is off for the run.
 - **Sharing is off.** A `"share": "auto"` of your own would publish every browsing session to a
   public link, so a run switches sharing off.
-- **Run sessions are kept apart from yours.** Runs and one-shots go into a session store under
-  `~/.browsentic`, not into `opencode session list`.
-- **Replies arrive a part at a time.** Like Vibe's, OpenCode's stream carries each finished part,
-  not tokens.
+- **Replies arrive a part at a time**, not token by token.
 - **A tool result is cut at 100 KB**, not OpenCode's own 50 KB, which a whole-page snapshot can
   exceed. Past that, the prompt asks for smaller reads, because a run cannot open the saved copy
   OpenCode points to.
-- **Effort is a variant.** `agents.opencode.effort` is passed as `--variant`, whose names each model
-  defines; a name the model lacks is ignored.
 - **The run is stopped if a local tool ran.** OpenCode reports every tool call, and one that ran
   outside the browser ends the run with `AGENT_UNSAFE`.
+
+**OpenCode 1:**
+
+- **Sign in with `opencode auth login`.** A provider in your config, such as a local model, counts
+  too.
+- **Run sessions are kept apart from yours.** Runs and one-shots go into a session store under
+  `~/.browsentic`, not into `opencode session list`. External plugins are off for the run, and the
+  MCP servers you set up still start, with their tools hidden.
+- **Effort is a variant.** `agents.opencode.effort` is passed as `--variant`, whose names each model
+  defines; a name the model lacks is ignored.
+
+**OpenCode 2:**
+
+- **Browsentic has a sign-in of its own.** OpenCode 2 keeps sign-ins in the same database as its
+  sessions, and Browsentic runs keep a database apart from yours, so your own sign-in does not carry
+  over. The agent picker shows the one line to run, which signs that database in; on macOS and Linux
+  it is `OPENCODE_DB="$HOME/.browsentic/agents/opencode/opencode-2.db" opencode auth login --standalone`.
+  An `OPENCODE_API_KEY` in the environment, or a provider in your config, counts too.
+- **Your sessions and your background service are never touched.** Every run starts its own private
+  OpenCode server rather than the shared one, so a run is never added to your session list and your
+  service never picks one up.
+- **A turn waits for the browser tools.** OpenCode 2 connects MCP servers in the background, so a
+  turn is held over its Agent Client Protocol (`opencode acp`) and the message goes once the browser's
+  tools have reached it, which adds well under a second.
+- **Your plugins and other MCP servers do not load.** A policy in the run's config keeps them off;
+  one in your global or managed config outranks it.
+- **Effort is set only where the model offers it.** OpenCode 2 refuses a run asking for an effort
+  the model lacks, so `agents.opencode.effort` is applied when the model lists that level and
+  otherwise left out.
+- **Sessions do not carry over from OpenCode 1.** After switching lines, a conversation's next turn
+  starts a fresh OpenCode session.
 
 ---
 
@@ -343,7 +372,7 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The Bridge's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode is signed in to no provider: run `opencode auth login`. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode 1 is signed in to no provider: run `opencode auth login`. OpenCode 2 has no sign-in of its own for Browsentic: run the line the picker shows. |
 | Codex: "not logged in" | The Bridge inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
@@ -359,11 +388,14 @@ Claude runner's settings.
 | Qwen Code: *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier has ended. Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL`. |
 | Qwen Code cannot find a key you have exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; `ANTHROPIC_*` and `GEMINI_*` are sealed away. Point Qwen at one of the first four. |
 | `AGENT_UNSAFE`: *Qwen Code registered …* or *loaded the MCP server …* | Qwen's own `init` line named a tool or a server Browsentic denied, so the run was stopped. Update Qwen Code and Browsentic, and report it if it persists. |
-| OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. Run `opencode auth login`, then pick that provider's model in the side panel's agent picker. |
+| OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. Sign in to a provider (`opencode auth login` on OpenCode 1, the line in the message on OpenCode 2), then pick that provider's model in the side panel's agent picker. |
+| OpenCode 2: *no model "…" here* | OpenCode 2 does not offer that model. Pick one of those the message lists, `provider/model`. |
+| OpenCode 2: *could not start Browsentic's browser tools* | The run's browser tools did not reach OpenCode within 20 seconds. Run `browsentic restart`, then send the message again. |
+| OpenCode: *changed version since Browsentic last checked it* | OpenCode 1 and 2 refuse each other's flags, which is what a swap while Browsentic runs looks like. Send the message again. |
 | OpenCode: *could not start this turn* | Usually a model OpenCode does not know. Pick one as `opencode models` lists it, `provider/model`. |
 | The model select says *built-in list*, with a reason | Browsentic could not read that CLI's own list, usually because it is signed out. Sign it in, then press *Recheck*. The shipped list works meanwhile. |
 | A model shows *not listed* | You pinned it, and the CLI no longer lists it. It is still passed to the CLI; pick a listed one if runs start failing. |
-| OpenCode cannot find a key you have exported | Only `OPENCODE_*` reaches a run. Run `opencode auth login` instead, which keeps the key in OpenCode's own file. |
+| OpenCode cannot find a key you have exported | Only `OPENCODE_*` reaches a run. Sign in instead (`opencode auth login` on OpenCode 1, the picker's line on OpenCode 2), which keeps the key in OpenCode's own store. |
 | `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped. Update OpenCode and Browsentic, and report it. |
 
 ---

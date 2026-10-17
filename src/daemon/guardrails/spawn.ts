@@ -86,7 +86,14 @@ interface Requirements {
   readonly fileContains?: Readonly<Record<string, readonly string[]>>;
   /** The only set-up commands the plan may run before its turn, each exactly as written here. */
   readonly prepare?: readonly (readonly string[])[];
+  /** Variables that must name the plan's own working directory, for a CLI that moves to one before using its cwd. */
+  readonly envIsCwd?: readonly string[];
+  /** What this shape cannot say, read out of the plan itself: each answer is a clause the label goes in front of. */
+  readonly inspect?: (plan: SpawnPlan) => string[];
 }
+
+/** One way of being contained, or several a CLI's releases each need, of which a plan has to meet one in full. */
+type Rules = Requirements | readonly Requirements[];
 
 interface Containment {
   readonly localTools: LocalTools;
@@ -105,10 +112,10 @@ interface Containment {
   readonly forbidden?: readonly RegExp[];
   /** Why this runner is only as contained as it is. Logged once per run. */
   readonly note: string;
-  readonly run: Requirements;
-  readonly task: Requirements;
+  readonly run: Rules;
+  readonly task: Rules;
   /** Only a runner that holds conversations has these; any other refuses to start one. */
-  readonly conversation?: Requirements;
+  readonly conversation?: Rules;
 }
 
 /**
@@ -159,6 +166,96 @@ const OPENCODE_SEALED = { OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE
 
 /** The ruleset that denies every tool not named after it, and the switch that keeps a session off opncd.ai. */
 const OPENCODE_CONFIG = ['"*":"deny"', '"share":"disabled"'];
+
+/**
+ * OpenCode 2 renamed the project switch, keeping the old name only as a fallback the new one overrides
+ * when set at all, and reads a global config folder `OPENCODE_DISABLE_PROJECT_CONFIG` never reaches.
+ */
+const OPENCODE2_SEALED = {
+  OPENCODE_CONFIG_PROJECT_DISABLE: '1',
+  OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+  OPENCODE_DISABLE_CLAUDE_CODE: '1',
+  OPENCODE_DISABLE_AUTOUPDATE: '1',
+};
+
+const OPENCODE_AGENT = 'browsentic-contained';
+
+const OPENCODE_WEB = ['webfetch', 'websearch'];
+
+interface OpenCodeStatement {
+  action?: unknown;
+  resource?: unknown;
+  effect?: unknown;
+}
+
+interface OpenCode2Config {
+  share?: unknown;
+  default_agent?: unknown;
+  policies?: OpenCodeStatement[];
+  agents?: Record<string, { permissions?: OpenCodeStatement[] } | undefined>;
+  mcp?: { servers?: Record<string, { codemode?: unknown } | undefined> };
+}
+
+/**
+ * OpenCode 2's config read rather than searched: its rules are a list, where an allow added after the
+ * deny would sit beside it and still match. A run's agent opens on denying everything and then allows
+ * the browser's tools, the web's on research, and a one-shot's scratch reads, nothing else; the
+ * browser's server is the only one and lists its tools directly, outside Code Mode's `execute`; and
+ * policies keep the user's plugins and other MCP servers from loading at all.
+ */
+const openCode2 =
+  (mode: SpawnMode) =>
+  (plan: SpawnPlan): string[] => {
+    let config: OpenCode2Config;
+    try {
+      config = JSON.parse(plan.env?.OPENCODE_CONFIG_CONTENT ?? '') as OpenCode2Config;
+    } catch {
+      return ['is spawned without a readable OPENCODE_CONFIG_CONTENT'];
+    }
+    const problems: string[] = [];
+    if (config.share !== 'disabled') problems.push('is spawned with sharing left on');
+    if (mode === 'conversation' && config.default_agent !== OPENCODE_AGENT) problems.push(`starts its sessions in an agent other than ${OPENCODE_AGENT}`);
+
+    const [first, ...rest] = config.agents?.[OPENCODE_AGENT]?.permissions ?? [];
+    if (first?.action !== '*' || first.resource !== '*' || first.effect !== 'deny') {
+      problems.push(`gives ${OPENCODE_AGENT} rules that do not open on denying everything`);
+    }
+    const mayAllow = ({ action, resource }: OpenCodeStatement) =>
+      mode === 'task'
+        ? action === 'read' && typeof resource === 'string' && resource !== '*'
+        : typeof action === 'string' && (action.startsWith('browsentic_') || OPENCODE_WEB.includes(action));
+    for (const rule of rest) {
+      if (rule.effect !== 'deny' && !mayAllow(rule)) problems.push(`lets ${OPENCODE_AGENT} ${String(rule.effect)} ${String(rule.action)} on ${String(rule.resource)}`);
+    }
+
+    const servers = config.mcp?.servers ?? {};
+    if (mode === 'task' && Object.keys(servers).length) problems.push('gives a one-shot an MCP server');
+    if (mode !== 'task' && (Object.keys(servers).join() !== 'browsentic' || servers.browsentic?.codemode !== false)) {
+      problems.push("serves the browser's tools other than directly, from its one server");
+    }
+
+    const policies = config.policies ?? [];
+    for (const resource of ['plugin:*', 'mcp:*']) {
+      const last = policies.filter((policy) => policy.action === 'integration.use' && policy.resource === resource).at(-1);
+      if (last?.effect !== 'deny') problems.push(`does not keep ${resource} from loading`);
+    }
+    return problems;
+  };
+
+const openCode2Rules = (mode: SpawnMode): Requirements => ({
+  required: mode === 'conversation' ? ['acp'] : ['--standalone'],
+  pairs:
+    mode === 'conversation'
+      ? []
+      : [
+          ['--agent', OPENCODE_AGENT],
+          ['--format', 'json'],
+        ],
+  env: OPENCODE2_SEALED,
+  envIsCwd: ['PWD'],
+  inspect: openCode2(mode),
+  files: mode === 'task' ? [] : ['instructions.md'],
+});
 
 export const CONTAINMENT: Record<AgentKind, Containment> = {
   claude: {
@@ -378,35 +475,43 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
     localTools: 'allowlist',
     // A key in ANTHROPIC_* or OPENAI_* would be one of a dozen providers OpenCode reads; `opencode auth login` keeps them in a file.
     keepsEnv: ['OPENCODE_'],
-    // `--auto` approves whatever is not denied, `--attach` runs the turn in a server started with someone
-    // else's config, `--dir` moves it out of the workspace, and `--share` publishes it.
-    forbidden: [/^--auto$/i, /^--attach/i, /^--dir/i, /^--share$/i],
+    // `--auto` approves whatever is not denied, `--attach` and `--server` run the turn in a server started with someone
+    // else's config, `--dir` moves it out of the workspace, `--share` publishes it, and `--file` hands the model a file.
+    forbidden: [/^--auto$/i, /^--attach/i, /^--server/i, /^--dir/i, /^--share$/i, /^--file/i, /^--(agent|format|model)=/i],
     note:
-      'a per-run permission ruleset opening on "*": "deny", which OpenCode applies after the user’s own rules, ' +
+      'a per-run permission ruleset opening on denying everything, which OpenCode applies after the user’s own rules, ' +
       'so the model is offered no tool that was not named — built-in, custom, or another MCP server’s; ' +
-      'external plugins and project config stay off, but MCP servers the user gave OpenCode itself still start, with their tools hidden',
-    run: {
-      // Plugins run inside OpenCode and can add tools or answer its permission prompts.
-      required: ['--pure'],
-      pairs: [
-        ['--agent', 'browsentic-contained'],
-        ['--format', 'json'],
-      ],
-      env: OPENCODE_SEALED,
-      envContains: { OPENCODE_CONFIG_CONTENT: OPENCODE_CONFIG },
-      files: ['instructions.md'],
-    },
-    task: {
-      required: ['--pure'],
-      pairs: [
-        ['--agent', 'browsentic-contained'],
-        ['--format', 'json'],
-      ],
-      env: OPENCODE_SEALED,
-      // An empty map adds no server of ours, so a one-shot has no way to the browser.
-      envContains: { OPENCODE_CONFIG_CONTENT: [...OPENCODE_CONFIG, '"mcp":{}'] },
-      files: [],
-    },
+      'on 1.x external plugins and project config stay off, but MCP servers the user gave OpenCode itself still start, with their tools hidden; ' +
+      'on 2.x a policy keeps the user’s plugins and other MCP servers from loading, though one in their global or managed config outranks it',
+    run: [
+      {
+        // Plugins run inside OpenCode and can add tools or answer its permission prompts.
+        required: ['--pure'],
+        pairs: [
+          ['--agent', OPENCODE_AGENT],
+          ['--format', 'json'],
+        ],
+        env: OPENCODE_SEALED,
+        envContains: { OPENCODE_CONFIG_CONTENT: OPENCODE_CONFIG },
+        files: ['instructions.md'],
+      },
+      openCode2Rules('run'),
+    ],
+    task: [
+      {
+        required: ['--pure'],
+        pairs: [
+          ['--agent', OPENCODE_AGENT],
+          ['--format', 'json'],
+        ],
+        env: OPENCODE_SEALED,
+        // An empty map adds no server of ours, so a one-shot has no way to the browser.
+        envContains: { OPENCODE_CONFIG_CONTENT: [...OPENCODE_CONFIG, '"mcp":{}'] },
+        files: [],
+      },
+      openCode2Rules('task'),
+    ],
+    conversation: openCode2Rules('conversation'),
   },
 };
 
@@ -419,6 +524,30 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
   const rules = CONTAINMENT[kind][mode];
   const label = `${AGENTS[kind].label} (${mode})`;
   if (!rules) return [`${label} has no containment written for it.`];
+  // A plan meets one way of being contained in full, or is held to the way it came closest to.
+  const shortfalls = alternativesOf(rules).map((alternative) => unmet(alternative, plan, label));
+  const problems = [...(shortfalls.find((shortfall) => shortfall.length === 0) ?? shortfalls.reduce((a, b) => (b.length < a.length ? b : a)))];
+
+  const banned = [...FORBIDDEN, ...(CONTAINMENT[kind].forbidden ?? [])];
+  for (const arg of plan.args) {
+    if (banned.some((pattern) => pattern.test(arg))) {
+      problems.push(`${label} is spawned with ${arg}, which disables its own containment.`);
+    }
+  }
+
+  for (const model of [...everyValueOf(plan.args, '--model'), ...everyValueOf(plan.args, '-m')]) {
+    if (!isModelId(model)) problems.push(`${label} is spawned with the model ${JSON.stringify(model)}, which it could read as a flag.`);
+  }
+
+  if (!within(plan.cwd, home)) problems.push(`${label} would run in ${plan.cwd}, which is outside ${home}.`);
+
+  return problems;
+}
+
+const alternativesOf = (rules: Rules): readonly Requirements[] => ('required' in rules ? [rules] : rules);
+
+/** What a plan lacks of one way of being contained. */
+function unmet(rules: Requirements, plan: SpawnPlan, label: string): string[] {
   const problems: string[] = [];
 
   for (const arg of rules.required) {
@@ -449,6 +578,10 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     if (plan.env?.[name] !== value) problems.push(`${label} is spawned without ${name}=${value}.`);
   }
 
+  for (const name of rules.envIsCwd ?? []) {
+    if (plan.env?.[name] !== plan.cwd) problems.push(`${label} is spawned with a ${name} other than the folder it runs in.`);
+  }
+
   for (const [name, needles] of Object.entries(rules.envContains ?? {})) {
     const missing = needles.filter((needle) => !plan.env?.[name]?.includes(needle));
     if (missing.length) problems.push(`${label} is spawned with a ${name} missing ${missing.join(', ')}.`);
@@ -474,18 +607,7 @@ export function vetPlan(kind: AgentKind, mode: SpawnMode, plan: SpawnPlan, home:
     if (!allowed) problems.push(`${label} would run "${command.join(' ')}" before its turn, which is not a set-up step it is allowed.`);
   }
 
-  const banned = [...FORBIDDEN, ...(CONTAINMENT[kind].forbidden ?? [])];
-  for (const arg of plan.args) {
-    if (banned.some((pattern) => pattern.test(arg))) {
-      problems.push(`${label} is spawned with ${arg}, which disables its own containment.`);
-    }
-  }
-
-  for (const model of everyValueOf(plan.args, '--model')) {
-    if (!isModelId(model)) problems.push(`${label} is spawned with the model ${JSON.stringify(model)}, which it could read as a flag.`);
-  }
-
-  if (!within(plan.cwd, home)) problems.push(`${label} would run in ${plan.cwd}, which is outside ${home}.`);
+  for (const clause of rules.inspect?.(plan) ?? []) problems.push(`${label} ${clause}.`);
 
   return problems;
 }

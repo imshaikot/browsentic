@@ -10,7 +10,10 @@ What each agent CLI printed on stdout, one event per line, for the reader tests 
   commands emptied. OpenCode's were recorded through the runner's own plan with the model provider
   replaced by a local stand-in, so the model's words are scripted and its URL is 127.0.0.1 — all but
   `free-tier`, which the real Zen endpoint answered and which lost only its `cf-ray` and
-  `cf-placement` headers; paths became `/Users/you`. Codex's `web-search`, `shell` and `two-calls`
+  `cf-placement` headers; paths became `/Users/you`. OpenCode 2.0.32's were recorded the same way,
+  from `opencode run --standalone` and from `opencode acp`; the `acp-` ones keep only what the CLI
+  printed, with its replies renumbered to the request ids the runner uses, and both `free-tier`
+  recordings were answered by the real Zen endpoint. Codex's `web-search`, `shell` and `two-calls`
   and Claude Code's `mcp-failed` were recorded the same way, each saying so in its first line.
 - `<case>.hand-written.jsonl` was written from the reader code, for streams a contained run cannot
   produce or a CLI that was not installed. Its first line says so.

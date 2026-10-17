@@ -57,11 +57,16 @@ export interface StreamContext {
   mcpTools: string[];
   /** The run's browser tools served in this process, for a CLI that takes tools other than over MCP. */
   tools: () => Promise<ToolHost>;
+  /** Settles once the run's MCP server has handed its tool list to the CLI, for a CLI that does not wait for it. */
+  toolsListed: () => Promise<void>;
+  /** The CLI's `--version` line as last probed, for a runner whose CLI changed its flags between releases. */
+  version?: string;
 }
 
 export interface JsonContext {
   prompt: string;
   settings: AgentSettings;
+  version?: string;
   workspace: string;
   /** The prompt names a file in the workspace that the agent has to open. */
   reads: boolean;
@@ -150,8 +155,8 @@ export interface Runner {
   answer(stdout: string): { text?: string; error?: string };
   /** Turns a stderr tail into something more useful than "exited with code 1". */
   hint?(stderrTail: string): string | null;
-  /** Anything beyond "the binary is installed" that has to be true before a run. */
-  check?(settings: AgentSettings): Promise<AgentProblem | null>;
+  /** Anything beyond "the binary is installed" that has to be true before a run, for the `--version` line just probed. */
+  check?(settings: AgentSettings, version?: string): Promise<AgentProblem | null>;
   /** Repairs what `check` reported, when the user asks for it. */
   grant?(): Promise<AgentProblem | null>;
 }

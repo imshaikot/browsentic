@@ -109,6 +109,9 @@ interface ActiveRun {
   limits?: CallLimits;
   /** An approval still on the user's screen after its call was handed back, until the agent calls again. */
   parked?: Waiting;
+  /** Settles when the run's MCP server first lists its tools to the agent. */
+  listed: Promise<void>;
+  markListed: () => void;
 }
 
 const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
@@ -193,6 +196,11 @@ export class AgentSession {
 
   owns(runId: string): boolean {
     return this.runs.has(runId);
+  }
+
+  /** The run's MCP server has just been told what its tools are, which a CLI that does not wait for them needs to know. */
+  described(runId: string): void {
+    this.runs.get(runId)?.markListed();
   }
 
   /**
@@ -464,6 +472,8 @@ export class AgentSession {
       extraHosts: config.guardrails?.hosts,
       pinTab: true,
     });
+    let markListed = () => {};
+    const listed = new Promise<void>((resolve) => (markListed = resolve));
     const run: ActiveRun = {
       id: runId,
       sessionId,
@@ -480,6 +490,8 @@ export class AgentSession {
       approved: new Set(),
       scheduled: context?.task !== undefined,
       limits: RUNNERS[config.agent].limits,
+      listed,
+      markListed,
     };
     this.runs.set(runId, run);
     if (run.liveTools && sessionId) this.codeListed.add(sessionId);
@@ -577,6 +589,8 @@ export class AgentSession {
         config: run.config,
         sessionId: resuming,
         mcpTools: agentRunToolNames(this.deps.actionNames()),
+        toolsListed: () => run.listed,
+        version: runner.version,
         signal: run.abort.signal,
         emit,
       });
