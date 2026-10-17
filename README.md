@@ -140,7 +140,7 @@ The extension dials out to Browsentic Bridge, because a Manifest V3 service work
 
 ![The side panel in Chrome partway through a run, waiting for approval to send a reminder; the Mac app's Overview and its one-click setup; the Windows app's agent picker and its Android phone checks](docs/assets/side-panel-and-apps.webp)
 
-The [side panel](docs/guide/features/conversations.md) is where you work with the agent. Every page action shows up as a step, and consequential ones, such as submitting a form, wait for your [approval](docs/guide/approvals.md).
+The [side panel](docs/guide/features/conversations.md) is where you work with the agent. Every page action shows up as a step, and consequential ones, such as submitting a form, wait for your [approval](docs/guide/approvals.md). A new tab opens [Browsentic Home](docs/guide/features/new-tab.md), a full-page composer with your frequent sites, which hands the task to the side panel as soon as you send it; you can switch it off.
 
 The desktop apps for [macOS](docs/guide/mac-app.md) and [Windows](docs/guide/windows-app.md) ([experimental](docs/guide/limits.md#windows-is-experimental)) install Node and Browsentic Bridge in one click, turn the Bridge on and off, add the extension to each browser, pick the [agent CLI](docs/guide/agents.md) and its model, and check an [Android phone](docs/guide/features/android.md) before the side panel drives it.
 

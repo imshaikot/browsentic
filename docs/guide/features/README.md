@@ -10,6 +10,7 @@ If you have not set Browsentic up yet, start with [Install](../install.md), [Pai
 | | |
 | --- | --- |
 | [Conversations](conversations.md) | Typing and dictating, one conversation per tab, the sessions strip, history |
+| [New tab](new-tab.md) | Browsentic Home on every new tab: a composer, your frequent sites and recent conversations, and how to switch it off |
 | [Hands-free](hands-free.md) | Talking to the page through a mic you can drag anywhere, with the side panel put away |
 | [Instant commands](instant-commands.md) | Commands such as "go back" and "scroll to the top" that run in milliseconds without an agent |
 | [A-Eye](a-eye.md) | Pointing at an element instead of describing it, and the agent asking you to point |

@@ -337,6 +337,15 @@
   );
 }
 
+/* The light Browsentic Home's composer sits in, as strong as the theme's glow dial allows. */
+@utility home-halo {
+  background: radial-gradient(
+    ellipse 65% 60% at 50% 42%,
+    color-mix(in oklch, var(--brand) calc(var(--glow) * 0.13), transparent),
+    transparent 72%
+  );
+}
+
 @utility text-gradient {
   background: linear-gradient(
     100deg,
@@ -417,6 +426,27 @@
   }
 }
 
+/* The mark tracing itself once on Browsentic Home: the path, then its three stops. */
+@keyframes browsentic-trace {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes browsentic-stop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* The panel folding down into the hands-free mic before it closes. */
 @keyframes browsentic-fold {
   to {
@@ -459,6 +489,25 @@
 
   .detach-orb {
     animation: browsentic-detach-orb 0.56s var(--ease-out-expo) both;
+  }
+
+  .logo-drawn path:last-of-type {
+    stroke-dasharray: 1;
+    animation: browsentic-trace 0.7s var(--ease-out-expo) 0.1s both;
+  }
+  .logo-drawn circle:nth-last-of-type(-n + 3) {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: browsentic-stop 0.4s var(--ease-out-expo) both;
+  }
+  .logo-drawn circle:nth-last-of-type(3) {
+    animation-delay: 0.1s;
+  }
+  .logo-drawn circle:nth-last-of-type(2) {
+    animation-delay: 0.38s;
+  }
+  .logo-drawn circle:nth-last-of-type(1) {
+    animation-delay: 0.62s;
   }
 
   [data-stream] .tok {

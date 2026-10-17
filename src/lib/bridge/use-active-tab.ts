@@ -47,3 +47,24 @@ export function useActiveTab(): ActiveTab {
 
   return tab;
 }
+
+/** The tab a page is itself open in, for a page whose conversation is its own whichever tab is in front. */
+export function useOwnTab(): ActiveTab {
+  const [tab, setTab] = useState<ActiveTab>(NO_TAB);
+
+  useEffect(() => {
+    let live = true;
+    void browser.tabs
+      .getCurrent()
+      .then((found) => {
+        if (!live || found?.id == null) return;
+        setTab({ url: found.url ?? '', tabId: found.id, windowId: found.windowId, title: found.title ?? document.title });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  return tab;
+}

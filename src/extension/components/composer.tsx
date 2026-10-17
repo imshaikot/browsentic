@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import {
   CalendarClock,
   Code2,
@@ -32,6 +32,11 @@ export interface AttachedSkill {
   name: string;
 }
 
+const SIZES = {
+  panel: { card: 'rounded-2xl', field: 'max-h-48 min-h-14 px-3 pt-2.5', bar: 'px-1.5 pb-1.5', rows: 2 },
+  hero: { card: 'rounded-3xl', field: 'max-h-72 min-h-20 px-4 pt-3.5 text-[0.9375rem]', bar: 'px-2.5 pb-2.5', rows: 3 },
+} as const;
+
 export function Composer({
   voice,
   voiceEnabled,
@@ -49,8 +54,11 @@ export function Composer({
   android,
   onToggleLiveTools,
   onPhone = false,
-  scheduling,
+  scheduling = false,
   onToggleScheduling,
+  placeholder = 'Tell me what to do on this page…',
+  size = 'panel',
+  accessory,
   actionCues,
   onToggleActionCues,
   onAttachSkill,
@@ -85,8 +93,13 @@ export function Composer({
   /** The panel is showing the phone conversation: what only works in a desktop tab is not offered. */
   onPhone?: boolean;
   onToggleLiveTools: () => void;
-  scheduling: boolean;
-  onToggleScheduling: () => void;
+  scheduling?: boolean;
+  /** Absent where a message cannot be scheduled from, which takes the button away. */
+  onToggleScheduling?: () => void;
+  placeholder?: string;
+  size?: keyof typeof SIZES;
+  /** Sits beside the send button. */
+  accessory?: ReactNode;
   actionCues: boolean;
   onToggleActionCues: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
@@ -96,7 +109,8 @@ export function Composer({
   onSend: () => void;
   onStop: () => void;
   onToggleVoice: () => void;
-  onPick: () => void;
+  /** Absent where there is no page to point at, which takes A-Eye away. */
+  onPick?: () => void;
   onClearFocus: () => void;
   onAttachFile: (file: File) => void;
   onRemoveFile: (fileId: string) => void;
@@ -142,6 +156,8 @@ export function Composer({
     if ((event.target as HTMLElement).closest('button, textarea')) return;
     composerRef.current?.focus();
   }
+
+  const sized = SIZES[size];
 
   return (
     <>
@@ -194,7 +210,8 @@ export function Composer({
       <div
         onClick={focusComposer}
         className={cn(
-          'panel-card relative flex flex-col rounded-2xl transition-colors has-[textarea:focus]:border-brand/50',
+          'panel-card relative flex flex-col transition-colors has-[textarea:focus]:border-brand/50',
+          sized.card,
           connected && 'cursor-text',
         )}
       >
@@ -245,29 +262,28 @@ export function Composer({
             }
           }}
           placeholder={
-            !connected
-              ? 'Pair the browser to get started'
-              : scheduling
-                ? 'Say what to do, then pick when…'
-                : 'Tell me what to do on this page…'
+            !connected ? 'Pair the browser to get started' : scheduling ? 'Say what to do, then pick when…' : placeholder
           }
+          aria-label="Instruction for Browsentic"
           disabled={!connected}
-          rows={2}
-          className="max-h-48 min-h-14 resize-none rounded-none border-0 bg-transparent px-3 pt-2.5 pb-0 focus-visible:border-0"
+          rows={sized.rows}
+          className={cn('resize-none rounded-none border-0 bg-transparent pb-0 focus-visible:border-0', sized.field)}
         />
 
-        <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
-          <Button
-            variant={focus || picking ? 'subtle' : 'ghost'}
-            size="icon-sm"
-            title="A-Eye — point at an element on the page and send it with your next message"
-            aria-label="Point at an element with A-Eye"
-            onClick={onPick}
-            disabled={!connected || picking}
-            className={cn(focus || picking ? 'text-ember' : undefined)}
-          >
-            <ScanEye className={cn('size-3.5', picking && 'animate-pulse')} />
-          </Button>
+        <div className={cn('flex items-center gap-0.5', sized.bar)}>
+          {onPick && (
+            <Button
+              variant={focus || picking ? 'subtle' : 'ghost'}
+              size="icon-sm"
+              title="A-Eye — point at an element on the page and send it with your next message"
+              aria-label="Point at an element with A-Eye"
+              onClick={onPick}
+              disabled={!connected || picking}
+              className={cn(focus || picking ? 'text-ember' : undefined)}
+            >
+              <ScanEye className={cn('size-3.5', picking && 'animate-pulse')} />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -295,7 +311,7 @@ export function Composer({
           >
             <Code2 className="size-3.5" />
           </Button>
-          {!onPhone && (
+          {!onPhone && onToggleScheduling && (
             <Button
               variant={scheduling ? 'subtle' : 'ghost'}
               size="icon-sm"
@@ -345,22 +361,24 @@ export function Composer({
             {voiceEnabled && !voice.error ? <Mic className="size-3.5" /> : <MicOff className="size-3.5" />}
           </Button>
 
-          {running && !scheduling ? (
-            <Button size="icon-sm" variant="destructive" className="ml-auto" aria-label="Stop the agent" onClick={onStop}>
-              <Square className="size-3 fill-current" />
-            </Button>
-          ) : (
-            <Button
-              size="icon-sm"
-              className="ml-auto"
-              aria-label={scheduling ? 'Schedule this…' : 'Send message'}
-              title={scheduling ? 'Schedule this…' : undefined}
-              onClick={onSend}
-              disabled={!voice.input.trim() || !connected}
-            >
-              {scheduling ? <CalendarClock className="size-3.5" /> : <Send className="size-3.5" />}
-            </Button>
-          )}
+          <div className="ml-auto flex min-w-0 items-center gap-1.5">
+            {accessory}
+            {running && !scheduling ? (
+              <Button size="icon-sm" variant="destructive" aria-label="Stop the agent" onClick={onStop}>
+                <Square className="size-3 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                size="icon-sm"
+                aria-label={scheduling ? 'Schedule this…' : 'Send message'}
+                title={scheduling ? 'Schedule this…' : undefined}
+                onClick={onSend}
+                disabled={!voice.input.trim() || !connected}
+              >
+                {scheduling ? <CalendarClock className="size-3.5" /> : <Send className="size-3.5" />}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
