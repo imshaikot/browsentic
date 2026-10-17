@@ -39,6 +39,9 @@ export const startHandsFree = (): Promise<void> => writeHandsFree({ muted: false
 
 export const endHandsFree = (): Promise<void> => writeHandsFree(null);
 
+/** Picks the side panel's tab, whether the panel is open already or about to be. */
+export const showPanelTab = (tab: PanelTab): Promise<void> => browser.storage.local.set({ [PANEL_TAB_KEY]: tab });
+
 export async function readPanelTab(): Promise<PanelTab> {
   const stored = await browser.storage.local.get(PANEL_TAB_KEY);
   const tab = stored[PANEL_TAB_KEY];

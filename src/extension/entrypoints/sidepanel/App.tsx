@@ -33,11 +33,11 @@ import { StatusPill, describeStatus } from '@/extension/components/status-pill';
 import { Button } from '@/extension/components/ui/button';
 import { ScrollArea } from '@/extension/components/ui/scroll-area';
 import { pickFocus } from '@/lib/bridge/aeye';
-import { putBytes } from '@/lib/bridge/file-store';
 import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recording-store';
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useActionCues, useBlockedPattern } from '@/lib/bridge/use-extension-settings';
+import { useAttachFiles } from '@/lib/bridge/use-attach-files';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
@@ -92,6 +92,7 @@ export default function App() {
   const pageUrl = phone ? (currentTarget(phone)?.url ?? '') : tabUrl;
   const blockedHere = useBlockedPattern(pageUrl);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const attachFiles = useAttachFiles(run.attachFile, setAttachError);
   const [attachedSkill, setAttachedSkill] = useState<AttachedSkill | null>(null);
   const [focus, setFocus] = useState<FocusedElement | null>(null);
   const [showTools, setShowTools] = useState(false);
@@ -270,25 +271,6 @@ export default function App() {
     setPicking(false);
     if ('focus' in outcome) setFocus(outcome.focus);
     else if ('error' in outcome) setAttachError(`A-Eye couldn’t read that element: ${outcome.error}`);
-  }
-
-  async function attachFiles(incoming: File[]) {
-    setAttachError(null);
-    for (const file of incoming) await storeFile(file);
-  }
-
-  /** A file over the cap is handed over by name and size only, so the analyst can say why it was not read. */
-  async function storeFile(file: File) {
-    const stored = { id: crypto.randomUUID(), name: file.name, mime: file.type || 'application/octet-stream', size: file.size };
-    if (file.size <= MAX_STORED_FILE_BYTES) {
-      try {
-        await putBytes({ id: stored.id, name: stored.name, mime: stored.mime, content: await readAsBase64(file) });
-      } catch (error) {
-        setAttachError(`Couldn’t store “${file.name}”: ${error instanceof Error ? error.message : String(error)}`);
-        return;
-      }
-    }
-    run.attachFile(stored);
   }
 
   function toggleVoice() {
@@ -554,16 +536,4 @@ export default function App() {
       {detaching && <DetachVeil />}
     </div>
   );
-}
-
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      resolve(typeof result === 'string' ? result.slice(result.indexOf(',') + 1) : '');
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read the file'));
-    reader.readAsDataURL(file);
-  });
 }

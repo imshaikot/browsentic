@@ -9,7 +9,7 @@ import type { NewFile } from './file-store';
 import type { SavedToolMeta } from './saved-tools';
 import { attachPreview, notice, reduce, type RunItem } from './run-items';
 import { RUN_PORT, type RunCommand, type RunMessage } from './run-port';
-import { useActiveTab } from './use-active-tab';
+import { useActiveTab, type ActiveTab } from './use-active-tab';
 import { useTabSessions } from './use-tab-sessions';
 import type { TabSession } from './tab-sessions';
 
@@ -73,7 +73,8 @@ export interface Run {
   reanalyzeFile: (fileId: string) => void;
 }
 
-export function useRun(): Run {
+/** Follows the tab in front, unless given a tab of its own to stay on. */
+export function useRun(pinned?: ActiveTab): Run {
   const [drafts, setDrafts] = useState<Record<string, SiteMapDraft>>({});
   const [recording, setRecording] = useState<RecordingState | null>(null);
   const [monitors, setMonitors] = useState<MonitorState[]>([]);
@@ -84,7 +85,8 @@ export function useRun(): Run {
   const [completed, setCompleted] = useState<CompletedTurn | null>(null);
   const port = useRef<Browser.runtime.Port | null>(null);
 
-  const tab = useActiveTab();
+  const front = useActiveTab();
+  const tab = pinned ?? front;
   const sessions = useTabSessions();
   const displayed = useMemo(
     () => (tab.tabId == null ? null : (sessions.find((s) => s.tabIds.includes(tab.tabId!)) ?? null)),

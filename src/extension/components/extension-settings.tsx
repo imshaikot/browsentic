@@ -8,6 +8,7 @@ import {
   openShortcutSettings,
   useActionCues,
   useContextMenuChoice,
+  useNewTabChoice,
   usePushToTalk,
   useShortcuts,
 } from '@/lib/bridge/use-extension-settings';
@@ -18,11 +19,43 @@ export function ExtensionSettings() {
   const handsFree = useHandsFreeSupported();
   return (
     <>
+      <NewTab />
       <ActionCues />
       <ContextMenuItems handsFree={handsFree} />
       <KeyboardShortcuts handsFree={handsFree} />
       {handsFree && <HandsFree />}
     </>
+  );
+}
+
+function NewTab() {
+  const [choice, setChoice] = useNewTabChoice();
+  const hidden = choice.hidden.length;
+  return (
+    <SettingsGroup
+      title="New tab"
+      note="With Home off, a new tab shows Chrome’s own new tab page. Edge, Brave and Firefox keep theirs out of an extension’s reach, so they get a plain page of your frequent sites instead."
+    >
+      <Row
+        title="Open Browsentic Home on new tabs"
+        note="A composer, your frequent sites and your recent conversations. Sending from it opens the side panel, which keeps the conversation when the agent takes the tab to a site."
+      >
+        <Switch checked={choice.home} label="Open Browsentic Home on new tabs" onChange={(home) => setChoice({ ...choice, home })} />
+      </Row>
+      <Row
+        title="Show frequent sites"
+        note={`The sites you visit most, as the browser ranks them. Hover one to hide it.${hidden ? ` ${hidden} hidden now.` : ''}`}
+      >
+        <div className="flex items-center gap-3">
+          {hidden > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setChoice({ ...choice, hidden: [] })}>
+              Show hidden
+            </Button>
+          )}
+          <Switch checked={choice.sites} label="Show frequent sites" onChange={(sites) => setChoice({ ...choice, sites })} />
+        </div>
+      </Row>
+    </SettingsGroup>
   );
 }
 

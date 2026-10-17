@@ -1,8 +1,9 @@
 import { cn } from '@/lib/utils';
 
-export function Logo({ className }: { className?: string }) {
+/** `drawn` traces the path and drops its three stops in, once, as the mark first appears. */
+export function Logo({ className, drawn = false }: { className?: string; drawn?: boolean }) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" className={cn('size-7', className)} aria-hidden>
+    <svg viewBox="0 0 32 32" fill="none" className={cn('size-7', drawn && 'logo-drawn', className)} aria-hidden>
       <rect
         x="2.25"
         y="4.25"
@@ -18,6 +19,7 @@ export function Logo({ className }: { className?: string }) {
       <circle cx="9.8" cy="7.4" r="1" fill="currentColor" fillOpacity="0.35" />
       <path
         d="M9 22.2c2.4 0 2.4-6.4 6.9-6.4s4.6 6.4 7 6.4"
+        pathLength={1}
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"

@@ -30,8 +30,11 @@ export default defineConfig({
       // Firefox has no sidePanel, debugger or offscreen permission, and addons.mozilla.org flags each name it does not know.
       // offscreen is the hidden page hands-free mode listens through once the side panel is closed.
       // userScripts runs a saved tool on every visit, once the user turns on Allow User Scripts.
-      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen', 'userScripts']),
+      // topSites and favicon fill the new tab page's frequent sites; <all_urls> already covers both warnings in Chrome.
+      ...(browser === 'firefox' ? [] : ['sidePanel', 'debugger', 'offscreen', 'userScripts', 'topSites', 'favicon']),
     ],
+    // Firefox shows topSites as a new warning, which would hold every update until accepted, so the new tab page asks for it.
+    ...(browser === 'firefox' && { optional_permissions: ['topSites'] }),
     host_permissions: ['<all_urls>'],
     // WXT writes the toolbar key only for a popup entrypoint, and the toolbar button opens the side panel instead.
     action: { default_title: 'Browsentic' },

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { BLOCKED_SITES_KEY, blockedBy, compileBlockedSites } from '@/lib/settings/blocked-sites';
+import { NEW_TAB_KEY, asNewTabChoice, type NewTabChoice } from '@/lib/settings/new-tab';
 import { shortcutsOf, shortcutsPageFor, type Shortcut } from '@/lib/settings/shortcuts';
 import { ACTION_CUES_KEY, actionCuesOn } from './action-cues';
 import { CONTEXT_MENU_KEY, asContextMenuChoice, type ContextMenuChoice } from './context-menu';
 import { brandFrom } from './identity';
+import { rememberHome } from './new-tab';
 import { PUSH_TO_TALK_KEY } from './panel-view';
 
 export function useLocalSetting<T>(key: string, parse: (value: unknown) => T): [T, (next: T) => void] {
@@ -44,6 +46,18 @@ export const useContextMenuChoice = (): [ContextMenuChoice, (next: ContextMenuCh
 export const usePushToTalk = (): [boolean, (on: boolean) => void] => useLocalSetting(PUSH_TO_TALK_KEY, isOn);
 
 export const useActionCues = (): [boolean, (on: boolean) => void] => useLocalSetting(ACTION_CUES_KEY, actionCuesOn);
+
+export function useNewTabChoice(): [NewTabChoice, (next: NewTabChoice) => void] {
+  const [choice, write] = useLocalSetting(NEW_TAB_KEY, asNewTabChoice);
+  const change = useCallback(
+    (next: NewTabChoice) => {
+      rememberHome(next.home);
+      write(next);
+    },
+    [write],
+  );
+  return [choice, change];
+}
 
 const asPatterns = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
