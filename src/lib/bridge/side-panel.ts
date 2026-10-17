@@ -6,6 +6,9 @@ function sidebarAction(): SidebarAction {
   return (browser as unknown as { sidebarAction: SidebarAction }).sidebarAction;
 }
 
+/** Some Chromium browsers have no side panel, and their toolbar button opens the launcher instead. */
+export const hasSidePanel = (): boolean => import.meta.env.FIREFOX || typeof browser.sidePanel?.open === 'function';
+
 export function openSidePanel(windowId: number) {
   if (import.meta.env.FIREFOX) return sidebarAction().open();
   return browser.sidePanel.open({ windowId });

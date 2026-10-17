@@ -38,6 +38,7 @@ import { removeRecording, type StoredRecordingMeta } from '@/lib/bridge/recordin
 import { removeSession } from '@/lib/bridge/session-store';
 import { useActiveTabUrl } from '@/lib/bridge/use-active-tab-url';
 import { useActionCues, useBlockedPattern } from '@/lib/bridge/use-extension-settings';
+import { useAutoPair } from '@/lib/bridge/use-auto-pair';
 import { useDaemonState } from '@/lib/bridge/use-daemon-state';
 import { useFileDrop } from '@/lib/bridge/use-file-drop';
 import { closeSidePanel } from '@/lib/bridge/side-panel';
@@ -66,6 +67,7 @@ const PHONE_HIDDEN_TABS: PanelTab[] = ['recordings', 'tasks'];
 
 export default function App() {
   const daemon = useDaemonState();
+  useAutoPair(daemon);
   const run = useRun();
   const star = useStarNudge(run.completed, run.sessionId, run.running);
   const update = useWaitingUpdate();

@@ -16,6 +16,53 @@ struct BridgeStatus: Decodable, Equatable {
     let extensionVersion: String?
     let pairedBrowsers: Int
     let pairingPending: Bool
+    /// Absent from a Bridge before automatic pairing.
+    let pairing: PairingSetting?
+}
+
+enum PairingMode: String, CaseIterable, Identifiable {
+    case auto, ask, code
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto: "Automatic"
+        case .ask: "Ask me"
+        case .code: "Code only"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .auto: "A browser with Browsentic connects by itself."
+        case .ask: "You allow each new browser here first."
+        case .code: "A browser connects only with a code you type into it."
+        }
+    }
+
+    var pairsByItself: Bool { self != .code }
+}
+
+/// The `pairing` answer, and the same pair inside `status`. The mode stays a string so a mode this app does not know yet still decodes.
+struct PairingSetting: Decodable, Equatable {
+    let mode: String
+    let approver: String
+    let error: String?
+
+    var kind: PairingMode? { PairingMode(rawValue: mode) }
+}
+
+enum PairedBy: String {
+    case code, auto, approved
+
+    var label: String {
+        switch self {
+        case .auto: "Paired by itself"
+        case .approved: "Allowed"
+        case .code: "Paired with a code"
+        }
+    }
 }
 
 struct BrowserSession: Decodable, Identifiable, Equatable {
@@ -29,14 +76,91 @@ struct BrowserSession: Decodable, Identifiable, Equatable {
     let pairedAt: String
     let lastSeenAt: String
     let connected: Bool
+    let label: String?
+    /// Absent from a Bridge before automatic pairing, when every browser paired with a code.
+    let pairedBy: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "id"
-        case browser, origin, source, extensionVersion, pairedAt, lastSeenAt, connected
+        case browser, origin, source, extensionVersion, pairedAt, lastSeenAt, connected, label, pairedBy
     }
 
     var id: String { sessionId ?? origin }
     var extensionId: String { origin.replacingOccurrences(of: #"^[a-z-]+-extension://"#, with: "", options: .regularExpression) }
+    var name: String? { label ?? browser }
+    var displayName: String { name ?? "This browser" }
+    var paired: PairedBy { pairedBy.flatMap(PairedBy.init(rawValue:)) ?? .code }
+    /// Changes when the same browser pairs again, so a second pairing counts as new.
+    var pairing: String { "\(id)@\(pairedAt)" }
+}
+
+/// A browser waiting for someone to let it in, from `pairRequests`.
+struct PairRequest: Decodable, Identifiable, Equatable {
+    let id: String
+    let installId: String
+    let browser: String?
+    let source: String
+    let extensionVersion: String
+    let firstAt: Double
+    let lastAskAt: Double
+    /// Minted by the Bridge per request and handed only to approvers, so an answer can prove which request it is for.
+    let nonce: String
+
+    var name: String { browser ?? "A browser" }
+    var shortId: String { String(installId.prefix(8)) }
+    var askedAt: Date { Date(timeIntervalSince1970: firstAt / 1000) }
+}
+
+/// A browser kept out after an Unpair or a Deny, until someone reconnects it.
+struct BlockedBrowser: Decodable, Identifiable, Equatable {
+    let installId: String
+    let browser: String?
+    let origin: String
+    let at: String
+    let reason: String
+
+    var id: String { installId }
+    var name: String { browser ?? "A browser" }
+    var shortId: String { String(installId.prefix(8)) }
+    var why: String { reason == "denied" ? "Denied" : "Unpaired" }
+}
+
+/// What the Bridge answers an op that only succeeds or fails.
+struct Acknowledgement: Decodable {
+    let ok: Bool
+    let error: String?
+}
+
+struct BridgeRefusal: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+/// The pure decisions behind the approval sheet and the notifications, kept apart so they can be tested.
+enum PairingWatch {
+    /// Oldest first, so the sheet shows requests in the order browsers asked.
+    static func queue(_ requests: [PairRequest]) -> [PairRequest] {
+        requests.sorted { ($0.firstAt, $0.id) < ($1.firstAt, $1.id) }
+    }
+
+    static func arrived(_ requests: [PairRequest], announced: Set<String>) -> [PairRequest] {
+        requests.filter { !announced.contains($0.id) }
+    }
+
+    static func gone(_ requests: [PairRequest], previous: [PairRequest]) -> Set<String> {
+        Set(previous.map(\.id)).subtracting(requests.map(\.id))
+    }
+
+    /// Nil `seen` is the first look at a Bridge: everything already there is old news.
+    static func pairedByThemselves(_ sessions: [BrowserSession], seen: Set<String>?) -> [BrowserSession] {
+        guard let seen else { return [] }
+        return sessions.filter { $0.paired == .auto && !seen.contains($0.pairing) }
+    }
+
+    /// An answer from a notification counts only for a request still waiting, with the nonce the Bridge gave it.
+    static func answerable(_ id: String, nonce: String, in requests: [PairRequest]) -> PairRequest? {
+        requests.first { $0.id == id && $0.nonce == nonce && !nonce.isEmpty }
+    }
 }
 
 struct PairingCode: Decodable, Equatable {

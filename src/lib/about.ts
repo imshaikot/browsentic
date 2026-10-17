@@ -8,6 +8,7 @@ export const LINKS = {
   site: 'https://browsentic.com',
   guide: 'https://browsentic.com/docs/guide/',
   pairing: 'https://browsentic.com/docs/guide/install/#3-pair-them-once',
+  installGuide: 'https://browsentic.com/docs/guide/install/',
   troubleshooting: 'https://browsentic.com/docs/guide/troubleshooting/',
   windowsApp: 'https://browsentic.com/docs/guide/windows-app/',
   changelog: 'https://browsentic.com/changelog/',

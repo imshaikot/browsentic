@@ -8,7 +8,9 @@ without a restart. It also watches the file, so the settings page and the Mac ap
 as soon as you save it.
 
 `BROWSENTIC_HOME` moves the whole state directory somewhere other than `~/.browsentic`.
-[internals/state.md](../internals/state.md) has the full disk layout.
+[internals/state.md](../internals/state.md) has the full disk layout. A Bridge whose state lives
+outside your home folder leaves your browsers registered with the one inside it, so a scratch copy
+never takes them over; set `BROWSENTIC_REGISTER_HOST=1` to register it anyway.
 
 ---
 
@@ -101,6 +103,12 @@ settings page shows but will not change.
 | `downloadTtlDays` | `14` | How long a captured download is kept before the Bridge sweeps it. Fractions are allowed: `0.5` is twelve hours |
 | `skillsDir` | `~/browsentic/skills` | Where panel uploads and generated site maps live |
 | `extensionDir` | `~/browsentic/extension/chrome-mv3` | Where `browsentic setup --unpacked` writes the unpacked extension. `--dir` writes it for you, and `update` reads it back so it refreshes the copy the browser actually loaded. If you change it by hand, load the new folder in the browser again, because the extension ID follows the path |
+
+## Pairing
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `pairing.mode` | `auto` | How a browser pairs through the native host: `auto` by itself, `ask` once you allow it in the app or with `browsentic approve`, `code` only with a typed code. A value that is none of these pairs only by code. `browsentic pairing` and the apps' Settings write it; the extension shows it but cannot change it. See [Pairing](pair.md#2-choose-how-browsers-pair) |
 
 ## Android
 

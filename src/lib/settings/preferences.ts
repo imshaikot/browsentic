@@ -7,12 +7,15 @@
 import { isThemeId, type ThemeId } from './theme';
 import { isRuleEffect, type GuardrailSettings, type GuardrailValue } from './guardrails';
 import { isUserProfile, type UserProfile } from './profile';
+import type { PairingMode } from '@/lib/pairing';
 
 export interface Preferences {
   /** Null until someone picks one; a browser that already has a choice then hands it over. */
   readonly theme: ThemeId | null;
   readonly guardrails: GuardrailSettings;
   readonly profile: UserProfile;
+  /** Shown, never changed, by the extension: the browser is what this setting guards. Absent from a Bridge before it. */
+  readonly pairing?: { readonly mode: PairingMode };
 }
 
 export type PreferenceChange =

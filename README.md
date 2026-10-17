@@ -157,7 +157,7 @@ The desktop apps for [macOS](docs/guide/mac-app.md) and [Windows](docs/guide/win
 
 ## Privacy and Security
 
-Nothing connects until you pair, and both ends prove who they are. The agent asks before any consequential action, credentials on a page are sealed before the agent sees them, and the sites you [block](docs/guide/features/blocked-sites.md) are off-limits to every agent: the browser enforces that list, where no agent can reach it. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
+Nothing connects except Browsentic's own extension, paired by itself through the browser or with a code, and both ends prove who they are. The agent asks before any consequential action, credentials on a page are sealed before the agent sees them, and the sites you [block](docs/guide/features/blocked-sites.md) are off-limits to every agent: the browser enforces that list, where no agent can reach it. The full model is in [SECURITY.md](SECURITY.md), and what it does not cover is in [Limits](docs/guide/limits.md).
 
 ## Contributing
 

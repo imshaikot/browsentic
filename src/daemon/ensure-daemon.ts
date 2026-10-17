@@ -1,39 +1,107 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { clearLockfile, holdWake, isRunning, readLockfile, type Lockfile } from './lockfile';
+import { clearLockfile, holdWake, isRunning, readLockfile, stateDir, type Lockfile } from './lockfile';
 import { log } from './log';
 import { daemonPorts } from './ports';
+import { runBridgeTask } from './windows-task';
 
 const SPAWN_TIMEOUT_MS = 8_000;
 const POLL_INTERVAL_MS = 150;
+const START_LOCK = join(stateDir, 'daemon.start.lock');
+const STALE_START_MS = SPAWN_TIMEOUT_MS * 2;
 
-export async function ensureDaemon(): Promise<Lockfile> {
-  const existing = await probeExisting();
-  if (existing) return existing;
+export const daemonMainPath = () => join(dirname(fileURLToPath(import.meta.url)), 'daemon-main.js');
 
+export interface EnsureOptions {
+  /** Start it through Task Scheduler: the caller runs in a job that dies with it (Firefox's native host on Windows). */
+  outsideJob?: boolean;
+}
+
+/**
+ * Several browsers wake the Bridge at once when the computer starts, and each would spawn its own on
+ * the next free port. Whoever holds the start lock spawns; everyone else waits for the one it starts.
+ */
+export async function ensureDaemon(options: EnsureOptions = {}): Promise<Lockfile> {
+  const deadline = Date.now() + SPAWN_TIMEOUT_MS * 2;
+  for (;;) {
+    const existing = await probeExisting();
+    if (existing) return existing;
+    const release = takeStartLock();
+    if (release) {
+      try {
+        return (await probeExisting()) ?? (await spawnDaemon(options));
+      } finally {
+        release();
+      }
+    }
+    if (Date.now() > deadline) throw new Error('Another Browsentic Bridge was starting and never came up — see "browsentic logs"');
+    await delay(POLL_INTERVAL_MS);
+  }
+}
+
+export function takeStartLock(retry = true): (() => void) | null {
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(START_LOCK, `${process.pid} ${Date.now()}\n`, { flag: 'wx', mode: 0o600 });
+    return () => rmSync(START_LOCK, { force: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') return () => undefined;
+  }
+  const [pid, at] = readStartLock();
+  if (retry && (!isRunning(pid) || Date.now() - at > STALE_START_MS)) {
+    rmSync(START_LOCK, { force: true });
+    return takeStartLock(false);
+  }
+  return null;
+}
+
+function readStartLock(): [number, number] {
+  try {
+    const [pid, at] = readFileSync(START_LOCK, 'utf8').trim().split(' ').map(Number);
+    return [pid || 0, at || 0];
+  } catch {
+    return [0, 0];
+  }
+}
+
+/** One the task started is waited for, never doubled by one spawned in the job that is about to die. */
+async function spawnDaemon({ outsideJob = false }: EnsureOptions): Promise<Lockfile> {
+  if (outsideJob && process.platform === 'win32' && runBridgeTask()) {
+    log('no daemon reachable; starting one through Task Scheduler');
+    return cameUp();
+  }
   log('no daemon reachable; spawning one');
-  const daemonMain = join(dirname(fileURLToPath(import.meta.url)), 'daemon-main.js');
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.BROWSENTIC_AGENT_RUN;
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
-
-  const child = spawn(process.execPath, [daemonMain], {
+  delete env.NODE_NO_WARNINGS;
+  const child = spawn(process.execPath, [daemonMainPath()], {
     detached: true,
     stdio: 'ignore',
     env,
     windowsHide: true,
   });
   child.unref();
+  return cameUp();
+}
 
-  const deadline = Date.now() + SPAWN_TIMEOUT_MS;
+async function cameUp(): Promise<Lockfile> {
+  const started = await waitForDaemon(SPAWN_TIMEOUT_MS);
+  if (started) return started;
+  throw new Error(`The Browsentic daemon did not come up within ${SPAWN_TIMEOUT_MS}ms — see the log with "browsentic logs"`);
+}
+
+async function waitForDaemon(timeoutMs: number): Promise<Lockfile | null> {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await delay(POLL_INTERVAL_MS);
     const started = await probeExisting();
     if (started) return started;
   }
-  throw new Error(`The Browsentic daemon did not come up within ${SPAWN_TIMEOUT_MS}ms — see the log with "browsentic-mcp logs"`);
+  return null;
 }
 
 export async function probeExisting(): Promise<Lockfile | null> {

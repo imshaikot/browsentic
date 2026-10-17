@@ -202,7 +202,7 @@ function Connection() {
         <DaemonLink />
       </Card>
       <p className="text-xs leading-relaxed text-ink-faint">
-        On a Mac, the Browsentic app’s Browsers tab also hands out pairing codes and lists every paired browser.
+        The Browsentic app’s Browsers tab lists every paired browser, and its Settings choose whether a new browser connects by itself, asks you first, or needs a code.
       </p>
     </div>
   );

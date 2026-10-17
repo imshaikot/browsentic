@@ -1,13 +1,13 @@
 # Install
 
 One line installs Browsentic Bridge on your computer, then walks you through adding the extension
-from your browser's store and pairing the two. Browsentic is your browser's superpower, free and
-open source, with no API key, no account and no cloud service of its own.
+from your browser's store. The two connect by themselves. Browsentic is your browser's superpower,
+free and open source, with no API key, no account and no cloud service of its own.
 
 The Mac app, the Windows app or `npx browsentic@latest setup` installs Browsentic Bridge (the part
 that runs on your computer), asks which browser you use and opens the extension's store page in it.
-Press **Add**, then enter the code it shows. The side panel runs on an agent CLI you are signed in
-to, such as Claude Code or Codex.
+Press **Add**, and the extension connects to the Bridge by itself. The side panel runs on an agent
+CLI you are signed in to, such as Claude Code or Codex.
 
 The extension is on the
 [Chrome Web Store](https://chromewebstore.google.com/detail/browsentic/npmocgldfflonjjmdadmdefpnfagnjmp)
@@ -107,15 +107,21 @@ Setup, or the app's button for that browser, opens Browsentic's store page in it
 Pin Browsentic to the toolbar from the puzzle-piece menu, so the side panel is one click away. It
 updates itself from its store from then on.
 
-If you added it from the store before running setup, pick the same browser in setup and enter the
-code it shows.
+If you added it from the store before installing the Bridge, the two connect as soon as the Bridge
+is in place: the extension's welcome page shows it happen.
 
 ## 3. Pair them, once
 
-Click Browsentic in the toolbar to open the side panel, press **Set up the link**, enter the code the
-app or `setup` shows, and press **Connect**. The code works once and lives for ten minutes;
-`browsentic pair`, or **Get a pairing code** in the app, issues another. The browser keeps the
-pairing, so you do this once. [Pairing](pair.md) has the detail.
+There is usually nothing to do: the extension pairs with the Bridge by itself, and the browser
+keeps the pairing. If you set pairing to ask you first, allow the browser in the app or with
+`browsentic approve`.
+
+If the extension asks for a code (an extension from before automatic pairing, a browser the Bridge
+cannot register with, or pairing set to `code`), click Browsentic in the toolbar to open the side
+panel, press **Set up the link**, then **Pair with a code instead**, enter the code the app or
+`setup` shows, and press **Connect**. The code works once and lives for ten minutes;
+`browsentic pair`, or **Get a pairing code** in the app, issues another. [Pairing](pair.md) has the
+detail.
 
 ---
 

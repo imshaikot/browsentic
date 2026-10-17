@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import type { Backend } from './backend';
-import { mockBackend } from './mock-backend';
+import type { Backend, PairLinkAct, PairRequestSummary, TrayStatus } from './backend';
+import { mockBackend, type MockBackend, type Scenario } from './mock-backend';
 import { Model, TABS, outcome, parseJson, short, type State } from './model';
 import { splitLine } from './views/logs';
 
@@ -134,9 +134,20 @@ describe('the running app', () => {
     ]);
   });
 
-  it('adds the extension to a browser by opening its store page and handing out the code to enter', async () => {
+  it('adds the extension to a browser by opening its store page, says it connects by itself, and keeps a code for a copy that asks', async () => {
     const model = await running();
     await until(model, (state) => state.browserRows.length > 0);
+    await model.addExtension(model.offeredBrowsers.find((row) => row.id === 'edge')!);
+    expect([model.snapshot().pairing?.code, model.snapshot().notice?.text]).toEqual([
+      'R4TW7KXE',
+      'Press “Allow extensions from other stores” if Edge shows it at the top of the page, confirm, and press “Add to Chrome”. It connects by itself. If it asks for a code, use the one below.',
+    ]);
+  });
+
+  it('hands out the code to enter with the store page when browsers pair only by code', async () => {
+    const model = start(mockBackend({ instant: true, scenario: 'code' }));
+    await model.runPreflight();
+    await until(model, (state) => state.pairingMode === 'code' && state.browserRows.length > 0);
     await model.addExtension(model.offeredBrowsers.find((row) => row.id === 'edge')!);
     expect([model.snapshot().pairing?.code, model.snapshot().notice?.text]).toEqual([
       'R4TW7KXE',
@@ -255,5 +266,157 @@ describe('the Android tab', () => {
     expect(model.snapshot().android?.ready).toBe(true);
     expect(model.snapshot().androidReadyOnce).toBe(true);
     expect(start(mockBackend({ instant: true })).snapshot().androidReadyOnce).toBe(true);
+  });
+});
+
+describe('pairing', () => {
+  /** The mock, with a record of what reached the control socket, the Rust side and the tray, and a hand on its links. */
+  function pairingBackend(scenario: Scenario) {
+    const backend = mockBackend({ instant: true, scenario });
+    const frames: Record<string, unknown>[] = [];
+    const handed: string[][] = [];
+    const announced: [string, string][] = [];
+    const trays: TrayStatus[] = [];
+    let follow: (act: PairLinkAct) => void = () => undefined;
+    let launched: () => void = () => undefined;
+    return {
+      frames,
+      handed,
+      announced,
+      trays,
+      follow: (act: PairLinkAct) => follow(act),
+      launch: () => launched(),
+      backend: {
+        ...backend,
+        controlRequest: (frame: Record<string, unknown>, timeoutMs?: number) => (frames.push(frame), backend.controlRequest(frame, timeoutMs)),
+        pairRequests: async (requests: PairRequestSummary[]) => void handed.push(requests.map((request) => request.id)),
+        announcePaired: async (session: string, name: string) => void announced.push([session, name]),
+        trayStatus: async (status: TrayStatus) => void trays.push(status),
+        onPairLink: (listener: (act: PairLinkAct) => void) => ((follow = listener), () => undefined),
+        onPairingLaunch: (listener: () => void) => ((launched = listener), () => undefined),
+      } satisfies MockBackend,
+    };
+  }
+
+  async function opened(backend: Backend) {
+    const model = start(backend);
+    await model.runPreflight();
+    await until(model, (state) => state.daemon === 'on' && !!state.pairingMode);
+    return model;
+  }
+
+  it('asks to be the approver on a new socket, and queues the browsers waiting oldest first', async () => {
+    const { backend, frames, handed, trays } = pairingBackend('ask');
+    const model = await opened(backend);
+    await until(model, (state) => state.pairRequests.length === 2);
+    expect(frames).toContainEqual({ op: 'pairRequests', watch: true, as: 'app' });
+    expect(model.snapshot().pairingMode).toBe('ask');
+    expect(model.snapshot().pairRequests.map((request) => request.browser)).toEqual(['Brave', 'Firefox']);
+    expect(handed.at(-1)).toEqual(['Rq7bX2kp', 'Fx4mN8cd']);
+    await until(model, () => trays.at(-1)?.waiting === 'Brave wants to connect…');
+  });
+
+  it('allows the first with the name typed for it, denies the next, and keeps the denied one out', async () => {
+    const { backend, frames, handed, trays } = pairingBackend('ask');
+    const model = await opened(backend);
+    await until(model, (state) => state.pairRequests.length === 2);
+    const [brave, firefox] = model.snapshot().pairRequests;
+
+    await model.decide(brave, true, '  Brave (personal) ');
+    expect(frames).toContainEqual({ op: 'decide', request: 'Rq7bX2kp', allow: true, label: 'Brave (personal)' });
+    expect(model.snapshot().notice?.text).toBe('Brave (personal) can connect to Browsentic Bridge now.');
+    expect(model.snapshot().pairRequests.map((request) => request.id)).toEqual(['Fx4mN8cd']);
+
+    await model.decide(firefox, false, 'ignored');
+    expect(frames).toContainEqual({ op: 'decide', request: 'Fx4mN8cd', allow: false });
+    expect(model.snapshot().notice?.text).toBe('Firefox is kept out. Reconnect it from Browsers if you change your mind.');
+    expect(model.snapshot().pairRequests).toEqual([]);
+    expect(model.snapshot().blocked).toMatchObject([{ browser: 'Firefox', reason: 'denied' }]);
+    expect(handed.at(-1)).toEqual([]);
+    await until(model, () => trays.at(-1)?.waiting === null);
+
+    await model.refresh();
+    expect(model.snapshot().sessions.find((session) => session.browser === 'Brave' && session.pairedBy === 'approved')?.label).toBe('Brave (personal)');
+  });
+
+  it('asks to be the approver again when the Bridge starts the app for a browser', async () => {
+    const { backend, frames, launch } = pairingBackend('auto');
+    const model = await opened(backend);
+    const watching = () => frames.filter((frame) => frame.op === 'pairRequests' && frame.watch === true).length;
+    await until(model, () => watching() === 1);
+    launch();
+    await until(model, () => watching() === 2);
+  });
+
+  it('reads the list again when the Bridge says it changed', async () => {
+    const { backend } = pairingBackend('auto');
+    const model = await opened(backend);
+    backend.ask({ id: 'Op9', installId: 'f00dfeed-0000-4000-8000-000000000001', browser: 'Opera', source: 'unpacked', extensionVersion: '0.8.0', firstAt: Date.now(), lastAskAt: Date.now(), nonce: 'n' });
+    await until(model, (state) => state.pairRequests[0]?.browser === 'Opera');
+  });
+
+  it('changes how browsers pair, and says so through the Bridge', async () => {
+    const { backend, frames } = pairingBackend('auto');
+    const model = await opened(backend);
+    expect(model.pairsByItself).toBe(true);
+    await model.setPairingMode('code');
+    expect(frames).toContainEqual({ op: 'pairing', set: 'code' });
+    expect(model.snapshot().pairingMode).toBe('code');
+    expect(model.pairsByItself).toBe(false);
+  });
+
+  it('keeps an unpaired browser out, and lets a kept-out one back in with Reconnect', async () => {
+    const { backend, frames } = pairingBackend('kept');
+    const model = await opened(backend);
+    await until(model, (state) => state.blocked.length === 2);
+    const vivaldi = model.snapshot().blocked.find((browser) => browser.browser === 'Vivaldi')!;
+    await model.reconnect(vivaldi);
+    expect(frames).toContainEqual({ op: 'decide', request: vivaldi.installId, allow: true });
+    expect(model.snapshot().notice?.text).toBe('Vivaldi can connect again.');
+    expect(model.snapshot().blocked.map((browser) => browser.browser)).toEqual(['Opera']);
+
+    await model.revoke(model.snapshot().sessions.find((session) => session.id === 's1'));
+    expect(model.snapshot().blocked).toMatchObject([{ browser: 'Opera' }, { browser: 'Google Chrome', reason: 'revoked' }]);
+  });
+
+  it('names a browser, and shows the name instead of the browser’s own', async () => {
+    const { backend, frames } = pairingBackend('auto');
+    const model = await opened(backend);
+    await until(model, (state) => state.sessions.length > 0);
+    await model.rename(model.snapshot().sessions[0], ' Chrome at home ');
+    expect(frames).toContainEqual({ op: 'label', session: 's1', label: 'Chrome at home' });
+    expect(model.snapshot().sessions[0].label).toBe('Chrome at home');
+  });
+
+  it('announces a browser that paired by itself once, and never the ones it found', async () => {
+    const { backend, announced } = pairingBackend('auto');
+    const model = await opened(backend);
+    await until(model, (state) => state.sessions.length === 2);
+    expect(announced).toEqual([]);
+    backend.arrive();
+    await model.refresh();
+    await model.refresh();
+    expect(model.snapshot().notice?.text).toBe('Microsoft Edge connected to Browsentic Bridge by itself.');
+    expect(announced).toEqual([['6f1c2a90-3b7e-4d1a-9c55-0e8f5d2b7a41', 'Microsoft Edge']]);
+  });
+
+  it('acts on a notification’s button only as the Rust side judged it', async () => {
+    const { backend, frames, follow } = pairingBackend('ask');
+    const model = await opened(backend);
+    await until(model, (state) => state.pairRequests.length === 2);
+
+    follow({ kind: 'show', request: 'Rq7bX2kp' });
+    follow({ kind: 'decide', request: 'nobody', allow: true });
+    expect(frames.filter((frame) => frame.op === 'decide')).toEqual([]);
+
+    follow({ kind: 'decide', request: 'Fx4mN8cd', allow: true });
+    await until(model, (state) => state.pairRequests.length === 1);
+    expect(frames).toContainEqual({ op: 'decide', request: 'Fx4mN8cd', allow: true });
+
+    follow({ kind: 'browsers' });
+    expect(model.snapshot().tab).toBe('browsers');
+
+    follow({ kind: 'unpair', session: 's2' });
+    await until(model, (state) => !state.sessions.some((session) => session.id === 's2'));
   });
 });

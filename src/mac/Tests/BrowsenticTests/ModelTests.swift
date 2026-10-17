@@ -237,3 +237,150 @@ import Testing
         #expect(Tab.allCases.compactMap(\.badge) == ["Experimental"])
     }
 }
+
+@Suite struct PairingDecodingTests {
+    private func decode<Value: Decodable>(_ type: Value.Type, _ json: String) throws -> Value {
+        try JSONDecoder().decode(type, from: Data(json.utf8))
+    }
+
+    @Test func statusFromABridgeBeforeAutomaticPairingHasNoMode() throws {
+        let status = try decode(BridgeStatus.self, #"{"connected":true,"daemonVersion":"0.8.9","protocolVersion":22,"port":8765,"manifestInSync":true,"pairedBrowsers":1,"pairingPending":false}"#)
+        #expect(status.pairing == nil)
+    }
+
+    @Test func statusSaysHowBrowsersPairAndWhoAllowsThem() throws {
+        let status = try decode(BridgeStatus.self, #"{"connected":true,"daemonVersion":"0.9.0","protocolVersion":23,"port":8765,"manifestInSync":true,"connectedBrowsers":1,"pairedBrowsers":1,"pairingPending":false,"pairing":{"mode":"ask","approver":"app"}}"#)
+        #expect(status.pairing?.kind == .ask)
+        #expect(status.pairing?.approver == "app")
+    }
+
+    @Test func aModeThisAppDoesNotKnowYetStillDecodes() throws {
+        let setting = try decode(PairingSetting.self, #"{"id":"1","op":"pairing","mode":"later","approver":"terminal"}"#)
+        #expect(setting.kind == nil)
+        #expect(setting.error == nil)
+    }
+
+    @Test func aRefusedModeChangeCarriesTheBridgesReason() throws {
+        let setting = try decode(PairingSetting.self, #"{"id":"1","op":"pairing","mode":"auto","approver":"app","error":"An agent run cannot change how browsers pair."}"#)
+        #expect(setting.kind == .auto)
+        #expect(setting.error == "An agent run cannot change how browsers pair.")
+    }
+
+    @Test func sessionsFromABridgeBeforeAutomaticPairingReadAsPairedWithACode() throws {
+        let session = try decode(BrowserSession.self, #"{"id":"i1","browser":"Chrome","origin":"chrome-extension://abc","source":"chrome-web-store","extensionVersion":"0.8.9","pairedAt":"2026-10-01T10:00:00.000Z","lastSeenAt":"2026-10-01T10:00:00.000Z","connected":true}"#)
+        #expect(session.label == nil)
+        #expect(session.paired == .code)
+        #expect(session.paired.label == "Paired with a code")
+        #expect(session.displayName == "Chrome")
+    }
+
+    @Test func aNamedSessionGoesByItsName() throws {
+        let session = try decode(BrowserSession.self, #"{"id":"i1","browser":"Chrome","origin":"chrome-extension://abc","extensionVersion":"0.9.0","pairedAt":"2026-10-01T10:00:00.000Z","lastSeenAt":"2026-10-01T10:00:00.000Z","connected":false,"label":"Work Chrome","pairedBy":"auto"}"#)
+        #expect(session.name == "Work Chrome")
+        #expect(session.paired.label == "Paired by itself")
+        #expect(session.pairing == "i1@2026-10-01T10:00:00.000Z")
+    }
+
+    @Test func aSessionWithNoBrowserOrNameStillHasSomethingToCallIt() throws {
+        let session = try decode(BrowserSession.self, #"{"origin":"chrome-extension://abc","extensionVersion":"0.5.0","pairedAt":"2026-09-01T10:00:00.000Z","lastSeenAt":"2026-09-01T10:00:00.000Z","connected":true,"pairedBy":"approved"}"#)
+        #expect(session.name == nil)
+        #expect(session.displayName == "This browser")
+        #expect(session.paired.label == "Allowed")
+    }
+
+    @Test func pairRequestsSayWhoIsAskingAndWhen() throws {
+        let requests = try decode([PairRequest].self, #"""
+        [{"id":"r1","installId":"0123456789abcdef","browser":"Brave","source":"chrome-web-store","extensionVersion":"0.9.0","firstAt":1790000000000,"lastAskAt":1790000005000,"nonce":"n1"},
+         {"id":"r2","installId":"fedcba9876543210","source":"unpacked","extensionVersion":"0.9.0","firstAt":1790000001000,"lastAskAt":1790000001000,"nonce":"n2"}]
+        """#)
+        #expect(requests[0].name == "Brave")
+        #expect(requests[0].shortId == "01234567")
+        #expect(requests[0].askedAt == Date(timeIntervalSince1970: 1_790_000_000))
+        #expect(requests[1].name == "A browser")
+        #expect(SourceLabel.of(requests[1].source).capitalizedFirst == "Unpacked")
+    }
+
+    @Test func keptOutBrowsersSayWhy() throws {
+        let blocked = try decode([BlockedBrowser].self, #"""
+        [{"installId":"0123456789abcdef","browser":"Edge","origin":"chrome-extension://x","at":"2026-10-16T09:00:00.000Z","reason":"revoked"},
+         {"installId":"fedcba9876543210","origin":"moz-extension://","at":"2026-10-16T09:00:00.000Z","reason":"denied"}]
+        """#)
+        #expect(blocked.map(\.why) == ["Unpaired", "Denied"])
+        #expect(blocked.map(\.name) == ["Edge", "A browser"])
+        #expect(blocked[1].id == "fedcba9876543210")
+        #expect(Timestamp.date(blocked[0].at) != nil)
+    }
+
+    @Test func anOpThatOnlySucceedsOrFailsCarriesItsError() throws {
+        #expect(try decode(Acknowledgement.self, #"{"id":"1","op":"decide","ok":true}"#).ok)
+        let refused = try decode(Acknowledgement.self, #"{"id":"1","op":"decide","ok":false,"error":"No request or blocked browser has that id."}"#)
+        #expect(!refused.ok)
+        #expect(BridgeRefusal(message: refused.error ?? "").localizedDescription == "No request or blocked browser has that id.")
+    }
+
+    @Test func everyModeIsOneTheBridgeKnowsWithItsOwnLine() {
+        #expect(PairingMode.allCases.map(\.rawValue) == ["auto", "ask", "code"])
+        #expect(PairingMode.allCases.map(\.label) == ["Automatic", "Ask me", "Code only"])
+        #expect(PairingMode.allCases.map(\.detail) == [
+            "A browser with Browsentic connects by itself.",
+            "You allow each new browser here first.",
+            "A browser connects only with a code you type into it.",
+        ])
+        #expect(PairingMode.allCases.filter(\.pairsByItself) == [.auto, .ask])
+    }
+}
+
+@Suite struct PairingWatchTests {
+    private func request(_ id: String, at firstAt: Double, nonce: String = "nonce") -> PairRequest {
+        PairRequest(id: id, installId: "install-\(id)", browser: "Chrome", source: "chrome-web-store", extensionVersion: "0.9.0", firstAt: firstAt, lastAskAt: firstAt, nonce: nonce)
+    }
+
+    private func session(_ id: String, pairedBy: String?, at pairedAt: String = "2026-10-16T09:00:00.000Z") -> BrowserSession {
+        BrowserSession(sessionId: id, browser: "Chrome", origin: "chrome-extension://\(id)", source: "chrome-web-store", extensionVersion: "0.9.0", pairedAt: pairedAt, lastSeenAt: pairedAt, connected: true, label: nil, pairedBy: pairedBy)
+    }
+
+    @Test func theQueueShowsTheOldestRequestFirst() {
+        let queue = PairingWatch.queue([request("b", at: 2), request("c", at: 3), request("a", at: 1)])
+        #expect(queue.map(\.id) == ["a", "b", "c"])
+    }
+
+    @Test func eachRequestIsAnnouncedOnce() {
+        let requests = [request("a", at: 1), request("b", at: 2)]
+        #expect(PairingWatch.arrived(requests, announced: []).map(\.id) == ["a", "b"])
+        #expect(PairingWatch.arrived(requests, announced: ["a"]).map(\.id) == ["b"])
+        #expect(PairingWatch.arrived(requests, announced: ["a", "b"]).isEmpty)
+    }
+
+    @Test func aDecidedOrExpiredRequestIsGone() {
+        let before = [request("a", at: 1), request("b", at: 2)]
+        #expect(PairingWatch.gone([request("b", at: 2)], previous: before) == ["a"])
+        #expect(PairingWatch.gone(before, previous: before).isEmpty)
+        #expect(PairingWatch.gone([], previous: before) == ["a", "b"])
+    }
+
+    @Test func browsersAlreadyThereOnTheFirstLookAreNotNews() {
+        let sessions = [session("one", pairedBy: "auto")]
+        #expect(PairingWatch.pairedByThemselves(sessions, seen: nil).isEmpty)
+    }
+
+    @Test func onlyABrowserThatPairedByItselfIsAnnounced() {
+        let sessions = [session("auto", pairedBy: "auto"), session("allowed", pairedBy: "approved"), session("code", pairedBy: "code"), session("old", pairedBy: nil)]
+        #expect(PairingWatch.pairedByThemselves(sessions, seen: []).map(\.id) == ["auto"])
+        #expect(PairingWatch.pairedByThemselves(sessions, seen: Set(sessions.map(\.pairing))).isEmpty)
+    }
+
+    @Test func theSameBrowserPairingAgainIsAnnouncedAgain() {
+        let first = session("one", pairedBy: "auto", at: "2026-10-16T09:00:00.000Z")
+        let again = session("one", pairedBy: "auto", at: "2026-10-16T10:00:00.000Z")
+        #expect(PairingWatch.pairedByThemselves([again], seen: [first.pairing]).map(\.id) == ["one"])
+    }
+
+    @Test func aNotificationAnswerCountsOnlyWithTheRequestsOwnNonce() {
+        let waiting = [request("a", at: 1, nonce: "secret")]
+        #expect(PairingWatch.answerable("a", nonce: "secret", in: waiting)?.id == "a")
+        #expect(PairingWatch.answerable("a", nonce: "guess", in: waiting) == nil)
+        #expect(PairingWatch.answerable("b", nonce: "secret", in: waiting) == nil)
+        #expect(PairingWatch.answerable("a", nonce: "secret", in: []) == nil)
+        #expect(PairingWatch.answerable("a", nonce: "", in: [request("a", at: 1, nonce: "")]) == nil)
+    }
+}

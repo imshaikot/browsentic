@@ -17,7 +17,7 @@ open socket rather than a `node` process every two seconds.
 
 | Path | Used for | Where |
 | --- | --- | --- |
-| **The control socket**: `ws://127.0.0.1:<port>/control`, bearer token from `daemon.json` | `status`, `sessions`, `pair`, `revoke`, `agent` set and grant, `preferences` and `setPreference` | [ControlClient.swift](../../src/mac/Sources/Browsentic/Core/ControlClient.swift), the same frames as [remote-bridge.ts](../../src/daemon/remote-bridge.ts) |
+| **The control socket**: `ws://127.0.0.1:<port>/control`, bearer token from `daemon.json` | `status`, `sessions`, `pair`, `revoke`, `agent` set and grant, `preferences` and `setPreference`, and for pairing `pairRequests` (watched, as the approver), `decide`, `pairing`, `blocked` and `label` | [ControlClient.swift](../../src/mac/Sources/Browsentic/Core/ControlClient.swift), the same frames as [remote-bridge.ts](../../src/daemon/remote-bridge.ts) |
 | **The installed command**: `node ~/.browsentic/cli/dist/cli.js …` | `start`, `stop`, `restart`, `setup`, `uninstall`, and the `--json` listings for `agent`, `skills`, `approvals`, `downloads` | [CLI.swift](../../src/mac/Sources/Browsentic/Core/CLI.swift) |
 
 Anything that reads or writes disk goes through the command, so config overrides (`downloadDir`,
@@ -26,6 +26,18 @@ what keeps the daemon from idling out while the app is up.
 
 A `ControlRequest` change in [control.ts](../../src/daemon/control.ts) needs the matching change in
 `ControlClient.swift` and `Models.swift`; nothing checks that for you.
+
+## Approving a browser
+
+The app watches `pairRequests` on every socket, so it is the approver the Bridge names while it runs.
+A browser that asks to pair in ask mode shows as a sheet in the main window (oldest first, with a
+name field), a notification with Allow and Deny (`PairingAlerts.swift`; the delegate is set in
+`applicationWillFinishLaunching` so a click that launches the app is not lost), a dot on the menu
+bar icon with a menu item, and one Dock bounce. A notification's answer counts only while its
+request still waits with the nonce the Bridge gave it. An ad-hoc signed build may never be granted
+notifications; the sheet, the dot and the bounce carry the flow without them. When no app is
+watching, the Bridge starts it with `open -g … --args --pairing`, which never takes focus. In auto
+mode a browser that paired by itself gets one notice and one notification, with Unpair.
 
 ## The payload
 

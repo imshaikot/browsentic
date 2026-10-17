@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct BrowsenticApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @StateObject private var model = AppModel()
+    @StateObject private var model = AppModel.shared
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
 
     private var scheme: ColorScheme? { Appearance(rawValue: appearance)?.scheme }
@@ -48,12 +48,22 @@ struct BrowsenticApp: App {
         MenuBarExtra {
             MenuBarContent().environmentObject(model)
         } label: {
-            Image(nsImage: model.daemon == .on ? MenuBarMark.on : MenuBarMark.off)
+            Image(nsImage: model.pendingRequests.isEmpty ? (model.daemon == .on ? MenuBarMark.on : MenuBarMark.off) : MenuBarMark.asking)
         }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// A notification that launches the app is delivered before launch finishes, so the delegate has to be in place first.
+    func applicationWillFinishLaunching(_: Notification) {
+        PairingAlerts.shared.install()
+    }
+
+    /// The Bridge starts the app with `--pairing`, in the background, when a browser asks and nobody is watching.
+    func applicationDidFinishLaunching(_: Notification) {
+        if CommandLine.arguments.contains("--pairing") { AppModel.shared.startPolling() }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool { false }
 
     func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows visible: Bool) -> Bool {
@@ -64,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 private struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -79,6 +90,10 @@ private struct RootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { Backdrop() }
+        .sheet(item: Binding(get: { model.pendingRequests.first }, set: { _ in })) { request in
+            PairRequestSheet(request: request).environmentObject(model)
+        }
+        .onAppear { model.openMainWindow = { openWindow(id: "main") } }
     }
 }
 
@@ -87,6 +102,13 @@ private struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        ForEach(model.pendingRequests) { request in
+            Button("\(request.name) wants to connect…") {
+                openWindow(id: "main")
+                NSApp.activate()
+            }
+        }
+        if !model.pendingRequests.isEmpty { Divider() }
         Text("Browsentic Bridge: \(model.daemon.label)\(model.status.map { " · 127.0.0.1:\($0.port)" } ?? "")")
         if let status = model.status {
             Text(status.connected ? "Extension connected" : "Extension not connected")

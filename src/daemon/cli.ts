@@ -6,6 +6,7 @@ import { ANDROID_PROTOCOL } from '@/lib/actions/protocol';
 import type { AndroidState } from '@/lib/phone/types';
 import { AGENTS, AGENT_KINDS, AGENT_LIST, isAgentKind, type AgentKind, type AgentState, type ModelList } from '@/lib/agents/catalog';
 import { SOURCE_LABEL } from '@/lib/stores';
+import { PAIRING_MODES, isPairingMode, type PairRequestSummary, type PairedBy, type PairingMode } from '@/lib/pairing';
 import { RESERVED_ACTIONS } from '@/lib/actions/reserved';
 import { assertToolNamesRoundTrip, toolNameFor } from '@/lib/actions/tool-names';
 import { formatWhen } from '@/lib/format-when';
@@ -29,14 +30,16 @@ import { forgetGrants, listGrants } from './agent/approvals';
 import { describeMoment, describeRule } from '@/lib/schedules/rule';
 import { findTask, readSchedules, setEnabled, setPaused, updateSchedules } from './schedules/store';
 import { clearDownloads, downloadDir, storedDownloads } from './downloads';
-import { readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/config';
+import { pairingMode, readAgentConfig, rememberExtensionDir, writeAgentModel } from './agent/config';
+import { desktopApp } from './desktop-app';
 import { loadSkills, skillDirNames, uploadedSkillsDir } from './agent/skills';
 import { ensureDaemon, probeExisting, runningDaemons, stopDaemons } from './ensure-daemon';
 import { install, InstallError, readStamp } from './install';
 import { logPath, readLockfile, wakeHeld } from './lockfile';
 import { log } from './log';
 import { installKind } from './npx';
-import { installNativeHost, registeredBrowsers, removeNativeHost, serveNativeHost } from './native-host';
+import { installNativeHost, registeredBrowsers, registrationCurrent, removeNativeHost } from './native-host';
+import { serveNativeHost } from './native-messaging';
 import { extensionDir } from './paths';
 import { RELEASES_PAGE, signedAddonAttached } from './firefox-addon';
 import { RemoteBridge } from './remote-bridge';
@@ -55,9 +58,14 @@ const USAGE = `browsentic ${pkg.version} — Browsentic Bridge, the half of Brow
   browsentic uninstall        stop the Bridge and remove everything Browsentic wrote
   browsentic browsers         the browsers on this computer, where each gets the extension, and which are connected
   browsentic pair             issue a one-time code to type into the extension
+  browsentic pairing [mode]   how browsers pair by themselves: auto, ask (you allow each one) or code (only with a code)
+  browsentic requests         browsers waiting for you to allow them, in ask mode
+  browsentic approve [id]     allow a waiting or unpaired browser; --watch asks about each one as it comes
+  browsentic deny <id>        turn a waiting browser down
   browsentic status           the Bridge, each paired browser, and the agent
-  browsentic sessions         list paired browsers
-  browsentic revoke [id]      unpair one browser by the id "sessions" prints, or all of them
+  browsentic sessions         list paired browsers, and the ones kept out
+  browsentic rename <id> <name>   name a paired browser, e.g. "Work Chrome"
+  browsentic revoke [id]      unpair one browser by the id "sessions" prints, or all of them; it stays out until you reconnect it
 
   browsentic agent            show which agent runs the side panel, and which are installed
   browsentic agent <name>     switch to claude, codex, antigravity, vibe, grok, cursor, qwen or opencode
@@ -96,6 +104,13 @@ For MCP clients
 // Above the switch, like USAGE: it runs the command before execution reaches the bottom of this
 // file, and the bundle hoists a constant declared down there as an undefined var.
 const AGENTS_GUIDE = 'https://browsentic.com/docs/guide/agents/';
+const PAIRING_LINE: Record<PairingMode, string> = {
+  auto: 'automatic: a browser with Browsentic connects by itself',
+  ask: 'ask: a browser connects once you allow it, in the app or with "browsentic approve"',
+  code: 'code only: a browser connects once you type a code from "browsentic pair" into it',
+};
+
+const PAIRED_BY: Record<PairedBy, string> = { code: 'paired with a code', auto: 'paired by itself', approved: 'allowed and paired' };
 const WAIT_MS = 5 * 60_000;
 const SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 /** Offered when no browser is found, since detection can miss one installed somewhere unusual. */
@@ -117,7 +132,8 @@ const servesBare = !!process.env.BROWSENTIC_AGENT_RUN;
 
 const [command] = process.argv.slice(2);
 const wantsJson = process.argv.includes('--json');
-const positional = process.argv.slice(3).filter((arg) => !arg.startsWith('--'));
+const VALUE_FLAGS = new Set(['--name']);
+const positional = process.argv.slice(3).filter((arg, at, args) => !arg.startsWith('--') && !VALUE_FLAGS.has(args[at - 1]));
 
 switch (command) {
   case undefined:
@@ -137,7 +153,20 @@ switch (command) {
     await uninstall(process.argv.slice(3));
     break;
   case 'native-host':
-    await serveNativeHost(ensureDaemon, wakeHeld);
+    await serveNativeHost({
+      ensure: (caller) => ensureDaemon({ outsideJob: caller?.family === 'firefox' }),
+      held: wakeHeld,
+      mode: () => pairingMode(),
+      version: pkg.version,
+      app: () => {
+        const app = desktopApp();
+        return app && { kind: app.kind, present: app.present };
+      },
+      connect: (lock) => RemoteBridge.connect(lock.port, lock.token),
+    });
+    break;
+  case 'unregister-host':
+    unregisterHost();
     break;
   case 'pair':
     await pair();
@@ -150,6 +179,21 @@ switch (command) {
     break;
   case 'revoke':
     await revoke(process.argv[3]);
+    break;
+  case 'pairing':
+    await setPairing(positional[0]);
+    break;
+  case 'requests':
+    await showRequests();
+    break;
+  case 'approve':
+    await approve(positional[0]);
+    break;
+  case 'deny':
+    await deny(positional[0]);
+    break;
+  case 'rename':
+    await rename(positional[0], positional.slice(1).join(' '));
     break;
   case 'agent':
     await chooseAgent(positional[0], positional[1], positional[2]);
@@ -283,12 +327,13 @@ function printSkills(): void {
 async function showStatus(): Promise<void> {
   const lock = await probeExisting();
   const waking = registeredBrowsers();
+  const outdated = waking.length && !registrationCurrent() ? ' (an older Bridge registered it: run "browsentic setup")' : '';
   const wake = `wake-up:   ${
     !waking.length
       ? 'not registered — run "browsentic setup"'
       : wakeHeld()
         ? `held since "browsentic stop" — "browsentic start" lets ${waking.join(', ')} start it again`
-        : `${waking.join(', ')} can start the Bridge`
+        : `${waking.join(', ')} can start the Bridge${outdated}`
   }`;
   if (!lock) {
     console.log('bridge:    not running');
@@ -333,6 +378,7 @@ async function showStatus(): Promise<void> {
   console.log(
     `tools:     ${status.manifestInSync ? 'in sync' : `the extension's own list (extension v${status.extensionVersion}, Bridge v${status.daemonVersion})`}`,
   );
+  if (status.pairing) console.log(`pairing:   ${PAIRING_LINE[status.pairing.mode]}`);
   if (status.pairingPending) console.log('pairing:   a code is waiting to be entered');
 }
 
@@ -483,11 +529,12 @@ async function setup(argv: string[]): Promise<void> {
     const located = locateBrowsers();
     const sessions = await bridge.sessions();
     const rows = browserRows(sessions, located, pkg.version);
+    const mode = (await bridge.pairing())?.mode ?? 'code';
 
     if (!json) {
       console.log(`\n  Browsentic ${pkg.version} — your browser's superpower\n`);
       console.log(`  ✓ Browsentic Bridge  running on 127.0.0.1:${lock.port} (pid ${lock.pid})`);
-      console.log(`  ${wakeLine(wake.browsers)}`);
+      console.log(`  ${wakeLine(wake)}`);
       for (const line of agentLines(await bridge.agent())) console.log(`  ${line}`);
       console.log();
     }
@@ -517,6 +564,7 @@ async function setup(argv: string[]): Promise<void> {
             version: pkg.version,
             daemon: { port: lock.port, pid: lock.pid },
             nativeHost: wake,
+            pairing: { mode },
             extensionDir: folder ? dir : null,
             unpacked: folder && { version: folder.version, changed: folder.changed, alreadyCurrent: folder.alreadyCurrent },
             alreadyPaired: sessions.length > 0,
@@ -537,18 +585,18 @@ async function setup(argv: string[]): Promise<void> {
       console.log(`  ✓ Unpacked copy      ${dir}, ${state}\n`);
     }
 
-    if (!choice) return printPlan(rows, sessions, folder?.version, code);
+    if (!choice) return printPlan(rows, sessions, mode, folder?.version, code);
     if (settled) {
       console.log(`  ${row!.label} is already connected: Browsentic ${settled.extensionVersion} from the ${SOURCE_LABEL[settled.source ?? 'unpacked']}.`);
       console.log(choice.unpacked ? `  Press ↻ on its card at ${row!.extensionsPage} to load this build.\n` : '  Nothing to do.\n');
       return;
     }
 
-    if (choice.unpacked) printUnpackedSteps(dir, row, code);
-    else await printStoreSteps(row!, opened, code);
+    if (choice.unpacked) printUnpackedSteps(dir, row, mode, code);
+    else await printStoreSteps(row!, opened, mode, code);
     if (!code || flag('no-wait')) return;
 
-    const joined = await waitForBrowser(bridge, since, row?.label ?? 'your browser');
+    const joined = await waitForBrowser(bridge, since, row?.label ?? 'your browser', mode);
     if (joined) {
       const panel = browserOf(joined.browser) === 'firefox' ? 'sidebar' : 'side panel';
       console.log(`  ✓ ${joined.browser ?? 'Your browser'} is connected: Browsentic ${joined.extensionVersion} from the ${SOURCE_LABEL[joined.source ?? 'unpacked']}.`);
@@ -563,10 +611,17 @@ async function setup(argv: string[]): Promise<void> {
   }
 }
 
-function wakeLine(browsers: string[]): string {
+function wakeLine({ browsers, skipped }: { browsers: string[]; skipped?: string }): string {
+  if (skipped) return `· Wake-up            not registered: ${skipped}`;
   return browsers.length
     ? `✓ Wake-up            ${browsers.join(', ')} can start the Bridge when it is down`
     : '· Wake-up            no supported browser found, so start the Bridge yourself after a reboot';
+}
+
+/** For the Windows app's uninstaller, which leaves the Bridge's files but must not leave browsers able to start it. */
+function unregisterHost(): void {
+  const removed = removeNativeHost();
+  console.log(removed.length ? `Unregistered from ${removed.length} place${removed.length === 1 ? '' : 's'}.` : 'Nothing was registered.');
 }
 
 function agentLines(state: AgentState): string[] {
@@ -630,13 +685,14 @@ function writeExtension(dir: string, force: boolean) {
   }
 }
 
-function codeLines(code: { code: string } | undefined): string[] {
-  return code
-    ? [`enter this code:  ${groupCode(code.code)}`, 'It works once and expires in 10 minutes. Need another? "browsentic pair"']
-    : ['enter a code from "browsentic pair".'];
+/** How the browser connects once the extension is in it, in this Bridge's pairing mode. */
+function codeLines(mode: PairingMode, code: { code: string } | undefined): string[] {
+  const enter = code ? `enter this code:  ${groupCode(code.code)}` : 'enter a code from "browsentic pair".';
+  const lead = { auto: `It connects by itself; if it asks for a code, ${enter}`, ask: `Allow it here when it asks; or ${enter}`, code: enter }[mode];
+  return code ? [lead, 'The code works once and expires in 10 minutes. Need another? "browsentic pair"'] : [lead];
 }
 
-async function printStoreSteps(row: BrowserRow, opened: boolean, code?: { code: string }): Promise<void> {
+async function printStoreSteps(row: BrowserRow, opened: boolean, mode: PairingMode, code?: { code: string }): Promise<void> {
   console.log(opened ? `  Opening the ${row.store} in ${row.label}:` : `  Open this page in ${row.label}:`);
   console.log(`    ${row.storeUrl}\n`);
   if (row.id === 'firefox' && (await signedAddonAttached(pkg.version)) === false) {
@@ -646,15 +702,15 @@ async function printStoreSteps(row: BrowserRow, opened: boolean, code?: { code: 
   if (row.sessions.some((session) => session.connected && session.source === 'unpacked')) {
     console.log(`  ${row.label} already runs an unpacked copy. Remove it at ${row.extensionsPage} first, or both will answer.\n`);
   }
-  const [enter, ...rest] = codeLines(code);
-  const steps = [...row.steps, `Click Browsentic in the toolbar (the puzzle piece lists it; pin it there) and ${enter}`];
+  const [enter, ...rest] = codeLines(mode, code);
+  const steps = [...row.steps, `Click Browsentic in the toolbar (the puzzle piece lists it; pin it there). ${enter}`];
   steps.forEach((step, index) => console.log(`    ${index + 1}. ${step}`));
   for (const line of rest) console.log(`       ${line}`);
   console.log();
 }
 
-function printUnpackedSteps(dir: string, row: BrowserRow | undefined, code?: { code: string }): void {
-  const [enter, ...rest] = codeLines(code);
+function printUnpackedSteps(dir: string, row: BrowserRow | undefined, mode: PairingMode, code?: { code: string }): void {
+  const [enter, ...rest] = codeLines(mode, code);
   console.log(`  Load it unpacked in ${row?.label ?? 'your browser'}:\n`);
   console.log(`    1. Open ${row?.extensionsPage ?? 'its extensions page (chrome://extensions)'} and turn on Developer mode.`);
   console.log(`    2. Press “Load unpacked” and choose:\n`);
@@ -663,7 +719,7 @@ function printUnpackedSteps(dir: string, row: BrowserRow | undefined, code?: { c
   // them. The folder picker shortcut is the next best thing, and it is where people stall.
   const picker = FOLDER_PICKER[process.platform];
   if (picker) console.log(`       ${picker}`);
-  console.log(`    3. Click Browsentic in the toolbar and ${enter}`);
+  console.log(`    3. Click Browsentic in the toolbar. ${enter}`);
   for (const line of rest) console.log(`       ${line}`);
   console.log();
 }
@@ -672,7 +728,7 @@ function printUnpackedSteps(dir: string, row: BrowserRow | undefined, code?: { c
  * Nobody to ask. Someone already set up hears what an update leaves them to do; anyone else, where
  * each browser gets the extension, with the choosing left to them.
  */
-function printPlan(rows: BrowserRow[], sessions: SessionSummary[], folderVersion?: string, code?: { code: string }): void {
+function printPlan(rows: BrowserRow[], sessions: SessionSummary[], mode: PairingMode, folderVersion?: string, code?: { code: string }): void {
   if (sessions.length) {
     const stale = sessions.filter((session) => session.source === 'unpacked' && folderVersion && session.extensionVersion !== folderVersion);
     const pages = new Set(stale.map((session) => BROWSERS[browserOf(session.browser) ?? 'chrome'].extensionsPage));
@@ -688,23 +744,35 @@ function printPlan(rows: BrowserRow[], sessions: SessionSummary[], folderVersion
   console.log(`      ${store('chrome').storeUrl}`);
   console.log(`    Firefox`);
   console.log(`      ${store('firefox').storeUrl}\n`);
-  const [enter, ...rest] = codeLines(code);
-  console.log(`  Then click Browsentic in the toolbar and ${enter}`);
+  const [enter, ...rest] = codeLines(mode, code);
+  console.log(`  Then click Browsentic in the toolbar. ${enter}`);
   for (const line of rest) console.log(`  ${line}`);
   console.log(`  On a terminal, "browsentic setup" asks which browser and walks you through it.\n`);
 }
 
-async function waitForBrowser(bridge: RemoteBridge, since: string, label: string): Promise<SessionSummary | null> {
+async function waitForBrowser(bridge: RemoteBridge, since: string, label: string, mode: PairingMode): Promise<SessionSummary | null> {
   const line = `Waiting for ${label} to connect…  (Ctrl-C stops waiting; nothing is undone)`;
   const spin = !!process.stdout.isTTY;
   if (!spin) console.log(`  ${line}`);
   const deadline = Date.now() + WAIT_MS;
+  const asked = new Set<string>();
   for (let tick = 0; Date.now() < deadline; tick++) {
     if (tick % 8 === 0) {
       const joined = (await bridge.sessions()).find((session) => session.connected && session.pairedAt >= since);
       if (joined) {
         if (spin) process.stdout.write('\r\x1b[2K');
         return joined;
+      }
+      if (mode === 'ask' && process.stdin.isTTY) {
+        for (const request of await bridge.pairRequests('terminal')) {
+          if (asked.has(request.id)) continue;
+          asked.add(request.id);
+          if (spin) process.stdout.write('\r\x1b[2K');
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          const answer = (await rl.question(`  ${describeRequest(request)} wants to connect. Allow it? [Y/n] `)).trim();
+          rl.close();
+          await bridge.decide(request.id, !/^n(o)?$/i.test(answer));
+        }
       }
     }
     if (spin) process.stdout.write(`\r  ${SPINNER[tick % SPINNER.length]} ${line}`);
@@ -826,14 +894,16 @@ async function showSessions(): Promise<void> {
   const sessions = await bridge.sessions();
   await bridge.close();
   if (!sessions.length) {
-    return console.log('No paired browsers. Run "browsentic setup" to add one.');
+    console.log('No paired browsers. Run "browsentic setup" to add one.');
+    return showBlocked();
   }
   for (const session of sessions) {
-    console.log(`${session.connected ? '●' : '○'} ${session.browser ?? session.origin}  ${session.id}`);
+    console.log(`${session.connected ? '●' : '○'} ${session.label ?? session.browser ?? session.origin}  ${session.id}`);
     console.log(
-      `    ${SOURCE_LABEL[session.source ?? 'unpacked']} (${session.origin}), extension v${session.extensionVersion}, paired ${session.pairedAt}, last seen ${session.lastSeenAt}`,
+      `    ${SOURCE_LABEL[session.source ?? 'unpacked']} (${session.origin}), extension v${session.extensionVersion}, ${PAIRED_BY[session.pairedBy ?? 'code']} ${session.pairedAt}, last seen ${session.lastSeenAt}`,
     );
   }
+  await showBlocked();
 }
 
 async function chooseAgent(first?: string, second?: string, third?: string): Promise<void> {
@@ -917,7 +987,156 @@ async function revoke(browser?: string): Promise<void> {
   const revoked = await bridge.revoke(browser);
   await bridge.close();
   if (!revoked) return console.log(browser ? `No session for ${browser}.` : 'Nothing to revoke.');
-  console.log(`Revoked ${revoked} session(s). Pair again with "browsentic pair".`);
+  console.log(`Revoked ${revoked} session(s). They will not pair again by themselves.`);
+  console.log('Reconnect one from its extension, or pair it with a code from "browsentic pair".');
+}
+
+async function setPairing(mode?: string): Promise<void> {
+  if (mode !== undefined && !isPairingMode(mode)) {
+    console.error(`Pairing is ${PAIRING_MODES.join(', ')}, not "${mode}".`);
+    process.exit(1);
+  }
+  const bridge = await connect();
+  const answer = await bridge.pairing(mode);
+  await bridge.close();
+  if (!answer) {
+    console.error('This Browsentic Bridge is too old to pair by itself. Run "browsentic restart" to start the one installed.');
+    process.exit(1);
+  }
+  if (answer.error) {
+    console.error(answer.error);
+    process.exit(1);
+  }
+  console.log(`Pairing: ${PAIRING_LINE[answer.mode]}.`);
+  if (answer.mode === 'ask') {
+    console.log(answer.approver === 'app' ? 'The Browsentic app asks you about each new browser.' : 'Allow each new browser with "browsentic approve".');
+  }
+}
+
+function describeRequest(request: PairRequestSummary): string {
+  const source = isSource(request.source) ? SOURCE_LABEL[request.source] : request.source;
+  return `${request.browser ?? 'A browser'} (${source}, extension v${request.extensionVersion})`;
+}
+
+function isSource(value: string): value is keyof typeof SOURCE_LABEL {
+  return value in SOURCE_LABEL;
+}
+
+async function showRequests(): Promise<void> {
+  const bridge = await connect();
+  const requests = await bridge.pairRequests();
+  await bridge.close();
+  if (wantsJson) return console.log(JSON.stringify({ requests }, null, 2));
+  if (!requests.length) return console.log('No browser is waiting to be allowed.');
+  for (const request of requests) console.log(`  ${request.id}  ${describeRequest(request)}, asked ${formatWhen(request.firstAt)}`);
+  console.log('\nAllow one with "browsentic approve <id>", or turn it down with "browsentic deny <id>".');
+}
+
+async function approve(id?: string): Promise<void> {
+  const bridge = await connect();
+  try {
+    if (process.argv.includes('--watch')) return await watchRequests(bridge);
+    const requests = await bridge.pairRequests();
+    const chosen = id ?? (requests.length === 1 ? requests[0].id : undefined);
+    if (!chosen) {
+      console.error(requests.length ? 'Several browsers are waiting. Name one: "browsentic requests" lists them.' : 'No browser is waiting to be allowed.');
+      process.exit(1);
+    }
+    const name = valueAfter('--name');
+    const { ok, error } = await bridge.decide(chosen, true, name);
+    if (!ok) {
+      console.error(error ?? `Nothing is waiting under ${chosen}.`);
+      process.exit(1);
+    }
+    const waiting = requests.some((request) => request.id === chosen || request.installId === chosen);
+    console.log(
+      waiting
+        ? 'Allowed. It connects within a few seconds; "browsentic status" shows it.'
+        : 'Allowed. It connects once you press Reconnect in its Browsentic side panel.',
+    );
+  } finally {
+    await bridge.close();
+  }
+}
+
+async function deny(id?: string): Promise<void> {
+  if (!id) {
+    console.error('Name the browser to turn down: "browsentic requests" lists them.');
+    process.exit(1);
+  }
+  const bridge = await connect();
+  const { ok, error } = await bridge.decide(id, false);
+  await bridge.close();
+  if (!ok) {
+    console.error(error ?? `Nothing is waiting under ${id}.`);
+    process.exit(1);
+  }
+  console.log('Turned down. It stays out until someone presses Reconnect in that browser and you allow it.');
+}
+
+async function rename(id?: string, name?: string): Promise<void> {
+  if (!id || name === undefined) {
+    console.error('Usage: browsentic rename <id> <name>. "browsentic sessions" prints the ids.');
+    process.exit(1);
+  }
+  const bridge = await connect();
+  const ok = await bridge.label(id, name);
+  await bridge.close();
+  if (!ok) {
+    console.error(`No paired browser has the id ${id}.`);
+    process.exit(1);
+  }
+  console.log(name.trim() ? `Named it "${name.trim()}".` : 'Cleared its name.');
+}
+
+async function showBlocked(): Promise<void> {
+  const lock = await probeExisting();
+  if (!lock) return;
+  const bridge = await RemoteBridge.connect(lock.port, lock.token);
+  const blocked = await bridge.blocked();
+  await bridge.close();
+  if (!blocked.length) return;
+  console.log('\nKept out until you reconnect them:');
+  for (const browser of blocked) {
+    console.log(`  ${browser.browser ?? browser.origin}  ${browser.installId}  ${browser.reason} ${browser.at}`);
+  }
+  console.log('Let one back in with "browsentic approve <id>", then press Reconnect in its Browsentic side panel.');
+}
+
+function valueAfter(flag: string): string | undefined {
+  const at = process.argv.indexOf(flag);
+  return at === -1 ? undefined : process.argv[at + 1];
+}
+
+/** A terminal that answers for every browser asking to pair, for as long as it runs. */
+async function watchRequests(bridge: RemoteBridge): Promise<void> {
+  if (!process.stdin.isTTY) {
+    console.error('--watch asks you about each browser, so it needs a terminal.');
+    process.exit(1);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const asked = new Set<string>();
+  let busy = false;
+  const review = async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      for (const request of await bridge.pairRequests('terminal')) {
+        if (asked.has(request.id)) continue;
+        asked.add(request.id);
+        const answer = (await rl.question(`\n  ${describeRequest(request)} wants to connect. Allow it? [Y/n] `)).trim();
+        const allow = !/^n(o)?$/i.test(answer);
+        const { ok } = await bridge.decide(request.id, allow);
+        console.log(ok ? (allow ? '  Allowed.' : '  Turned down.') : '  It had already been decided or had expired.');
+      }
+    } finally {
+      busy = false;
+    }
+  };
+  bridge.onPairRequestsChanged(() => void review());
+  console.log('Waiting for browsers that ask to pair. Ctrl-C stops.');
+  await review();
+  await new Promise(() => undefined);
 }
 
 async function android(args: string[]): Promise<void> {

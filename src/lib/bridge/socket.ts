@@ -33,7 +33,9 @@ import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
+import type { Approver, PairingMode, RefusalCode } from '@/lib/pairing';
 import { identify } from './identity';
+import type { BridgeReach } from './native-pair';
 import { invokeForHarness } from './invoke';
 import { wakeDaemon } from './native-wake';
 
@@ -41,6 +43,8 @@ export const DAEMON_STATE_KEY = 'browsentic/daemon';
 export const RECONNECT_ALARM = 'browsentic/reconnect';
 export const TASKS_KEY = 'browsentic/tasks';
 const SESSION_KEY_STORE = 'browsentic/sessionKey';
+/** Set when the Bridge said it holds no session for the stored key: kept until a new one replaces it, but no longer worth dialling with. */
+const STALE_KEY_STORE = 'browsentic/staleKey';
 
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 30_000;
@@ -58,6 +62,7 @@ interface Credential {
 interface Refusal {
   reason: string;
   retryable: boolean;
+  code?: RefusalCode;
 }
 
 interface Attempt {
@@ -88,7 +93,22 @@ export interface DaemonState {
   /** The phones the Bridge sees. Pushed only by a Bridge that speaks Android, on connect and on every change. */
   android?: AndroidState;
   error?: string;
+  /** Whether this browser can reach Browsentic Bridge's native host. Absent until it has been asked. */
+  bridge?: BridgeReach;
+  /** Where pairing by itself stands, while this browser is not paired. */
+  pairing?: PairingState;
   lastChangeAt: number;
+}
+
+export interface PairingState {
+  mode?: PairingMode;
+  /** Waiting for someone to allow this browser, in the app or in a terminal. */
+  wait?: { approver: Approver };
+  /** This computer unpaired or turned down this browser; only Reconnect or a code brings it back. */
+  blocked?: 'revoked' | 'denied';
+  /** The user pressed Disconnect here, so it does not pair again by itself. */
+  manual?: boolean;
+  error?: string;
 }
 
 let socket: WebSocket | null = null;
@@ -103,6 +123,7 @@ const welcomeListeners = new Set<(daemonVersion: string) => void>();
 let draftListener: ((runId: string, draft: SiteMapDraft) => void) | null = null;
 let taskRunner: ((order: TaskOrder) => Promise<ActionResult>) | null = null;
 let preferencesListener: ((preferences: Preferences) => void) | null = null;
+const staleKeyListeners = new Set<() => void>();
 
 export type CdpEvent = Extract<SocketFrame, { t: 'cdpEvent' }>;
 
@@ -134,6 +155,14 @@ export function onSiteMapDraft(listener: (runId: string, draft: SiteMapDraft) =>
 
 export function onRunEvent(listener: (runId: string, event: RunEvent) => void): void {
   runListener = listener;
+}
+
+/** The Bridge proved itself and does not know the stored key: a wiped or reinstalled Bridge, to pair with again. */
+export const onStaleKey = (listener: () => void) => listen(staleKeyListeners, listener);
+
+export async function sessionKeyUsable(): Promise<boolean> {
+  const stored = await browser.storage.session.get(STALE_KEY_STORE);
+  return !stored[STALE_KEY_STORE] && !!(await storedSessionKey());
 }
 
 export function onWelcome(listener: (daemonVersion: string) => void): void {
@@ -460,7 +489,7 @@ async function reconnect(): Promise<void> {
   const state = await readState();
   if ((state && !state.paired && state.error) || isLive()) return;
   clearTimeout(reconnectTimer);
-  dial({ kind: 'session', secret: sessionKey }, 0);
+  dial({ kind: 'session', secret: sessionKey }, DAEMON_PORTS, 0);
 }
 
 export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; error?: string }> {
@@ -470,10 +499,26 @@ export async function pairDaemon(pairingToken: string): Promise<{ ok: boolean; e
   disconnectSocket();
   clearTimeout(reconnectTimer);
   attempts = 0;
+  return pairWith(code, DAEMON_PORTS);
+}
+
+/**
+ * Redeems a grant the native host handed over: never typed, so never normalised, and tried first on the
+ * port of the Bridge that issued it, which may not be the first one answering.
+ */
+export function redeemGrant(code: string, port: number): Promise<{ ok: boolean; error?: string }> {
+  disconnectSocket();
+  clearTimeout(reconnectTimer);
+  attempts = 0;
+  return pairWith(code, [port, ...DAEMON_PORTS.filter((other) => other !== port)]);
+}
+
+function pairWith(code: string, ports: readonly number[]): Promise<{ ok: boolean; error?: string }> {
+  settlePairing({ ok: false, error: 'Superseded by a newer pairing attempt.' });
   return new Promise((resolve) => {
     pairingResult = resolve;
-    dial({ kind: 'pair', secret: code }, 0);
-    setTimeout(
+    dial({ kind: 'pair', secret: code }, ports, 0);
+    pairingTimer = setTimeout(
       () => settlePairing({ ok: false, error: 'No Browsentic daemon is running. Start one with "browsentic pair".' }),
       PAIRING_TIMEOUT_MS,
     );
@@ -484,12 +529,28 @@ export async function disconnectDaemon(): Promise<void> {
   clearTimeout(reconnectTimer);
   disconnectSocket();
   await browser.storage.local.remove(SESSION_KEY_STORE);
+  await browser.storage.session.remove(STALE_KEY_STORE);
   await setState({ connected: false, paired: false, error: undefined, agent: undefined, android: undefined, lastChangeAt: Date.now() });
 }
 
+/** An update may be what a refusal was waiting for, so the link is tried again with the key it has. */
+export async function retryAfterUpdate(): Promise<void> {
+  const state = await readState();
+  if (state && !state.paired && state.error) await setState({ error: undefined, lastChangeAt: Date.now() });
+  await connectDaemon();
+}
+
+export const pairingNow = async (): Promise<PairingState | undefined> => (await readState())?.pairing;
+
+/** Where pairing by itself stands, for the surfaces to show while this browser is not paired. */
+export const reportPairing = (bridge: BridgeReach | undefined, pairing: PairingState | undefined): Promise<void> =>
+  setState({ bridge, pairing, lastChangeAt: Date.now() });
+
 let pairingResult: ((result: { ok: boolean; error?: string }) => void) | null = null;
+let pairingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function settlePairing(result: { ok: boolean; error?: string }): void {
+  clearTimeout(pairingTimer);
   pairingResult?.(result);
   pairingResult = null;
 }
@@ -512,10 +573,10 @@ function disconnectSocket(): void {
   }
 }
 
-function dial(credential: Credential, portIndex: number, carried?: Refusal): void {
-  if (portIndex >= DAEMON_PORTS.length) return giveUp(credential, carried);
+function dial(credential: Credential, ports: readonly number[], portIndex: number, carried?: Refusal): void {
+  if (portIndex >= ports.length) return giveUp(credential, carried);
 
-  const port = DAEMON_PORTS[portIndex];
+  const port = ports[portIndex];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/extension`);
   socket = ws;
   let settled = false;
@@ -581,11 +642,12 @@ function dial(credential: Credential, portIndex: number, carried?: Refusal): voi
     refusal ??= closeRefusal(event);
     // Nothing on this port ever proved itself — a squatter, a stale daemon, an empty port — so the
     // walk continues instead of pinning the extension to whoever answered first.
-    if (!welcomed) return dial(credential, portIndex + 1, refusal);
+    if (!welcomed) return dial(credential, ports, portIndex + 1, refusal);
     void setState({ connected: false, paired: true, error: undefined, android: undefined, lastChangeAt: Date.now() });
     for (const [id] of pendingPhoneOps) settlePhoneOp(id, failure('PHONE_GONE', 'The link to Browsentic Bridge went down.'));
     for (const listener of closedListeners) listener();
-    if (credential.kind === 'session') scheduleRetry();
+    // A link opened by a code or a grant was welcomed with a session key, so it comes back on that key like any other.
+    scheduleRetry();
   };
 }
 
@@ -594,15 +656,13 @@ const OWN_CLOSE = new Set(['unproven daemon', '']);
 function closeRefusal(event: CloseEvent): Refusal | undefined {
   const reason = event.reason?.trim();
   if (!reason || OWN_CLOSE.has(reason)) return undefined;
-  return /protocol version mismatch/i.test(reason)
-    ? { reason: `${reason}. Rebuild and reload the extension — “yarn build”, then Reload at chrome://extensions.`, retryable: false }
-    : { reason, retryable: true };
+  return /protocol version mismatch/i.test(reason) ? { reason, retryable: false } : { reason, retryable: true };
 }
 
 function giveUp(credential: Credential, refusal?: Refusal): void {
   if (refusal && !refusal.retryable) {
     settlePairing({ ok: false, error: refusal.reason });
-    void setState({ connected: false, paired: false, error: refusal.reason, lastChangeAt: Date.now() });
+    void refuse(credential, refusal);
     return;
   }
   settlePairing({ ok: false, error: refusal?.reason ?? 'No Browsentic daemon is running.' });
@@ -613,6 +673,25 @@ function giveUp(credential: Credential, refusal?: Refusal): void {
     clearTimeout(reconnectTimer);
     reconnectTimer = setTimeout(() => void connectDaemon(), WOKEN_RETRY_MS);
   });
+}
+
+async function refuse(credential: Credential, refusal: Refusal): Promise<void> {
+  const reason = await adviceFor(refusal.reason);
+  const blocked = credential.kind === 'session' && refusal.code === 'revoked' ? { pairing: { blocked: 'revoked' as const } } : {};
+  await setState({ connected: false, paired: false, error: reason, ...blocked, lastChangeAt: Date.now() });
+  if (credential.kind !== 'session' || (refusal.code !== 'unknown' && refusal.code !== 'revoked')) return;
+  // Either way the Bridge holds no session for this key; only a Bridge that forgot it is paired with again unasked.
+  await browser.storage.session.set({ [STALE_KEY_STORE]: true });
+  if (refusal.code === 'unknown') for (const listener of staleKeyListeners) listener();
+}
+
+/** A store copy cannot be rebuilt: it is told the store update is on its way, and the store is asked for it now. */
+async function adviceFor(reason: string): Promise<string> {
+  if (!/protocol version mismatch/i.test(reason)) return reason;
+  const unpacked = (await browser.management.getSelf().catch(() => null))?.installType === 'development';
+  if (unpacked) return `${reason}. Rebuild and reload the extension — “yarn build”, then Reload at chrome://extensions.`;
+  if (!import.meta.env.FIREFOX) await browser.runtime.requestUpdateCheck().catch(() => undefined);
+  return `${reason}. This copy of Browsentic is older than Browsentic Bridge; the browser installs its update shortly.`;
 }
 
 function transcriptOf(attempt: Attempt): Transcript {
@@ -645,7 +724,7 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
 
     // Nothing has proved itself yet, so this is a claim, not a verdict: note it and try the next port.
     case 'unauthorized':
-      return attempt.walk({ reason: frame.reason, retryable: frame.retryable !== false });
+      return attempt.walk({ reason: frame.reason, retryable: frame.retryable !== false, code: frame.code });
 
     case 'welcome': {
       const secret = attempt.secret;
@@ -669,7 +748,10 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
       // backoff on the welcome alone lets two peers take the link from each other every second.
       clearTimeout(stableTimer);
       stableTimer = setTimeout(() => (attempts = 0), STABLE_AFTER_MS);
-      if (sessionKey) await browser.storage.local.set({ [SESSION_KEY_STORE]: sessionKey });
+      if (sessionKey) {
+        await browser.storage.local.set({ [SESSION_KEY_STORE]: sessionKey });
+        await browser.storage.session.remove(STALE_KEY_STORE);
+      }
       settlePairing({ ok: true });
       await setState({
         connected: true,
@@ -679,6 +761,8 @@ async function handle(ws: WebSocket, raw: string, attempt: Attempt): Promise<voi
         protocolVersion: frame.protocolVersion,
         manifestInSync: frame.manifestInSync,
         error: undefined,
+        bridge: undefined,
+        pairing: undefined,
         lastChangeAt: Date.now(),
       });
       for (const listener of welcomeListeners) listener(frame.daemonVersion);

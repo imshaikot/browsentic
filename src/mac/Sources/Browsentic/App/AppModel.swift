@@ -57,6 +57,8 @@ struct Notice: Identifiable, Equatable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    static let shared = AppModel()
+
     @Published var phase: Phase = .preflight
     @Published var tab: Tab = .overview
     @Published var settingsSection: SettingsSection = .general
@@ -90,6 +92,12 @@ final class AppModel: ObservableObject {
     @Published var lastUpdateCheck: Date?
     @Published var busy: Set<String> = []
     @Published var notice: Notice?
+    /// Browsers waiting to be let in, oldest first; the approval sheet shows the first.
+    @Published var pendingRequests: [PairRequest] = []
+    @Published var pairingMode: PairingMode?
+    @Published var blocked: [BlockedBrowser] = []
+    /// Set by a view that can open the main window; the app delegate and the notifications cannot.
+    var openMainWindow: (() -> Void)?
 
     private(set) var node: NodeInstall?
     private let control = ControlClient()
@@ -97,6 +105,8 @@ final class AppModel: ObservableObject {
     private var eventWatcher: Task<Void, Never>?
     private var updateWatcher: Task<Void, Never>?
     private var watchingAndroid = false
+    private var announcedRequests: Set<String> = []
+    private var seenPairings: Set<String>?
 
     var cli: CLI? { node.map(CLI.init) }
     var appVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? Payload.bundledVersion ?? "dev" }
@@ -105,6 +115,11 @@ final class AppModel: ObservableObject {
         guard let stamp else { return false }
         return sessions.contains { $0.connected && $0.source == "unpacked" && $0.extensionVersion != stamp.version }
     }
+
+    /// False for a Bridge from before automatic pairing, which never answers its ops.
+    var bridgePairs: Bool { status?.pairing != nil }
+    var mainWindow: NSWindow? { NSApp.windows.first(where: \.canBecomeMain) }
+    var mainWindowVisible: Bool { NSApp.isActive && mainWindow?.isVisible == true }
 
     /// The browsers worth a row: found on this Mac or already paired, else the usual few to try.
     var offeredBrowsers: [BrowserRow] {
@@ -242,22 +257,26 @@ final class AppModel: ObservableObject {
 
     // MARK: Daemon
 
+    /// Runs once however often it is called: cancelling the task that reads the event stream would end the stream for good.
     func startPolling() {
-        eventWatcher?.cancel()
-        eventWatcher = Task { [weak self, control] in
-            for await event in control.events {
-                switch event {
-                case "settings-changed":
-                    await self?.loadPreferences()
-                    await self?.loadAgents()
-                case "android-changed":
-                    await self?.loadAndroid()
-                default:
-                    break
+        if eventWatcher == nil {
+            eventWatcher = Task { [weak self, control] in
+                for await event in control.events {
+                    switch event {
+                    case "settings-changed":
+                        await self?.loadPreferences()
+                        await self?.loadAgents()
+                    case "android-changed":
+                        await self?.loadAndroid()
+                    case "pair-requests-changed":
+                        await self?.loadPairRequests()
+                    default:
+                        break
+                    }
                 }
             }
         }
-        poller?.cancel()
+        guard poller == nil else { return }
         poller = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh()
@@ -279,11 +298,14 @@ final class AppModel: ObservableObject {
             self.lock = lock
             self.status = status
             self.sessions = sessions
+            pairingMode = status.pairing?.kind
+            noticePairedByThemselves(sessions)
             if daemon != .stopping { daemon = .on }
             if pairing != nil, !status.pairingPending || (pairing?.expiry ?? .distantPast) < Date() { pairing = nil }
             if agents == nil { await loadAgents() }
             stamp = ExtensionFiles.stamp()
             if changed { Task { await loadBrowsers() } }
+            if status.pairing != nil { await loadPairRequests() }
         } catch {
             await control.close()
             markOff()
@@ -298,6 +320,11 @@ final class AppModel: ObservableObject {
         sessions = []
         pairing = nil
         preferences = nil
+        pairingMode = nil
+        blocked = []
+        seenPairings = nil
+        PairingAlerts.shared.withdraw(Set(pendingRequests.map(\.id)))
+        pendingRequests = []
     }
 
     private static func readLock() -> Lockfile? {
@@ -337,11 +364,107 @@ final class AppModel: ObservableObject {
     }
 
     func revoke(_ session: BrowserSession?) async {
-        await perform("revoke") { _, control in
+        await onBridge("revoke") { control in
             let count = try await control.revoke(session)
             self.say(count == 0 ? "Nothing to unpair." : "Unpaired \(count) browser\(count == 1 ? "" : "s").")
         }
         await refresh()
+    }
+
+    // MARK: Pairing
+
+    func loadPairRequests() async {
+        guard let requests = try? await control.pairRequests() else { return }
+        receive(requests)
+        if let blocked = try? await control.blocked(), blocked != self.blocked { self.blocked = blocked }
+    }
+
+    private func receive(_ requests: [PairRequest]) {
+        let queue = PairingWatch.queue(requests)
+        let arrived = PairingWatch.arrived(queue, announced: announcedRequests)
+        PairingAlerts.shared.withdraw(PairingWatch.gone(queue, previous: pendingRequests))
+        announcedRequests.formUnion(arrived.map(\.id))
+        if queue != pendingRequests { pendingRequests = queue }
+        for request in arrived {
+            NSApp.requestUserAttention(.criticalRequest)
+            Task { await PairingAlerts.shared.ask(about: request) }
+        }
+    }
+
+    private func noticePairedByThemselves(_ sessions: [BrowserSession]) {
+        let fresh = PairingWatch.pairedByThemselves(sessions, seen: seenPairings)
+        seenPairings = Set(sessions.map(\.pairing))
+        for session in fresh {
+            say("\(session.displayName) connected to Browsentic Bridge by itself.")
+            Task { await PairingAlerts.shared.announce(session) }
+        }
+    }
+
+    func decide(_ request: PairRequest, allow: Bool, name: String? = nil) async {
+        let named = name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        await onBridge("decide:\(request.id)") { control in
+            try await control.decide(request.id, allow: allow, label: allow ? named : nil)
+            PairingAlerts.shared.withdraw([request.id])
+            self.pendingRequests.removeAll { $0.id == request.id }
+            self.say(
+                allow
+                    ? "\(named ?? request.name) can connect now."
+                    : "\(request.name) stays out. Reconnect it from the Browsers tab if you change your mind."
+            )
+        }
+        await loadPairRequests()
+    }
+
+    /// An Allow or Deny pressed on a notification, which counts only while its request still waits with the same nonce.
+    func answer(request id: String?, nonce: String?, allow: Bool) async {
+        startPolling()
+        await refresh()
+        guard let id, let nonce, let request = PairingWatch.answerable(id, nonce: nonce, in: pendingRequests) else {
+            return showMainWindow()
+        }
+        await decide(request, allow: allow)
+    }
+
+    func unpair(session id: String) async {
+        startPolling()
+        await refresh()
+        await onBridge("revoke") { control in
+            let count = try await control.revoke(session: id)
+            self.say(count == 0 ? "That browser was already unpaired." : "Unpaired. It won’t reconnect by itself until you reconnect it.")
+        }
+        await refresh()
+    }
+
+    func reconnect(_ browser: BlockedBrowser) async {
+        await onBridge("reconnect:\(browser.id)") { control in
+            try await control.decide(browser.installId, allow: true)
+            self.say("\(browser.name) can connect again. If it doesn’t by itself, press Reconnect in its Browsentic side panel.")
+        }
+        await refresh()
+    }
+
+    func rename(_ session: BrowserSession, to name: String) async {
+        await onBridge("label:\(session.id)") { control in
+            try await control.label(session: session.id, name.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        await refresh()
+    }
+
+    func setPairingMode(_ mode: PairingMode) async {
+        await onBridge("pairing") { control in self.pairingMode = try await control.pairing(set: mode).kind }
+    }
+
+    func showMainWindow(on tab: Tab? = nil) {
+        startPolling()
+        if let tab, phase == .main { self.tab = tab }
+        if let openMainWindow {
+            openMainWindow()
+        } else if let mainWindow {
+            mainWindow.makeKeyAndOrderFront(nil)
+        } else {
+            NSWorkspace.shared.open(Bundle.main.bundleURL)
+        }
+        NSApp.activate()
     }
 
     func loadAgents() async {
@@ -457,7 +580,15 @@ final class AppModel: ObservableObject {
             let result = try await cli.addExtension(to: row.id)
             if result.chosen?.opened != true, let url = URL(string: row.storeUrl) { self.open(url, in: row) }
             if let code = result.pairingCode, let expiresAt = result.expiresAt { self.pairing = PairingCode(code: code, expiresAt: expiresAt) }
-            self.say("\(row.steps.first ?? "") Then click Browsentic in \(row.label)’s toolbar and enter the code below.")
+            self.say("\(row.steps.first ?? "") \(self.afterAdding(row))")
+        }
+    }
+
+    private func afterAdding(_ row: BrowserRow) -> String {
+        switch pairingMode {
+        case .auto: "It connects by itself. If it asks for a code, use the one below."
+        case .ask: "Allow it here when it asks to connect. If it asks for a code instead, use the one below."
+        default: "Then click Browsentic in \(row.label)’s toolbar and enter the code below."
         }
     }
 
@@ -513,6 +644,7 @@ final class AppModel: ObservableObject {
             CommandLink.unlink()
             _ = try await cli.uninstall(keepSkills: keepSkills)
             self.poller?.cancel()
+            self.poller = nil
             self.updateWatcher?.cancel()
             self.markOff()
             self.phase = .preflight
@@ -581,6 +713,13 @@ final class AppModel: ObservableObject {
         do { try await work(cli, control) } catch { if !quiet { report(error) } }
     }
 
+    private func onBridge(_ key: String, _ work: @escaping (ControlClient) async throws -> Void) async {
+        guard !busy.contains(key) else { return }
+        busy.insert(key)
+        defer { busy.remove(key) }
+        do { try await work(control) } catch { report(error) }
+    }
+
     func say(_ text: String) { show(Notice(text: text, isError: false)) }
     func report(_ error: Error) { show(Notice(text: error.localizedDescription, isError: true)) }
 
@@ -595,4 +734,8 @@ final class AppModel: ObservableObject {
     private static func pause(_ seconds: Double) async {
         try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
     }
+}
+
+extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

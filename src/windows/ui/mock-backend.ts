@@ -7,14 +7,30 @@ import { AGENT_LIST, AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import type { GuardrailSettings } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
 import { EMPTY_PROFILE } from '@/lib/settings/profile';
-import type { AgentListing, Backend, CliOutput, InstallStamp, Lockfile, NodeInstall, Preferences } from './backend';
+import type { Source } from '@/lib/stores';
+import type { AgentListing, Backend, BlockedBrowser, CliOutput, InstallStamp, Lockfile, NodeInstall, PairRequestSummary, PairedBy, PairingMode, Preferences } from './backend';
+
+/**
+ * How the stand-in machine pairs, picked by the address's hash: #ask has two browsers waiting to be
+ * let in, #kept has two kept out, #arrives has Edge pair by itself a moment after the window opens,
+ * and #code pairs only by code. Anything else pairs automatically with nobody waiting.
+ */
+export type Scenario = 'ask' | 'kept' | 'arrives' | 'code' | 'auto';
+const SCENARIOS: Scenario[] = ['ask', 'kept', 'arrives', 'code', 'auto'];
+const scenarioOf = (hash: string): Scenario => SCENARIOS.find((scenario) => `#${scenario}` === hash) ?? 'auto';
+
+/** The stand-in, with the hands a test needs: a browser asking, and one pairing by itself. */
+export interface MockBackend extends Backend {
+  ask(request: PairRequestSummary): void;
+  arrive(): void;
+}
 
 /**
  * A stand-in machine for working on the window in a plain browser: `yarn win:preview`. Everything
  * is installed and the daemon is running, unless the address ends in #fresh, which starts from a
  * computer that has nothing yet.
  */
-export function mockBackend({ instant = false, fresh = location.hash === '#fresh' } = {}): Backend {
+export function mockBackend({ instant = false, fresh = location.hash === '#fresh', scenario = scenarioOf(location.hash) } = {}): MockBackend {
   const home = 'C:\\Users\\you';
   const version = '0.8.0';
   let node: NodeInstall | null = fresh ? null : { path: `${home}\\.browsentic\\runtime\\node\\node.exe`, version: 'v24.11.1', isPrivate: true };
@@ -30,6 +46,13 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
   let preferences: Preferences = { theme: null, guardrails: guardrails(`${home}\\.browsentic\\config.json`), profile: EMPTY_PROFILE };
   const phones = phoneStates(home);
   let phone = -1;
+  let mode: PairingMode = scenario === 'ask' ? 'ask' : scenario === 'code' ? 'code' : 'auto';
+  let requests: PairRequestSummary[] = scenario === 'ask' ? [...ASKING] : [];
+  let blocked: BlockedBrowser[] = scenario === 'kept' ? [...KEPT_OUT] : [];
+  let sessions: PairedSession[] = SESSIONS.map(({ pairedAgo, ...session }) => ({ ...session, pairedAt: ago(pairedAgo) }));
+  let sessionReads = 0;
+  const announce = (event: string) => listeners.forEach((listener) => listener(event));
+  const arrive = () => void sessions.push({ ...ARRIVING, pairedAt: ago(0) });
 
   const ok = (stdout: string): CliOutput => ({ ok: true, code: 0, stdout, stderr: '' });
   const later = <T>(value: T, ms = 350) => new Promise<T>((resolve) => setTimeout(() => resolve(value), instant ? 0 : ms));
@@ -46,11 +69,58 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
 
   const replies: Record<string, (frame: Record<string, unknown>) => Record<string, unknown>> = {
     status: () => ({
-      status: { connected: true, daemonVersion: version, protocolVersion: 22, port: 8765, manifestInSync: true, extensionVersion: version, connectedBrowsers: 2, pairedBrowsers: 2, pairingPending: codePending },
+      status: {
+        connected: true,
+        daemonVersion: version,
+        protocolVersion: 22,
+        port: 8765,
+        manifestInSync: true,
+        extensionVersion: version,
+        connectedBrowsers: sessions.filter((session) => session.connected).length,
+        pairedBrowsers: sessions.length,
+        pairingPending: codePending,
+        pairing: { mode, approver: 'app' },
+      },
     }),
-    sessions: () => ({ sessions: SESSIONS.map((session) => ({ ...session, pairedAt: ago(session.pairedAgo), lastSeenAt: ago(4) })) }),
+    sessions: () => {
+      if (scenario === 'arrives' && ++sessionReads === 3) arrive();
+      return { sessions: sessions.map((session) => ({ ...session, lastSeenAt: ago(4) })) };
+    },
     pair: () => ((codePending = true), { code: 'K7Q2M9', expiresAt: Date.now() + 10 * 60 * 1000 }),
-    revoke: () => ({ revoked: 1 }),
+    revoke: ({ session }) => {
+      const revoked = sessions.filter((held) => !session || held.id === session);
+      sessions = sessions.filter((held) => !revoked.includes(held));
+      blocked = [...blocked, ...revoked.map(({ id, browser, origin }) => ({ installId: id, browser, origin, at: new Date().toISOString(), reason: 'revoked' as const }))];
+      return { revoked: revoked.length };
+    },
+    pairRequests: () => ({ requests }),
+    decide: ({ request, allow, label }) => {
+      const asked = requests.find((held) => held.id === request || held.installId === request);
+      const installId = asked?.installId ?? blocked.find((held) => held.installId === request)?.installId;
+      if (!installId) return { ok: false, error: 'No request or blocked browser has that id.' };
+      requests = requests.filter((held) => held !== asked);
+      blocked = blocked.filter((held) => held.installId !== installId);
+      if (asked && !allow) blocked = [...blocked, { installId, browser: asked.browser, origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', at: new Date().toISOString(), reason: 'denied' }];
+      if (asked && allow) {
+        const named = typeof label === 'string' && label.trim() ? label.trim() : undefined;
+        sessions.push({ id: installId, browser: asked.browser, label: named, origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', source: asked.source as Source, extensionVersion: asked.extensionVersion, pairedAt: ago(0), connected: true, pairedBy: 'approved' });
+      }
+      announce('pair-requests-changed');
+      return { ok: true };
+    },
+    pairing: ({ set }) => {
+      if (typeof set === 'string') {
+        mode = set as PairingMode;
+        announce('settings-changed');
+      }
+      return { mode, approver: 'app' };
+    },
+    blocked: () => ({ blocked }),
+    label: ({ session, label }) => {
+      const named = sessions.find((held) => held.id === session);
+      if (named) named.label = String(label).trim() || undefined;
+      return { ok: !!named };
+    },
     preferences: () => ({ result: { ok: true, data: preferences } }),
     setPreference: ({ change }) => {
       const next = change as PreferenceChange;
@@ -81,12 +151,12 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
       const browser = args[args.indexOf('--browser') + 1];
       if (args.includes('--browser')) {
         codePending = true;
-        return ok(JSON.stringify({ version, extensionDir: null, daemon: { port: 8765, pid: 18115 }, alreadyPaired: true, chosen: { id: browser, unpacked: false, opened: true, connected: false }, pairingCode: 'R4TW7KXE', expiresAt: Date.now() + 10 * 60 * 1000, browsers: rows() }));
+        return ok(JSON.stringify({ version, extensionDir: null, daemon: { port: 8765, pid: 18115 }, alreadyPaired: true, chosen: { id: browser, unpacked: false, opened: true, connected: false }, pairingCode: 'R4TW7KXE', expiresAt: Date.now() + 10 * 60 * 1000, browsers: rows(sessions) }));
       }
       if (args.includes('--unpacked')) stamp = { version, installedAt: new Date().toISOString() };
-      return ok(JSON.stringify({ version, extensionDir: stamp && `${home}\\browsentic\\extension\\chrome-mv3`, daemon: { port: 8765, pid: 18115 }, alreadyPaired: true, chosen: null, browsers: rows() }));
+      return ok(JSON.stringify({ version, extensionDir: stamp && `${home}\\browsentic\\extension\\chrome-mv3`, daemon: { port: 8765, pid: 18115 }, alreadyPaired: true, chosen: null, browsers: rows(sessions) }));
     },
-    browsers: () => ok(JSON.stringify({ running, browsers: rows(), unpacked: { dir: `${home}\\browsentic\\extension\\chrome-mv3`, version: stamp?.version ?? null } })),
+    browsers: () => ok(JSON.stringify({ running, browsers: rows(sessions), unpacked: { dir: `${home}\\browsentic\\extension\\chrome-mv3`, version: stamp?.version ?? null } })),
     agent: (args) => {
       if (args[1] === 'model') models[args[2] as AgentKind] = args[3];
       return ok(JSON.stringify(agents()));
@@ -146,22 +216,68 @@ export function mockBackend({ instant = false, fresh = location.hash === '#fresh
     controlRequest: (frame) => later((replies[String(frame.op)] ?? (() => ({})))(frame), 60),
     controlClose: () => later(void (socket = false), 20),
     trayStatus: () => later(undefined, 0),
+    pairRequests: () => later(undefined, 0),
+    announcePaired: () => later(undefined, 0),
     checkUpdate: () => later(null),
     installUpdate: () => later(undefined),
     onControlEvent: (listener) => (listeners.add(listener), () => listeners.delete(listener)),
     onTray: () => () => undefined,
+    onPairLink: () => () => undefined,
+    onPairingLaunch: () => () => undefined,
     openUrl: async (url) => void window.open(url, '_blank'),
     reveal: async () => undefined,
     setWindowTheme: async () => undefined,
+    ask: (request) => {
+      requests = [...requests, request];
+      announce('pair-requests-changed');
+    },
+    arrive,
   };
 }
 
 const ago = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
 
-/** A store copy in Chrome, an unpacked one in Brave a build behind, and Edge and Firefox yet to get it. */
-const SESSIONS = [
-  { id: 's1', browser: 'Google Chrome', origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', source: 'chrome-web-store' as const, extensionVersion: '0.8.0', pairedAgo: 3 * 86400, connected: true },
-  { id: 's2', browser: 'Brave', origin: 'chrome-extension://pplbfkdfiimmogofmehpibbmldcefgpc/', source: 'unpacked' as const, extensionVersion: '0.7.15', pairedAgo: 9 * 86400, connected: true },
+interface MockSession {
+  id: string;
+  browser?: string;
+  label?: string;
+  origin: string;
+  source: Source;
+  extensionVersion: string;
+  pairedAgo: number;
+  connected: boolean;
+  pairedBy?: PairedBy;
+}
+
+type PairedSession = Omit<MockSession, 'pairedAgo'> & { pairedAt: string };
+
+/** A store copy in Chrome that paired by itself, an unpacked one in Brave a build behind and named for work, and Edge and Firefox yet to get it. */
+const SESSIONS: MockSession[] = [
+  { id: 's1', browser: 'Google Chrome', origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', source: 'chrome-web-store', extensionVersion: '0.8.0', pairedAgo: 3 * 86400, connected: true, pairedBy: 'auto' },
+  { id: 's2', browser: 'Brave', label: 'Brave (work)', origin: 'chrome-extension://pplbfkdfiimmogofmehpibbmldcefgpc/', source: 'unpacked', extensionVersion: '0.7.15', pairedAgo: 9 * 86400, connected: true, pairedBy: 'code' },
+];
+
+const ARRIVING: Omit<MockSession, 'pairedAgo'> = {
+  id: '6f1c2a90-3b7e-4d1a-9c55-0e8f5d2b7a41',
+  browser: 'Microsoft Edge',
+  origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/',
+  source: 'chrome-web-store',
+  extensionVersion: '0.8.0',
+  connected: true,
+  pairedBy: 'auto',
+};
+
+const asked = (seconds: number) => Date.now() - seconds * 1000;
+
+/** A second Brave profile with the store copy, then a Firefox that asked a little later. */
+const ASKING: PairRequestSummary[] = [
+  { id: 'Rq7bX2kp', installId: '3e9a51c0-77d2-4b8e-a1f4-6c0d2e9b5f13', browser: 'Brave', source: 'chrome-web-store', extensionVersion: '0.8.0', firstAt: asked(40), lastAskAt: asked(5), nonce: 'q0Zt8Hn3LwVb1yRk5sXe2A' },
+  { id: 'Fx4mN8cd', installId: 'a71f0b2e-5c94-4d3a-8e6b-29f1c7d04e88', browser: 'Firefox', source: 'firefox', extensionVersion: '0.8.0', firstAt: asked(12), lastAskAt: asked(2), nonce: 'Jm2Pw9Ux4Ec7Kb1Sd6Fh3Q' },
+];
+
+const KEPT_OUT: BlockedBrowser[] = [
+  { installId: 'c4d8e2f1-0a6b-4c3d-9e7f-1b2a3c4d5e6f', browser: 'Vivaldi', origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', at: new Date(Date.now() - 2 * 86400 * 1000).toISOString(), reason: 'revoked' },
+  { installId: '9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', browser: 'Opera', origin: 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/', at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(), reason: 'denied' },
 ];
 
 const STORES = {
@@ -169,9 +285,9 @@ const STORES = {
   firefox: { store: 'Firefox add-on', storeUrl: 'https://github.com/imshaikot/browsentic/releases/download/v0.8.0/browsentic-0.8.0-firefox.xpi' },
 };
 
-function rows(): BrowserRow[] {
+function rows(paired: Pick<MockSession, 'id' | 'browser' | 'source' | 'extensionVersion' | 'connected'>[]): BrowserRow[] {
   const row = (id: BrowserRow['id'], label: string, brand: string, installed: boolean): BrowserRow => {
-    const sessions = SESSIONS.filter((session) => session.browser === brand).map(({ id, source, extensionVersion, connected }) => ({ id, source, extensionVersion, connected }));
+    const sessions = paired.filter((session) => session.browser === brand).map(({ id, source, extensionVersion, connected }) => ({ id, source, extensionVersion, connected }));
     const firefox = id === 'firefox';
     const source = firefox ? 'firefox' : 'chrome-web-store';
     return {

@@ -100,7 +100,7 @@ export class FakeBrowser {
     send(socket, { t: 'prove', proof: await clientProof(secret, transcript) });
 
     const verdict = await inbox.next();
-    if (verdict?.t === 'unauthorized') throw new Error(verdict.reason);
+    if (verdict?.t === 'unauthorized') throw Object.assign(new Error(verdict.reason), { refusal: verdict.code });
     if (verdict?.t !== 'welcome') throw new Error(`expected a welcome, got ${verdict?.t}`);
     const minted = verdict.sealedSessionKey ? await openSessionKey(secret, transcript, verdict.sealedSessionKey) : null;
     // The daemon asks a drifted build for its manifest right behind the welcome, so whatever

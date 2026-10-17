@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { AGENT_LIST, type AgentDescriptor, type AgentKind } from '@/lib/agents/catalog';
+import { isPairingMode } from '@/lib/pairing';
 import type { GuardrailValue } from '@/lib/settings/guardrails';
 import type { PreferenceChange } from '@/lib/settings/preferences';
 import type { ThemeId } from '@/lib/settings/theme';
@@ -10,6 +11,7 @@ import type {
   AgentListing,
   AppInfo,
   Backend,
+  BlockedBrowser,
   Browser,
   BridgeStatus,
   CliOutput,
@@ -19,7 +21,10 @@ import type {
   InstallStamp,
   Lockfile,
   NodeInstall,
+  PairLinkAct,
+  PairRequestSummary,
   PairingCode,
+  PairingMode,
   Preferences,
   Release,
   SessionSummary,
@@ -77,6 +82,12 @@ export interface State {
   status?: BridgeStatus;
   sessions: SessionSummary[];
   pairing?: PairingCode;
+  /** Absent while the Bridge is off, and from a Bridge before browsers could pair by themselves. */
+  pairingMode?: PairingMode;
+  /** Browsers waiting for someone to let them in, oldest first: the dialog shows the first. */
+  pairRequests: PairRequestSummary[];
+  /** Browsers unpaired or denied here, kept out until someone reconnects them. */
+  blocked: BlockedBrowser[];
   agents?: AgentListing;
   /** `browsentic android --json` while the Android tab is open; the Bridge looks for phones only then. */
   android?: AndroidJson;
@@ -104,6 +115,13 @@ export interface State {
 }
 
 const MINIMUM_NODE = 20;
+
+/** What to do once the store has added the extension; the code is there for a copy that asks for one. */
+const AFTER_ADDING: Record<PairingMode, (browser: string) => string> = {
+  auto: () => 'It connects by itself. If it asks for a code, use the one below.',
+  ask: () => 'Allow it here when it asks to connect. If it asks for a code instead, use the one below.',
+  code: (browser) => `Then click Browsentic in ${browser}’s toolbar and enter the code below.`,
+};
 const FINISH_UPDATE = 'browsentic/finishUpdateOnLaunch';
 const APPEARANCE = 'browsentic/appearance';
 const START_ON_LAUNCH = 'browsentic/startDaemonOnLaunch';
@@ -165,6 +183,8 @@ export const initialState = (): State => ({
   fixing: false,
   daemon: 'off',
   sessions: [],
+  pairRequests: [],
+  blocked: [],
   preferencesUnsupported: false,
   grants: [],
   browsers: [],
@@ -187,6 +207,8 @@ export class Model {
   private noticeTimer?: ReturnType<typeof setTimeout>;
   private noticeCount = 0;
   private started = false;
+  /** Every session seen since the app opened, so one that is new can be told apart from the ones it found. */
+  private seenSessions?: Set<string>;
 
   constructor(
     private readonly backend: Backend,
@@ -195,6 +217,10 @@ export class Model {
     backend.onTray((action) => {
       if (action === 'toggle') void this.setDaemon(this.state.daemon === 'off');
       if (action === 'restart') void this.restartDaemon();
+    });
+    backend.onPairLink((act) => this.follow(act));
+    backend.onPairingLaunch(() => {
+      if (this.state.phase === 'main') void this.refresh().then(() => this.watchPairRequests());
     });
   }
 
@@ -210,7 +236,7 @@ export class Model {
     const before = this.state;
     this.state = { ...this.state, ...next };
     this.listeners.forEach((listener) => listener());
-    if (before.daemon !== this.state.daemon || before.status !== this.state.status || before.phase !== this.state.phase) {
+    if (before.daemon !== this.state.daemon || before.status !== this.state.status || before.phase !== this.state.phase || before.pairRequests !== this.state.pairRequests) {
       void this.syncTray();
     }
   }
@@ -231,6 +257,11 @@ export class Model {
   get extensionNeedsReload() {
     const { stamp, sessions } = this.state;
     return !!stamp && sessions.some((session) => session.connected && session.source === 'unpacked' && session.extensionVersion !== stamp.version);
+  }
+
+  /** Browsers connect through the native host by themselves, with or without someone allowing each first. */
+  get pairsByItself() {
+    return this.state.pairingMode === 'auto' || this.state.pairingMode === 'ask';
   }
 
   /** The browsers worth a row: found on this computer or already paired, else the usual few to try. */
@@ -409,9 +440,15 @@ export class Model {
     this.stopEvents?.();
     this.stopEvents = this.backend.onControlEvent((event) => {
       if (event === 'android-changed') return void this.loadAndroid();
+      if (event === 'pair-requests-changed') {
+        void this.loadPairRequests();
+        void this.loadBlocked();
+        return;
+      }
       if (event !== 'settings-changed') return;
       void this.loadPreferences();
       void this.loadAgents();
+      void this.loadPairingMode();
     });
     clearInterval(this.poller);
     void this.refresh();
@@ -435,6 +472,7 @@ export class Model {
     try {
       if (await this.backend.controlConnect()) {
         void this.loadPreferences(true);
+        void this.watchPairRequests();
         if (this.watchingAndroid) void this.watchAndroid(true);
       }
       const status = (await this.control({ op: 'status' })).status as BridgeStatus;
@@ -446,9 +484,12 @@ export class Model {
         status,
         sessions,
         stamp,
+        pairingMode: isPairingMode(status.pairing?.mode) ? status.pairing.mode : undefined,
         daemon: state.daemon === 'stopping' ? 'stopping' : 'on',
         pairing: state.pairing && status.pairingPending && state.pairing.expiresAt > Date.now() ? state.pairing : undefined,
       }));
+      this.announceArrivals(sessions);
+      if (status.pairing) void this.loadPairRequests();
       if (!this.state.agents) await this.loadAgents();
       if (changed) void this.loadBrowsers();
     } catch {
@@ -459,7 +500,8 @@ export class Model {
 
   private markOff() {
     if (this.state.daemon === 'starting') return;
-    this.set({ daemon: 'off', lock: undefined, status: undefined, sessions: [], pairing: undefined, preferences: undefined });
+    this.set({ daemon: 'off', lock: undefined, status: undefined, sessions: [], pairing: undefined, preferences: undefined, pairingMode: undefined, blocked: [] });
+    if (this.state.pairRequests.length) this.showPairRequests([]);
   }
 
   async setDaemon(on: boolean) {
@@ -507,6 +549,112 @@ export class Model {
       this.say(count === 0 ? 'Nothing to unpair.' : `Unpaired ${count} browser${count === 1 ? '' : 's'}.`);
     });
     await this.refresh();
+    await this.loadBlocked();
+  }
+
+  // Pairing
+
+  /** Every new socket asks as the app, so the Bridge tells this window, not a terminal, when a browser asks. */
+  private async watchPairRequests() {
+    await this.readPairRequests({ op: 'pairRequests', watch: true, as: 'app' });
+    await this.loadBlocked();
+  }
+
+  loadPairRequests() {
+    return this.readPairRequests({ op: 'pairRequests' });
+  }
+
+  private async readPairRequests(frame: Record<string, unknown>) {
+    try {
+      const reply = await this.control(frame);
+      this.showPairRequests(Array.isArray(reply.requests) ? (reply.requests as PairRequestSummary[]) : []);
+    } catch {
+      /* A Bridge from before browsers could pair by themselves never answers, and nobody is waiting on it. */
+    }
+  }
+
+  private showPairRequests(requests: PairRequestSummary[]) {
+    const pairRequests = [...requests].sort((a, b) => a.firstAt - b.firstAt);
+    this.set({ pairRequests });
+    void this.backend.pairRequests(pairRequests).catch(() => undefined);
+  }
+
+  async loadBlocked() {
+    try {
+      const reply = await this.control({ op: 'blocked' });
+      this.set({ blocked: Array.isArray(reply.blocked) ? (reply.blocked as BlockedBrowser[]) : [] });
+    } catch {
+      /* The Kept out list stays as it was until the Bridge answers. */
+    }
+  }
+
+  async loadPairingMode() {
+    try {
+      const reply = await this.control({ op: 'pairing' });
+      if (isPairingMode(reply.mode)) this.set({ pairingMode: reply.mode });
+    } catch {
+      /* The next status read carries the mode too. */
+    }
+  }
+
+  setPairingMode(mode: PairingMode) {
+    return this.perform('pairing', async () => {
+      const reply = accepted(await this.control({ op: 'pairing', set: mode }), 'Browsentic Bridge kept the pairing setting as it was.');
+      if (isPairingMode(reply.mode)) this.set({ pairingMode: reply.mode });
+    });
+  }
+
+  /** Allow sends the name typed in the dialog; Deny keeps the browser out until someone reconnects it. */
+  decide(request: PairRequestSummary, allow: boolean, label?: string) {
+    const named = label?.trim() || undefined;
+    return this.perform(`decide:${request.id}`, async () => {
+      accepted(await this.control({ op: 'decide', request: request.id, allow, ...(allow && named ? { label: named } : {}) }), 'Browsentic Bridge could not settle that request.');
+      const name = (allow && named) || browserName(request);
+      this.say(allow ? `${name} can connect to Browsentic Bridge now.` : `${name} is kept out. Reconnect it from Browsers if you change your mind.`);
+      this.showPairRequests(this.state.pairRequests.filter((held) => held.id !== request.id));
+      await Promise.all([this.loadPairRequests(), this.loadBlocked()]);
+    });
+  }
+
+  reconnect(browser: BlockedBrowser) {
+    return this.perform(`reconnect:${browser.installId}`, async () => {
+      accepted(await this.control({ op: 'decide', request: browser.installId, allow: true }), 'Browsentic Bridge could not let that browser back in.');
+      this.say(`${browser.browser ?? 'That browser'} can connect again.`);
+      await this.loadBlocked();
+    });
+  }
+
+  rename(session: SessionSummary, label: string) {
+    return this.perform(`label:${session.id}`, async () => {
+      accepted(await this.control({ op: 'label', session: session.id, label: label.trim() }), 'Browsentic Bridge could not rename that browser.');
+      await this.refresh();
+    });
+  }
+
+  /** The sessions read first are the ones the app found; any after that are new, and one that paired by itself is announced once. */
+  private announceArrivals(sessions: SessionSummary[]) {
+    const keyOf = (session: SessionSummary) => `${session.id}@${session.pairedAt}`;
+    const seen = this.seenSessions;
+    this.seenSessions = new Set([...(seen ?? []), ...sessions.map(keyOf)]);
+    if (!seen) return;
+    for (const session of sessions.filter((candidate) => candidate.pairedBy === 'auto' && !seen.has(keyOf(candidate)))) {
+      const name = sessionName(session);
+      this.say(`${name} connected to Browsentic Bridge by itself.`);
+      void this.backend.announcePaired(session.id, name).catch(() => undefined);
+    }
+  }
+
+  /** A notification's button, once the Rust side has matched its nonce; anything else only opens the window. */
+  private follow(act: PairLinkAct) {
+    if (act.kind === 'browsers') return this.setTab('browsers');
+    if (act.kind === 'decide') {
+      const request = this.state.pairRequests.find((held) => held.id === act.request);
+      if (request) void this.decide(request, act.allow);
+    }
+    if (act.kind === 'unpair') {
+      const session = this.state.sessions.find((held) => held.id === act.session);
+      if (session) void this.revoke(session);
+    }
   }
 
   async loadAgents() {
@@ -654,7 +802,7 @@ export class Model {
       const result = parseJson<SetupResult>(await this.backend.cli(['setup', '--browser', row.id, '--no-wait', '--no-self-update', '--json'], 120), 'setup');
       if (!result.chosen?.opened) await this.backend.openUrl(row.storeUrl);
       if (result.pairingCode && result.expiresAt) this.set({ pairing: { code: result.pairingCode, expiresAt: result.expiresAt } });
-      this.say(`${row.steps[0]} Then click Browsentic in ${row.label}’s toolbar and enter the code below.`);
+      this.say(`${row.steps[0]} ${AFTER_ADDING[this.state.pairingMode ?? 'code'](row.label)}`);
     });
   }
 
@@ -828,7 +976,7 @@ export class Model {
   }
 
   private async syncTray() {
-    const { daemon, status, phase } = this.state;
+    const { daemon, status, phase, pairRequests } = this.state;
     const label = { off: 'Off', starting: 'Starting', on: 'Running', stopping: 'Stopping' }[daemon];
     const link = status ? ` · extension ${status.connected ? 'connected' : 'not connected'}` : '';
     await this.backend
@@ -837,6 +985,7 @@ export class Model {
         toggle: daemon === 'on' ? 'Turn Off' : 'Turn On',
         canToggle: phase === 'main' && (daemon === 'on' || daemon === 'off'),
         canRestart: daemon === 'on',
+        waiting: pairRequests[0] ? `${browserName(pairRequests[0])} wants to connect…` : null,
       })
       .catch(() => undefined);
   }
@@ -848,6 +997,17 @@ interface SetupResult {
   chosen: { id: string; opened: boolean; connected: boolean } | null;
   pairingCode?: string;
   expiresAt?: number;
+}
+
+export const browserName = (request: Pick<PairRequestSummary, 'browser'>) => request.browser ?? 'A browser';
+
+export const sessionName = (session: Pick<SessionSummary, 'label' | 'browser'>) => session.label ?? session.browser ?? 'A browser';
+
+/** The pairing ops answer `{ok, error}` or `{mode, error}`, a refusal in words rather than an ActionResult. */
+function accepted(reply: Record<string, unknown>, fallback: string) {
+  if (typeof reply.error === 'string' && reply.error) throw new Error(reply.error);
+  if (reply.ok === false) throw new Error(fallback);
+  return reply;
 }
 
 /** Which copies are connected, as one string: a change is what makes the browser rows worth reading again. */

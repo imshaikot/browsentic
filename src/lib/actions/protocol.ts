@@ -9,6 +9,7 @@ import type { PreferenceChange, Preferences } from '@/lib/settings/preferences';
 import type { SkillCategory, SkillDraft } from '@/lib/skills/format';
 import type { SiteMapDraft } from '@/lib/skills/site-map';
 import type { TaskContext, TaskList, TaskOrder, TaskResult } from '@/lib/schedules/task';
+import type { RefusalCode } from '@/lib/pairing';
 
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
@@ -44,6 +45,8 @@ export type BridgeRequest =
   | { channel: typeof BRIDGE_CHANNEL; op: 'invoke'; action: string; input?: unknown }
   | { channel: typeof BRIDGE_CHANNEL; op: 'pair'; token: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'disconnect' }
+  /** A page opened, or someone pressed Connect: pair through the native host. `wait` holds the ask open while a person decides. */
+  | { channel: typeof BRIDGE_CHANNEL; op: 'autoPair'; gesture?: boolean; wait?: boolean }
   | { channel: typeof BRIDGE_CHANNEL; op: 'panelOpened' }
   | { channel: typeof BRIDGE_CHANNEL; op: 'saveSkill'; skillId: string }
   | { channel: typeof BRIDGE_CHANNEL; op: 'removeSkill'; skillId: string }
@@ -231,7 +234,8 @@ export type SocketFrame =
       proof: string;
       sealedSessionKey?: string;
     }
-  | { t: 'unauthorized'; reason: string; retryable: boolean }
+  /** `code` says what an extension that pairs by itself may do about it; `reason` keeps the words shipped extensions read. */
+  | { t: 'unauthorized'; reason: string; retryable: boolean; code?: RefusalCode }
   | { t: 'describe'; id: string }
   | { t: 'manifest'; id: string; tools: ToolDescriptor[] }
   | { t: 'invoke'; id: string; action: string; input?: unknown; tabId?: number; runId?: string }

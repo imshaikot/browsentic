@@ -8,6 +8,7 @@ import { ANDROID_PROTOCOL, failure, type ActionResult } from '@/lib/actions/prot
 import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { AndroidState } from '@/lib/phone/types';
 import { AWAIT_DEFAULT_TIMEOUT_MS } from '@/lib/monitor/events';
+import type { Approver, BlockedBrowser, GrantOutcome, PairRequestSummary, PairingMode } from '@/lib/pairing';
 import type { Bridge, BridgeStatus, ControlMessage, ControlRequest, Described, SessionSummary } from './control';
 
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -16,6 +17,7 @@ export class RemoteBridge implements Bridge {
   private readonly pending = new Map<string, (message: ControlMessage) => void>();
   private readonly manifestListeners = new Set<() => void>();
   private readonly androidListeners = new Set<(state: AndroidState) => void>();
+  private readonly pairRequestListeners = new Set<() => void>();
 
   private constructor(
     private readonly socket: WebSocket,
@@ -50,10 +52,46 @@ export class RemoteBridge implements Bridge {
     return failure('DAEMON_UNREACHABLE', 'The Browsentic daemon did not respond');
   }
 
-  async status(): Promise<BridgeStatus> {
-    const reply = await this.request({ id: randomUUID(), op: 'status' });
+  async status(timeoutMs = REQUEST_TIMEOUT_MS): Promise<BridgeStatus> {
+    const reply = await this.request({ id: randomUUID(), op: 'status' }, timeoutMs);
     if (reply && 'status' in reply) return reply.status;
     throw new Error('The Browsentic daemon did not respond to a status request');
+  }
+
+  /** Null when nothing answered in time: a Bridge older than grants never answers the op at all. */
+  async grant(request: Omit<Extract<ControlRequest, { op: 'grant' }>, 'id' | 'op'>, timeoutMs: number): Promise<GrantOutcome | null> {
+    const reply = await this.request({ id: randomUUID(), op: 'grant', ...request }, timeoutMs);
+    return reply && 'outcome' in reply ? reply.outcome : null;
+  }
+
+  /** `watch` makes this caller an approver, told whenever the list changes. */
+  async pairRequests(watch?: Approver): Promise<PairRequestSummary[]> {
+    const reply = await this.request({ id: randomUUID(), op: 'pairRequests', ...(watch ? { watch: true, as: watch } : {}) });
+    return reply && 'requests' in reply ? reply.requests : [];
+  }
+
+  async decide(request: string, allow: boolean, label?: string): Promise<{ ok: boolean; error?: string }> {
+    const reply = await this.request({ id: randomUUID(), op: 'decide', request, allow, ...(label ? { label } : {}) });
+    return reply && 'op' in reply && reply.op === 'decide' ? { ok: reply.ok, error: reply.error } : { ok: false, error: 'The Bridge did not answer.' };
+  }
+
+  async pairing(set?: PairingMode): Promise<{ mode: PairingMode; approver: Approver; error?: string } | null> {
+    const reply = await this.request({ id: randomUUID(), op: 'pairing', ...(set ? { set } : {}) }, 5_000);
+    return reply && 'op' in reply && reply.op === 'pairing' ? { mode: reply.mode, approver: reply.approver, error: reply.error } : null;
+  }
+
+  async blocked(): Promise<BlockedBrowser[]> {
+    const reply = await this.request({ id: randomUUID(), op: 'blocked' }, 5_000);
+    return reply && 'blocked' in reply ? reply.blocked : [];
+  }
+
+  async label(session: string, label: string): Promise<boolean> {
+    const reply = await this.request({ id: randomUUID(), op: 'label', session, label }, 5_000);
+    return !!reply && 'op' in reply && reply.op === 'label' && reply.ok;
+  }
+
+  onPairRequestsChanged(listener: () => void): void {
+    this.pairRequestListeners.add(listener);
   }
 
   async pair(): Promise<{ code: string; expiresAt: number }> {
@@ -141,6 +179,7 @@ export class RemoteBridge implements Bridge {
     if ('event' in message) {
       if (message.event === 'manifest-changed') for (const listener of this.manifestListeners) listener();
       if (message.event === 'android-changed') for (const listener of this.androidListeners) listener(message.state);
+      if (message.event === 'pair-requests-changed') for (const listener of this.pairRequestListeners) listener();
       return;
     }
     this.pending.get(message.id)?.(message);

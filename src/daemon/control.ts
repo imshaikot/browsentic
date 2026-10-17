@@ -4,6 +4,7 @@ import type { AgentKind, AgentState } from '@/lib/agents/catalog';
 import type { AndroidState } from '@/lib/phone/types';
 import type { Preferences } from '@/lib/settings/preferences';
 import type { Source } from '@/lib/stores';
+import type { Approver, BlockedBrowser, GrantOutcome, PairRequestSummary, PairedBy, PairingMode } from '@/lib/pairing';
 
 export interface BridgeStatus {
   connected: boolean;
@@ -17,6 +18,8 @@ export interface BridgeStatus {
   connectedBrowsers: number;
   pairedBrowsers: number;
   pairingPending: boolean;
+  /** How browsers pair through the native host. Absent from a Bridge that cannot grant, which a newer host reads as "too old". */
+  pairing?: { mode: PairingMode; approver: Approver };
 }
 
 export interface SessionSummary {
@@ -29,6 +32,10 @@ export interface SessionSummary {
   pairedAt: string;
   lastSeenAt: string;
   connected: boolean;
+  /** What someone named it. */
+  label?: string;
+  /** Absent from a Bridge before automatic pairing, when every browser paired by code. */
+  pairedBy?: PairedBy;
 }
 
 /**
@@ -56,7 +63,16 @@ export type ControlRequest =
    * `android-changed` and `watch: false` lets go, so the Bridge stops looking once nobody shows phones.
    * `peek` answers only what is already known, NOT_CHECKED while nobody watches.
    */
-  | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
+  | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean }
+  /** Only the native host asks: `caller` is what the browser vouched for. `waitMs` holds the answer while ask mode waits on a person. */
+  | { id: string; op: 'grant'; installId: string; caller: string; browser?: string; extensionVersion: string; gesture?: boolean; waitMs?: number }
+  /** `watch` makes this caller an approver, sent `pair-requests-changed` whenever the list does. */
+  | { id: string; op: 'pairRequests'; watch?: boolean; as?: Approver }
+  /** `request` is a request id or an install id; an install id also lifts a block when allowed. */
+  | { id: string; op: 'decide'; request: string; allow: boolean; label?: string }
+  | { id: string; op: 'pairing'; set?: PairingMode }
+  | { id: string; op: 'blocked' }
+  | { id: string; op: 'label'; session: string; label: string };
 
 export type ControlMessage =
   | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
@@ -69,7 +85,15 @@ export type ControlMessage =
   | { id: string; op: 'agent'; state: AgentState }
   | { id: string; op: 'preferences'; result: ActionResult<Preferences> }
   | { id: string; op: 'android'; result: ActionResult<AndroidState> }
+  | { id: string; op: 'grant'; outcome: GrantOutcome }
+  | { id: string; op: 'pairRequests'; requests: PairRequestSummary[] }
+  | { id: string; op: 'decide'; ok: boolean; error?: string }
+  | { id: string; op: 'pairing'; mode: PairingMode; approver: Approver; error?: string }
+  | { id: string; op: 'blocked'; blocked: BlockedBrowser[] }
+  | { id: string; op: 'label'; ok: boolean; error?: string }
   | { event: 'manifest-changed' }
+  /** A browser asked to pair, or a request was decided or expired: read `pairRequests` again. */
+  | { event: 'pair-requests-changed' }
   /** config.json changed, from any side: read the preferences and the agent state again. */
   | { event: 'settings-changed' }
   | { event: 'android-changed'; state: AndroidState };

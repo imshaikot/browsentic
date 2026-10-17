@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
@@ -39,11 +40,15 @@ import {
   type Transcript,
 } from '@/lib/actions/handshake';
 import {
+  approveInstall,
+  blockOf,
   claimSession,
   consumePairing,
   createPairing,
   createSession,
   hasPendingPairing,
+  labelSession,
+  listBlocked,
   listSessions,
   pendingPairings,
   revokeSessions,
@@ -52,13 +57,16 @@ import {
   type Install,
   type Session,
 } from './auth-store';
+import { MAX_PAIR_WAIT_MS, isPairingMode, type Approver, type GrantOutcome, type PairedBy, type RefusalCode } from '@/lib/pairing';
+import { pairingDesk } from './pairing-desk';
+import { desktopApp, launchDesktopApp } from './desktop-app';
 import { AgentSession } from './agent/service';
 import { androidOff, type Android } from './android/service';
 import { solveCaptchaWithAnalyst } from './agent/captcha-solver';
 import { FileAnalyses } from './agent/file-analyst';
 import { analyzeRecording } from './agent/recording';
 import { nameSession } from './agent/title';
-import { readAgentConfig, writeActiveAgent, writeAgentModel } from './agent/config';
+import { pairingMode, readAgentConfig, writeActiveAgent, writeAgentModel, writePairingMode } from './agent/config';
 import { agentSkills } from './agent/agent-skills';
 import { agentState, grantRunner, refreshModelLists } from './agent/runners';
 import { deleteSiteMap, deleteSkill, saveSkill } from './agent/skill-store';
@@ -76,6 +84,7 @@ import {
 import { ExtensionLink } from './extension-link';
 import { startScheduler } from './schedules/scheduler';
 import { refreshNativeHost } from './native-host';
+import { daemonMainPath } from './ensure-daemon';
 import {
   ANYWHERE,
   INJECT_ACTION,
@@ -108,6 +117,7 @@ function phoneReply(request: PhoneRequest, result: ActionResult<never>): SocketF
 }
 
 const IDLE_EXIT_MS = 30 * 60 * 1000;
+const REREGISTER_MS = 60 * 60 * 1000;
 const BINDING_IDLE_MS = 2 * 60 * 1000;
 const BROWSER_LABEL_MAX = 40;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
@@ -239,6 +249,20 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     daemonVersion: version,
   };
 
+  const approvers = new Map<WebSocket, Approver>();
+  const approverNow = (): Approver =>
+    [...approvers.values()].includes('app') || desktopApp()?.present ? 'app' : 'terminal';
+  const desk = pairingDesk({
+    port: () => lock.port,
+    mode: () => pairingMode(),
+    approver: approverNow,
+    appWatching: () => [...approvers.values()].includes('app'),
+    launchApp: () => launchDesktopApp(),
+    changed: () => {
+      for (const ws of approvers.keys()) send(ws, { event: 'pair-requests-changed' });
+    },
+  });
+
   const http = createServer((req, res) => {
     if (!fromLoopback(req)) {
       res.writeHead(403).end();
@@ -266,8 +290,12 @@ export async function startDaemon({ version, idleExit = true, android = androidO
   lock.port = port;
   writeLockfile(lock);
   releaseWake();
-  // A registration an older daemon wrote lets in only what it knew, which leaves the store copies out.
-  refreshNativeHost();
+  // A registration an older daemon wrote lets in only what it knew, which leaves the store copies out,
+  // and a browser installed since needs its own; both are put right now and every hour.
+  const reregister = () => refreshNativeHost({ cliPath: join(dirname(daemonMainPath()), 'cli.js') });
+  reregister();
+  const reregistering = setInterval(reregister, REREGISTER_MS);
+  reregistering.unref();
   log(`daemon ${version} listening on 127.0.0.1:${port} (pid ${process.pid})`);
   scheduleIdleExit();
 
@@ -304,10 +332,10 @@ export async function startDaemon({ version, idleExit = true, android = androidO
   }
 
   async function greet(ws: WebSocket, req: IncomingMessage): Promise<void> {
-    const reject = (reason: string, retryable: boolean) => {
-      log(`rejected extension: ${reason}`);
+    const reject = (reason: string, retryable: boolean, code: RefusalCode) => {
+      log(`rejected extension: ${reason} [${code}]`);
       try {
-        ws.send(JSON.stringify({ t: 'unauthorized', reason, retryable }));
+        ws.send(JSON.stringify({ t: 'unauthorized', reason, retryable, code }));
       } catch {
       }
       ws.close(4401, 'unauthorized');
@@ -362,25 +390,31 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     let secret: string;
     let sealedSessionKey: string | undefined;
     if (hello.auth?.kind === 'pair') {
-      const matched = await matchPairing(proven.proof, transcript);
+      const matched = await matchPairing(proven.proof, transcript, install);
       if (!matched) {
-        return reject('That pairing code is wrong or expired. Run "browsentic pair" for a new one.', true);
+        return reject('That pairing code is wrong or expired. Run "browsentic pair" for a new one.', true, 'bad-code');
       }
-      consumePairing(matched.code);
+      if (matched.pairedBy === 'code') {
+        consumePairing(matched.code);
+        // Typing a code is consent enough, so ask mode lets this browser back in by itself from now on.
+        approveInstall({ installId: install.installId, origin: install.origin, browser: install.browser });
+      }
+      desk.consume(install.installId);
       secret = matched.secret;
-      const session = createSession(install);
+      const session = createSession(install, matched.pairedBy);
       sealedSessionKey = await sealSessionKey(secret, transcript, session.key);
-      log(`paired ${install.browser ?? install.origin} (extension ${hello.extensionVersion})`);
+      log(`paired ${install.browser ?? install.origin} (extension ${hello.extensionVersion}) [${matched.pairedBy}]`);
       refreshNativeHost();
     } else if (hello.auth?.kind === 'session') {
       const session = await matchSession(proven.proof, transcript, install);
       if (!session) {
-        return reject('This browser is no longer paired. Run "browsentic pair" to pair again.', false);
+        const code = blockOf(install.installId) ? 'revoked' : 'unknown';
+        return reject('This browser is no longer paired. Run "browsentic pair" to pair again.', false, code);
       }
       claimSession(session.key, install);
       secret = session.key;
     } else {
-      return reject('That hello named no credential to prove.', false);
+      return reject('That hello named no credential to prove.', false, 'bad-code');
     }
 
     await settle(ws, hello, install, transcript, secret, sealedSessionKey);
@@ -393,13 +427,20 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     return null;
   }
 
+  /** The grant held for this very browser first, so a typed code costs at most one more PBKDF2 than before. */
   async function matchPairing(
     proof: unknown,
     transcript: Transcript,
-  ): Promise<{ code: string; secret: string } | null> {
-    for (const code of pendingPairings()) {
-      const secret = await pairingSecret(code, transcript);
-      if (sameProof(proof, await clientProof(secret, transcript))) return { code, secret };
+    install: Install,
+  ): Promise<{ code: string; secret: string; pairedBy: PairedBy } | null> {
+    const granted = desk.grantFor(install.installId, install.origin);
+    const candidates = [
+      ...(granted ? [{ code: granted.code, pairedBy: granted.pairedBy }] : []),
+      ...pendingPairings().map((code) => ({ code, pairedBy: 'code' as const })),
+    ];
+    for (const candidate of candidates) {
+      const secret = await pairingSecret(candidate.code, transcript);
+      if (sameProof(proof, await clientProof(secret, transcript))) return { ...candidate, secret };
     }
     return null;
   }
@@ -416,6 +457,14 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     links.get(install.installId)?.close('superseded by a newer connection');
     const known = bundledByHash.get(hello.manifestHash);
     const manifestInSync = known !== undefined;
+    const welcome = {
+      daemonVersion: version,
+      manifestHash: known ? hello.manifestHash : bundledHash,
+      manifestInSync,
+      sealedSessionKey,
+    };
+    // Proven before the link is listed, so no broadcast can reach this browser ahead of its welcome.
+    const proof = await serverProof(secret, transcript, welcome);
     const accepted = new ExtensionLink(
       ws,
       { ...hello, ...install },
@@ -529,18 +578,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     accepted.tools = known ?? bundled;
     settleOffer();
     log(`extension ${hello.extensionVersion} connected from ${accepted.label} (manifest ${manifestInSync ? 'in sync' : 'DRIFTED'})`);
-    const welcome = {
-      daemonVersion: version,
-      manifestHash: known ? hello.manifestHash : bundledHash,
-      manifestInSync,
-      sealedSessionKey,
-    };
-    accepted.send({
-      t: 'welcome',
-      ...welcome,
-      protocolVersion: SOCKET_PROTOCOL_VERSION,
-      proof: await serverProof(secret, transcript, welcome),
-    });
+    accepted.send({ t: 'welcome', ...welcome, protocolVersion: SOCKET_PROTOCOL_VERSION, proof });
     scheduleIdleExit();
     void pushAgentState(accepted);
     watchModels();
@@ -916,6 +954,48 @@ export async function startDaemon({ version, idleExit = true, android = androidO
         send(ws, { id: request.id, op: 'preferences', result: applyPreference(request.change) });
         return configChanged();
       }
+      if (request.op === 'grant') {
+        if (speaksForRun) {
+          log(`control ${client} asked for a pairing grant from inside an agent run; refused`);
+          return send(ws, { id: request.id, op: 'grant', outcome: { refused: 'off', error: 'An agent run cannot pair a browser.' } });
+        }
+        return send(ws, { id: request.id, op: 'grant', outcome: await settleGrant(request) });
+      }
+      if (request.op === 'pairRequests') {
+        if (request.watch) approvers.set(ws, request.as === 'terminal' ? 'terminal' : 'app');
+        return send(ws, { id: request.id, op: 'pairRequests', requests: desk.pending() });
+      }
+      if (request.op === 'decide') {
+        if (speaksForRun) {
+          log(`control ${client} tried to decide a pairing request from inside an agent run; refused`);
+          return send(ws, { id: request.id, op: 'decide', ok: false, error: 'An agent run cannot let a browser in.' });
+        }
+        const ok = typeof request.request === 'string' && desk.decide(request.request, request.allow === true, request.label);
+        return send(ws, { id: request.id, op: 'decide', ok, ...(ok ? {} : { error: 'No request or blocked browser has that id.' }) });
+      }
+      if (request.op === 'pairing') {
+        if (request.set !== undefined) {
+          if (speaksForRun) {
+            log(`control ${client} tried to change how browsers pair from inside an agent run; refused`);
+            return send(ws, { id: request.id, op: 'pairing', mode: pairingMode(), approver: approverNow(), error: 'An agent run cannot change how browsers pair.' });
+          }
+          if (!isPairingMode(request.set)) {
+            return send(ws, { id: request.id, op: 'pairing', mode: pairingMode(), approver: approverNow(), error: 'Pairing is auto, ask or code.' });
+          }
+          writePairingMode(request.set);
+          log(`control ${client} set pairing to ${request.set}`);
+          configChanged();
+        }
+        return send(ws, { id: request.id, op: 'pairing', mode: pairingMode(), approver: approverNow() });
+      }
+      if (request.op === 'blocked') {
+        return send(ws, { id: request.id, op: 'blocked', blocked: listBlocked() });
+      }
+      if (request.op === 'label') {
+        if (speaksForRun) return send(ws, { id: request.id, op: 'label', ok: false, error: 'An agent run cannot rename a browser.' });
+        const ok = typeof request.session === 'string' && typeof request.label === 'string' && labelSession(request.session, request.label);
+        return send(ws, { id: request.id, op: 'label', ok });
+      }
       if (request.op === 'revoke') {
         const { session: id, origin } = request;
         const revoked = revokeSessions((session) => (id ? sessionId(session) === id : !origin || session.origin === origin));
@@ -931,6 +1011,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
       for (const call of inflight.values()) call.abort();
       controls.delete(ws);
       settingsWatchers.delete(ws);
+      approvers.delete(ws);
       unwatchAndroid(ws);
       scheduleIdleExit();
     };
@@ -944,6 +1025,25 @@ export async function startDaemon({ version, idleExit = true, android = androidO
 
   function broadcast(message: ControlMessage): void {
     for (const ws of controls) send(ws, message);
+  }
+
+  /** A host in ask mode may hold its request open, so an open page hears the decision at once. */
+  async function settleGrant(request: Extract<ControlRequest, { op: 'grant' }>): Promise<GrantOutcome> {
+    if (!isInstallId(request.installId) || typeof request.caller !== 'string') {
+      return { refused: 'off', error: 'That grant request names no browser.' };
+    }
+    const asker = {
+      installId: request.installId,
+      caller: request.caller,
+      browser: browserLabel(request.browser),
+      extensionVersion: typeof request.extensionVersion === 'string' ? request.extensionVersion.slice(0, 32) : 'unknown',
+      gesture: request.gesture === true,
+    };
+    const first = desk.ask(asker);
+    const waitMs = Math.min(MAX_PAIR_WAIT_MS, Math.max(0, Number(request.waitMs) || 0));
+    if (!('wait' in first) || !waitMs) return first;
+    await desk.settled(asker.installId, waitMs);
+    return desk.ask({ ...asker, gesture: false });
   }
 
   function sessionSummaries(): SessionSummary[] {
@@ -965,6 +1065,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
       connectedBrowsers: openLinks().length,
       pairedBrowsers: listSessions().length,
       pairingPending: hasPendingPairing(),
+      pairing: { mode: pairingMode(), approver: approverNow() },
     };
   }
 
@@ -1047,6 +1148,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
 
   async function stop(): Promise<void> {
     if (idleTimer) clearTimeout(idleTimer);
+    clearInterval(reregistering);
     scheduler.stop();
     unwatchConfig();
     for (const watcher of [...androidWatches.keys()]) unwatchAndroid(watcher);

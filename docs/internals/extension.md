@@ -583,6 +583,39 @@ loaded. If that is newer, it is held the same way, and **Update** reloads the ex
 folder. `browsentic update` and the apps restart the Bridge before they rewrite the folder, so the
 welcome often comes too early; the panel reads the manifest again whenever it opens or gets focus.
 
+## Pairing by itself
+
+`auto-pair.ts` pairs the extension with Browsentic Bridge through the native host, with no code.
+`native-pair.ts` sends the host a `pair` op and reads the answer; the grant it hands back is redeemed
+by `redeemGrant()` in `socket.ts`, through the same handshake a typed code uses, on the grant's own
+port first. [Transport](transport.md#pairing-by-itself-grants) has the Bridge's half.
+
+**When it tries.** Only while there is no usable session key: on `onInstalled` (install and update),
+`onStartup`, the worker's start and the one-minute alarm, whenever a page that shows the link opens
+(`useAutoPair()` sends the `autoPair` bridge op), and on **Connect** or **Reconnect**. One attempt
+runs at a time, and each launches a process, so `isDue()` spaces them by what the last one found:
+every minute for the first ten minutes with no Bridge, then every fifteen; hourly for a Bridge too
+old or blocked by policy; ten minutes while it is held; 1, 2, 4… up to 30 minutes after failures;
+never unasked once this browser was revoked or denied, or after **Disconnect**. A click always tries.
+While ask mode waits on a person and a page is open, the page holds the ask open 25 s at a time,
+so it connects the moment someone allows it.
+
+**What it shows.** `DaemonState.bridge` says whether the host was found and in what shape (`ready`,
+`old`, `missing`, `forbidden`, `policy`, `stopped`, `failed`, `off`), read from the browsers' own
+error strings; anything else is `failed`, never a confident wrong cause. `DaemonState.pairing`
+carries the mode, a wait and its approver, a block, or **Disconnect**. `PairingStatus` renders each
+with its own message, and the code form one click away (leading when nothing automatic can work).
+
+**The welcome page.** `entrypoints/welcome/` opens once, on install: the three pieces (the extension,
+the Bridge, an agent), the one-line setup command (with Copy) and the install guide while the Bridge
+is missing, and once connected the
+agent picker and **Open the side panel**. The window id is read ahead of the click, because opening
+the panel needs the gesture and an `await` spends it.
+
+**Keys.** A session key is replaced only by a new one the Bridge proved it issued. When the Bridge
+says it holds no session for the key (`unauthorized.code`), the key is marked stale: `unknown` pairs
+again at once, `revoked` waits for **Reconnect**.
+
 ---
 
 ## Next

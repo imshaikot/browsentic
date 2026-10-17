@@ -125,7 +125,7 @@ and reuses the same screenshots. The images (five 1280×800 screenshots, a 440×
 | `scripting` | Reads and acts on the pages the user asks about: finding elements, filling in fields, clicking and extracting text. |
 | `notifications` | Tells the user when a scheduled task or a timer they set has finished, or when a task needs their approval. |
 | `downloads` | Saves a file the user asked the agent to download, and lists what it downloaded so it can hand the file back in the conversation. |
-| `nativeMessaging` | Starts Browsentic Bridge, Browsentic's own companion on the user's computer, when it is not running. It talks only to Browsentic's native host. |
+| `nativeMessaging` | Starts and connects to Browsentic Bridge, Browsentic's own companion on the user's computer: it starts the Bridge when it is not running and pairs with it without a code. It talks only to Browsentic's native host, which only Browsentic's own extension IDs can launch. |
 | `sidePanel` | The side panel is Browsentic's main interface: the user types or speaks a task there and watches each step as it happens. |
 | `debugger` | Used where a page's own scripts would otherwise block an action: trusted clicks and key presses, working inside cross-origin frames, and pages whose Content Security Policy blocks injected scripts. It attaches only to the tab a task is working on, and Chrome shows its standard banner while attached. |
 | `offscreen` | Hands-free mode listens for the user's voice through an offscreen document, so it keeps working after the side panel is closed. |

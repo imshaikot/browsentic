@@ -75,9 +75,14 @@ See [guide/install.md](../guide/install.md) and [guide/maintenance.md](../guide/
 
 | Command | Does |
 | --- | --- |
-| `browsentic pair` | Issue a one-time code to paste into the side panel (status pill → **Connection**). 8 characters, valid 10 minutes, single use |
-| `browsentic sessions` | List paired browsers |
-| `browsentic revoke [id]` | Unpair one browser by the id `sessions` prints, or all of them. An origin still works, and unpairs every browser presenting it |
+| `browsentic pair` | Issue a one-time code to paste into the side panel (status pill → **Connection** → **Pair with a code instead**). 8 characters, valid 10 minutes, single use |
+| `browsentic pairing [auto\|ask\|code]` | Show or set how a browser pairs through the native host: by itself (`auto`, the default), once you allow it (`ask`), or only with a code (`code`) |
+| `browsentic requests` | The browsers waiting for you to allow them, in `ask` mode. `--json` for scripts |
+| `browsentic approve [id]` | Allow a waiting browser (the only one, when there is one), or let a revoked or denied one back in by its id. `--name <name>` names it; `--watch` asks about each browser as it asks, until Ctrl-C |
+| `browsentic deny <id>` | Turn a waiting browser down. It stays out until someone presses **Reconnect** in it and you allow it |
+| `browsentic sessions` | List paired browsers, how each paired, and the ones kept out |
+| `browsentic rename <id> <name>` | Name a paired browser, as the app's list shows it. An empty name clears it |
+| `browsentic revoke [id]` | Unpair one browser by the id `sessions` prints, or all of them, and keep them from pairing again by themselves. An origin still works, and unpairs every browser presenting it |
 
 See [guide/pair.md](../guide/pair.md).
 
