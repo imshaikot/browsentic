@@ -69,7 +69,7 @@ function inProcessTools(runId: string, config: AgentConfig): { open: () => Promi
     return RemoteBridge.connect(lock.port, lock.token, runId);
   };
   return {
-    open: () => (host ??= (bridge = connect()).then((connected) => toolHost(connected, { agentRun: true, policy: policyFrom(config.guardrails), tag: fenceTag() }))),
+    open: () => (host ??= (bridge = connect()).then((connected) => toolHost(connected, { agentRun: true, namespaces: true, policy: policyFrom(config.guardrails), tag: fenceTag() }))),
     close: () => void bridge?.then((connected) => connected.close()).catch(() => {}),
   };
 }

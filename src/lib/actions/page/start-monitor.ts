@@ -5,6 +5,7 @@ import { targetSchema } from './dom';
 
 export const startMonitor = defineAction({
   name: 'page.startMonitor',
+  group: 'monitoring',
   description:
     'Watch one tab in the background until a progress condition completes — an upload reaching 100%, a build log announcing success, a spinner disappearing. ' +
     'Returns a monitorId immediately; the extension pins the tab, keeps watching with no further tool calls even while the user works elsewhere, and notifies them on completion. ' +

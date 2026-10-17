@@ -38,7 +38,7 @@ const printing = (...lines: unknown[]) =>
 const node = { bin: process.execPath };
 
 /** Browser tools with nothing in them, for a runner that asks for its own. */
-const noTools = async () => ({ list: async () => ({ tools: [], withheld: [] }), call: async () => ({ content: [] }) });
+const noTools = async () => ({ list: async () => ({ tools: [], withheld: [], groups: [] }), call: async () => ({ content: [] }) });
 
 const run = async (
   runner: Runner,

@@ -10,6 +10,7 @@ import { ActionError, defineAction } from '../core';
 
 export const startTimer = defineAction({
   name: 'page.startTimer',
+  group: 'monitoring',
   description:
     'Schedule work for later — “in ten minutes check whether the build finished”, “every two minutes refresh the queue and tell me when something lands”. ' +
     'Returns a timerId immediately; the extension keeps the schedule with no further tool calls and wakes this conversation with your prompt each time it fires, so set it and end your turn. ' +

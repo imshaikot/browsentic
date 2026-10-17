@@ -3,6 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const stopMonitor = defineAction({
   name: 'page.stopMonitor',
+  group: 'monitoring',
   description:
     'Stop a background monitor before it completes. The tab is unpinned again if the monitor pinned it. No notification is shown — the stop was asked for.',
   input: z.object({

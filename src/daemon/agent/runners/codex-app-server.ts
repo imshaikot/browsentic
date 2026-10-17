@@ -1,4 +1,4 @@
-import type { ListedTool, ToolReply } from '../../tool-host';
+import type { ListedGroup, ListedTool, ToolReply } from '../../tool-host';
 import type { AgentSettings } from '../config';
 import { CONVERSATION_REFUSED, type Conversation, type ConversationIO, type Plan, type StreamContext, type StreamSink } from './types';
 
@@ -84,14 +84,18 @@ export function appServerTurn(context: StreamContext, turn: AppServerTurn): Conv
     context
       .tools()
       .then((host) => host.list())
-      .then(({ tools, withheld }) =>
+      .then(({ tools, withheld, groups }) =>
         io.write({
           jsonrpc: '2.0',
           id: ASK.thread,
           method: 'thread/start',
           params: {
             ...threadParams(disabled),
-            dynamicTools: [...tools.map((tool) => dynamicTool(tool, false)), ...(withheld.length ? [outOfSight(withheld)] : [])],
+            dynamicTools: [
+              ...tools.map((tool) => dynamicTool(tool, false)),
+              ...groups.map(deferred),
+              ...(withheld.length ? [deferred({ name: 'browsentic', description: WITHHELD, tools: withheld })] : []),
+            ],
           },
         }),
       )
@@ -247,11 +251,17 @@ const dynamicTool = (tool: ListedTool, deferLoading: boolean) => ({
   deferLoading,
 });
 
-/** Codex keeps a deferred tool only inside a namespace, where the model finds it by searching. */
-const outOfSight = (tools: ListedTool[]) => ({
+const WITHHELD = 'Browsentic tools that answer only once the user has switched them on for a message.';
+
+/**
+ * Codex keeps a deferred tool only inside a namespace, out of the model's requests until its
+ * `tool_search` matches the namespace or the tool, and then loads the whole namespace into the
+ * conversation, so the tool list and its cached prefix stay as they were.
+ */
+const deferred = ({ name, description, tools }: ListedGroup) => ({
   type: 'namespace',
-  name: 'browsentic',
-  description: 'Browsentic tools that answer only once the user has switched them on for a message.',
+  name,
+  description,
   tools: tools.map((tool) => dynamicTool(tool, true)),
 });
 

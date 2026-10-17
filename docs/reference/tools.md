@@ -15,14 +15,15 @@ human-readable copy; `yarn daemon:manifest` prints the machine listing (see
 **Names.** An action is namespaced with dots, a tool with underscores: action `page.fillInput` is
 published as tool `page_fillInput`. The mapping is mechanical, so this page names each tool once
 and the action is implied. Actions under the reserved `browsentic.` prefix are daemon verbs, not
-registry actions. Of those, only `browsentic_status` (always) and `browsentic_saveSiteMap`
-(mapping runs only) become tools.
+registry actions. Of those, `browsentic_status` and `browsentic_openSkill` are always tools,
+`browsentic_use` is one in the side-panel runs that reach the less common tools on demand, and
+`browsentic_saveSiteMap` becomes one in mapping runs only.
 
 Tools by group:
 
 | Group | Tools |
 | --- | --- |
-| [Status](#status) | `browsentic_status` |
+| [Status and guides](#status-and-guides) | `browsentic_status`, `browsentic_openSkill`, `browsentic_use` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_pickElement`, `page_screenshot` |
 | [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
@@ -61,13 +62,42 @@ Below, a parameter typed *[target](#element-targets)* is exactly this object.
 
 ---
 
-## Status
+## Status and guides
 
 ### browsentic_status
 
 Report whether the extension is connected, its version, the active tab, any running monitors, and
 a `hint` naming the fix when something is wrong. Call it first when a page tool fails. No
 parameters.
+
+### browsentic_openSkill
+
+Open the guide to a less common capability: the skill that teaches it, then each of its tools with
+its description and input schema. The guides are `captcha`, `theming`, `diagnostics`, `monitoring`
+(monitors and timers), `downloads` and `drag`. Each has a one-line entry in the tool's description
+and in the server's instructions, so an agent can tell which one the page calls for. A guide lists
+only the tools this caller is offered and names the rest; one with nothing to offer, such as
+`captcha` in Firefox, is refused with `UNAVAILABLE`.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `name` | string | required | The guide to open, one of the six above |
+
+### browsentic_use
+
+Run a page tool that is not in this caller's tool list, by name. A side-panel run on Claude Code,
+OpenCode or Mistral Vibe lists only the core tools, because those CLIs send the description of every
+tool they are given on every turn. The tools of the guides above are left off its list, and the
+agent calls them through `browsentic_use` once a guide, a skill or a result has named one. The call
+goes the way the tool's own call would: the same approvals, guardrails, blocked sites and steps in
+the panel, and the same result. A run on Codex's app-server gets each guide's tools as a namespace
+that Codex's own `tool_search` loads, and every other caller lists every tool. Neither is offered
+this one.
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `action` | string | required | The tool to run: `page_dragElement`, `page.dragElement`, `dragElement` and the name an agent's CLI shows, such as `mcp__browsentic__page_dragElement`, all name it. Anything that is not a page tool is answered with `UNKNOWN_ACTION` and the list of guides |
+| `input` | object | `{}` | Its parameters, as its own schema has them. A JSON string of the object is taken too. Input the tool refuses comes back as `INVALID_INPUT` with its schema |
 
 ---
 

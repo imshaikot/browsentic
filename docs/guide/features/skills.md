@@ -35,6 +35,11 @@ One bundled skill is never the base: `page-scripting` rides along with whichever
 picked, and only when the composer's **Live tool** switch is on (see
 [Page actions](page-actions.md#repeating-a-job-and-doing-what-no-tool-covers)).
 
+Five of these also open mid-run, when the page calls for what they teach: `captcha`,
+`page-theming`, `page-diagnostics`, `monitor-progress` and `scheduled-jobs`. The agent opens one as
+a guide with `browsentic_openSkill`, which hands it the skill and the tools that go with it, and
+your own copy of the skill is the one it gets.
+
 Typing `/` at the start of the composer opens a picker over every kind of skill described below,
 with skills for the current site first, so you do not have to remember names. Picking a Browsentic skill inserts its `@name`
 for you.

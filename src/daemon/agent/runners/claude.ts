@@ -94,6 +94,8 @@ export const claudeRunner: Runner = {
   // Claude Code records the system prompt on a session's first request and resends that record on every
   // resume, whatever --append-system-prompt says (`--system-prompt-snapshot`, on by default in 2.1.283).
   keepsFirstPrompt: true,
+  // ToolSearch is denied, so every listed schema rides along on every turn.
+  delivery: () => 'on-demand',
 
   workspace: () => stateDir,
 

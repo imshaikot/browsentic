@@ -59,7 +59,15 @@ export type ControlRequest =
   | { id: string; op: 'android'; launch?: string; url?: string; watch?: boolean; peek?: boolean };
 
 export type ControlMessage =
-  | { id: string; op: 'describe'; tools: ToolDescriptor[]; reserved?: string[]; withheld?: ToolDescriptor[] }
+  | {
+      id: string;
+      op: 'describe';
+      tools: ToolDescriptor[];
+      reserved?: string[];
+      withheld?: ToolDescriptor[];
+      onDemand?: string[];
+      delivery?: ToolDelivery;
+    }
   | { id: string; op: 'status'; status: BridgeStatus }
   | { id: string; op: 'invoke'; result: ActionResult }
   | { id: string; op: 'working' }
@@ -74,6 +82,14 @@ export type ControlMessage =
   | { event: 'settings-changed' }
   | { event: 'android-changed'; state: AndroidState };
 
+/**
+ * How a run's grouped tools reach its model. `listed`: in its tool list, for a CLI that keeps schemas
+ * out of the model's context until it looks one up. `on-demand`: left off the list and called through
+ * browsentic_use, for a CLI that sends every schema it is given on every turn. `namespaced`: one
+ * deferred namespace a group, loaded by the CLI's own tool search (Codex's app-server).
+ */
+export type ToolDelivery = 'listed' | 'on-demand' | 'namespaced';
+
 export interface Described {
   tools: ToolDescriptor[];
   /** Reserved actions this caller may be offered. Absent when the daemon predates the field. */
@@ -84,6 +100,12 @@ export interface Described {
    * them out of sight up front; a call to one while it is withheld is refused.
    */
   withheld?: ToolDescriptor[];
+  /**
+   * Actions in `tools` this run does not list, reached as `delivery` says and found through the
+   * guides. A caller that does not know the field lists them as it always has.
+   */
+  onDemand?: string[];
+  delivery?: ToolDelivery;
 }
 
 export interface Bridge {

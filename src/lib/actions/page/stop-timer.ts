@@ -3,6 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const stopTimer = defineAction({
   name: 'page.stopTimer',
+  group: 'monitoring',
   description:
     'Cancel a scheduled job before it has run out. Nothing further fires and no notification is shown — the stop was asked for.',
   input: z.object({

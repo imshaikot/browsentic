@@ -6,6 +6,7 @@ export const CAPTURE_TIMEOUT_MS = 60_000;
 
 export const captureDownload = defineAction({
   name: 'page.captureDownload',
+  group: 'downloads',
   description:
     'Make the page download a file and keep it. Either click something that produces a download — an “Export CSV” button, a “Download invoice” link — or give a direct url, which is fetched in the browser’s own logged-in session rather than anonymously. The file lands in the user’s ~/browsentic/download/ folder and the result reports the path and notes about what arrived; you get the notes, never the bytes. Hand the returned downloadId to page.attachFile to upload it somewhere else without the file ever passing through you.',
   input: z.object({

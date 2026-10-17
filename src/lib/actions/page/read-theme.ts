@@ -46,6 +46,7 @@ interface Surface {
 
 export const readTheme = defineAction({
   name: 'page.readTheme',
+  group: 'theming',
   description:
     'Measure the page’s theme: the relative luminance of its background and text, whether it is rendering light or dark, ' +
     'the palette actually painted on screen grouped into surface, text, border and accent colours with how much area each covers, ' +

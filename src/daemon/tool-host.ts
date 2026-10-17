@@ -1,14 +1,48 @@
+import { TOOL_GROUPS } from '@/lib/actions/groups';
 import type { ToolDescriptor } from '@/lib/actions/manifest';
-import type { ActionResult } from '@/lib/actions/protocol';
+import { failure, type ActionResult } from '@/lib/actions/protocol';
 import { FOCUS_SHOT_ACTION, RESERVED_ACTIONS, SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
-import { actionNameFor, assertToolNamesRoundTrip, STATUS_TOOL, toolNameFor } from '@/lib/actions/tool-names';
-import type { Bridge } from './control';
+import { actionNameFor, assertToolNamesRoundTrip, OPEN_SKILL_TOOL, STATUS_TOOL, toolNameFor, USE_TOOL } from '@/lib/actions/tool-names';
+import { loadSkills } from './agent/skills';
+import type { Bridge, Described } from './control';
 import { IMAGE_NOTE, fence, sealSecrets, shouldFence, type Policy } from './guardrails';
+import { GROUP_INDEX, groupGuide, grouped, groupNamed, groupsOf, pageActionNamed } from './tool-groups';
 
-const SCREENSHOT_TOOL = 'page_screenshot';
-const PICK_TOOL = 'page_pickElement';
-const CAPTCHA_TOOL = 'page_solveCaptcha';
-const EXTRACT_TOOL = 'page_extractText';
+const EXTRACT_ACTION = 'page.extractText';
+
+const RENDERERS: Record<string, (result: ActionResult, fenceWith?: string) => ToolReply> = {
+  'page.screenshot': renderScreenshot,
+  'page.pickElement': renderPick,
+  'page.solveCaptcha': renderCaptcha,
+  [FOCUS_SHOT_ACTION]: renderFocusShot,
+};
+
+const OPEN_SKILL = {
+  name: OPEN_SKILL_TOOL,
+  description: `Open the guide to one of these less common capabilities: how to go about it, then its tools with their input schemas.\n${GROUP_INDEX}`,
+  inputSchema: {
+    type: 'object' as const,
+    properties: { name: { type: 'string', enum: Object.keys(TOOL_GROUPS), description: 'The capability whose guide to open.' } },
+    required: ['name'],
+    additionalProperties: false,
+  },
+};
+
+const USE = {
+  name: USE_TOOL,
+  description:
+    `Run a browser action that is not in your tool list. A guide from ${OPEN_SKILL_TOOL} gives each one with its input schema, ` +
+    'and a skill or a result may name one, as page.solveCaptcha or page_dragElement: call it here, with that name as action and ' +
+    'its parameters as input. It runs and answers exactly as a tool of its own would.',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      action: { type: 'string', description: 'The action to run, e.g. page_dragElement.' },
+      input: { type: 'object', description: 'Its parameters, as its input schema lays them out. Leave it out when there are none.' },
+    },
+    required: ['action'],
+  },
+};
 
 const FOCUS_SHOT_TOOL = {
   name: toolNameFor(FOCUS_SHOT_ACTION),
@@ -99,10 +133,18 @@ export interface ListedTool {
   inputSchema: { type: 'object' } & Record<string, unknown>;
 }
 
+export interface ListedGroup {
+  name: string;
+  description: string;
+  tools: ListedTool[];
+}
+
 export interface ToolList {
   tools: ListedTool[];
   /** Offered later in the conversation, perhaps — see `Described.withheld`. */
   withheld: ListedTool[];
+  /** A namespaced run's grouped tools, for its CLI to load when its own search asks for them. */
+  groups: ListedGroup[];
 }
 
 export type ToolContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
@@ -125,41 +167,94 @@ export interface ToolHost {
 
 interface HostOptions {
   agentRun?: boolean;
+  /** The CLI takes deferred namespaces (Codex's app-server). Without them, a namespaced run's grouped tools are listed. */
+  namespaces?: boolean;
   /** The most text, in UTF-8 bytes, the CLI on the other end passes to its model; unset for no limit. */
   resultBytes?: number;
   policy: Policy;
   tag: string;
 }
 
-export function toolHost(bridge: Bridge, { agentRun = false, resultBytes, policy, tag }: HostOptions): ToolHost {
+export function toolHost(bridge: Bridge, { agentRun = false, namespaces = false, resultBytes, policy, tag }: HostOptions): ToolHost {
+  const invoke = (action: string, args: Record<string, unknown>, signal?: AbortSignal) =>
+    bridge.invoke(action, resultBytes && action === EXTRACT_ACTION ? fitRead(args, resultBytes) : args, signal);
+
+  const present = (action: string, result: ActionResult) =>
+    (RENDERERS[action] ?? render)(result, shouldFence(action, policy) ? tag : undefined);
+
+  const offer = async (): Promise<Described> => {
+    const described = await bridge.describe();
+    return described.delivery === 'namespaced' && !namespaces ? { ...described, onDemand: [], delivery: 'listed' } : described;
+  };
+
+  const openSkill = async ({ name }: Record<string, unknown>): Promise<ToolReply> => {
+    const group = typeof name === 'string' ? groupNamed(name) : undefined;
+    if (!group) return render(failure('UNKNOWN_SKILL', `There is no guide named "${String(name ?? '')}". The guides are:\n${GROUP_INDEX}`));
+    const guide = groupGuide(group, await offer(), loadSkills());
+    return guide.ok ? { content: [{ type: 'text', text: guide.data }] } : render(guide);
+  };
+
+  const withSchema = async (action: string, result: ActionResult): Promise<ActionResult> => {
+    if (result.ok || result.error.code !== 'INVALID_INPUT') return result;
+    const schema = (await bridge.describe()).tools.find((tool) => tool.name === action)?.inputSchema;
+    return schema ? failure('INVALID_INPUT', `${result.error.message}\n${toolNameFor(action)} takes: ${JSON.stringify(schema)}`) : result;
+  };
+
+  const use = async ({ action: named, input, ...flat }: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply> => {
+    const action = typeof named === 'string' ? pageActionNamed(named) : undefined;
+    if (!action) {
+      return render(
+        failure(
+          'UNKNOWN_ACTION',
+          `There is no browser action named "${String(named ?? '')}". Open the guide that covers what you need with ${OPEN_SKILL_TOOL}:\n${GROUP_INDEX}`,
+        ),
+      );
+    }
+    const args = inputFrom(input ?? flat);
+    if (!args) return render(failure('INVALID_INPUT', `input must be an object, or a JSON string of one, holding ${toolNameFor(action)}'s parameters.`));
+    return present(action, await withSchema(action, await invoke(action, args, signal)));
+  };
+
   const answer = async (name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolReply> => {
     if (name === STATUS_TOOL) return render(await status(bridge));
+    if (name === OPEN_SKILL_TOOL) return openSkill(args);
+    if (name === USE_TOOL) return use(args, signal);
     const action = actionNameFor(name);
-    const result = await bridge.invoke(action, resultBytes && name === EXTRACT_TOOL ? fitRead(args, resultBytes) : args, signal);
-    const fenceWith = shouldFence(action, policy) ? tag : undefined;
-    if (name === SCREENSHOT_TOOL) return renderScreenshot(result);
-    if (name === FOCUS_SHOT_TOOL.name) return renderFocusShot(result);
-    if (name === PICK_TOOL) return renderPick(result, fenceWith);
-    if (name === CAPTCHA_TOOL) return renderCaptcha(result, fenceWith);
-    return render(result, fenceWith);
+    return present(action, await invoke(action, args, signal));
   };
 
   return {
     async list() {
-      const { tools: actions, reserved = agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [], withheld = [] } = await bridge.describe();
+      const {
+        tools: actions,
+        reserved = agentRun ? RESERVED_TOOLS.map((tool) => tool.action) : [],
+        withheld = [],
+        onDemand = [],
+        delivery,
+      } = await offer();
       assertToolNamesRoundTrip([...actions.map((action) => action.name), ...RESERVED_ACTIONS]);
+      const namespaced = delivery === 'namespaced';
+      const inItsGroup = (tool: ToolDescriptor) => namespaced && grouped(tool.name);
       return {
         tools: [
-          ...actions.map(listed),
+          ...actions.filter((action) => !onDemand.includes(action.name)).map(listed),
           {
             name: STATUS_TOOL,
             description:
               'Report whether the Browsentic browser extension is connected, its version, and the active tab. Use this first if a page tool fails.',
             inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
           },
+          OPEN_SKILL,
+          ...(onDemand.length && !namespaced ? [USE] : []),
           ...RESERVED_TOOLS.filter((tool) => reserved.includes(tool.action)).map((tool) => tool.descriptor),
         ],
-        withheld: withheld.map(listed),
+        withheld: withheld.filter((tool) => !inItsGroup(tool)).map(listed),
+        groups: namespaced
+          ? groupsOf([...actions.filter((action) => onDemand.includes(action.name)), ...withheld.filter(inItsGroup)]).map((group) => ({
+              ...group,
+              tools: group.tools.map(listed),
+            }))
+          : [],
       };
     },
 
@@ -202,6 +297,21 @@ function withinLimit(reply: ToolReply, resultBytes: number): ToolReply {
       },
     ],
   };
+}
+
+/** An action's input as a model sends it: an object, or that object as a JSON string, which some CLIs pass instead. */
+function inputFrom(input: unknown): Record<string, unknown> | undefined {
+  const value = typeof input === 'string' ? parseJson(input) : input;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function parseJson(text: string): unknown {
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 const listed = (action: ToolDescriptor): ListedTool => ({

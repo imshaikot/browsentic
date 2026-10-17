@@ -6,6 +6,7 @@ export const SOLVE_CAPTCHA_TIMEOUT_MS = 120_000;
 export const solveCaptcha = defineAction({
   name: 'page.solveCaptcha',
   chromiumOnly: true,
+  group: 'captcha',
   description:
     'Get past a captcha. Call it as soon as page.getPageInfo reports a "captcha", or a page stalls on “verify you are human” — nothing else reaches the widget, so do not try clicks or selectors first. It finds the widget in any frame at any depth, through closed shadow roots and cross-origin iframes, waits out one that is still loading, ticks the checkbox with a real browser-level click, and sees an image challenge through: Browsentic’s own vision analyst answers reCAPTCHA and hCaptcha challenges round by round when it can. State "solved" means carry on. State "challenge" means a challenge is still open and waiting on you: the result carries it as an image plus its prompt — a tile grid with each tile numbered (answer with "tiles") or a picture to tap on (answer with "points") — look at it and call this again with your answer, repeating until "solved". "invisible" is a scoring captcha with nothing to click; "needsHuman" is a puzzle it cannot answer (Arkose, AWS WAF) — hand that one to the user. Shows the debugger bar while it runs, and is gated for approval because it acts on another site’s security control.',
   input: z.object({

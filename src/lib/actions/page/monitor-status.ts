@@ -3,6 +3,7 @@ import { ActionError, defineAction } from '../core';
 
 export const monitorStatus = defineAction({
   name: 'page.monitorStatus',
+  group: 'monitoring',
   description:
     'Report on background monitors started with page.startMonitor: phase, percent, ETA, how long since anything changed, and the latest log lines.',
   input: z.object({

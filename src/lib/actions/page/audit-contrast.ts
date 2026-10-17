@@ -31,6 +31,7 @@ interface Check {
 
 export const auditContrast = defineAction({
   name: 'page.auditContrast',
+  group: 'theming',
   description:
     'Score the readability of the page against WCAG contrast rules. Walks the visible text, resolves each run’s ' +
     'foreground against the real background painted behind it — blending translucent layers up the ancestor chain — ' +
