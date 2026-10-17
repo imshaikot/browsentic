@@ -57,9 +57,10 @@ a `browser_specific_settings.gecko` block the Chrome build has no use for:
   behind whichever agent CLI the user runs.
 - **`strict_min_version: 140.0`**: the first Firefox that understands the data-collection key.
 
-Four permissions are filtered out of that build (`sidePanel`, `debugger`, `offscreen` and
-`userScripts`): the Firefox Manifest V2 build has no use for any of them, and AMO's validator flags
-each name it does not know. The Firefox sidebar is `sidebar_action`, which WXT derives from the same
+Six permissions are filtered out of that build (`sidePanel`, `debugger`, `offscreen`,
+`userScripts`, `topSites` and `favicon`): the Firefox Manifest V2 build has no use for most of them,
+and AMO's validator flags each name it does not know. `topSites` comes back as an optional
+permission, which Browsentic Home asks for (see [Browsentic Home](#browsentic-home-the-new-tab-page)). The Firefox sidebar is `sidebar_action`, which WXT derives from the same
 entrypoint, and the nine tools that need the debugger are left off the list a Firefox build offers
 (see [Background vs content script](#background-vs-content-script)).
 
@@ -78,8 +79,8 @@ the content script via `browser.scripting.executeScript` and:
 not leave a browser full of unreachable tabs.
 
 Pages that refuse content scripts entirely (`chrome://`, the Web Store, the new-tab page) stay
-`TAB_UNREACHABLE` permanently. `page_navigate` still works there through the tabs API, which is why
-it is the documented escape hatch.
+`TAB_UNREACHABLE` permanently. `page_navigate` still works there: on any tab that is not an http(s)
+page it goes straight through the tabs API, which is why it is the documented escape hatch.
 
 ---
 
@@ -130,7 +131,8 @@ such as the old `#appearance`, lands on **Extension**. **Agent** and **Connectio
 `AgentPicker` and `DaemonLink` the connection sheet and the launcher show; those keep their copies,
 so a blocked run is still one click from its fix.
 
-**Extension** is the theme, then what belongs to this browser alone, in `storage.local`: the
+**Extension** is the theme, then what belongs to this browser alone, in `storage.local`: the new
+tab page (`browsentic/newTab`, see [Browsentic Home](#browsentic-home-the-new-tab-page)), the
 right-click items (`browsentic/contextMenu`), the keyboard shortcuts, and hold to talk
 (`browsentic/pushToTalk`, the switch the orb's menu writes too). The shortcuts are the manifest's
 `commands`, declared from [shortcuts.ts](../../src/lib/settings/shortcuts.ts) with suggested keys. The
@@ -209,6 +211,58 @@ React mounts, and lets storage correct it a moment later. `index.html` carries
 `data-theme="ember"` and an inline ground so the frame before the stylesheet is neither white nor
 unpainted; `applyTheme` clears that inline colour, since an inline colour outranks every rule and
 would otherwise pin `<html>` to a dark ground under a light theme.
+
+## Browsentic Home: the new tab page
+
+`entrypoints/newtab/` is the browser's new tab page; WXT writes it as `chrome_url_overrides.newtab`
+in both builds. It is a full-tab surface over the panel's own pieces: the `Composer` at
+`size="hero"` (no A-Eye, since there is no page to point at, and no scheduling, since the Schedules
+tab lives in the panel), an agent chip that opens `AgentPicker`, the status pill over `DaemonLink`
+and `AgentPicker`, frequent sites, and recent conversations. See [New tab](../guide/features/new-tab.md)
+for what the user sees.
+
+**Its conversation is its own tab's.** `useOwnTab()` reads the page's tab with `tabs.getCurrent()`,
+and `useRun(own)` pins the run port to that tab instead of following the tab in front, so a Home tab
+in the background still shows, and sends to, its own session. The browser hides a new tab page's
+address from the extension, so a run from Home starts with no URL, and with no URL the run's host
+scope starts open, as it does on a blank tab.
+
+**Sending opens the side panel first.** `sidePanel.open()` needs a live gesture, a click stays live
+for about five seconds, and a run reaches its first navigation well after that. So Home opens the
+panel in the key press or click that sends, then posts `instruct`. When the agent navigates the tab,
+the panel is already showing that tab's conversation, which the navigation does not touch: the
+session belongs to the tab. Two things were checked against Chrome 153 before settling on this:
+`open()` refuses outside a gesture, and `setOptions({ tabId, enabled: false })` removes only a
+tab-specific panel, so the window-wide panel cannot be hidden on Home alone and stays open there if
+it already was.
+
+**`navigate` leaves a page that is not a web page through the tabs API.** `routeInTab` sends it
+straight to `tabs.update` when the tab's URL is not http(s), without messaging the page first. An
+extension page in a tab receives `tabs.sendMessage` as soon as it has a `runtime.onMessage`
+listener, and its `undefined` answer would read as a navigation that happened.
+
+**Frequent sites** come from `topSites.get()`, one per host, minus the hosts the user hid, eight at
+most ([frequent-sites.ts](../../src/lib/home/frequent-sites.ts)). Chrome serves their icons through
+the `_favicon` endpoint (`favicon` permission); Firefox returns data URLs. In Chrome, `<all_urls>`
+already covers the warnings for `topSites` and `favicon`, so adding them did not hold the update for
+re-approval. Firefox would show `topSites` as a new warning and hold the update until it was
+accepted, so the Firefox build lists it under `optional_permissions`, and Home asks for it from a
+**Show frequent sites** click. The suggestions under an idle composer are tasks matched to those
+hosts in [suggestions.ts](../../src/lib/home/suggestions.ts), padded with general ones to three.
+
+**Switching Home off cannot give the slot back**: only the manifest overrides the new tab page. The
+page hands the tab on instead, through `tabs.update`, since a page may not open a `chrome://` address
+itself: Google Chrome goes to `chrome://new-tab-page/`, and every other browser, whose own page is out
+of an extension's reach, gets a plain page of frequent sites. The switch is `browsentic/newTab` in
+`storage.local`, mirrored to `localStorage` as `browsentic/newTab.paint` so a tab with Home off never
+paints it before handing on.
+
+**Home's mic is per page.** The panel's voice switch is a stored preference; Home's starts off on
+every tab, so a new tab never starts listening because the panel was left listening.
+
+**Chrome asks once whether to keep the new tab page**, on Windows, Mac and ChromeOS. Its **Change
+back** disables the whole extension (`DISABLE_USER_ACTION`), not only the page, and **Keep it** is
+remembered for good. The guide tells users to keep it and switch Home off in settings instead.
 
 ## Minimizing: the rail lives in the page
 

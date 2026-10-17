@@ -97,6 +97,9 @@ Those three answer most questions. The Bridge's log is at `~/.browsentic/daemon.
 | --- | --- | --- |
 | `TAB_UNREACHABLE` on a normal site | The extension needs reloading | Turn Browsentic off and on at `chrome://extensions` (press ↻ on an unpacked copy). Ordinary sites otherwise recover by themselves |
 | `TAB_UNREACHABLE` on `chrome://`, the Web Store, the new-tab page | Those pages cannot host a content script | Go to an http(s) page with `page_navigate`, which still works on these pages |
+| New tabs open Browsentic instead of the browser's own page | That is [Browsentic Home](features/new-tab.md) | Switch it off under **Settings → Extension → New tab**, or in Home's **Customize** menu. Chrome then shows its own new tab page; other browsers show a plain page of your frequent sites |
+| Browsentic is gone after Chrome asked "Change back to Google?" | Chrome's **Change back** switches off the whole extension, not only its new tab page | Turn Browsentic back on at `chrome://extensions`. To get Chrome's own new tab page, switch Home off in **Settings → Extension → New tab** instead |
+| Sent a task from a new tab, and no side panel opened | The panel opens with the key press or click that sends. A message sent by voice after a pause has neither, and some Chromium browsers have no side panel | Press **Open the side panel** on the page, or click Browsentic in the toolbar |
 | `TARGET_NOT_FOUND` for something clearly on screen | The page changed since the snapshot, or the element is inside a captcha widget's shadow root | Take a new snapshot with `page_getPageInfo`. For a captcha, use [`page_solveCaptcha`](features/captcha.md) |
 | A captcha keeps setting new image challenges | The vendor distrusts the browser, however well each round is answered; this is common with automated or headless browsers | Solve one round yourself in the page; a person's answer usually clears the distrust. See [Captchas](features/captcha.md#image-challenges) |
 | `DEBUGGER_UNAVAILABLE` | DevTools is open on that tab | Close DevTools, or use `page_clickElement` instead of `page_trustedClick` |
@@ -154,6 +157,8 @@ These apply only when another tool drives Browsentic through its optional MCP en
 | A theme change vanished | Themes do not survive a reload or a navigation. Reapply it |
 | A site map was written but nothing changed | Maps are staged for review. Open **Skills** in the panel and press **Activate** |
 | The panel switched conversations on its own | The panel follows the tab in front, and each tab has its own conversation |
+| The side panel stays open beside Browsentic Home | Chrome can hide a side panel on one tab only when the panel belongs to that tab, and Browsentic's follows you across tabs |
+| Typing on a new tab goes into the address bar | Browsers keep the keyboard in the address bar on a new tab page. Click Home's composer, or click the page and type |
 | A recording's typed values came back as `{{placeholders}}` | That is the default. Tick **Save what I type** to keep literal values |
 
 ---

@@ -91,6 +91,12 @@ are never logged or stored. See [Android phones](android.md).
 **Blocked sites** are `browsentic/blockedSites` in `storage.local`: a list of up to 500 patterns that
 the daemon never receives. Removing the extension removes it; each browser keeps its own.
 
+**Browsentic Home** is `browsentic/newTab` in `storage.local`: whether new tabs open Home and whether
+it shows frequent sites (both on when absent), and up to 100 hosts the user hid from that row. The
+on or off is mirrored to the extension's `localStorage` as `browsentic/newTab.paint`. The frequent
+sites themselves are read from the browser each time a new tab opens; they are never stored, and
+never sent to the Bridge.
+
 **The star request** is `browsentic/starNudge` in `storage.local`: whether its star was clicked, the
 conversations it asked in (three at most), and up to two conversation ids counted since the last
 ask. It never leaves the browser.
