@@ -8,7 +8,7 @@ import { CONTAINMENT, sealEnv, sealedAway, vetPlan, within, type SpawnMode } fro
 
 const settingsFor = (kind: AgentKind) => ({ bin: AGENTS[kind].bin });
 
-const contextFor = (kind: AgentKind, research: boolean): StreamContext => ({
+const contextFor = (kind: AgentKind, research: boolean, version?: string): StreamContext => ({
   runId: 'run-1',
   conversation: 'conversation-1',
   instruction: 'what does this page cost',
@@ -20,11 +20,13 @@ const contextFor = (kind: AgentKind, research: boolean): StreamContext => ({
   mcp: mcpServerFor('run-1'),
   mcpTools: ['page_getPageInfo', 'page_clickElement', 'browsentic_status'],
   tools: () => Promise.reject(new Error('no browser tools in a containment test')),
+  toolsListed: () => Promise.resolve(),
+  version,
 });
 
-const planOf = (kind: AgentKind, mode: SpawnMode, { research = false, reads = false } = {}): Plan => {
-  if (mode === 'task') return RUNNERS[kind].json({ prompt: 'summarize this', settings: settingsFor(kind), workspace: stateDir, reads });
-  const context = contextFor(kind, research);
+const planOf = (kind: AgentKind, mode: SpawnMode, { research = false, reads = false, version = undefined as string | undefined } = {}): Plan => {
+  if (mode === 'task') return RUNNERS[kind].json({ prompt: 'summarize this', settings: settingsFor(kind), version, workspace: stateDir, reads });
+  const context = contextFor(kind, research, version);
   if (mode === 'run') return RUNNERS[kind].stream(context);
   const conversation = RUNNERS[kind].converse?.(context);
   if (!conversation) throw new Error(`${kind} holds no conversation`);
@@ -491,6 +493,94 @@ describe('spawn containment', () => {
 
     test('losing the opencode instructions file is caught', () => {
       expect(vetPlan('opencode', 'run', { ...opencodeRun, files: [] }, stateDir)).toHaveLength(1);
+    });
+
+    describe('OpenCode 2', () => {
+      const version = 'opencode v2.0.32';
+      const turn = planOf('opencode', 'conversation', { version });
+      const fallback = planOf('opencode', 'run', { version });
+      const oneShot = planOf('opencode', 'task', { version });
+      interface Statement {
+        action: string;
+        resource: string;
+        effect: string;
+      }
+      const agentRules = (config: Record<string, unknown>) =>
+        (config.agents as Record<string, { permissions: Statement[] }>)['browsentic-contained'].permissions;
+
+      test('its turn, the plain run it falls back to, and its one-shots are contained, on research and reading a file too', () => {
+        for (const [mode, plan] of [
+          ['conversation', turn],
+          ['conversation', planOf('opencode', 'conversation', { version, research: true })],
+          ['run', fallback],
+          ['task', oneShot],
+          ['task', planOf('opencode', 'task', { version, reads: true })],
+        ] as const) {
+          expect(vetPlan('opencode', mode, plan, stateDir)).toEqual([]);
+        }
+      });
+
+      // Without it, `run` hands the turn to the user's background service, which starts with this environment if it is not running.
+      test('a run without its own server is caught', () => {
+        expect(vetPlan('opencode', 'run', without(fallback, '--standalone'), stateDir)).not.toEqual([]);
+        expect(vetPlan('opencode', 'task', without(oneShot, '--standalone'), stateDir)).not.toEqual([]);
+      });
+
+      test('a turn whose folder is not the one OpenCode moves to is caught', () => {
+        expect(vetPlan('opencode', 'conversation', withEnv(turn, 'PWD', '/'), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'task', withEnv(oneShot, 'PWD'), stateDir)).toHaveLength(1);
+      });
+
+      // A list keeps the deny-all where it was, so only reading the rules shows a later allow.
+      test('an allow added after the deny-all, or a deny-all that went, is caught', () => {
+        const shell = reconfigured(turn, (config) => void agentRules(config).push({ action: 'shell', resource: '*', effect: 'allow' }));
+        expect(vetPlan('opencode', 'conversation', shell, stateDir)).toEqual([expect.stringContaining('allow shell')]);
+        expect(vetPlan('opencode', 'conversation', reconfigured(turn, (config) => void agentRules(config).shift()), stateDir)).not.toEqual([]);
+      });
+
+      test('a one-shot reading anything but its scratch folder is caught', () => {
+        const reads = planOf('opencode', 'task', { version, reads: true });
+        const everywhere = reconfigured(reads, (config) => void (agentRules(config)[1].resource = '*'));
+        expect(vetPlan('opencode', 'task', everywhere, stateDir)).toHaveLength(1);
+      });
+
+      // Code Mode lists one `execute` tool in place of the server's, and it runs a script with the network.
+      test("browser tools behind Code Mode, or a one-shot given a server, are caught", () => {
+        const behind = reconfigured(turn, (config) => void ((config.mcp as { servers: Record<string, { codemode?: boolean }> }).servers.browsentic.codemode = true));
+        expect(vetPlan('opencode', 'conversation', behind, stateDir)).toHaveLength(1);
+        const reaching = reconfigured(oneShot, (config) => void (config.mcp = { servers: { browsentic: { type: 'local' } } }));
+        expect(vetPlan('opencode', 'task', reaching, stateDir)).toHaveLength(1);
+      });
+
+      test("letting the user's plugins or other MCP servers load is caught", () => {
+        const plugins = reconfigured(turn, (config) => void (config.policies as Statement[]).push({ action: 'integration.use', resource: 'plugin:*', effect: 'allow' }));
+        expect(vetPlan('opencode', 'conversation', plugins, stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'conversation', reconfigured(turn, (config) => void delete config.policies), stateDir)).toHaveLength(2);
+      });
+
+      test('a session started in another agent, or shared, is caught', () => {
+        expect(vetPlan('opencode', 'conversation', reconfigured(turn, (config) => void (config.default_agent = 'build')), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'conversation', reconfigured(turn, (config) => void (config.share = 'auto')), stateDir)).toHaveLength(1);
+      });
+
+      test('project config switched back on under either name is caught', () => {
+        expect(vetPlan('opencode', 'conversation', withEnv(turn, 'OPENCODE_CONFIG_PROJECT_DISABLE', '0'), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'conversation', withEnv(turn, 'OPENCODE_DISABLE_PROJECT_CONFIG'), stateDir)).toHaveLength(1);
+      });
+
+      // Each line refuses the other's flags, but the vet holds a plan to one line's rules in full.
+      test("one line's flags with the other line's config are caught", () => {
+        const v1 = planOf('opencode', 'run');
+        expect(vetPlan('opencode', 'run', { ...fallback, env: v1.env }, stateDir)).not.toEqual([]);
+        expect(vetPlan('opencode', 'run', { ...v1, env: fallback.env }, stateDir)).not.toEqual([]);
+      });
+
+      test('a turn sent to another server, handed a file, or given a model it could read as a flag is caught', () => {
+        expect(vetPlan('opencode', 'run', plus(fallback, '--server', 'http://127.0.0.1:4096'), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'run', plus(fallback, '--file', '/etc/hosts'), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'run', plus(fallback, '--agent=build'), stateDir)).toHaveLength(1);
+        expect(vetPlan('opencode', 'run', plus(fallback, '-m', '--auto'), stateDir)).not.toEqual([]);
+      });
     });
 
     test('running outside the state dir is caught', () => {

@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import type { AgentProblem } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
+import type { AgentSettings } from '../config';
 import { MCP_SERVER_NAME } from './claude';
+import { spawnCli, stopTree, type CliProcess } from './command';
+import { childEnv } from './drive';
+import { acpTurn } from './opencode-acp';
 import { conversationDir, effortOf, MCP_CALL_TIMEOUT_MS, parseJsonLine, sweepRunDirs } from './util';
 import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
@@ -18,6 +22,9 @@ import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, Stre
  * the system prompt is a file the config points at, and instruction files are read verbatim.
  *
  * `opencode run` waits for stdin to close and appends it to the message; drive.ts spawns it ignored.
+ *
+ * OpenCode 2 is a second line of releases (`@opencode/cli`, beside 1's `opencode-ai`) with its own
+ * flags, config, database and protocol; which one a plan is for comes from the `--version` probed.
  */
 
 /**
@@ -38,26 +45,72 @@ const TRUNCATION = `A tool result over ${RESULT_BYTES / 1000} KB comes back cut,
 /** A user's `share: auto` would publish every browsing session; project config would load from folders above the workspace. */
 const SEALED = { OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_SHARE: '1' };
 
+/** OpenCode 2 renamed the project switch, reading the old name only when the new one is unset, and dropped the share one. */
+const SEALED_2 = {
+  OPENCODE_CONFIG_PROJECT_DISABLE: '1',
+  OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+  OPENCODE_DISABLE_CLAUDE_CODE: '1',
+  OPENCODE_DISABLE_AUTOUPDATE: '1',
+};
+
 /** Every folder outside git is one project to OpenCode, so runs kept in its own store would fill the user's session list. */
 const sessionsDb = () => join(stateDir, 'agents', 'opencode', 'sessions.db');
+
+/**
+ * OpenCode 2 keeps its logins in the same database as its sessions, and migrates one 1 cannot open
+ * again. Runs keep their own, so the user's background service never sees one, and it holds the
+ * sign-in the user gave Browsentic.
+ */
+const database2 = () => join(stateDir, 'agents', 'opencode', 'opencode-2.db');
 
 const configHome = () => join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'opencode');
 
 const INSTALL = 'npm i -g opencode-ai';
 
+/** `opencode v2.0.32` from 2.x, a bare `1.19.3` from 1.x. */
+export const isOpenCode2 = (version?: string): boolean => Number(/^(?:opencode\s+)?v?(\d+)\./i.exec(version?.trim() ?? '')?.[1] ?? 0) >= 2;
+
+/** Bins whose OpenCode would not hold a conversation, whose turns go through `opencode run` until the daemon restarts. */
+const noConversation = new Set<string>();
+
 type Permission = Record<string, string | Record<string, string>>;
+
+interface Rule {
+  action: string;
+  resource: string;
+  effect: 'allow' | 'deny';
+}
+
+const rule = (action: string, effect: Rule['effect'] = 'allow', resource = '*'): Rule => ({ action, resource, effect });
+
+/**
+ * Plugins run inside OpenCode, and another MCP server of the user's would start beside the run's own.
+ * A policy in the user's global or managed config outranks these, which the containment note says.
+ */
+const POLICIES = [
+  { action: 'integration.use', resource: 'plugin:*', effect: 'deny' },
+  { action: 'integration.use', resource: 'mcp:*', effect: 'deny' },
+  { action: 'integration.use', resource: `mcp:${MCP_SERVER_NAME}`, effect: 'allow' },
+];
 
 interface Part {
   type?: string;
   text?: string;
   tool?: string;
   callID?: string;
+  id?: string;
+  messageID?: string;
   state?: { status?: string };
   tokens?: { input?: number; output?: number; reasoning?: number; cache?: { read?: number; write?: number } };
 }
 
+/** 1.x names an error and nests what the provider said; 2.x types it, `provider.auth` and the like. */
 interface Failure {
   name?: string;
+  type?: string;
+  message?: string;
+  status?: number;
+  response?: { body?: string };
   data?: { message?: string; statusCode?: number; responseBody?: string };
 }
 
@@ -86,6 +139,7 @@ export const opencodeRunner: Runner = {
   ],
 
   stream(context: StreamContext): Plan {
+    if (isOpenCode2(context.version)) return standalone(context);
     const { settings, research } = context;
     const base = this.workspace('run');
     sweepRunDirs(base);
@@ -117,9 +171,26 @@ export const opencodeRunner: Runner = {
     };
   },
 
+  /**
+   * OpenCode 2's `run` sends its first request before the run's MCP server has connected, and that
+   * step's tool list is fixed when it is sent, so the turn is held over ACP until the tools are there.
+   */
+  converse(context: StreamContext) {
+    const { bin } = context.settings;
+    if (!isOpenCode2(context.version) || noConversation.has(bin)) return null;
+    return acpTurn(context, {
+      plan: { ...turn2(context), args: ['acp'] },
+      agent: AGENT,
+      declined: () => noConversation.add(bin),
+      explain: (message) => explain({ message }, bin),
+      stoppedFor: (tool) => stoppedFor(tool),
+    });
+  },
+
   reader(): StreamReader {
     let spoke = false;
     let generated = 0;
+    const continues = continuation();
 
     const report = (tokens: NonNullable<Part['tokens']>, sink: StreamSink) => {
       const made = (tokens.output ?? 0) + (tokens.reasoning ?? 0);
@@ -135,23 +206,21 @@ export const opencodeRunner: Runner = {
       const part = event.part;
 
       switch (event.type) {
-        case 'text':
+        case 'text': {
           if (!part?.text) return;
-          sink.text(spoke ? `\n\n${part.text}` : part.text);
+          const goesOn = continues(part);
+          sink.text(spoke && !goesOn ? `\n\n${part.text}` : part.text);
           spoke = true;
           return;
+        }
 
         case 'tool_use': {
           const name = part?.tool;
           if (!name || ownTool(name)) return;
-          if (WEB_TOOLS.includes(name)) return sink.tool(part.callID ?? randomUUID(), name);
+          if (WEB_TOOLS.includes(name)) return sink.tool(part.callID ?? part.id ?? randomUUID(), name);
           // A refused call is the model reaching for a tool it was never offered; one that ran means the ruleset did not hold.
           if (part.state?.status !== 'completed') return;
-          return sink.fail(
-            'AGENT_UNSAFE',
-            `OpenCode ran its own ${name} tool in this run, which Browsentic denied, so the run was stopped. ` +
-              'Update OpenCode and Browsentic; if it persists, please report it.',
-          );
+          return sink.fail('AGENT_UNSAFE', stoppedFor(name));
         }
 
         case 'step_finish':
@@ -167,6 +236,20 @@ export const opencodeRunner: Runner = {
   json(context: JsonContext): Plan {
     const { settings, reads } = context;
     const cwd = this.workspace('task');
+    if (isOpenCode2(context.version)) {
+      return {
+        cwd,
+        env: {
+          ...SEALED_2,
+          PWD: cwd,
+          OPENCODE_DB: database2(),
+          // A path inside the folder a run starts in is matched as seen from it, and anything outside is an external directory the deny covers.
+          OPENCODE_CONFIG_CONTENT: config2({ servers: {}, allowed: reads ? [rule('read', 'allow', 'tmp/*')] : [] }),
+        },
+        args: [...invocation2(), ...(settings.model ? ['--model', settings.model] : [])],
+        input: context.prompt,
+      };
+    }
     const permission: Permission = { '*': 'deny', ...(reads ? { read: scratchReads(cwd) } : {}) };
     return {
       cwd,
@@ -182,11 +265,15 @@ export const opencodeRunner: Runner = {
 
   answer(stdout: string) {
     let said: string[] = [];
+    const continues = continuation();
     for (const line of stdout.split('\n')) {
       const event = parseJsonLine<Event>(line);
       if (event?.type === 'error') return { error: explain(event.error) };
       if (event?.type === 'step_start') said = [];
-      if (event?.type === 'text' && event.part?.text) said.push(event.part.text);
+      if (event?.type === 'text' && event.part?.text) {
+        if (continues(event.part) && said.length) said[said.length - 1] += event.part.text;
+        else said.push(event.part.text);
+      }
     }
     return { text: said.length ? said.join('\n\n') : undefined };
   },
@@ -195,10 +282,15 @@ export const opencodeRunner: Runner = {
     if (/Unknown arguments?|Not enough arguments|Invalid values/i.test(stderrTail)) {
       return `Your OpenCode does not understand the flags Browsentic uses. Update it (${INSTALL}), then try again. (${stderrTail.trim()})`;
     }
+    // Each release line refuses the other's flags, which happens when OpenCode is swapped while Browsentic is running.
+    if (/Unrecognized flag/i.test(stderrTail) || /V2 permissions are not supported/i.test(stderrTail)) {
+      return `OpenCode changed version since Browsentic last checked it. Send the message again. (${oneLine(stderrTail)})`;
+    }
     return null;
   },
 
-  async check(): Promise<AgentProblem | null> {
+  async check(settings: AgentSettings, version?: string): Promise<AgentProblem | null> {
+    if (isOpenCode2(version)) return check2(settings);
     if (process.env.OPENCODE_API_KEY || process.env.OPENCODE_AUTH_CONTENT || signedIn() || declaresProvider()) return null;
     return {
       code: 'AGENT_NEEDS_PERMISSION',
@@ -211,7 +303,31 @@ export const opencodeRunner: Runner = {
 
 const invocation = () => ['run', '--format', 'json', '--pure', '--agent', AGENT];
 
+/** No message on argv: 2.x quotes any word with a space in it, and appends what follows `--` a second time. */
+const invocation2 = () => ['run', '--standalone', '--format', 'json', '--agent', AGENT];
+
 const ownTool = (name: string) => name.startsWith(`${MCP_SERVER_NAME}_`);
+
+/**
+ * Whether a text part goes on with one already said. 2.x ends a turn by sending whatever of a text
+ * block it had not yet printed, under that block's number in its message — `prt_<message>_text-<n>` —
+ * and a block printed in part before goes on where it stopped. 1.x's parts never carry the number.
+ */
+function continuation(): (part: Part) => boolean {
+  const blocks = new Map<string, number>();
+  return (part) => {
+    const message = part.messageID ?? '';
+    const shown = blocks.get(message) ?? 0;
+    const numbered = /_text-(\d+)$/.exec(part.id ?? '');
+    if (numbered && Number(numbered[1]) < shown) return true;
+    blocks.set(message, numbered ? Number(numbered[1]) + 1 : shown + 1);
+    return false;
+  };
+}
+
+const stoppedFor = (tool: string) =>
+  `OpenCode ran its own ${tool} tool in this run, which Browsentic denied, so the run was stopped. ` +
+  'Update OpenCode and Browsentic; if it persists, please report it.';
 
 const server = (mcp: McpServer) => ({
   type: 'local',
@@ -219,6 +335,15 @@ const server = (mcp: McpServer) => ({
   environment: mcp.env,
   enabled: true,
   timeout: MCP_CALL_TIMEOUT_MS,
+});
+
+/** Code Mode would hide the tools behind an `execute` tool the ruleset denies, and that tool is a script with the network. */
+const server2 = (mcp: McpServer) => ({
+  type: 'local',
+  command: [mcp.command, ...mcp.args],
+  environment: mcp.env,
+  codemode: false,
+  timeout: { execution: MCP_CALL_TIMEOUT_MS },
 });
 
 /** Title generation is a model call per new session that the panel already makes for itself. */
@@ -232,6 +357,60 @@ function config({ mcp, instructions, permission }: { mcp: Record<string, unknown
     ...(instructions ? { instructions } : {}),
     agent: { title: { disable: true }, [AGENT]: { mode: 'primary', permission } },
   });
+}
+
+/** 2.x's own shape: the rules are a list where the last match wins, and an ACP session starts in `default_agent`. */
+function config2({ servers, instructions, allowed }: { servers: Record<string, unknown>; instructions?: string[]; allowed: Rule[] }): string {
+  return JSON.stringify({
+    share: 'disabled',
+    update: 'disable',
+    snapshots: false,
+    tool_output: { max_bytes: RESULT_BYTES, max_lines: RESULT_BYTES },
+    ...(instructions ? { instructions } : {}),
+    default_agent: AGENT,
+    mcp: { servers },
+    policies: POLICIES,
+    agents: { title: { disabled: true }, [AGENT]: { mode: 'primary', permissions: [rule('*', 'deny'), ...allowed] } },
+  });
+}
+
+/** What a 2.x turn starts from, however it is then spoken to. 2.x moves to `$PWD` before its own working directory. */
+function turn2(context: StreamContext): Omit<Plan, 'args'> {
+  const base = opencodeRunner.workspace('run');
+  sweepRunDirs(base);
+  const cwd = conversationDir(base, context.conversation ?? context.runId);
+  const allowed = [...context.mcpTools.map((tool) => `${MCP_SERVER_NAME}_${tool}`), ...(context.research ? WEB_TOOLS : [])];
+  return {
+    cwd,
+    env: {
+      ...SEALED_2,
+      PWD: cwd,
+      OPENCODE_DB: database2(),
+      OPENCODE_CONFIG_CONTENT: config2({
+        servers: { [MCP_SERVER_NAME]: server2(context.mcp) },
+        instructions: [join(cwd, INSTRUCTIONS)],
+        allowed: allowed.map((action) => rule(action)),
+      }),
+      BROWSENTIC_AGENT_RUN: context.runId,
+    },
+    files: [{ path: INSTRUCTIONS, content: `${context.systemPrompt.trim()}\n\n${TRUNCATION}\n` }],
+  };
+}
+
+/**
+ * A 2.x turn through `opencode run`, for an OpenCode that would not hold a conversation. Its first step
+ * may not see the browser tools yet. No effort: 2.x refuses the run when the model lacks that variant.
+ */
+function standalone(context: StreamContext): Plan {
+  return {
+    ...turn2(context),
+    args: [
+      ...invocation2(),
+      ...(context.sessionId ? ['--session', context.sessionId] : []),
+      ...(context.settings.model ? ['--model', context.settings.model] : []),
+    ],
+    input: context.instruction,
+  };
 }
 
 /**
@@ -251,24 +430,53 @@ function scratchReads(workspace: string): Record<string, string> {
   }
 }
 
-function explain(failure: Failure | undefined): string {
-  const message = oneLine(failure?.data?.message ?? failure?.name ?? 'OpenCode reported an error');
-  const status = failure?.data?.statusCode;
+/** The command that signs Browsentic's own OpenCode 2 database in, in the user's shell. */
+export function signInLine(bin: string, platform: NodeJS.Platform = process.platform): string {
+  const db = database2();
+  if (platform === 'win32') return `$env:OPENCODE_DB='${db.replaceAll("'", "''")}'; & '${bin.replaceAll("'", "''")}' auth login --standalone`;
+  const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
+  return `OPENCODE_DB=${quote(db)} ${/^[\w./-]+$/.test(bin) ? bin : quote(bin)} auth login --standalone`;
+}
+
+function explain(failure: Failure | undefined, bin = 'opencode'): string {
+  const message = oneLine(failure?.data?.message ?? failure?.message ?? failure?.name ?? failure?.type ?? 'OpenCode reported an error');
+  const status = failure?.data?.statusCode ?? failure?.status;
+  const body = failure?.data?.responseBody ?? failure?.response?.body ?? '';
+  // 1.x names its errors and nests what the provider said; 2.x types them, and over ACP passes on only a message.
+  const v1 = failure?.name !== undefined || failure?.data !== undefined;
   // Zen serves its free models only to requests carrying OpenCode's own built-in tools.
-  if (failure?.data?.responseBody?.includes('FreeTierError')) {
+  if (v1 && body.includes('FreeTierError')) {
     return (
       `OpenCode Zen's free models refuse a run whose tools Browsentic has narrowed to the browser. Run "opencode auth login" ` +
       `to sign in to a provider, then pick one of its models in the Browsentic side panel. (${message})`
     );
   }
-  if (failure?.name === 'ProviderAuthError' || status === 401 || status === 403) {
+  if (!v1 && body.includes('FreeTierError')) {
+    return (
+      `OpenCode Zen's free models refuse a run whose tools Browsentic has narrowed to the browser. Sign Browsentic's OpenCode in ` +
+      `to a provider with ${signInLine(bin)}, then pick one of its models in the side panel. (${message})`
+    );
+  }
+  // Over ACP, 2.x says only this, for a provider with no sign-in and for Zen's free tier alike.
+  if (!v1 && /authentication required/i.test(message)) {
+    return (
+      `OpenCode has no sign-in for this model in Browsentic, and OpenCode Zen's free models refuse a run whose tools Browsentic ` +
+      `has narrowed to the browser. Sign Browsentic's OpenCode in to a provider with ${signInLine(bin)}, then pick one of its models in the side panel. (${message})`
+    );
+  }
+  if (failure?.name === 'ProviderAuthError' || failure?.type === 'provider.auth' || status === 401 || status === 403) {
+    if (!v1) return `${message} If that is a login problem, sign Browsentic's OpenCode in with ${signInLine(bin)}.`;
     return (
       `${message} If that is a login problem, run "opencode auth login" — a key kept only in an environment ` +
       'variable is not passed to a Browsentic run.'
     );
   }
-  if (status === 429) return `The provider behind OpenCode is rate-limiting this account. Wait and try again. (${message})`;
-  if (failure?.name === 'UnknownError') {
+  if (status === 429 || failure?.type === 'provider.rate-limit') return `The provider behind OpenCode is rate-limiting this account. Wait and try again. (${message})`;
+  if (failure?.type === 'provider.quota') return `The provider behind OpenCode says this account is out of credit or quota. Top it up, or pick another provider's model. (${message})`;
+  if (/variant unavailable/i.test(message)) {
+    return `The model OpenCode is using has no such level of effort. Clear the effort in Browsentic's settings, or pick another, then try again. (${message})`;
+  }
+  if (failure?.name === 'UnknownError' || /model unavailable|invalid model reference/i.test(message)) {
     return (
       `OpenCode could not start this turn, most often because it does not know the model. Pick one in the ` +
       `Browsentic side panel as "opencode models" lists it — provider/model — then try again. (${message})`
@@ -291,12 +499,101 @@ function signedIn(): boolean {
 }
 
 /** A provider the user configured by hand — a local model needs no login. */
-function declaresProvider(): boolean {
+function declaresProvider(pattern = /"provider"\s*:/): boolean {
   return ['opencode.json', 'opencode.jsonc', 'config.json'].some((name) => {
     try {
-      return /"provider"\s*:/.test(readFileSync(join(configHome(), name), 'utf8'));
+      return pattern.test(readFileSync(join(configHome(), name), 'utf8'));
     } catch {
       return false;
     }
+  });
+}
+
+const AUTH_TIMEOUT_MS = 5_000;
+
+/** One answer per state of the database, and one question at a time. */
+let lastAnswer: { key: string; problem: AgentProblem | null } | undefined;
+let asking: Promise<AgentProblem | null> | undefined;
+
+/**
+ * OpenCode 2's sign-ins live in its database, so its own `auth list` is asked, against Browsentic's
+ * database and in the environment a run gets: an exported key shows there exactly when a run sees it.
+ * `--standalone` keeps the user's background service out of it — without it that service would be
+ * started with this environment and run on Browsentic's database. Anything unexpected reads as signed
+ * in, because a picker that wrongly says *needs setup* blocks a working agent.
+ */
+async function check2(settings: AgentSettings): Promise<AgentProblem | null> {
+  if (process.env.OPENCODE_API_KEY || declaresProvider(/"providers?"\s*:/)) return null;
+  const db = database2();
+  // The sign-in line points OpenCode at this file, and its server will not start in a folder that is not there.
+  mkdirSync(dirname(db), { recursive: true });
+  const stamped = stamp(db);
+  if (!stamped) return needsSignIn(settings.bin);
+  const key = `${settings.bin}|${stamped}|${stamp(`${db}-wal`)}`;
+  if (lastAnswer?.key === key) return lastAnswer.problem;
+  asking ??= listSignIns(settings.bin)
+    .then((signedIn) => {
+      const problem = signedIn ? null : needsSignIn(settings.bin);
+      lastAnswer = { key, problem };
+      return problem;
+    })
+    .finally(() => (asking = undefined));
+  return asking;
+}
+
+const stamp = (path: string) => {
+  try {
+    const { mtimeMs, size } = statSync(path);
+    return `${mtimeMs}:${size}`;
+  } catch {
+    return '';
+  }
+};
+
+const needsSignIn = (bin: string): AgentProblem => ({
+  code: 'AGENT_NEEDS_PERMISSION',
+  message:
+    "This OpenCode 2 has no sign-in of its own for Browsentic, which keeps one apart from yours, and OpenCode Zen's free models refuse a run whose tools Browsentic has narrowed to the browser.",
+  fix: signInLine(bin),
+});
+
+interface Integration {
+  connections?: { status?: { status?: string } }[];
+}
+
+function listSignIns(bin: string): Promise<boolean> {
+  const cwd = opencodeRunner.workspace('task');
+  mkdirSync(cwd, { recursive: true });
+  let child: CliProcess;
+  try {
+    child = spawnCli(bin, ['auth', 'list', '--standalone', '--format', 'json'], {
+      cwd,
+      env: { ...childEnv('opencode'), ...SEALED_2, PWD: cwd, OPENCODE_DB: database2(), OPENCODE_CONFIG_CONTENT: JSON.stringify({ policies: POLICIES }) },
+    });
+  } catch {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    let output = '';
+    let settled = false;
+    const done = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => {
+      stopTree(child, 'SIGKILL');
+      done(true);
+    }, AUTH_TIMEOUT_MS);
+    timer.unref();
+    child.stdout.on('data', (chunk: Buffer) => void (output += chunk.toString()));
+    child.stderr.on('data', () => {});
+    child.on('error', () => done(true));
+    child.on('close', (code) => {
+      const integrations = code === 0 ? parseJsonLine<Integration[]>(output.trim()) : null;
+      if (!Array.isArray(integrations)) return done(true);
+      done(integrations.some((integration) => integration.connections?.some((connection) => !connection.status || connection.status.status === 'connected')));
+    });
   });
 }

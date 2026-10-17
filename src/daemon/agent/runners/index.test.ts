@@ -7,7 +7,7 @@ import { stateDir } from '../../lockfile';
 import type { AgentConfig, AgentSettings } from '../config';
 import { MCP_RULE, settingsPath } from './antigravity';
 import { stubCli } from './fixtures/support';
-import { agentState, grantRunner, mcpServerFor, refreshModelLists, RUNNERS, runnerFor } from './index';
+import { agentState, grantRunner, mcpServerFor, refreshModelLists, RUNNERS, runnerFor, versionOf } from './index';
 
 const bin = join(stateDir, 'stub-bin');
 const probes = join(stateDir, 'probes.log');
@@ -83,6 +83,7 @@ describe('readiness probes', () => {
   beforeAll(() => {
     mkdirSync(bin, { recursive: true });
     for (const name of ['claude', 'claude-next', 'codex', 'agy', 'vibe', 'grok', 'cursor-agent', 'qwen', 'opencode']) stub(name);
+    stub('opencode2', { prints: 'opencode v2.0.32' });
     stub('codex-expired', { prints: 'licence expired', exit: 3 });
   });
 
@@ -152,6 +153,23 @@ describe('readiness probes', () => {
     rmSync(signedIn);
     vi.stubEnv('XAI_API_KEY', 'xai-key');
     expect([withLogin?.ready, (await runner('grok', configWith({})))?.ready]).toEqual([true, true]);
+  });
+
+  // Its sign-ins moved into a database of Browsentic's own, which only a 2.x check knows to look in.
+  test('the version an agent printed is the one its readiness is checked for', async () => {
+    vi.stubEnv('OPENCODE_API_KEY', '');
+    rmSync(join(stateDir, 'agents', 'opencode'), { recursive: true, force: true });
+    const status = await runner('opencode', configWith({ opencode: { bin: join(bin, 'opencode2') } }));
+    expect(status).toMatchObject({ version: 'opencode v2.0.32', ready: false, problem: { fix: expect.stringContaining('auth login --standalone') } });
+  });
+
+  test('a one-shot is built for the version last probed, and a binary never probed is probed once', async () => {
+    await agentState(configWith({ opencode: { bin: join(bin, 'opencode2') } }), { refresh: true });
+    expect(await versionOf('opencode', join(bin, 'opencode2'))).toBe('opencode v2.0.32');
+    rmSync(probes, { force: true });
+    expect(await versionOf('opencode', join(bin, 'opencode'))).toBe('opencode 1.0.0');
+    expect(await versionOf('opencode', join(bin, 'opencode'))).toBe('opencode 1.0.0');
+    expect(readFileSync(probes, 'utf8')).toBe('opencode\n');
   });
 
   test('probes are reused for half a minute, even when only the active agent changed', async () => {

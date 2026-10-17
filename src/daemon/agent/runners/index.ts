@@ -68,6 +68,19 @@ const PROBE_TTL_MS = 30_000;
 
 let cached: { at: number; signature: string; state: AgentState } | null = null;
 
+/** Each agent's `--version` line as last probed, which outlives the cache a refresh or a grant clears. */
+const probed = new Map<AgentKind, { bin: string; version?: string }>();
+
+/** The version a plan is built for: the one last probed for this bin, or a fresh probe when there is none. */
+export async function versionOf(kind: AgentKind, bin: string): Promise<string | undefined> {
+  const known = probed.get(kind);
+  if (known?.bin === bin) return known.version;
+  const found = await version(bin, RUNNERS[kind].versionArgs);
+  if (!found.ok) return undefined;
+  probed.set(kind, { bin, version: found.detail });
+  return found.detail;
+}
+
 export async function agentState(config: AgentConfig, { refresh = false } = {}): Promise<AgentState> {
   const signature = JSON.stringify(config.agents);
   if (!refresh && cached && cached.signature === signature && Date.now() - cached.at < PROBE_TTL_MS) {
@@ -154,7 +167,8 @@ async function probe(runner: Runner, settings: AgentSettings): Promise<RunnerSta
     };
   }
 
-  const problem = (await runner.check?.(settings)) ?? null;
+  probed.set(runner.kind, { bin: settings.bin, version: found.detail });
+  const problem = (await runner.check?.(settings, found.detail)) ?? null;
   return {
     kind: runner.kind,
     bin: settings.bin,

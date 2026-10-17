@@ -6,7 +6,7 @@ import { RemoteBridge } from '../remote-bridge';
 import { toolHost, type ToolHost } from '../tool-host';
 import type { AgentConfig } from './config';
 import { runJson, runStream, type JsonOptions } from './runners/drive';
-import { mcpServerFor, runnerFor } from './runners';
+import { mcpServerFor, runnerFor, versionOf } from './runners';
 import { RunError, type RunOutcome } from './runners/types';
 
 export { RunError };
@@ -24,6 +24,10 @@ export interface RunRequest {
   sessionId: string | null;
   /** The tools the run's MCP server will offer, by the names it lists them under. */
   mcpTools: string[];
+  /** Settles once the run's MCP server has listed those tools to the CLI. */
+  toolsListed: () => Promise<void>;
+  /** The agent CLI's `--version` line, from the probe that found it ready. */
+  version?: string;
   signal: AbortSignal;
   emit: (event: RunEvent) => void;
 }
@@ -46,6 +50,8 @@ export async function runInstruction(request: RunRequest): Promise<RunOutcome> {
         mcp: mcpServerFor(request.runId, runner.limits),
         mcpTools: request.mcpTools,
         tools: tools.open,
+        toolsListed: request.toolsListed,
+        version: request.version,
       },
       request.signal,
       request.emit,
@@ -75,14 +81,15 @@ function inProcessTools(runId: string, config: AgentConfig): { open: () => Promi
 }
 
 /** One-shot, no browser: summarize a file, name a conversation, read back a recording. */
-export function runAgentJson(
+export async function runAgentJson(
   prompt: string,
   config: AgentConfig,
   signal: AbortSignal,
   { reads = false, image, ...options }: JsonOptions & { reads?: boolean; image?: string },
 ): Promise<string> {
   const { runner, settings } = runnerFor(config);
-  return runJson(runner, { prompt, settings, reads, image, workspace: runner.workspace('task') }, signal, options);
+  const version = await versionOf(runner.kind, settings.bin);
+  return runJson(runner, { prompt, settings, version, reads, image, workspace: runner.workspace('task') }, signal, options);
 }
 
 /** Where a one-shot's scratch files go — inside the agent's own workspace, so it is allowed to read them. */

@@ -1,0 +1,2 @@
+{"type":"step_start","timestamp":1792236624669,"sessionID":"ses_eb65f6781ffezd6RAcEQYaQRJC","part":{"id":"prt_149a09b1d001qiOgtteVdQzYQ4","sessionID":"ses_eb65f6781ffezd6RAcEQYaQRJC","messageID":"msg_149a09b0f0011CxTK0bdUwyoJN","type":"step-start"}}
+{"type":"text","timestamp":1792236624676,"sessionID":"ses_eb65f6781ffezd6RAcEQYaQRJC","part":{"id":"prt_149a09b0f0011CxTK0bdUwyoJN_text-0","sessionID":"ses_eb65f6781ffezd6RAcEQYaQRJC","messageID":"msg_149a09b0f0011CxTK0bdUwyoJN","type":"text","text":"Still Example Domain.","time":{"start":1792236624658,"end":1792236624676}}}
