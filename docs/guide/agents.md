@@ -29,14 +29,15 @@ Where a CLI can list the models your account has, the select offers that list:
 | Antigravity | `agy models` |
 | Grok Build | `grok models` |
 | Cursor CLI | `cursor-agent models`; there are over 200, so the select becomes a filter, with Browsentic's picks first |
+| OpenCode 2 | `opencode api --standalone model.list` on Browsentic's own OpenCode database, leaving out models that cannot call a tool and OpenCode Zen's free ones ([why](#opencode-is-in-beta)) |
 
-The other four have no such command, so the select offers a short list shipped with Browsentic. For
-Claude Code that list is its aliases (`fable`, `opus`, `sonnet`, `haiku`), which it resolves to the
-newest model of each family.
+Claude Code, Mistral Vibe, Qwen Code and OpenCode 1 have no such command, so the select offers a
+short list shipped with Browsentic. For Claude Code that list is its aliases (`fable`, `opus`,
+`sonnet`, `haiku`), which it resolves to the newest model of each family.
 
 The Bridge reads each list in the background, so the agent picker never waits on one. A list is
-kept for six hours and read again at once when the CLI is updated; *Recheck* reads it again
-immediately. If a read fails (the CLI is signed out, times out, or prints something Browsentic
+kept for six hours and read again at once when the CLI is updated, or for OpenCode 2 when its
+sign-ins change; *Recheck* reads it again immediately. If a read fails (the CLI is signed out, times out, or prints something Browsentic
 cannot parse), the last list that read cleanly stays, or the shipped one if there is none, and the
 line under the select says why. A model you pinned yourself is never changed: if the CLI stops
 listing it, it stays selected, marked *not listed*.
@@ -282,8 +283,9 @@ What both lines share:
 
 - **Zen's free models refuse a Browsentic run.** They answer only requests that carry OpenCode's
   own built-in tools. A Browsentic run carries only the browser's, so they refuse it with *free tier
-  can only be used from within OpenCode*. Sign in to a provider first; until then the agent picker
-  shows *needs setup*.
+  can only be used from within OpenCode*. Sign in to a provider, or to OpenCode Zen and pick one of
+  its paid models, which Zen bills to your OpenCode account. Until you are signed in, the agent
+  picker shows *needs setup*.
 - **Models are `provider/model`**, spelled as `opencode models` lists them.
 - **A key in the environment does not reach a run.** Only `OPENCODE_*` does; `ANTHROPIC_API_KEY`
   and the like are sealed away. Sign in instead, which keeps the key in OpenCode's own store.
@@ -319,6 +321,10 @@ What both lines share:
   On Windows the line is for PowerShell, and it puts the window's own `OPENCODE_DB` back once the
   sign-in ends, so OpenCode run there afterwards still opens your database. An `OPENCODE_API_KEY` in
   the environment, or a provider in your config, counts too.
+- **The agent picker lists the models that sign-in reaches.** It asks OpenCode itself, on
+  Browsentic's database, and leaves out models that cannot call a tool and Zen's free ones. With no
+  model picked, OpenCode chooses one itself, and on a sign-in to OpenCode Zen that is one of the free
+  models, so pick one. A refused turn names the model it ran on.
 - **Your sessions and your background service are never touched.** Every run starts its own private
   OpenCode server rather than the shared one, so a run is never added to your session list and your
   service never picks one up.
@@ -390,7 +396,9 @@ Claude runner's settings.
 | Qwen Code: *No auth type is selected* | Qwen has no provider configured, and its OAuth free tier has ended. Run `qwen` and use `/auth`, or export `OPENAI_API_KEY` with `OPENAI_BASE_URL`. |
 | Qwen Code cannot find a key you have exported | Only `QWEN_*`, `DASHSCOPE_*`, `BAILIAN_*` and `OPENAI_*` reach a run; `ANTHROPIC_*` and `GEMINI_*` are sealed away. Point Qwen at one of the first four. |
 | `AGENT_UNSAFE`: *Qwen Code registered …* or *loaded the MCP server …* | Qwen's own `init` line named a tool or a server Browsentic denied, so the run was stopped. Update Qwen Code and Browsentic, and report it if it persists. |
-| OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. Sign in to a provider (`opencode auth login` on OpenCode 1, the line in the message on OpenCode 2), then pick that provider's model in the side panel's agent picker. |
+| OpenCode: *free models refuse a run whose tools Browsentic has narrowed to the browser* | Zen's free tier serves only requests carrying OpenCode's own tools. On OpenCode 2, pick a paid model in the side panel's agent picker, or sign in to another provider with the line in the message. On OpenCode 1, sign in to a provider with `opencode auth login`, then pick that provider's model. |
+| OpenCode 2: *OpenCode Zen refused …* | Zen turned down the model named, which OpenCode chose itself when the message says no model is picked. Its free models refuse every Browsentic run, and its paid ones need credit on your OpenCode account. Pick a paid model in the agent picker, or sign in to another provider with the line in the message. |
+| OpenCode 2: *no working sign-in for …* | Browsentic's OpenCode is not signed in to that model's provider, or the sign-in has lapsed. Run the line in the message, or pick another model. |
 | OpenCode 2: *no model "…" here* | OpenCode 2 does not offer that model. Pick one of those the message lists, `provider/model`. |
 | OpenCode 2: *could not start Browsentic's browser tools* | The run's browser tools did not reach OpenCode within 20 seconds. Run `browsentic restart`, then send the message again. |
 | OpenCode: *changed version since Browsentic last checked it* | OpenCode 1 and 2 refuse each other's flags, which is what a swap while Browsentic runs looks like. Send the message again. |

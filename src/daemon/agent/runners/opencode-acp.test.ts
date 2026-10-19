@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { opencodeRunner } from './opencode';
+import { opencodeRunner, signInLine } from './opencode';
 import { streamContext, transcript, type Call } from './fixtures/support';
 import type { Conversation, StreamContext, StreamSink } from './types';
 
@@ -192,8 +192,23 @@ describe('a turn', () => {
   });
 
   // Recorded against the real Zen endpoint with no sign-in: ACP passes on only "Authentication required".
-  test('a model with no sign-in says how to sign Browsentic in', () => {
-    expect(through('free-tier')).toEqual([['fail', 'AGENT_FAILED', expect.stringMatching(/narrowed to the browser.*OPENCODE_DB=.*auth login --standalone/)]]);
+  test('a refused model OpenCode chose itself is named, with the paid model to pick instead', () => {
+    const failed = through('free-tier');
+    expect(failed).toEqual([['fail', 'AGENT_FAILED', expect.stringMatching(/^OpenCode Zen refused opencode\/big-pickle, which OpenCode chose because no model is picked in Browsentic\. /)]]);
+    expect(failed[0][2]).toContain(`Pick a paid model in the side panel, or sign Browsentic's OpenCode in to another provider with ${signInLine('opencode')}. (Authentication required`);
+  });
+
+  test('a refused model picked in Browsentic is named as picked, and one of another provider names the sign-in it lacks', () => {
+    const refusedFor = (model: string) => {
+      const turn = holding({ settings: { bin: 'opencode', model } });
+      turn.feed(answerTo('free-tier', 1), answerTo('free-tier', 3), answerTo('free-tier', 6));
+      return turn.failed();
+    };
+    expect(refusedFor('opencode/big-pickle')).toEqual([['fail', 'AGENT_FAILED', expect.stringMatching(/^OpenCode Zen refused opencode\/big-pickle\. Zen's free models/)]]);
+    expect(refusedFor('mock/m1')).toEqual([
+      ['fail', 'AGENT_FAILED', expect.stringMatching(/^Browsentic's OpenCode has no working sign-in for mock, so it could not run mock\/m1\. /)],
+    ]);
+    expect(refusedFor('mock/m1')[0][2]).toContain(`Sign it in with ${signInLine('opencode')}, or pick another model in the side panel.`);
   });
 
   test("another session's updates are not this turn's", () => {

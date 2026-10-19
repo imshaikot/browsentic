@@ -61,8 +61,8 @@ None of these keys is required.
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |
 | `agents.codex.transport` | unset (the app-server) | `"exec"` runs Codex through `codex exec` instead of its app-server; see [agents.md § Codex](agents.md#codex-gets-the-browser-tools-as-its-own) |
 
-The models the select offers are not configurable: Codex, Antigravity, Grok Build and Cursor CLI are
-asked for their own list, and the rest offer a short list shipped with Browsentic.
+The models the select offers are not configurable: Codex, Antigravity, Grok Build, Cursor CLI and
+OpenCode 2 are asked for their own list, and the rest offer a short list shipped with Browsentic.
 
 Full detail, including the Antigravity permission rule: [Choosing an agent](agents.md).
 

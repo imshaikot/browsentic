@@ -23,4 +23,8 @@ Lines starting with `#` are comments, and the tests skip them.
 - `<cli version>-models.txt` and `-models-signed-out.txt` are what the CLI's model-listing command
   printed, for `../models.test.ts`: stdout, then stderr after a `# stderr` line, with the exit code
   in a `# exit` line. `codex/<version>-models_cache.json` is Codex's own cache, cut to the fields the
-  lister reads, with the account identity and etag replaced.
+  lister reads, with the account identity and etag replaced. OpenCode 2.0.32's are what
+  `opencode api --standalone model.list` printed, cut to the fields the lister reads, which drops
+  the account's organization id: `models` on a database signed in to OpenCode Zen alone,
+  `-signed-out` on an empty one, and `-provider-keys` on an empty one with stand-in keys for
+  Anthropic, OpenAI and Google in the environment.

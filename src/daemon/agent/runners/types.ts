@@ -117,13 +117,27 @@ export interface Listing {
   code: number | null;
 }
 
+/** A subcommand that prints the models the account can use. */
+export interface CommandLister {
+  args: string[];
+  /** Set for the listing alone, over the sealed environment every spawn of the agent gets. */
+  env?(cwd: string): Record<string, string>;
+  /** What the list depends on besides the CLI itself, such as its sign-ins: a change reads it again. */
+  stamp?(): string | undefined;
+  parse(listing: Listing): string[] | null;
+}
+
+/** A file the CLI keeps its model list in. */
+export interface FileLister {
+  file(): string;
+  parse(content: string): string[] | null;
+}
+
 /**
- * Where a CLI lists the models its account can use: a subcommand it prints them from, or a file
- * it keeps them in. `parse` answers null for anything but a clean list — signed out included.
+ * Where a CLI lists the models its account can use. `parse` answers null for anything but a clean
+ * list — signed out included.
  */
-export type ModelLister =
-  | { args: string[]; parse(listing: Listing): string[] | null }
-  | { file(): string; parse(content: string): string[] | null };
+export type ModelLister = CommandLister | FileLister;
 
 export interface Runner {
   kind: AgentKind;
@@ -134,8 +148,8 @@ export interface Runner {
   workspace(mode: RunMode): string;
   /** Directories where this CLI keeps the user's own skills, feeding the panel's skill picker. */
   skillDirs?(): string[];
-  /** Absent: the picker offers the catalog's curated models. */
-  models?: ModelLister;
+  /** Absent, or none for the version probed: the picker offers the catalog's curated models. */
+  models?: ModelLister | ((version?: string) => ModelLister | undefined);
   stream(context: StreamContext): Plan;
   /** A conversation to hold for this turn instead, where the CLI offers one; null to use `stream`. */
   converse?(context: StreamContext): Conversation | null;

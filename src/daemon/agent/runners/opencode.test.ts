@@ -2,9 +2,10 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { dirname, join, parse, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { stateDir } from '../../lockfile';
+import { listerFor } from './models';
 import { isOpenCode2, opencodeRunner, signInLine } from './opencode';
 import { jsonContext, readThrough, shown, streamContext, stubCli, transcript, valueOf } from './fixtures/support';
-import type { Plan } from './types';
+import type { CommandLister, Plan } from './types';
 
 const settings = { bin: 'opencode' };
 const stream = (overrides: Parameters<typeof streamContext>[1] = {}) => opencodeRunner.stream(streamContext(settings, overrides));
@@ -526,10 +527,11 @@ describe('reading an OpenCode 2 stream', () => {
   });
 
   // Recorded against the real Zen endpoint, which still serves its free models only to OpenCode's own tools.
-  test("Zen's free tier refusing a contained run says to sign Browsentic in to a provider", () => {
+  test("Zen's free tier refusing a contained run says to pick a paid model, or sign Browsentic in to another provider", () => {
     const [[, , message]] = read2('2.0.32-free-tier.jsonl', 'fail');
-    expect(message).toEqual(expect.stringContaining('narrowed to the browser'));
-    expect(message).toContain(`OPENCODE_DB=`);
+    expect(message).toContain(
+      `narrowed to the browser. Pick a paid model in the side panel, which Zen bills to your OpenCode account, or sign Browsentic's OpenCode in to another provider with ${signInLine('opencode')}.`,
+    );
   });
 
   test('a model, or an effort, OpenCode does not have says which to change', () => {
@@ -543,6 +545,48 @@ describe('what an OpenCode 2 says when it cannot start', () => {
   test('a flag of the other line asks for the message again', () => {
     expect(opencodeRunner.hint?.('ERROR\n  Unrecognized flag: --pure in command opencode run')).toContain('changed version');
     expect(opencodeRunner.hint?.('Configuration is invalid ↳ V2 permissions are not supported by OpenCode V1.')).toContain('changed version');
+  });
+});
+
+describe('the models an OpenCode 2 picker offers', () => {
+  const lister = () => listerFor(opencodeRunner, V2) as CommandLister;
+  const parsed = (data: unknown[]) => lister().parse({ stdout: JSON.stringify({ data }), stderr: '', code: 0 });
+
+  // Without --standalone, the question would start the user's background service on Browsentic's database.
+  test("are asked of OpenCode's own server, on Browsentic's database, with the user's plugins and other servers kept out", () => {
+    const env = lister().env?.('/state/agents/opencode/models') ?? {};
+    expect(lister().args).toEqual(['api', '--standalone', 'model.list']);
+    expect(env).toMatchObject({
+      OPENCODE_DB: join(stateDir, 'agents', 'opencode', 'opencode-2.db'),
+      PWD: '/state/agents/opencode/models',
+      OPENCODE_CONFIG_PROJECT_DISABLE: '1',
+    });
+    expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).policies).toEqual([
+      { action: 'integration.use', resource: 'plugin:*', effect: 'deny' },
+      { action: 'integration.use', resource: 'mcp:*', effect: 'deny' },
+      { action: 'integration.use', resource: 'mcp:browsentic', effect: 'allow' },
+    ]);
+  });
+
+  test('OpenCode 1 has no such list, so its picker keeps the curated one', () => {
+    expect(listerFor(opencodeRunner, '1.19.3')).toBeUndefined();
+  });
+
+  test('a disabled model is left out, and a Zen model with no price on record is kept', () => {
+    expect(
+      parsed([
+        { providerID: 'opencode', id: 'unpriced' },
+        { providerID: 'opencode', id: 'retired', enabled: false, cost: [{ input: 1, output: 2 }] },
+        { providerID: 'opencode', id: 'priced-past-a-tier', cost: [{ input: 0, output: 0 }, { input: 4, output: 15 }] },
+        { providerID: 'ollama', id: 'qwen3.8', cost: [{ input: 0, output: 0 }] },
+        { id: 'no-provider' },
+      ]),
+    ).toEqual(['ollama/qwen3.8', 'opencode/priced-past-a-tier', 'opencode/unpriced']);
+  });
+
+  test('an answer that is not the list, or a failed one, is no list', () => {
+    expect(lister().parse({ stdout: '<!doctype html>', stderr: '', code: 0 })).toBeNull();
+    expect(lister().parse({ stdout: JSON.stringify({ data: [{ providerID: 'opencode', id: 'm' }] }), stderr: '', code: 1 })).toBeNull();
   });
 });
 
@@ -588,6 +632,21 @@ describe('OpenCode 2 readiness', () => {
     expect(await problem(answering(JSON.stringify([{ id: 'anthropic', connections: [{ type: 'credential', label: 'Anthropic' }] }])).bin)).toBeNull();
     const stale = [{ id: 'opencode', connections: [{ type: 'env', name: 'OPENCODE_API_KEY', status: { status: 'needs_auth' } }] }];
     expect((await problem(answering(JSON.stringify(stale)).bin))?.code).toBe('AGENT_NEEDS_PERMISSION');
+  }, 20_000);
+
+  // A run writes its sessions to the same database, which has the sign-ins asked again without changing them.
+  test('the model list is read again once the sign-ins change, and not for a run that only wrote its sessions', async () => {
+    created();
+    const zen = [{ id: 'opencode', connections: [{ id: 'cred_zen', type: 'credential' }] }];
+    const stamp = () => (listerFor(opencodeRunner, V2) as CommandLister).stamp?.();
+    await problem(answering(JSON.stringify(zen)).bin);
+    const signedIn = stamp();
+    writeFileSync(db, 'a run wrote its session');
+    await problem(answering(JSON.stringify(zen)).bin);
+    const afterRun = stamp();
+    writeFileSync(db, 'signed in to another provider');
+    await problem(answering(JSON.stringify([...zen, { id: 'anthropic', connections: [{ id: 'cred_anthropic', type: 'credential' }] }])).bin);
+    expect([signedIn, afterRun === signedIn, stamp() === signedIn]).toEqual([expect.stringMatching(/^[0-9a-f]{16}$/), true, false]);
   }, 20_000);
 
   // A picker that wrongly says "needs setup" blocks a working agent; the run's own error catches the opposite case.

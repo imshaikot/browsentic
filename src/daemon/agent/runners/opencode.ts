@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
@@ -8,9 +8,9 @@ import type { AgentSettings } from '../config';
 import { MCP_SERVER_NAME } from './claude';
 import { spawnCli, stopTree, type CliProcess } from './command';
 import { childEnv } from './drive';
-import { acpTurn } from './opencode-acp';
+import { acpTurn, type TurnModel } from './opencode-acp';
 import { conversationDir, effortOf, MCP_CALL_TIMEOUT_MS, parseJsonLine, sweepRunDirs } from './util';
-import type { JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
+import type { CommandLister, JsonContext, McpServer, Plan, Runner, RunMode, StreamContext, StreamReader, StreamSink } from './types';
 
 /**
  * The whole config travels in OPENCODE_CONFIG_CONTENT, and its containment is one rule: the agent
@@ -66,6 +66,11 @@ const database2 = () => join(stateDir, 'agents', 'opencode', 'opencode-2.db');
 const configHome = () => join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'opencode');
 
 const INSTALL = 'npm i -g opencode-ai';
+
+/** OpenCode Zen's provider id, whose free models serve only requests carrying OpenCode's own tools. */
+const ZEN = 'opencode';
+
+const NARROWED = 'a run whose tools Browsentic has narrowed to the browser';
 
 /** `opencode v2.0.32` from 2.x, a bare `1.19.3` from 1.x. */
 export const isOpenCode2 = (version?: string): boolean => Number(/^(?:opencode\s+)?v?(\d+)\./i.exec(version?.trim() ?? '')?.[1] ?? 0) >= 2;
@@ -139,6 +144,8 @@ export const opencodeRunner: Runner = {
     join(homedir(), '.claude', 'skills'),
   ],
 
+  models: (version) => (isOpenCode2(version) ? models2 : undefined),
+
   stream(context: StreamContext): Plan {
     if (isOpenCode2(context.version)) return standalone(context);
     const { settings, research } = context;
@@ -183,7 +190,7 @@ export const opencodeRunner: Runner = {
       plan: { ...turn2(context), args: ['acp'] },
       agent: AGENT,
       declined: () => noConversation.add(bin),
-      explain: (message) => explain({ message }, bin),
+      explain: (message, model) => explain({ message }, bin, model),
       stoppedFor: (tool) => stoppedFor(tool),
     });
   },
@@ -446,7 +453,7 @@ export function signInLine(bin: string, platform: NodeJS.Platform = process.plat
   return `OPENCODE_DB=${quote(db)} ${/^[\w./-]+$/.test(bin) ? bin : quote(bin)} auth login --standalone`;
 }
 
-function explain(failure: Failure | undefined, bin = 'opencode'): string {
+function explain(failure: Failure | undefined, bin = 'opencode', model?: TurnModel): string {
   const message = oneLine(failure?.data?.message ?? failure?.message ?? failure?.name ?? failure?.type ?? 'OpenCode reported an error');
   const status = failure?.data?.statusCode ?? failure?.status;
   const body = failure?.data?.responseBody ?? failure?.response?.body ?? '';
@@ -461,17 +468,12 @@ function explain(failure: Failure | undefined, bin = 'opencode'): string {
   }
   if (!v1 && body.includes('FreeTierError')) {
     return (
-      `OpenCode Zen's free models refuse a run whose tools Browsentic has narrowed to the browser. Sign Browsentic's OpenCode in ` +
-      `to a provider with ${signInLine(bin)}, then pick one of its models in the side panel. (${message})`
+      `OpenCode Zen's free models refuse ${NARROWED}. Pick a paid model in the side panel, which Zen bills to your OpenCode account, ` +
+      `or sign Browsentic's OpenCode in to another provider with ${signInLine(bin)}. (${message})`
     );
   }
   // Over ACP, 2.x says only this, for a provider with no sign-in and for Zen's free tier alike.
-  if (!v1 && /authentication required/i.test(message)) {
-    return (
-      `OpenCode has no sign-in for this model in Browsentic, and OpenCode Zen's free models refuse a run whose tools Browsentic ` +
-      `has narrowed to the browser. Sign Browsentic's OpenCode in to a provider with ${signInLine(bin)}, then pick one of its models in the side panel. (${message})`
-    );
-  }
+  if (!v1 && /authentication required/i.test(message)) return `${refused(model, bin)} (${message})`;
   if (failure?.name === 'ProviderAuthError' || failure?.type === 'provider.auth' || status === 401 || status === 403) {
     if (!v1) return `${message} If that is a login problem, sign Browsentic's OpenCode in with ${signInLine(bin)}.`;
     return (
@@ -491,6 +493,26 @@ function explain(failure: Failure | undefined, bin = 'opencode'): string {
     );
   }
   return message;
+}
+
+/** What a refused 2.x turn needs, told from the provider of the model it ran on. */
+function refused(model: TurnModel | undefined, bin: string): string {
+  const line = signInLine(bin);
+  if (!model) {
+    return (
+      `OpenCode Zen's free models refuse ${NARROWED}, and any other model needs a sign-in Browsentic's OpenCode holds. ` +
+      `Pick a paid model in the side panel, or sign Browsentic's OpenCode in to a provider with ${line}.`
+    );
+  }
+  const chosen = model.picked ? model.id : `${model.id}, which OpenCode chose because no model is picked in Browsentic`;
+  const provider = model.id.split('/')[0];
+  if (provider === ZEN) {
+    return (
+      `OpenCode Zen refused ${chosen}. Zen's free models refuse ${NARROWED}, and its paid ones need credit on your OpenCode account. ` +
+      `Pick a paid model in the side panel, or sign Browsentic's OpenCode in to another provider with ${line}.`
+    );
+  }
+  return `Browsentic's OpenCode has no working sign-in for ${provider}, so it could not run ${chosen}. Sign it in with ${line}, or pick another model in the side panel.`;
 }
 
 const oneLine = (message: string) => message.replace(/\s+/g, ' ').trim().slice(0, 240);
@@ -520,7 +542,7 @@ function declaresProvider(pattern = /"provider"\s*:/): boolean {
 const AUTH_TIMEOUT_MS = 5_000;
 
 /** One answer per state of the database, and one question at a time. */
-let lastAnswer: { key: string; problem: AgentProblem | null } | undefined;
+let lastAnswer: { key: string; problem: AgentProblem | null; signIns?: string } | undefined;
 let asking: Promise<AgentProblem | null> | undefined;
 
 /**
@@ -540,9 +562,9 @@ async function check2(settings: AgentSettings): Promise<AgentProblem | null> {
   const key = `${settings.bin}|${stamped}|${stamp(`${db}-wal`)}`;
   if (lastAnswer?.key === key) return lastAnswer.problem;
   asking ??= listSignIns(settings.bin)
-    .then((signedIn) => {
-      const problem = signedIn ? null : needsSignIn(settings.bin);
-      lastAnswer = { key, problem };
+    .then((integrations) => {
+      const problem = connected(integrations) ? null : needsSignIn(settings.bin);
+      lastAnswer = { key, problem, signIns: integrations ? signInsOf(integrations) : undefined };
       return problem;
     })
     .finally(() => (asking = undefined));
@@ -561,30 +583,46 @@ const stamp = (path: string) => {
 const needsSignIn = (bin: string): AgentProblem => ({
   code: 'AGENT_NEEDS_PERMISSION',
   message:
-    "This OpenCode 2 has no sign-in of its own for Browsentic, which keeps one apart from yours, and OpenCode Zen's free models refuse a run whose tools Browsentic has narrowed to the browser.",
+    "This OpenCode 2 has no sign-in of its own for Browsentic, which keeps one apart from yours. Sign it in to a model provider, or to OpenCode Zen and then pick a paid model: Zen's free models refuse a run whose tools Browsentic has narrowed to the browser.",
   fix: signInLine(bin),
 });
 
 interface Integration {
-  connections?: { status?: { status?: string } }[];
+  id?: string;
+  connections?: { id?: string; type?: string; status?: { status?: string } }[];
 }
 
-function listSignIns(bin: string): Promise<boolean> {
+const connected = (integrations: Integration[] | null) =>
+  !integrations || integrations.some(({ connections }) => connections?.some(({ status }) => !status || status.status === 'connected'));
+
+/** The sign-ins as they stand, which a run writing its sessions to the same database leaves alone. */
+const signInsOf = (integrations: Integration[]) =>
+  createHash('sha256')
+    .update(JSON.stringify(integrations.map(({ id, connections }) => [id, connections?.map(({ id: credential, type, status }) => [credential ?? type, status?.status])])))
+    .digest('hex')
+    .slice(0, 16);
+
+/** How Browsentic's own OpenCode 2 is asked something: on its database, with the user's plugins and other MCP servers kept out. */
+const asked2 = (cwd: string) => ({
+  ...SEALED_2,
+  PWD: cwd,
+  OPENCODE_DB: database2(),
+  OPENCODE_CONFIG_CONTENT: JSON.stringify({ policies: POLICIES }),
+});
+
+function listSignIns(bin: string): Promise<Integration[] | null> {
   const cwd = opencodeRunner.workspace('task');
   mkdirSync(cwd, { recursive: true });
   let child: CliProcess;
   try {
-    child = spawnCli(bin, ['auth', 'list', '--standalone', '--format', 'json'], {
-      cwd,
-      env: { ...childEnv('opencode'), ...SEALED_2, PWD: cwd, OPENCODE_DB: database2(), OPENCODE_CONFIG_CONTENT: JSON.stringify({ policies: POLICIES }) },
-    });
+    child = spawnCli(bin, ['auth', 'list', '--standalone', '--format', 'json'], { cwd, env: { ...childEnv('opencode'), ...asked2(cwd) } });
   } catch {
-    return Promise.resolve(true);
+    return Promise.resolve(null);
   }
   return new Promise((resolve) => {
     let output = '';
     let settled = false;
-    const done = (value: boolean) => {
+    const done = (value: Integration[] | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -592,16 +630,52 @@ function listSignIns(bin: string): Promise<boolean> {
     };
     const timer = setTimeout(() => {
       stopTree(child, 'SIGKILL');
-      done(true);
+      done(null);
     }, AUTH_TIMEOUT_MS);
     timer.unref();
     child.stdout.on('data', (chunk: Buffer) => void (output += chunk.toString()));
     child.stderr.on('data', () => {});
-    child.on('error', () => done(true));
+    child.on('error', () => done(null));
     child.on('close', (code) => {
       const integrations = code === 0 ? parseJsonLine<Integration[]>(output.trim()) : null;
-      if (!Array.isArray(integrations)) return done(true);
-      done(integrations.some((integration) => integration.connections?.some((connection) => !connection.status || connection.status.status === 'connected')));
+      done(Array.isArray(integrations) ? integrations : null);
     });
   });
 }
+
+interface ListedModel {
+  providerID?: string;
+  id?: string;
+  enabled?: boolean;
+  capabilities?: { tools?: boolean };
+  cost?: { input?: number; output?: number }[];
+}
+
+interface Listed {
+  data?: ListedModel[];
+}
+
+/** Zen bills nothing for its free models, and serves them only to OpenCode's own tools. */
+const zenFree = ({ providerID, cost = [] }: ListedModel) => providerID === ZEN && cost.length > 0 && cost.every(({ input, output }) => !input && !output);
+
+function runnable(listed: Listed | null): string[] | null {
+  const models = listed?.data;
+  if (!Array.isArray(models)) return null;
+  const ids = models
+    .filter((model) => model.providerID && model.id && model.enabled !== false && model.capabilities?.tools !== false && !zenFree(model))
+    .map(({ providerID, id }) => `${providerID}/${id}`)
+    .sort();
+  return ids.length ? ids : null;
+}
+
+/**
+ * The models Browsentic's own OpenCode 2 can run a turn on, as its server lists them for the sign-ins
+ * that database holds: none that cannot call a tool, and none of Zen's free ones. The list is read
+ * again when a sign-in changes.
+ */
+const models2: CommandLister = {
+  args: ['api', '--standalone', 'model.list'],
+  env: asked2,
+  stamp: () => lastAnswer?.signIns,
+  parse: ({ stdout, code }) => (code === 0 ? runnable(parseJsonLine<Listed>(stdout.trim())) : null),
+};

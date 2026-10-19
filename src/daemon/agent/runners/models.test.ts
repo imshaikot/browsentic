@@ -5,15 +5,18 @@ import { AGENTS, type AgentKind } from '@/lib/agents/catalog';
 import { stateDir } from '../../lockfile';
 import { listing, stubCli } from './fixtures/support';
 import { RUNNERS } from './index';
-import { modelsFor, refreshModels } from './models';
-import type { Listing, Runner } from './types';
+import { listerFor, modelsFor, refreshModels } from './models';
+import type { CommandLister, Listing, ModelLister, Runner } from './types';
 
 const bin = join(stateDir, 'model-bin');
 const calls = join(stateDir, 'model-calls.log');
 const store = join(stateDir, 'models.json');
 
+/** The version each recording was made with, for a runner that lists per version. */
+const RECORDED: Partial<Record<AgentKind, string>> = { opencode: 'opencode v2.0.32' };
+
 const parsed = (kind: AgentKind, output: Listing) => {
-  const lister = RUNNERS[kind].models;
+  const lister = listerFor(RUNNERS[kind], RECORDED[kind]);
   if (!lister || 'file' in lister) throw new Error(`${kind} does not list its models with a command`);
   return lister.parse(output);
 };
@@ -36,14 +39,33 @@ describe("each CLI's own list, as recorded", () => {
   });
 
   test("Codex's cache yields the models its own picker lists, by its priority, and none of its hidden helpers", () => {
-    const lister = RUNNERS.codex.models;
+    const lister = listerFor(RUNNERS.codex, 'codex-cli 0.155.1');
     expect(lister && 'file' in lister ? lister.parse(codexCache()) : null).toEqual(['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5']);
+  });
+
+  // Zen's free models serve only requests carrying OpenCode's own tools, so a Browsentic run on one is refused.
+  test("OpenCode 2 lists what Browsentic's own sign-in reaches, by provider and in order, and none of Zen's free models", () => {
+    const ids = parsed('opencode', listing('opencode', '2.0.32-models.txt')) ?? [];
+    expect([ids.length, ids.every((id) => id.startsWith('opencode/')), ids.includes('opencode/claude-sonnet-5-5')]).toEqual([31, true, true]);
+    expect(ids.filter((id) => id.endsWith('-free') || id === 'opencode/big-pickle')).toEqual([]);
+    expect(ids).toEqual([...ids].sort());
+  });
+
+  test('OpenCode 2 leaves out a model that cannot call a tool, and keeps a free one of any provider but Zen', () => {
+    const ids = parsed('opencode', listing('opencode', '2.0.32-models-provider-keys.txt')) ?? [];
+    expect([ids.length, ids.includes('google/gemma-4-31b-it'), ids.includes('openai/text-embedding-3-small'), ids.some((id) => id.startsWith('opencode/'))]).toEqual([
+      115,
+      true,
+      false,
+      false,
+    ]);
   });
 
   test.each([
     ['antigravity', '1.2.11-models-signed-out.txt'],
     ['cursor', '2026.09.18-models-signed-out.txt'],
     ['grok', '1.0.40-models-signed-out.txt'],
+    ['opencode', '2.0.32-models-signed-out.txt'],
   ] as const)('%s signed out is no list at all', (kind, name) => {
     expect(parsed(kind, listing(kind, name))).toBeNull();
   });
@@ -53,6 +75,7 @@ describe("each CLI's own list, as recorded", () => {
       antigravity: parsed('antigravity', listing('antigravity', '1.2.11-models.txt')),
       cursor: parsed('cursor', listing('cursor', '2026.09.18-models.txt')),
       grok: parsed('grok', listing('grok', '1.0.40-models.txt')),
+      opencode: parsed('opencode', listing('opencode', '2.0.32-models-provider-keys.txt')),
     };
     const unlisted = Object.entries(listed).flatMap(([kind, ids]) =>
       AGENTS[kind as AgentKind].models.filter((id) => !ids?.includes(id)).map((id) => `${kind}: ${id}`),
@@ -123,6 +146,33 @@ describe('reading and keeping a list', () => {
     await refreshModels(agy, settings(listed), '1.2.12');
     await refreshModels(agy, settings(signedOut), '1.2.12');
     expect(spawned()).toEqual(['agy models', 'agy models', 'agy-signed-out models']);
+  });
+
+  test('a list that rests on more than the CLI, such as its sign-ins, is read again when that changes, and only then', async () => {
+    let signIns = 'zen';
+    const stamped: Runner = { ...agy, models: { ...(agy.models as CommandLister), stamp: () => signIns } };
+    await refreshModels(stamped, settings(listed), '1.2.11');
+    await refreshModels(stamped, settings(listed), '1.2.11');
+    signIns = 'zen and anthropic';
+    await refreshModels(stamped, settings(listed), '1.2.11');
+    expect(spawned()).toEqual(['agy models', 'agy models']);
+  });
+
+  test("a lister's own environment reaches the listing, which runs in a folder of its own", async () => {
+    const seen = join(bin, 'listed-in.json');
+    const reporting = stub(
+      'agy-env',
+      `require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify([process.env.LISTED_IN, process.env.NO_COLOR]));\n${out('gemini-3.8-flash-high\tFlash\n')}`,
+    );
+    const withEnv: Runner = { ...agy, models: { ...(agy.models as CommandLister), env: (cwd) => ({ LISTED_IN: cwd }) } };
+    await refreshModels(withEnv, settings(reporting), '1.2.11');
+    expect(JSON.parse(readFileSync(seen, 'utf8'))).toEqual([join(stateDir, 'agents', 'antigravity', 'models'), '1']);
+  });
+
+  test('a runner that lists per version reads nothing for a version it has no lister for', async () => {
+    const versioned: Runner = { ...agy, models: (version) => (version === '2' ? (agy.models as ModelLister) : undefined) };
+    expect([await refreshModels(versioned, settings(listed), '1'), await refreshModels(versioned, settings(listed), '2')]).toEqual([false, true]);
+    expect(spawned()).toEqual(['agy models']);
   });
 
   test('a failed read keeps the last good list, and says why', async () => {

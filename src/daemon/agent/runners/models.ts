@@ -6,7 +6,7 @@ import { log } from '../../log';
 import type { AgentSettings } from '../config';
 import { spawnCli, stopTree, type CliProcess } from './command';
 import { childEnv } from './drive';
-import type { Listing, ModelLister, Runner } from './types';
+import type { CommandLister, Listing, ModelLister, Runner } from './types';
 
 const FRESH_MS = 6 * 60 * 60_000;
 const RETRY_MS = 10 * 60_000;
@@ -19,12 +19,16 @@ const storePath = join(stateDir, 'models.json');
 interface Entry {
   bin: string;
   version?: string;
+  stamp?: string;
   /** The last list that read cleanly. A failed read never replaces it. */
   ids?: string[];
   at?: number;
   triedAt: number;
   error?: string;
 }
+
+/** What a list was read from: a change to any of it reads the list again. */
+type Source = Pick<Entry, 'bin' | 'version' | 'stamp'>;
 
 type Store = Partial<Record<AgentKind, Entry>>;
 
@@ -50,15 +54,16 @@ export function refreshModels(
   version: string | undefined,
   { force = false } = {},
 ): Promise<boolean> {
-  const lister = runner.models;
+  const lister = listerFor(runner, version);
   if (!lister) return Promise.resolve(false);
   const running = inFlight.get(runner.kind);
   if (running) return running;
-  if (!force && !due(readStore()[runner.kind], settings.bin, version, lister)) return Promise.resolve(false);
+  const source: Source = { bin: settings.bin, version, stamp: 'file' in lister ? undefined : lister.stamp?.() };
+  if (!force && !due(readStore()[runner.kind], source, lister)) return Promise.resolve(false);
 
   const reading = read(runner.kind, settings.bin, lister)
     .catch((error: unknown): Outcome => ({ error: String(error) }))
-    .then((outcome) => record(runner.kind, settings.bin, version, outcome))
+    .then((outcome) => record(runner.kind, source, outcome))
     .catch((error: unknown) => {
       log(`could not keep ${AGENTS[runner.kind].label}'s model list: ${String(error)}`);
       return false;
@@ -68,8 +73,12 @@ export function refreshModels(
   return reading;
 }
 
-function due(entry: Entry | undefined, bin: string, version: string | undefined, lister: ModelLister): boolean {
-  if (!entry || entry.bin !== bin || entry.version !== version) return true;
+export function listerFor(runner: Runner, version: string | undefined): ModelLister | undefined {
+  return typeof runner.models === 'function' ? runner.models(version) : runner.models;
+}
+
+function due(entry: Entry | undefined, { bin, version, stamp }: Source, lister: ModelLister): boolean {
+  if (!entry || entry.bin !== bin || entry.version !== version || entry.stamp !== stamp) return true;
   const age = Date.now() - entry.triedAt;
   if (entry.error) return age >= RETRY_MS;
   return 'file' in lister || age >= FRESH_MS;
@@ -87,7 +96,7 @@ async function read(kind: AgentKind, bin: string, lister: ModelLister): Promise<
     return accepted(() => lister.parse(content)) ?? { error: `${basename(path)} holds no model Browsentic could read.` };
   }
 
-  const listing = await list(kind, bin, lister.args);
+  const listing = await list(kind, bin, lister);
   if ('error' in listing) return listing;
   return accepted(() => lister.parse(listing)) ?? { error: reason(listing) };
 }
@@ -115,7 +124,7 @@ function reason({ stdout, stderr, code }: Listing): string {
   return code === 0 ? 'It printed no model list Browsentic could read.' : `It exited with code ${code}.`;
 }
 
-function list(kind: AgentKind, bin: string, args: string[]): Promise<Listing | { error: string }> {
+function list(kind: AgentKind, bin: string, { args, env }: CommandLister): Promise<Listing | { error: string }> {
   const cwd = join(stateDir, 'agents', kind, 'models');
   mkdirSync(cwd, { recursive: true, mode: 0o700 });
   const command = `"${[basename(bin), ...args].join(' ')}"`;
@@ -123,7 +132,7 @@ function list(kind: AgentKind, bin: string, args: string[]): Promise<Listing | {
 
   let child: CliProcess;
   try {
-    child = spawnCli(bin, args, { cwd, env: { ...childEnv(kind), NO_COLOR: '1' }, detached: group });
+    child = spawnCli(bin, args, { cwd, env: { ...childEnv(kind), ...env?.(cwd), NO_COLOR: '1' }, detached: group });
   } catch (error) {
     return Promise.resolve({ error: (error as Error).message });
   }
@@ -165,14 +174,14 @@ function list(kind: AgentKind, bin: string, args: string[]): Promise<Listing | {
   });
 }
 
-function record(kind: AgentKind, bin: string, version: string | undefined, outcome: Outcome): boolean {
+function record(kind: AgentKind, source: Source, outcome: Outcome): boolean {
   const store = readStore();
   const before = store[kind];
   const now = Date.now();
   const entry: Entry =
     'ids' in outcome
-      ? { bin, version, ids: outcome.ids, at: now, triedAt: now }
-      : { bin, version, ids: before?.ids, at: before?.at, triedAt: now, error: outcome.error };
+      ? { ...source, ids: outcome.ids, at: now, triedAt: now }
+      : { ...source, ids: before?.ids, at: before?.at, triedAt: now, error: outcome.error };
   if ('error' in outcome) log(`could not list ${AGENTS[kind].label}'s models: ${outcome.error}`);
   store[kind] = entry;
   writeStore(store);
@@ -203,6 +212,7 @@ function entryOf(value: unknown): Entry | null {
   return {
     bin: raw.bin,
     version: typeof raw.version === 'string' ? raw.version : undefined,
+    stamp: typeof raw.stamp === 'string' ? raw.stamp : undefined,
     ids: ids?.length ? ids : undefined,
     at: typeof raw.at === 'number' ? raw.at : undefined,
     triedAt: raw.triedAt,

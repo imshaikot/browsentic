@@ -47,12 +47,18 @@ interface Update {
   used?: number;
 }
 
+/** The model a turn ran on, and whether it was picked in Browsentic or left to OpenCode. */
+export interface TurnModel {
+  id: string;
+  picked: boolean;
+}
+
 export interface AcpTurn {
   plan: Plan;
   /** The agent the config defines, which every session has to be in. */
   agent: string;
   declined: (reason: string) => void;
-  explain: (message: string | undefined) => string;
+  explain: (message: string | undefined, model?: TurnModel) => string;
   stoppedFor: (tool: string) => string;
 }
 
@@ -64,6 +70,7 @@ export interface AcpTurn {
  */
 export function acpTurn(context: StreamContext, turn: AcpTurn): Conversation {
   let session: string | undefined;
+  let model: TurnModel | undefined;
   let holding = false;
   let contextTokens = 0;
   const calls = new Map<string, string>();
@@ -101,20 +108,27 @@ export function acpTurn(context: StreamContext, turn: AcpTurn): Conversation {
     return prompt(io, sink);
   };
 
+  const modelOf = (options: ConfigOption[] | undefined): TurnModel | undefined => {
+    const pinned = context.settings.model;
+    if (pinned) return { id: pinned, picked: true };
+    const current = option(options, 'model')?.currentValue;
+    return current ? { id: current, picked: false } : undefined;
+  };
+
   // A model OpenCode does not know is swapped for another without a word, so a pinned one is asked for by name.
   const chooseModel = (options: ConfigOption[] | undefined, io: ConversationIO, sink: StreamSink) => {
-    const model = context.settings.model;
+    const pinned = context.settings.model;
     const choice = option(options, 'model');
-    if (!model || choice?.currentValue === model) return chooseEffort(options, io, sink);
-    if (!offers(choice, model)) {
+    if (!pinned || choice?.currentValue === pinned) return chooseEffort(options, io, sink);
+    if (!offers(choice, pinned)) {
       const some = (choice?.options ?? []).flatMap((offered) => (offered.value ? [offered.value] : [])).slice(0, 6);
       return sink.fail(
         'AGENT_FAILED',
-        `OpenCode offers no model "${model}" here.${some.length ? ` It offers ${some.join(', ')}, among others.` : ''} ` +
+        `OpenCode offers no model "${pinned}" here.${some.length ? ` It offers ${some.join(', ')}, among others.` : ''} ` +
           'Pick one in the Browsentic side panel, spelled provider/model, then try again.',
       );
     }
-    return ask(io, ASK.model, 'session/set_config_option', { sessionId: session, configId: 'model', value: model });
+    return ask(io, ASK.model, 'session/set_config_option', { sessionId: session, configId: 'model', value: pinned });
   };
 
   const onSession = (message: Message, io: ConversationIO, sink: StreamSink) => {
@@ -126,6 +140,7 @@ export function acpTurn(context: StreamContext, turn: AcpTurn): Conversation {
     session = message.result?.sessionId ?? context.sessionId ?? undefined;
     if (!session) return sink.fail('AGENT_FAILED', 'OpenCode opened a session without naming it.');
     holding = true;
+    model = modelOf(options);
     sink.session(session);
     chooseModel(options, io, sink);
   };
@@ -147,14 +162,14 @@ export function acpTurn(context: StreamContext, turn: AcpTurn): Conversation {
         return onSession(message, io, sink);
 
       case ASK.model:
-        if (failed) return sink.fail('AGENT_FAILED', turn.explain(failed.message));
+        if (failed) return sink.fail('AGENT_FAILED', turn.explain(failed.message, model));
         return chooseEffort(message.result?.configOptions, io, sink);
 
       case ASK.effort:
         return prompt(io, sink);
 
       case ASK.prompt: {
-        if (failed) return sink.fail('AGENT_FAILED', turn.explain(failed.message));
+        if (failed) return sink.fail('AGENT_FAILED', turn.explain(failed.message, model));
         const output = message.result?.usage?.outputTokens;
         if (output !== undefined) sink.usage({ contextTokens, outputTokens: output });
         // Stopped from Browsentic, OpenCode ends the prompt itself before it exits.
