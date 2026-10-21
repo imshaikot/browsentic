@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Clapperboard, Cpu, FileText, Globe, Layers, type LucideIcon } from 'lucide-react';
 
 import { AgentMark } from '@/extension/components/agent-marks';
-import { AGENTS } from '@/lib/agents/catalog';
+import { agentLabel as labelOf } from '@/lib/agents/catalog';
 import type { ContextBreakdown } from '@/lib/bridge/commands';
 import { cn } from '@/lib/utils';
 
@@ -128,7 +128,7 @@ function Row({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }
 
 function agentLabel(breakdown: ContextBreakdown): string {
   if (!breakdown.agent) return 'no agent yet';
-  return `${AGENTS[breakdown.agent].label}${breakdown.resumes ? ' · resumes' : ''}`;
+  return `${labelOf(breakdown.agent)}${breakdown.resumes ? ' · resumes' : ''}`;
 }
 
 function compact(n: number): string {

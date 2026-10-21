@@ -242,6 +242,158 @@ const openCode2 =
     return problems;
   };
 
+/**
+ * Rows of a DeepSeek Harness profile that give the model a tool of its own, or run work beside the
+ * turn: the shell, the disk, skills, sub-agents, scripted workflows, goals, its own commands and
+ * questions, and the telemetry exporters. The web rows are left to a run in research mode.
+ */
+const DEEPSEEK_OFF = [
+  'tool-bash', 'tool-pwsh', 'tool-jobs', 'tool-fs', 'tool-fs-search',
+  'tool-skill', 'skill', 'skill-filesystem',
+  'tool-subagent', 'tool-subagent-fork', 'tool-subagent-control', 'tool-subagent-list-agents',
+  'tool-workflow', 'workflow-ptc', 'ptc-runtime',
+  'tool-goal', 'goal', 'goal-round-driver', 'command-goal', 'tool-working-directory',
+  'plan-mode', 'mcp-resources', 'user-questions', 'commands', 'command-feedback', 'command-compact',
+  'otel', 'session-telemetry-otel',
+];
+
+const DEEPSEEK_SIGN_IN = ['credentials', 'authorization', 'deepseek-account'];
+
+const DEEPSEEK_PROVIDERS = ['deepseek-account', 'deepseek-official'];
+
+const DEEPSEEK_EFFORTS = ['off', 'low', 'high', 'max'];
+
+const DEEPSEEK_PERSONA = "You are Browsentic's browser agent, powered by the {{model}} model.";
+
+/** dsh's own environment switches: a sandbox for whatever might still run, and no telemetry. */
+const DEEPSEEK_SEALED = { DSH_PERMISSION_MODE: 'read-only', DSH_TELEMETRY_MODE: 'DISABLED', DSH_TELEMETRY_DISABLED: '1' };
+
+interface DeepseekRow {
+  id?: unknown;
+  name?: unknown;
+  disabled?: unknown;
+  config?: Record<string, unknown>;
+  insert?: DeepseekRow[];
+}
+
+const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * A DeepSeek Harness plan read rather than searched. Its argv is exactly a profile and a patch; its
+ * homes are Browsentic's own, so none of the user's patches, AGENTS.md or skills compose into it;
+ * and the patch switches off every row that hands the model a tool. Beyond those it may switch the
+ * sign-in back on, point the credentials row at the user's file, pick a route, keep instructions
+ * to the run's folder, set the persona and the result ceiling, give a one-shot a read-only `read`
+ * and a headless run the browser's server: anything else is refused.
+ */
+const deepseek =
+  (mode: SpawnMode) =>
+  (plan: SpawnPlan): string[] => {
+    const problems: string[] = [];
+    const profile = mode === 'conversation' ? 'acp' : 'headless';
+    const patchFile = mode === 'task' ? 'task.patch.yml' : 'browsentic.patch.yml';
+    const patchPath = posix.join(plan.cwd, patchFile) === plan.args[3] || win32.join(plan.cwd, patchFile) === plan.args[3] ? plan.args[3] : undefined;
+    const tail = plan.args.slice(4);
+    const shaped =
+      plan.args[0] === '--profile' && plan.args[1] === profile && plan.args[2] === '--patch' && patchPath !== undefined &&
+      (mode === 'conversation'
+        ? tail.length === 0
+        : sameJson(tail.slice(-2), ['--json', '-']) && (tail.length === 2 || (mode === 'run' && tail.length === 4 && tail[0] === '--session-id')));
+    if (!shaped) problems.push(`is spawned other than as \`dsh --profile ${profile} --patch <its ${patchFile}>\``);
+
+    const owner = deepseekRoot(plan.cwd);
+    for (const name of ['DSH_HOME', 'DSH_AGENTS_HOME']) {
+      const value = plan.env?.[name];
+      if (!owner || !value || !within(value, owner)) problems.push(`is spawned with a ${name} outside Browsentic's own`);
+    }
+
+    let rows: DeepseekRow[];
+    try {
+      rows = JSON.parse(plan.files?.find((file) => file.path === patchFile)?.content ?? '') as DeepseekRow[];
+      if (!Array.isArray(rows)) throw new Error('not a list');
+    } catch {
+      return [...problems, `writes a ${patchFile} that is not a readable list of rows`];
+    }
+
+    const switchedOff = new Set(rows.filter((row) => row.disabled === true && Object.keys(row).length === 2).map((row) => row.id));
+    const missing = DEEPSEEK_OFF.filter((id) => !switchedOff.has(id) && !(mode === 'task' && id === 'tool-fs' && readOnly(rows)));
+    if (missing.length) problems.push(`leaves ${missing.join(', ')} switched on`);
+    for (const row of rows) {
+      const clause = deepseekRow(row, mode);
+      if (clause) problems.push(clause);
+    }
+    return problems;
+  };
+
+/** Whether the one-shot's patch gives it `read` and no other file tool. */
+const readOnly = (rows: DeepseekRow[]) =>
+  rows.some((row) => row.id === 'tool-fs' && sameJson(row.config, { read: true, readImage: false, write: false, edit: false }) && row.disabled === undefined);
+
+/** What is wrong with one row of the patch, or null when it is a row the plan may carry. */
+function deepseekRow(row: DeepseekRow, mode: SpawnMode): string | null {
+  if (row.insert !== undefined) {
+    const [server, ...others] = Array.isArray(row.insert) ? row.insert : [];
+    const config = server?.config ?? {};
+    const browser =
+      mode === 'run' && others.length === 0 && Object.keys(row).length === 1 &&
+      server?.name === '@deepseek-ai/dsh-mcp-client' && config.serverName === 'browsentic' && config.transport === 'stdio' &&
+      Array.isArray(config.args) && config.args.at(-1) === 'mcp' &&
+      typeof (config.env as Record<string, unknown> | undefined)?.BROWSENTIC_AGENT_RUN === 'string';
+    return browser ? null : 'inserts a row other than the browser’s own server';
+  }
+  const { id, disabled, config } = row;
+  if (typeof id !== 'string') return 'carries a row with no id';
+  if (disabled === true) return config === undefined && Object.keys(row).length === 2 ? null : `switches ${id} off with a config besides`;
+  if (disabled === false && !DEEPSEEK_SIGN_IN.includes(id)) return `switches ${id} on`;
+  if (config === undefined) return disabled === false ? null : `carries a ${id} row that does nothing`;
+  switch (id) {
+    case 'credentials':
+      return Object.keys(config).join() === 'path' && typeof config.path === 'string' && /[\\/]\.credentials\.yaml$/.test(config.path) ? null : 'points the credentials row elsewhere than a sign-in file';
+    case 'agent-default-model':
+    case 'acp': {
+      const known = Object.keys(config).every((key) => ['provider', 'model', ...(id === 'acp' ? [] : ['reasoningEffort'])].includes(key));
+      const fits =
+        DEEPSEEK_PROVIDERS.includes(config.provider as string) && isModelId(config.model) &&
+        (config.reasoningEffort === undefined || DEEPSEEK_EFFORTS.includes(config.reasoningEffort as string));
+      return known && fits && (id !== 'acp' || mode === 'conversation') ? null : `picks a route through ${id} it may not`;
+    }
+    case 'agent-instructions': {
+      const marker = mode === 'task' ? 'task.patch.yml' : 'browsentic.patch.yml';
+      const keys = Object.keys(config).sort().join();
+      return keys === 'localInstructionFileCandidates,maxBytes,projectRootMarkers' && typeof config.maxBytes === 'number' &&
+        sameJson(config.projectRootMarkers, [marker]) && sameJson(config.localInstructionFileCandidates, [])
+        ? null
+        : 'lets workspace instructions come from beyond the run’s own folder';
+    }
+    case 'system-prompt':
+      return sameJson(config, { personaPrefix: DEEPSEEK_PERSONA }) ? null : 'rewrites the system prompt’s persona';
+    case 'spill-policy':
+      return Object.keys(config).join() === 'maxInlineTokens' && typeof config.maxInlineTokens === 'number' ? null : 'reconfigures the result ceiling';
+    case 'tool-fs':
+      return mode === 'task' && sameJson(config, { read: true, readImage: false, write: false, edit: false }) ? null : 'gives the model file tools';
+    default:
+      return `reconfigures ${id}`;
+  }
+}
+
+/** The `agents/deepseek` folder a plan's working directory lies in, whose homes are the only ones it may use. */
+function deepseekRoot(cwd: string): string | undefined {
+  const path = cwd.includes('\\') ? win32 : posix;
+  for (let dir = cwd; path.dirname(dir) !== dir; dir = path.dirname(dir)) {
+    if (path.basename(dir) === 'deepseek' && path.basename(path.dirname(dir)) === 'agents') return dir;
+  }
+  return undefined;
+}
+
+const deepseekRules = (mode: SpawnMode): Requirements => ({
+  required: [],
+  pairs: [],
+  env: DEEPSEEK_SEALED,
+  envIsCwd: ['PWD'],
+  inspect: deepseek(mode),
+  files: mode === 'task' ? ['task.patch.yml'] : ['browsentic.patch.yml', 'AGENTS.md'],
+});
+
 const openCode2Rules = (mode: SpawnMode): Requirements => ({
   required: mode === 'conversation' ? ['acp'] : ['--standalone'],
   pairs:
@@ -513,6 +665,21 @@ export const CONTAINMENT: Record<AgentKind, Containment> = {
     ],
     conversation: openCode2Rules('conversation'),
   },
+
+  deepseek: {
+    localTools: 'allowlist',
+    // A run signs in with the user's dsh sign-in, through the patch; DEEPSEEK_API_KEY is the other route dsh reads.
+    keepsEnv: ['DEEPSEEK_'],
+    // Its own launcher flags would load another profile or patch, or rewrite a profile, beside the vetted one.
+    forbidden: [/^--profile=/i, /^--patch=/i, /^--from-default-profile/i, /^--dump/i],
+    note:
+      'a per-run patch over its plugin tree that switches off every row giving the model a tool of its own — shell, files, ' +
+      'skills, sub-agents, workflows — so the model is offered the browser alone; runs keep a dsh home of Browsentic’s, ' +
+      'so the user’s own patches, AGENTS.md and skills never compose in, and borrow only the sign-in',
+    run: deepseekRules('run'),
+    task: deepseekRules('task'),
+    conversation: deepseekRules('conversation'),
+  },
 };
 
 /**
@@ -631,7 +798,7 @@ const SECRET_PREFIX: readonly string[] = [
   'STRIPE_', 'SLACK_', 'TWILIO_', 'SENDGRID_', 'SENTRY_', 'DATADOG_', 'PAGERDUTY_',
   'DATABASE_', 'POSTGRES_', 'PGPASS', 'MYSQL_', 'REDIS_', 'MONGO_', 'SUPABASE_',
   'OPENAI_', 'ANTHROPIC_', 'GEMINI_', 'CLAUDE_', 'CODEX_', 'ANTIGRAVITY_', 'MISTRAL_', 'XAI_', 'GROK_', 'CURSOR_', 'HF_', 'HUGGINGFACE_',
-  'QWEN_', 'DASHSCOPE_', 'BAILIAN_', 'OPENCODE_',
+  'QWEN_', 'DASHSCOPE_', 'BAILIAN_', 'OPENCODE_', 'DEEPSEEK_', 'DSH_',
   'VERCEL_', 'NETLIFY_', 'CLOUDFLARE_', 'FLY_', 'HEROKU_', 'RAILWAY_',
 ];
 

@@ -104,6 +104,10 @@ Those three answer most questions. The Bridge's log is at `~/.browsentic/daemon.
 | OpenCode fails with *could not start this turn* | Usually a model OpenCode does not know | Pick a model exactly as `opencode models` lists it, `provider/model` |
 | OpenCode cannot see an API key you exported | Only `OPENCODE_*` reaches a run; the rest are sealed away | Sign in instead (`opencode auth login` on OpenCode 1, the agent picker's line on OpenCode 2), which keeps the key in OpenCode's own store |
 | `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped | Update OpenCode and Browsentic, and report it |
+| DeepSeek Harness says it is not signed in | Runs use a dsh home of their own and borrow only your sign-in file, `~/.dsh/.credentials.yaml` | Run `dsh web` and sign in, or set `DEEPSEEK_API_KEY` where the Bridge starts |
+| `AGENT_UNSAFE`: *DeepSeek Harness ran its own … tool* | A tool outside the browser ran despite the run's patch, so the run was stopped | Update DeepSeek Harness and Browsentic, and report it |
+| DeepSeek Harness is unusable after a dsh update | The new release's plugin tree has a tool plugin Browsentic has not checked | Update Browsentic, or install the dsh it was checked against |
+| A DeepSeek Harness screenshot reads as *[image unavailable]* | `deepseek-v4-pro` has no image input | Pick `deepseek-flash` |
 
 ## Pages and tabs
 

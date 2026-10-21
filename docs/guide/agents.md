@@ -1,7 +1,8 @@
 # Choosing an agent
 
-The side panel runs an agent CLI you are already signed in to. Eight are supported: Claude Code,
-Codex and Antigravity, plus Mistral Vibe, Grok Build, Cursor CLI, Qwen Code and OpenCode in beta.
+The side panel runs an agent CLI you are already signed in to. Nine are supported: Claude Code,
+Codex and Antigravity, plus Mistral Vibe, Grok Build, Cursor CLI, Qwen Code, OpenCode and DeepSeek
+Harness in beta.
 This page covers picking one, how each is contained, and each one's setup and quirks.
 
 It applies to the side panel only. Driving Browsentic from another tool goes through the optional
@@ -31,9 +32,10 @@ Where a CLI can list the models your account has, the select offers that list:
 | Cursor CLI | `cursor-agent models`; there are over 200, so the select becomes a filter, with Browsentic's picks first |
 | OpenCode 2 | `opencode api --standalone model.list` on Browsentic's own OpenCode database, leaving out models that cannot call a tool and OpenCode Zen's free ones ([why](#opencode-is-in-beta)) |
 
-Claude Code, Mistral Vibe, Qwen Code and OpenCode 1 have no such command, so the select offers a
-short list shipped with Browsentic. For Claude Code that list is its aliases (`fable`, `opus`,
-`sonnet`, `haiku`), which it resolves to the newest model of each family.
+Claude Code, Mistral Vibe, Qwen Code, OpenCode 1 and DeepSeek Harness have no such command, so the
+select offers a short list shipped with Browsentic. For Claude Code that list is its aliases (`fable`,
+`opus`, `sonnet`, `haiku`), which it resolves to the newest model of each family. For DeepSeek
+Harness it is `deepseek-flash` and `deepseek-v4-pro`.
 
 The Bridge reads each list in the background, so the agent picker never waits on one. A list is
 kept for six hours and read again at once when the CLI is updated, or for OpenCode 2 when its
@@ -59,16 +61,16 @@ cannot resume each other's sessions, so the next instruction starts a new one.
 
 ## Supported agents
 
-| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) | Qwen Code (beta) | OpenCode (beta) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba | Anomaly |
-| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` | `opencode` |
-| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` |
-| Default model | `sonnet`, the newest Sonnet | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own |
-| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none; set `thinking` in Vibe's own config | `low`…`xhigh` | none; put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none; the model id is the only lever | a variant the model defines, e.g. `high` or `max` |
-| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, no MCP server but the browser's, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist; its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools |
+| | Claude Code | Codex | Antigravity | Mistral Vibe (beta) | Grok Build (beta) | Cursor CLI (beta) | Qwen Code (beta) | OpenCode (beta) | DeepSeek Harness (beta) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Vendor | Anthropic | OpenAI | Google | Mistral AI | xAI | Anysphere | Alibaba | Anomaly | DeepSeek |
+| Binary | `claude` | `codex` | `agy` | `vibe` | `grok` | `cursor-agent` | `qwen` | `opencode` | `dsh` |
+| Install | `npm i -g @anthropic-ai/claude-code` | `npm i -g @openai/codex` | [antigravity.google/docs/cli/install](https://antigravity.google/docs/cli/install) | `uv tool install mistral-vibe` | `curl -fsSL https://x.ai/cli/install.sh \| bash` | `curl https://cursor.com/install -fsS \| bash` | `npm i -g @qwen-code/qwen-code` | `npm i -g opencode-ai` | `npm i -g @deepseek-ai/dsh` |
+| Default model | `sonnet`, the newest Sonnet | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | the CLI's own | `deepseek-flash` |
+| Effort names | `low`…`max` | `low`…`xhigh` | `low`…`high` | none; set `thinking` in Vibe's own config | `low`…`xhigh` | none; put it in the model id, e.g. `claude-opus-4-8[effort=high]` | none; the model id is the only lever | a variant the model defines, e.g. `high` or `max` | `off`, `low`, `high`, `max` |
+| Kept off your machine by | a per-run tool allowlist plus an explicit deny list | its shell and image viewer switched off, no MCP server but the browser's, and a read-only sandbox (`sandbox_mode="read-only"`) | its own permission rules | a per-run tool allowlist; its shell and file tools are never loaded | a per-run tool list, approvals that refuse anything not granted up front, and a kernel sandbox that keeps its writes in its own folder | per-run deny rules, where a deny beats every allow; a kernel sandbox is asked for too but not depended on | `--safe-mode`, which drops every setting of your own, plus deny rules for the shell, the disk and the tools that reach either | a per-run agent whose rules deny every tool not named for it, so the model is never offered the shell, the disk or another server's tools | a per-run patch that switches off every tool of dsh's own, so the model is offered the browser's tools and a to-do list only, inside dsh's read-only sandbox |
 
-All eight get the same system prompt, the same browser tools and the same
+All nine get the same system prompt, the same browser tools and the same
 [approval gate](approvals.md). Codex is handed the tools directly; the others reach them through a
 `browsentic` MCP server pointed back at the Bridge. What differs is how well each can be fenced off
 from the rest of your machine;
@@ -341,6 +343,45 @@ What both lines share:
 
 ---
 
+### DeepSeek Harness is in beta
+
+DeepSeek Harness (`dsh`) is DeepSeek's own open-source agent harness, released as a developer
+preview. Browsentic's runner was checked against `dsh` 0.2.1-rc.2 with a real DeepSeek account: a
+browser tool call, a screenshot and a follow-up turn resuming. A real side-panel run has not been
+through it yet. Expect rough edges, and please report them.
+
+- **Sign in first.** Run `dsh web` and sign in with a DeepSeek account, or set `DEEPSEEK_API_KEY`.
+  Until then the agent picker shows *needs setup*. Browsentic needs dsh 0.2.1 or later.
+- **Runs keep a dsh home of their own.** Browsentic starts dsh in
+  `~/.browsentic/agents/deepseek/home` and borrows only your sign-in file, `~/.dsh/.credentials.yaml`
+  (or `$DSH_HOME/.credentials.yaml`). Your own dsh patches, your profiles' plugins, your `AGENTS.md`
+  and your skills never load into a run, and Browsentic's conversations do not appear in the
+  `dsh web` history. The side panel's `/` picker still lists your skills from `~/.dsh/skills` and
+  `~/.agents/skills`, because it reads them from disk itself.
+- **Only `DEEPSEEK_*` reaches a run from the environment.** Every other key is sealed away, and
+  `$DSH_HOME/.env` is not read by a run.
+- **Every tool of dsh's own is switched off.** Each run carries a patch over dsh's plugin tree that
+  switches off the shell, the files, skills, sub-agents, workflows and the web (unless the run is
+  [mapping a site](features/site-maps.md)), so the model is offered the browser's tools and a to-do
+  list only. dsh's read-only sandbox is on as well, and its telemetry is off. If one of its own tools
+  runs anyway, the run is stopped with `AGENT_UNSAFE`.
+- **A dsh update can be refused.** Browsentic checks dsh's plugin tree against the patch, and a
+  release that leaves on a tool plugin Browsentic has not checked is reported as unusable until
+  Browsentic is updated.
+- **Two models, and only one reads pictures.** The agent picker offers `deepseek-flash` (the
+  default) and `deepseek-v4-pro`. `deepseek-v4-pro` is text only, so a screenshot reaches it as a
+  placeholder.
+- **Effort is dsh's reasoning effort:** `off`, `low`, `high` or `max`.
+- **A turn is held over ACP.** Browsentic runs `dsh --profile acp` and hands the session the
+  browser's MCP server. If dsh refuses ACP, the turn runs through `--profile headless` instead.
+  One-shots (titles, file reports, recordings) always run headless.
+- **dsh gives up on a tool call after 60 seconds.** As on Cursor, an approval you have not answered
+  by then stays on screen and the agent asks again under the same card, and waits inside a call are
+  cut to fit. A result of up to 25,000 tokens reaches the model whole.
+- **No token counts.** dsh's reply to a turn carries none, so the context card has none to show.
+
+---
+
 ## Per-agent settings
 
 In `~/.browsentic/config.json`:
@@ -356,7 +397,8 @@ In `~/.browsentic/config.json`:
     "grok": { "bin": "grok", "model": "grok-4.7" },
     "cursor": { "bin": "cursor-agent", "model": "composer-2.5" },
     "qwen": { "bin": "qwen", "model": "qwen3-coder-plus" },
-    "opencode": { "bin": "opencode", "model": "anthropic/claude-sonnet-5" }
+    "opencode": { "bin": "opencode", "model": "anthropic/claude-sonnet-5" },
+    "deepseek": { "bin": "dsh", "model": "deepseek-flash", "effort": "high" }
   }
 }
 ```
@@ -365,7 +407,7 @@ In `~/.browsentic/config.json`:
 | --- | --- | --- |
 | `agent` | `claude` | Which CLI the side panel runs on. The agent picker writes this. |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary. Set this when the Bridge's `PATH` differs from your shell's, the usual cause of `AGENT_MISSING`. On Windows it may name the `.cmd` npm installed, or the `.exe` itself. |
-| `agents.<name>.model` | `sonnet` for Claude, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. A value that starts with a dash or holds a space is ignored, so a typo cannot pass the CLI a flag. |
+| `agents.<name>.model` | `sonnet` for Claude, `deepseek-flash` for DeepSeek Harness, otherwise the CLI's own default | Passed as `--model`. The picker's model select writes this. A value that starts with a dash or holds a space is ignored, so a typo cannot pass the CLI a flag. |
 | `agents.<name>.effort` | unset | Passed as that CLI's reasoning-effort flag. A value the CLI does not accept is dropped rather than failing the run. |
 
 Changes apply to the next run: the config is re-read each time, so the Bridge needs no restart.
@@ -380,7 +422,7 @@ Claude runner's settings.
 | Symptom | Fix |
 | --- | --- |
 | `AGENT_MISSING` | The Bridge's `PATH` differs from your shell's. Set `agents.<name>.bin` to an absolute path. |
-| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode 1 is signed in to no provider: run `opencode auth login`. OpenCode 2 has no sign-in of its own for Browsentic: run the line the picker shows. |
+| `AGENT_NEEDS_PERMISSION` | Antigravity has no rule for Browsentic's tools: press the button, or `browsentic agent fix antigravity`. Grok Build is not signed in: run `grok login`. Qwen Code has no model provider: run `qwen` and use `/auth`. OpenCode 1 is signed in to no provider: run `opencode auth login`. OpenCode 2 has no sign-in of its own for Browsentic: run the line the picker shows. DeepSeek Harness is signed in to no DeepSeek account and no `DEEPSEEK_API_KEY` is set: run `dsh web`. |
 | Codex: "not logged in" | The Bridge inherits no session. Run `codex login`, then retry. |
 | Codex answers about the page without opening it, or from a web search | Update Browsentic. Codex hides the browser tools until the model searches for them, and an older Browsentic left Codex's own web search switched on, which the model reached for first. |
 | Mistral Vibe: a follow-up turn says *this agent run is no longer active* | Update Browsentic, then start a new conversation. An older one gave each turn its own folder, and Vibe keeps re-reading the first turn's, so a conversation begun before the update stays broken. |
@@ -407,6 +449,10 @@ Claude runner's settings.
 | A model shows *not listed* | You pinned it, and the CLI no longer lists it. It is still passed to the CLI; pick a listed one if runs start failing. |
 | OpenCode cannot find a key you have exported | Only `OPENCODE_*` reaches a run. Sign in instead (`opencode auth login` on OpenCode 1, the picker's line on OpenCode 2), which keeps the key in OpenCode's own store. |
 | `AGENT_UNSAFE`: *OpenCode ran its own … tool* | A tool outside the browser ran despite the run's rules, so the run was stopped. Update OpenCode and Browsentic, and report it. |
+| DeepSeek Harness: *not signed in* | Runs use a dsh home of their own and borrow only `~/.dsh/.credentials.yaml`. Run `dsh web` and sign in, or set `DEEPSEEK_API_KEY` where the Bridge starts. |
+| `AGENT_UNSAFE`: *DeepSeek Harness ran its own … tool* | A tool outside the browser ran despite the run's patch, so the run was stopped. Update DeepSeek Harness and Browsentic, and report it. |
+| DeepSeek Harness is unusable after a dsh update | The new release's plugin tree has a tool plugin Browsentic has not checked. Update Browsentic, or install the dsh it was checked against. |
+| DeepSeek Harness: a screenshot reads as *[image unavailable]* | `deepseek-v4-pro` has no image input. Pick `deepseek-flash`. |
 
 ---
 

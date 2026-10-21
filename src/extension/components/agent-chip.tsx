@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react';
 
 import { AgentMark } from '@/extension/components/agent-marks';
-import { AGENTS, activeRunner, type AgentState } from '@/lib/agents/catalog';
+import { activeRunner, agentLabel, type AgentState } from '@/lib/agents/catalog';
 import { cn } from '@/lib/utils';
 
 /** Which agent a message goes to, and on which model; pressing it opens the picker. */
@@ -16,7 +16,7 @@ export function AgentChip({
 }) {
   const runner = activeRunner(state);
   if (!state || !runner) return null;
-  const { label } = AGENTS[state.active];
+  const label = agentLabel(state.active);
   return (
     <button
       type="button"

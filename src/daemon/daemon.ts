@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
+  AGENT_PROTOCOL,
   ANDROID_PROTOCOL,
   EXTERNAL_RUN_ID,
   MIN_EXTENSION_PROTOCOL,
@@ -25,7 +26,7 @@ import { hashManifest, type ToolDescriptor } from '@/lib/actions/manifest';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
 import { describeActions } from '@/lib/actions/registry';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
-import { AGENTS, isAgentKind, type AgentState } from '@/lib/agents/catalog';
+import { AGENTS, isAgentKind, needsNewerExtension, type AgentKind, type AgentState } from '@/lib/agents/catalog';
 import { sourceOf } from '@/lib/stores';
 import { saveScreenshot } from './screenshots';
 import { adoptDownload, listDownloads, resolveAttachment, sweepDownloads, type CapturedItem } from './downloads';
@@ -535,7 +536,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
           request.t === 'grantAgent'
         ) {
           void settleAgent(request).then((state) => {
-            source.send({ t: 'agentInfo', id: request.id, result: state });
+            source.send({ t: 'agentInfo', id: request.id, result: state.ok ? agentStateFor(source, state.data) : state });
             // The catalog's agent-skill half belongs to the agent that just took over.
             if (request.t === 'setAgent') pushSkillCatalog(source);
             if (request.t === 'grantAgent') announceAgent(source);
@@ -544,7 +545,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
           return;
         }
         if (request.t === 'listSkills') {
-          return source.send({ t: 'skillCatalog', id: request.id, result: skillCatalogNow(request.refresh === true) });
+          return source.send({ t: 'skillCatalog', id: request.id, result: skillCatalogFor(source, request.refresh === true) });
         }
         if (request.t === 'preferences') {
           return source.send({ t: 'preferencesInfo', id: request.id, result: success(preferencesNow()) });
@@ -743,7 +744,22 @@ export async function startDaemon({ version, idleExit = true, android = androidO
 
   async function pushAgentState(target: ExtensionLink): Promise<void> {
     const state = await agentState(readAgentConfig());
-    if (target.isOpen) target.send({ t: 'agentInfo', id: '', result: success(state) });
+    if (target.isOpen) target.send({ t: 'agentInfo', id: '', result: agentStateFor(target, state) });
+  }
+
+  function knowsAgent(link: ExtensionLink, kind: AgentKind): boolean {
+    return link.speaks(AGENT_PROTOCOL[kind] ?? 0);
+  }
+
+  // An older panel would throw on an agent it cannot look up, so it hears only of those it knows.
+  function agentStateFor(link: ExtensionLink, state: AgentState): ActionResult<AgentState> {
+    if (!knowsAgent(link, state.active)) return failure('UNSUPPORTED', needsNewerExtension(state.active));
+    return success({ ...state, runners: state.runners.filter((runner) => knowsAgent(link, runner.kind)) });
+  }
+
+  function skillCatalogFor(link: ExtensionLink, refresh = false): ActionResult<SkillCatalog> {
+    const catalog = skillCatalogNow(refresh);
+    return catalog.ok && !knowsAgent(link, catalog.data.agent) ? failure('UNSUPPORTED', needsNewerExtension(catalog.data.agent)) : catalog;
   }
 
   function skillCatalogNow(refresh = false): ActionResult<SkillCatalog> {
@@ -763,7 +779,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
   }
 
   function pushSkillCatalog(target: ExtensionLink): void {
-    if (target.isOpen) target.send({ t: 'skillCatalog', id: '', result: skillCatalogNow() });
+    if (target.isOpen) target.send({ t: 'skillCatalog', id: '', result: skillCatalogFor(target) });
   }
 
   function session(source: ExtensionLink): AgentSession {
@@ -776,6 +792,7 @@ export async function startDaemon({ version, idleExit = true, android = androidO
       running: () => [...agents.values()].reduce((total, agent) => total + agent.running, 0),
       actionNames: () => source.tools.map((tool) => tool.name),
       awaitAnalysis: (fileId, signal) => analyses.wait(fileId, signal),
+      knowsAgent: (kind) => knowsAgent(source, kind),
     });
     agents.set(source, created);
     return created;

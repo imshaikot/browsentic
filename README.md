@@ -38,7 +38,8 @@ Also an optional [MCP server](docs/guide/mcp-clients.md), so any MCP client can 
   <a href="https://docs.x.ai/build/overview"><img src="docs/assets/agents/grok.svg" width="40" height="40" alt="Grok Build (beta)" title="Grok Build (beta)"></a>&emsp;
   <a href="https://cursor.com/docs/cli/overview"><img src="docs/assets/agents/cursor.svg" width="40" height="40" alt="Cursor CLI (beta)" title="Cursor CLI (beta)"></a>&emsp;
   <a href="https://qwenlm.github.io/qwen-code-docs/en/"><img src="docs/assets/agents/qwen.svg" width="40" height="40" alt="Qwen Code (beta)" title="Qwen Code (beta)"></a>&emsp;
-  <a href="https://opencode.ai/docs/"><img src="docs/assets/agents/opencode.svg" width="40" height="40" alt="OpenCode (beta)" title="OpenCode (beta)"></a>
+  <a href="https://opencode.ai/docs/"><img src="docs/assets/agents/opencode.svg" width="40" height="40" alt="OpenCode (beta)" title="OpenCode (beta)"></a>&emsp;
+  <a href="https://deepseek-harness.github.io/deepseek-harness/"><img src="docs/assets/agents/deepseek.svg" width="40" height="40" alt="DeepSeek Harness (beta)" title="DeepSeek Harness (beta)"></a>
 </p>
 
 </div>

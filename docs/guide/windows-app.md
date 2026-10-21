@@ -46,7 +46,7 @@ The app opens on five checks and runs them automatically:
 | **Node.js runtime** | `node` 20 or newer is on your `PATH` | **Install** downloads the current LTS from nodejs.org into `%USERPROFILE%\.browsentic\runtime\node`, verified against its published SHA-256. No administrator |
 | **Browsentic Bridge** | `%USERPROFILE%\.browsentic\cli` holds the version this app carries | **Install** copies it there, writes the `browsentic.exe` launcher to `%USERPROFILE%\.browsentic\bin`, and registers it with your browsers so they can start it |
 | **A browser** | Chrome, Edge, Brave, Vivaldi, Opera, Chromium or Firefox is installed | **Get Chrome** opens the download page. Advisory: it does not block you |
-| **An AI agent** | One of `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent`, `qwen` or `opencode` is on your `PATH` | **Install Claude Code** runs `npm install --global @anthropic-ai/claude-code`. Advisory |
+| **An AI agent** | One of `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent`, `qwen`, `opencode` or `dsh` is on your `PATH` | **Install Claude Code** runs `npm install --global @anthropic-ai/claude-code`. Advisory |
 
 **Set up everything** installs Node and the Bridge in one click. The browser, the extension and the
 agent are your choice, so each has its own button. Once everything required is in place the app

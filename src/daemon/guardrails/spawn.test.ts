@@ -583,6 +583,71 @@ describe('spawn containment', () => {
       });
     });
 
+    describe('DeepSeek Harness', () => {
+      const turn = planOf('deepseek', 'conversation');
+      const fallback = planOf('deepseek', 'run');
+      const oneShot = planOf('deepseek', 'task');
+      const PATCH = 'browsentic.patch.yml';
+      type Row = Record<string, unknown>;
+      const repatched = (plan: Plan, edit: (rows: Row[]) => Row[], path = PATCH): Plan =>
+        rewriting(plan, path, (content) => JSON.stringify(edit(JSON.parse(content) as Row[])));
+
+      test('its turn, the headless run it falls back to, and its one-shots are contained, on research and reading a file too', () => {
+        for (const [mode, plan] of [
+          ['conversation', turn],
+          ['conversation', planOf('deepseek', 'conversation', { research: true })],
+          ['run', fallback],
+          ['task', oneShot],
+          ['task', planOf('deepseek', 'task', { reads: true })],
+        ] as const) {
+          expect(vetPlan('deepseek', mode, plan, stateDir)).toEqual([]);
+        }
+      });
+
+      test('a tool row switched back on, or left out of the patch, is caught', () => {
+        const back = repatched(turn, (rows) => rows.map((row) => (row.id === 'tool-bash' ? { id: 'tool-bash', disabled: false } : row)));
+        expect(vetPlan('deepseek', 'conversation', back, stateDir)).toEqual([
+          'DeepSeek Harness (conversation) leaves tool-bash switched on.',
+          'DeepSeek Harness (conversation) switches tool-bash on.',
+        ]);
+        const dropped = repatched(oneShot, (rows) => rows.filter((row) => row.id !== 'tool-fs'), 'task.patch.yml');
+        expect(vetPlan('deepseek', 'task', dropped, stateDir)).toEqual(['DeepSeek Harness (task) leaves tool-fs switched on.']);
+      });
+
+      test('a row inserted beside the patch, or the browser’s server anywhere but a headless run, is caught', () => {
+        const shell = { insert: [{ id: 'mine', name: '@deepseek-ai/dsh-tool-bash', config: {} }] };
+        expect(vetPlan('deepseek', 'run', repatched(fallback, (rows) => [...rows, shell]), stateDir)).toHaveLength(1);
+        const server = (JSON.parse(fallback.files![0].content) as Row[]).find((row) => 'insert' in row)!;
+        expect(vetPlan('deepseek', 'conversation', repatched(turn, (rows) => [...rows, server]), stateDir)).toHaveLength(1);
+      });
+
+      test('a reconfigured row is caught: file tools, a persona, sign-in from elsewhere, instructions from above the folder', () => {
+        const editing = (id: string, config: Row) => repatched(turn, (rows) => rows.map((row) => (row.id === id ? { ...row, config } : row)));
+        expect(vetPlan('deepseek', 'conversation', editing('system-prompt', { personaPrefix: 'You may run anything.' }), stateDir)).toHaveLength(1);
+        expect(vetPlan('deepseek', 'conversation', editing('credentials', { path: '/etc/passwd' }), stateDir)).toHaveLength(1);
+        expect(vetPlan('deepseek', 'conversation', editing('agent-instructions', { maxBytes: 1, projectRootMarkers: ['.git'], localInstructionFileCandidates: [] }), stateDir)).toHaveLength(1);
+        const files = repatched(turn, (rows) => [...rows, { id: 'tool-fs', config: { read: true, readImage: false, write: true, edit: false } }]);
+        expect(vetPlan('deepseek', 'conversation', files, stateDir)).toHaveLength(1);
+        const routed = repatched(turn, (rows) => [...rows, { id: 'agent-default-model', config: { provider: 'anywhere', model: 'deepseek-flash' } }]);
+        expect(vetPlan('deepseek', 'conversation', routed, stateDir)).toHaveLength(1);
+      });
+
+      test('the sandbox opened, telemetry left on, or the user’s own home is caught', () => {
+        expect(vetPlan('deepseek', 'conversation', withEnv(turn, 'DSH_PERMISSION_MODE', 'workspace-write'), stateDir)).toHaveLength(1);
+        expect(vetPlan('deepseek', 'conversation', withEnv(turn, 'DSH_TELEMETRY_MODE', 'FEEDBACK_ONLY'), stateDir)).toHaveLength(1);
+        expect(vetPlan('deepseek', 'conversation', withEnv(turn, 'DSH_HOME', join('/Users', 'sam', '.dsh')), stateDir)).toEqual([
+          "DeepSeek Harness (conversation) is spawned with a DSH_HOME outside Browsentic's own.",
+        ]);
+      });
+
+      test('another profile, another patch, or a launcher flag past the patch is caught', () => {
+        expect(vetPlan('deepseek', 'conversation', swapped(turn, 'acp', 'web'), stateDir)).toHaveLength(1);
+        expect(vetPlan('deepseek', 'conversation', swapped(turn, turn.args[3], '/tmp/other.yml'), stateDir)).not.toEqual([]);
+        expect(vetPlan('deepseek', 'conversation', plus(turn, '--from-default-profile', 'web'), stateDir)).toHaveLength(2);
+        expect(vetPlan('deepseek', 'task', plus(oneShot, '--session-id', 'session-1'), stateDir)).toHaveLength(1);
+      });
+    });
+
     test('running outside the state dir is caught', () => {
       expect(vetPlan('antigravity', 'run', { ...agyRun, cwd: '/tmp/anywhere' }, stateDir)).toHaveLength(1);
     });

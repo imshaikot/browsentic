@@ -15,6 +15,7 @@ import { claudeRunner } from './claude';
 import { codexRunner } from './codex';
 import { spawnCli, stopTree, type CliProcess } from './command';
 import { cursorRunner } from './cursor';
+import { deepseekRunner } from './deepseek';
 import { grokRunner } from './grok';
 import { modelsFor, refreshModels } from './models';
 import { opencodeRunner } from './opencode';
@@ -32,6 +33,7 @@ export const RUNNERS: Record<AgentKind, Runner> = {
   cursor: cursorRunner,
   qwen: qwenRunner,
   opencode: opencodeRunner,
+  deepseek: deepseekRunner,
 };
 
 const cliPath = join(dirname(fileURLToPath(import.meta.url)), 'cli.js');

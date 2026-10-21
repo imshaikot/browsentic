@@ -13,7 +13,12 @@ What each agent CLI printed on stdout, one event per line, for the reader tests 
   `cf-placement` headers; paths became `/Users/you`. OpenCode 2.0.32's were recorded the same way,
   from `opencode run --standalone` and from `opencode acp`; the `acp-` ones keep only what the CLI
   printed, with its replies renumbered to the request ids the runner uses, and both `free-tier`
-  recordings were answered by the real Zen endpoint. Codex's `web-search`, `shell`, `two-calls` and `tool-search`
+  recordings were answered by the real Zen endpoint. DeepSeek Harness 0.2.1-rc.2's were recorded through
+  the runner's plans with a stand-in for the browser's MCP server: the `acp-` ones keep only what
+  `dsh --profile acp` printed, with its replies renumbered to the runner's request ids, and the
+  `headless-` ones what `dsh --profile headless --json` printed. `acp-turn` was answered by a real
+  DeepSeek account and keeps the line of dsh's own that is not JSON; the rest by a local stand-in
+  model. Paths became `/Users/you`. Codex's `web-search`, `shell`, `two-calls` and `tool-search`
   and Claude Code's `mcp-failed` were recorded the same way, each saying so in its first line.
 - `<case>.hand-written.jsonl` was written from the reader code, for streams a contained run cannot
   produce or a CLI that was not installed. Its first line says so.

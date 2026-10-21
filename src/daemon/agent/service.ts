@@ -23,7 +23,7 @@ import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
 import { agentRunToolNames, toolNameFor } from '@/lib/actions/tool-names';
 import type { FileReport } from '@/lib/files/report';
 import { TASK_APPROVAL_WAIT_MS, TASK_RUN_MAX_MS } from '@/lib/schedules/task';
-import { activeRunner, AGENTS, type AgentKind } from '@/lib/agents/catalog';
+import { activeRunner, AGENTS, needsNewerExtension, type AgentKind } from '@/lib/agents/catalog';
 import { SAVE_SITE_MAP_ACTION, SITE_MAPPER_SKILL, validateSiteMapReport } from '@/lib/skills/site-map';
 import {
   blocked,
@@ -81,6 +81,8 @@ export interface AgentSessionDeps {
   actionNames: () => string[];
   /** The report on a file the analyst is still reading, or null when nothing is reading it. */
   awaitAnalysis?: (fileId: string, signal: AbortSignal) => Promise<FileReport | null>;
+  /** Whether the panel asking knows this agent; one too old for it is refused rather than sent it. */
+  knowsAgent?: (kind: AgentKind) => boolean;
 }
 
 interface ActiveRun {
@@ -448,6 +450,9 @@ export class AgentSession {
     }
 
     const config = readAgentConfig();
+    if (this.deps.knowsAgent?.(config.agent) === false) {
+      return emit({ kind: 'error', code: 'AGENT_UNUSABLE', message: needsNewerExtension(config.agent) });
+    }
     const limit = maxConcurrentRuns(config);
     if ((this.deps.running?.() ?? this.runs.size) >= limit) {
       return emit({

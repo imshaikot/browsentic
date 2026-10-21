@@ -173,7 +173,7 @@ dialling. It never deletes the stored key; only pairing again or `disconnect` re
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **24**). They used to have to match
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **25**). They used to have to match
 exactly. A store copy updates when its browser decides to, not when the daemon does, so the
 extension and the daemon are routinely a version apart, and the daemon accepts a **window**:
 
@@ -192,6 +192,14 @@ bumps `SOCKET_PROTOCOL_VERSION`, and the new frame is sent only to a peer whose 
 a change neither side can do without raises a minimum. A refusal must never strand a browser: the
 v0.8.0 store build unpairs on any refusal and does not retry, so no daemon may refuse protocol 22
 until a store build that retries has replaced it.
+
+### Protocol 25: an agent the extension does not know
+
+An extension looks every agent up by its kind, so one built before an agent was added cannot show
+it. `AGENT_PROTOCOL` names the first protocol whose extension knows each agent added since the window
+opened; for DeepSeek Harness that is 25. An extension below it is never sent that agent: its agent
+list leaves it out, and while it is the chosen agent a run started there is refused with
+`AGENT_UNUSABLE`, *DeepSeek Harness needs a newer Browsentic extension*.
 
 ### Protocol 24: notices for the desktop app
 

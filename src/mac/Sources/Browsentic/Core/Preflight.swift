@@ -88,7 +88,17 @@ struct Browser: Identifiable, Equatable {
 }
 
 enum AgentProbe {
-    static let bins = [("Claude Code", "claude"), ("Codex", "codex"), ("Antigravity", "agy"), ("Mistral Vibe", "vibe"), ("Grok Build", "grok")]
+    static let bins: [(String, String)] = [
+        ("Claude Code", "claude"),
+        ("Codex", "codex"),
+        ("Antigravity", "agy"),
+        ("Mistral Vibe", "vibe"),
+        ("Grok Build", "grok"),
+        ("Cursor CLI", "cursor-agent"),
+        ("Qwen Code", "qwen"),
+        ("OpenCode", "opencode"),
+        ("DeepSeek Harness", "dsh"),
+    ]
 
     static func installed() -> [String] {
         bins.filter { Shell.which($0.1) != nil }.map(\.0)

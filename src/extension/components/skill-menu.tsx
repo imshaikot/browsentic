@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { BookOpen, Globe, Sparkles, SquareSlash, Zap } from 'lucide-react';
 
 import type { SkillCatalog } from '@/lib/actions/protocol';
-import { AGENTS } from '@/lib/agents/catalog';
+import { agentLabel } from '@/lib/agents/catalog';
 import {
   ANDROID_ALIASES,
   ANDROID_COMMAND,
@@ -171,7 +171,7 @@ export function SkillMenu({
     command: 'Commands',
     site: 'On this site',
     general: 'Browsentic skills',
-    agent: `${agent ? AGENTS[agent].label : 'Agent'} skills`,
+    agent: `${agent ? agentLabel(agent) : 'Agent'} skills`,
     'other-site': 'Other sites',
   };
 

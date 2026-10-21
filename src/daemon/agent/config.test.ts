@@ -39,6 +39,7 @@ const DEFAULTS: AgentConfig = {
     cursor: { bin: 'cursor-agent' },
     qwen: { bin: 'qwen' },
     opencode: { bin: 'opencode' },
+    deepseek: { bin: 'dsh' },
   },
   requireApproval: ['page.submitForm'],
 };

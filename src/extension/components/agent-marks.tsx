@@ -1,4 +1,4 @@
-import type { AgentKind } from '@/lib/agents/catalog';
+import { isAgentKind, type AgentKind } from '@/lib/agents/catalog';
 import { cn } from '@/lib/utils';
 
 // Each vendor's own mark, as published, in one colour. They are trademarks used to say
@@ -36,11 +36,19 @@ const MARKS: Record<AgentKind, { viewBox: string; path: string }> = {
     viewBox: '128 96 256 320',
     path: 'M384 416H128V96H384V416ZM320 160H192V352H320V160Z',
   },
+  // Not DeepSeek's own mark, which its brand rules keep for itself: the letters it suggests, DSH.
+  deepseek: {
+    viewBox: '0 -8 28 28',
+    path: 'M0 0H5L8 3V9L5 12H0ZM2 2V10H4.2L6 8.2V3.8L4.2 2ZM10 0H18V2H12V5H18V12H10V10H16V7H10ZM20 0H22V5H26V0H28V12H26V7H22V12H20Z',
+  },
 };
+
+/** A plain prompt, for an agent a newer Bridge can run and this build has no mark for. */
+const UNKNOWN_MARK = { viewBox: '0 0 24 24', path: 'M5 6.5 6.5 5l7 7-7 7L5 17.5 10.5 12 5 6.5ZM12 17h7v2h-7v-2Z' };
 
 /** The vendor's mark in the current text colour, so it follows the row's state and the theme. */
 export function AgentMark({ kind, className }: { kind: AgentKind; className?: string }) {
-  const mark = MARKS[kind];
+  const mark = isAgentKind(kind) ? MARKS[kind] : UNKNOWN_MARK;
   return (
     <svg viewBox={mark.viewBox} fill="currentColor" className={cn('size-3.5 shrink-0', className)} aria-hidden>
       <path d={mark.path} />

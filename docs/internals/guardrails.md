@@ -370,6 +370,7 @@ type LocalTools = 'allowlist' | 'sandbox' | 'host'
 | **Qwen Code** | `allowlist` | `--allowed-tools mcp__browsentic` is what a run may call without being asked, and a headless turn refuses everything it would otherwise have prompted for. `--safe-mode` is what makes the rest hold: it drops the user's hooks, extensions, bundled skills, `settings.json` MCP servers, `.mcp.json` and permission rules, while keeping `--mcp-config`, an explicit per-invocation argument rather than ambient state. Its cost is that it also **silently ignores `--core-tools`**, the fail-closed allowlist over Qwen's twenty-one core tools, so the built-ins are closed with `--exclude-tools` deny rules instead. A deny list cannot be fail-closed, so the `init` line is read back: it names every tool and MCP server that actually registered, and the reader ends the run with `AGENT_UNSAFE` on anything Browsentic did not ask for, before the model has spoken |
 | **Cursor CLI** | `allowlist` | Deny rules in a project `.cursor/cli.json`, where **a deny beats every allow**, including the user's own. Measured against 2026.09.18: a headless run asked to `echo` a marker got `permissionDenied`, twice, and gave up. `--sandbox enabled` is asked for as well but not depended on, and it has no Windows backend. This is the first runner whose containment lives in a file rather than in argv, which is why `vetPlan` checks file *content* and not only that the file was written. `--trust` is **required**, not forbidden: headless Cursor refuses to start in a folder nobody trusted, and the folder is one Browsentic created and wrote every file in; trusting it grants no tool permission of its own. The project's MCP server starts only once approved, keyed to its exact config, so each turn's plan carries one set-up step, `cursor-agent mcp enable browsentic`, run in its folder before the turn; `vetPlan` allows that step and no other, for a run and never a task, and `--approve-mcps`, which approves every server the user has, stays forbidden. Every plugin's MCP server loads in every run under `plugin-<plugin>-<server>`, so `Mcp(plugin-*:*)` is denied beside the user's own servers by name, and an answer from any server but `browsentic` ends the run with `AGENT_UNSAFE` |
 | **OpenCode** | `allowlist` | The run is an agent the config defines, whose permission ruleset opens on `"*": "deny"` and then allows each browser tool by name. OpenCode applies the last rule that matches and puts an agent's rules after the user's, so every other tool (built-in, custom, another MCP server's, or one a later release adds) is denied, and a tool denied outright is never offered to the model. `--pure` keeps plugins out, which run inside OpenCode and can answer its permission prompts. MCP servers the user set up in OpenCode itself still start, with their tools hidden. OpenCode 2 is held to a second rule set, below |
+| **DeepSeek Harness** | `allowlist` | A per-run patch over dsh's plugin tree switches off every row that gives the model a tool of its own: the shell, files and file search, skills, sub-agents, workflows and scripted tool calls, goals, plan mode, its commands and user questions, MCP resources, and the web unless the run is researching. The model is offered the browser's tools and a to-do list only. Runs keep a dsh home of Browsentic's own, so the user's patches, profiles' plugins, `AGENTS.md` and skills never compose in. `DSH_PERMISSION_MODE=read-only` puts dsh's sandbox under whatever might still run, and a built-in tool that runs anyway ends the run with `AGENT_UNSAFE`. Detail below |
 
 **Windows is less measured.** Cursor's kernel sandbox has no Windows backend, so only its deny rules
 apply there. Codex's `sandbox_mode="read-only"` and Grok's `--sandbox workspace` are asked for as on
@@ -486,6 +487,34 @@ not supported*), so a plan built for the wrong line never starts. What 2.x chang
 **What remains on 2.x:** a policy in the user's global or managed config outranks the run's, so a user
 who allows a plugin there gets it loaded; its tools are still denied by the agent's rules.
 
+#### DeepSeek Harness: a patch over its plugin tree
+
+dsh is a tree of plugins, each a row of a profile, so a run's containment is a patch over that tree.
+The patch is written as JSON, which dsh reads as YAML unchanged and which can carry no `!!js`
+expression. A held turn is `dsh --profile acp --patch <file>`, with the browser's MCP server handed
+to the session. A one-shot is `dsh --profile headless --patch <file> --json` with no server at all,
+and a turn ACP refused runs the same way with the browser's server mounted by the patch. Before
+every spawn `vetPlan()` parses the patch rather than searching it:
+
+- every required switch-off is present, each a row that switches its plugin off and does nothing
+  else;
+- nothing is switched on but the sign-in rows;
+- every other row is a known override: the credentials row pointed at a `.credentials.yaml`, the
+  route (a DeepSeek provider, a model, an effort dsh accepts), workspace instructions kept to the
+  run's own folder, the persona, the result ceiling, a one-shot's read-only `read`, and on a headless
+  run the browser's own server;
+- `DSH_HOME` and `DSH_AGENTS_HOME` lie inside Browsentic's own folder, and
+  `DSH_PERMISSION_MODE=read-only` and `DSH_TELEMETRY_MODE=DISABLED` are set.
+
+A patch switches off only the rows it names, so a dsh release that adds a tool plugin would hand it
+to the model. At readiness Browsentic composes the installed dsh's plugin tree with the patch and
+reports a release that leaves an unvetted tool plugin on as `AGENT_UNUSABLE`, as it does a dsh older
+than 0.2.1. The reader checks the rest: a built-in tool that runs anyway stops the run with
+`AGENT_UNSAFE`.
+
+**What remains:** a one-shot that reads a file gets dsh's `read` tool alone, read-only, which can
+read any file the user can, as Codex's shell can in the same case.
+
 `localTools` records which case each runner is in, and the note is logged once per run, so the weak
 one is **visible in the log rather than assumed away**.
 
@@ -495,17 +524,20 @@ one is **visible in the log rather than assumed away**.
 analyst reading an attached file, the captcha analyst looking at one round of a challenge, or turning
 a raw recording trace into steps. That is asserted by requiring `{"mcpServers":{}}` (or
 `mcp_servers={}`, or Grok's `--deny MCPTool`) in its argv, or OpenCode's `"mcp":{}` and `"*":"deny"`
-in its config (on OpenCode 2, no servers and a deny-all agent). `Read` is deliberately left out of `task`'s deny list, because some tasks are handed a
-file in the scratch workspace.
+in its config (on OpenCode 2, no servers and a deny-all agent), or a DeepSeek Harness patch that
+mounts no server. `Read` is deliberately left out of `task`'s deny list, because some tasks are
+handed a file in the scratch workspace.
 
 The file analyst adds three things. A file is screened before anything spawns, so an archive, an
 executable or an oversized file never reaches an agent. The one-shot is stopped the moment its answer
 is in rather than left to exit, and its copy of the file is deleted. And the session is not kept
 where the CLI allows that: Claude Code runs a task with `--no-session-persistence` and Codex with
 `--ephemeral`. OpenCode has no such switch, but its runs and tasks both go into a session store
-under `~/.browsentic` (`OPENCODE_DB`) rather than the user's, one per line of releases.
-Antigravity, Mistral Vibe, Grok Build, Cursor CLI and Qwen Code have neither, so a task's session
-stays in that CLI's own history, inside the per-mode task workspace it was started in.
+under `~/.browsentic` (`OPENCODE_DB`) rather than the user's, one per line of releases. DeepSeek
+Harness has none either, but its runs and tasks keep their sessions in dsh homes under
+`~/.browsentic`. Antigravity, Mistral Vibe, Grok Build, Cursor CLI and Qwen Code have neither, so a
+task's session stays in that CLI's own history, inside the per-mode task workspace it was started
+in.
 
 ### Sealing the environment
 
@@ -528,6 +560,7 @@ Each agent keeps only the prefixes it needs to authenticate:
 | Cursor CLI | `CURSOR_` |
 | Qwen Code | `QWEN_`, `DASHSCOPE_`, `BAILIAN_`, `OPENAI_` |
 | OpenCode | `OPENCODE_` |
+| DeepSeek Harness | `DEEPSEEK_` |
 
 Qwen Code is the awkward one. It authenticates through whichever provider it is pointed at, and the
 documented mainstream setup is `OPENAI_API_KEY` with `OPENAI_BASE_URL` at a DashScope endpoint, so
@@ -543,11 +576,15 @@ declared in its config as signed in. On OpenCode 2 it asks `opencode auth list -
 the runs' own database, in the environment a run gets, so a key counts exactly when a run would see
 it; `--standalone` keeps the user's background service from being started with that environment.
 
+DeepSeek Harness signs in through the file `dsh web` writes, which the run's patch points to, so only
+`DEEPSEEK_` survives, for `DEEPSEEK_API_KEY`. A run's `DSH_` variables are the ones Browsentic sets,
+and `$DSH_HOME/.env` is not read. `DSH_` and `DEEPSEEK_` are sealed away from every other agent.
+
 Sealing is not absolute for Qwen either. Qwen loads the first `.env` it finds walking up from its
 working directory, then `~/.qwen/.env` and `~/.env`, for variables not already present, so a key
 `sealEnv` stripped can come back from disk. It reaches the model provider rather than the model,
 because the shell and file tools are denied, but the guarantee is weaker there than for the other
-seven.
+eight.
 
 Then there are **federated** cases, where a flag turns another prefix into the agent's own
 credentials. Claude Code on Bedrock authenticates with `AWS_*`, so sealing it would lock the agent

@@ -45,7 +45,7 @@ The extension updates itself from its store, and the two do not have to be the s
 - Node.js 20 or newer
 - Chrome, Edge, Brave, Arc, Vivaldi, Opera or another Chromium browser, or Firefox 140 or newer
 - One agent CLI on your `PATH`, logged in: `claude`, `codex`, `agy`, `vibe`, `grok`, `cursor-agent`,
-  `qwen` or `opencode`
+  `qwen`, `opencode` or `dsh`
 
 ## Commands
 

@@ -1,4 +1,4 @@
-export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor', 'qwen', 'opencode'] as const;
+export const AGENT_KINDS = ['claude', 'codex', 'antigravity', 'vibe', 'grok', 'cursor', 'qwen', 'opencode', 'deepseek'] as const;
 
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
@@ -100,12 +100,33 @@ export const AGENTS: Record<AgentKind, AgentDescriptor> = {
     models: ['anthropic/claude-opus-5-5', 'anthropic/claude-sonnet-5', 'openai/gpt-5.6', 'google/gemini-3.1-pro-preview'],
     beta: true,
   },
+  deepseek: {
+    kind: 'deepseek',
+    label: 'DeepSeek Harness',
+    vendor: 'DeepSeek',
+    bin: 'dsh',
+    install: 'npm i -g @deepseek-ai/dsh',
+    docs: 'https://deepseek-harness.github.io/deepseek-harness/',
+    // The same ids on a DeepSeek account and on an API key. Only deepseek-flash reads a screenshot.
+    models: ['deepseek-flash', 'deepseek-v4-pro'],
+    beta: true,
+  },
 };
 
 export const AGENT_LIST: AgentDescriptor[] = AGENT_KINDS.map((kind) => AGENTS[kind]);
 
 export function isAgentKind(value: unknown): value is AgentKind {
   return typeof value === 'string' && (AGENT_KINDS as readonly string[]).includes(value);
+}
+
+/** An agent's name, or its kind as sent when it came after this build: a newer Bridge can run one. */
+export function agentLabel(kind: AgentKind): string {
+  return isAgentKind(kind) ? AGENTS[kind].label : String(kind);
+}
+
+/** What a panel too old to know the chosen agent is told instead of being sent it. */
+export function needsNewerExtension(kind: AgentKind): string {
+  return `${agentLabel(kind)} needs a newer Browsentic extension. Update it, or pick another agent with \`browsentic agent claude\`.`;
 }
 
 export interface AgentProblem {

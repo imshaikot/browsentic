@@ -1,0 +1,4 @@
+# Printed by `dsh --profile acp` 0.2.1-rc.2 to a client speaking the runner's protocol, its request ids renumbered to the runner's own. A resume of a session id dsh never held.
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"deepseek-harness-acp","version":"0.0.1"},"agentCapabilities":{"mcpCapabilities":{"http":true},"promptCapabilities":{"image":true,"audio":false,"embeddedContext":false},"sessionCapabilities":{"close":{},"list":{},"resume":{}}},"authMethods":[]}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Invalid params: session is not resumable: 00000000-0000-4000-8000-000000000000"}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Invalid params: session cwd does not match: /Users/you/.browsentic/agents/deepseek/run/conversation-1"}}

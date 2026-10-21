@@ -19,7 +19,7 @@ For running Browsentic on your own machine.
 | [Pair](guide/pair.md) | Connecting a browser to Browsentic Bridge with a single-use code |
 | [First run](guide/first-run.md) | A tour of the side panel and your first instruction |
 | [Features](guide/features/) | One page per capability: what it does and when to use it |
-| [Choosing an agent](guide/agents.md) | The eight agent CLIs the side panel can run on |
+| [Choosing an agent](guide/agents.md) | The nine agent CLIs the side panel can run on |
 | [MCP clients](guide/mcp-clients.md) | Optional: drive the same browser from Claude Code, Cursor, Zed or Gemini CLI |
 | [Configuration](guide/configuration.md) | Every key in `~/.browsentic/config.json` |
 | [Approvals](guide/approvals.md) | Which actions wait for your approval, and how to change that |

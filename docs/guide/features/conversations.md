@@ -110,8 +110,8 @@ can resume where it left off.
 
 The card also shows token counts from the agent CLI's own reporting: roughly how many tokens the
 model's context window held after its last reply, and how many it generated on the last run. Claude
-Code, Codex, Grok Build, Cursor CLI, Qwen Code and OpenCode report these; Antigravity and Mistral
-Vibe do not, and the card says so.
+Code, Codex, Grok Build, Cursor CLI, Qwen Code and OpenCode report these; Antigravity, Mistral Vibe
+and DeepSeek Harness do not, and the card says so.
 
 Browsentic builds the card in the browser without waking an agent, so it also works mid-run. It
 describes what this browser holds; the agent's own working memory lives with the agent.

@@ -74,16 +74,18 @@ contains it with whatever controls that CLI offers, and they are not equal:
 | Cursor CLI (beta) | Per-run deny rules, where a deny beats every allow including your own; a kernel sandbox is asked for too, but it has no Windows backend and is not depended on |
 | Qwen Code (beta) | `--safe-mode` drops every setting of your own (hooks, extensions, bundled skills, MCP servers, permission rules), and deny rules close the shell, the disk and the tools that reach either; because that mode also disables Qwen's own fail-closed tool allowlist, the run's startup line is read back and anything unexpected stops it |
 | OpenCode (beta) | A per-run agent whose rules open on a deny for every tool, applied after your own rules, so the model is offered only the browser; project config is off. On OpenCode 1 external plugins are off, and MCP servers you set up in OpenCode itself still start, with their tools hidden. On OpenCode 2 a policy keeps your plugins and other MCP servers from loading, though one in your global or managed config outranks it, and each run has a private server and database of its own |
+| DeepSeek Harness (beta) | A per-run patch over its plugin tree switches off every tool of its own (the shell, the files, skills, sub-agents, workflows, and the web except when mapping a site), so the model is offered the browser's tools and a to-do list only; runs keep a dsh home of Browsentic's own, so your patches, plugins, `AGENTS.md` and skills never load, and dsh's read-only sandbox is on |
 
 The environment is sealed for all of them: cloud keys, registry tokens and database URLs inherited
 from your shell are removed before the spawn, keeping only what that agent needs to authenticate.
 Details are in [internals/guardrails.md](../internals/guardrails.md#spawn-containment).
 
-## Five of the agents are beta
+## Six of the agents are beta
 
-Mistral Vibe, Grok Build, Cursor CLI, Qwen Code and OpenCode were built by reading each CLI and
-checking its flags, its containment and its error texts, but none has carried a whole conversation
-end to end yet, so the agent picker, the docs and the release notes mark them *beta*. In practice:
+Mistral Vibe, Grok Build, Cursor CLI, Qwen Code, OpenCode and DeepSeek Harness were built by reading
+each CLI and checking its flags, its containment and its error texts, but none has carried a whole
+conversation end to end yet, so the agent picker, the docs and the release notes mark them *beta*.
+In practice:
 
 - a run that fails says why, with the command that fixes it, rather than hanging;
 - Vibe's replies arrive a message at a time rather than streaming, and it reports no token counts;
@@ -94,7 +96,9 @@ end to end yet, so the agent picker, the docs and the release notes mark them *b
 - OpenCode needs a provider signed in, because Zen's free models refuse a run narrowed to the
   browser, and on OpenCode 2 that sign-in is one of Browsentic's own; its replies arrive a part at a
   time;
-- the other three agents are untouched: the hooks the five share are covered by the spawn and
+- DeepSeek Harness was checked with a real DeepSeek account but not yet through a real side-panel
+  run; it gives up on a tool call after 60 seconds, as Cursor does, and it reports no token counts;
+- the other three agents are untouched: the hooks the six share are covered by the spawn and
   drive tests.
 
 [Choosing an agent](agents.md) has the per-agent detail. Please report what you find.

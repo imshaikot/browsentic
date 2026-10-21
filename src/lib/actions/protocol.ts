@@ -15,10 +15,16 @@ import type { DeviceNotice } from '@/lib/notices';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 24;
+export const SOCKET_PROTOCOL_VERSION = 25;
 
 /** The first protocol with the Android frames: `androidInfo`, the phone requests, `cdpEvent` and `phoneClosed`. */
 export const ANDROID_PROTOCOL = 23;
+
+/**
+ * The first protocol whose extension knows each agent added since the compatibility window opened.
+ * An older panel looks every agent up by kind, so it is never told about one it does not know.
+ */
+export const AGENT_PROTOCOL: Partial<Record<AgentKind, number>> = { deepseek: 25 };
 
 /**
  * The oldest extension the daemon lets in. A store copy updates when its browser decides to, so it

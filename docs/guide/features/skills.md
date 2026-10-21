@@ -109,6 +109,7 @@ The `/` picker also lists the skills the active agent CLI keeps for itself:
 | Cursor CLI | `~/.cursor/skills/`, `~/.agents/skills/` |
 | Qwen Code | `~/.qwen/skills/`, `~/.agents/skills/` |
 | OpenCode | `~/.config/opencode/skills/` (and `skill/`), `~/.opencode/skills/`, `~/.agents/skills/`, `~/.claude/skills/` |
+| DeepSeek Harness | `~/.dsh/skills/` (`$DSH_HOME/skills/`), `~/.agents/skills/` (`$DSH_AGENTS_HOME/skills/`) |
 
 Picking one attaches it to that message: Browsentic Bridge reads the file when it starts the run and
 appends it to the system prompt, clearly marked, with a note that browser tools are all the run has.

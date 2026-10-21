@@ -86,7 +86,7 @@ only the tools this caller is offered and names the rest; one with nothing to of
 ### browsentic_use
 
 Run a page tool that is not in this caller's tool list, by name. A side-panel run on Claude Code,
-OpenCode or Mistral Vibe lists only the core tools, because those CLIs send the description of every
+OpenCode, Mistral Vibe or DeepSeek Harness lists only the core tools, because those CLIs send the description of every
 tool they are given on every turn. The tools of the guides above are left off its list, and the
 agent calls them through `browsentic_use` once a guide, a skill or a result has named one. The call
 goes the way the tool's own call would: the same approvals, guardrails, blocked sites and steps in

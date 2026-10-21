@@ -55,9 +55,9 @@ None of these keys is required.
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex`, `antigravity`, `vibe`, `grok`, `cursor`, `qwen` or `opencode` |
+| `agent` | `claude` | Which CLI the side panel runs on: `claude`, `codex`, `antigravity`, `vibe`, `grok`, `cursor`, `qwen`, `opencode` or `deepseek` |
 | `agents.<name>.bin` | the CLI's own command name | Absolute path to the binary |
-| `agents.<name>.model` | `sonnet` for Claude, else the CLI's default | Passed as `--model`; the agent picker's model select writes it. One starting with a dash or holding a space is ignored |
+| `agents.<name>.model` | `sonnet` for Claude, `deepseek-flash` for DeepSeek Harness, else the CLI's default | Passed as `--model`; the agent picker's model select writes it. One starting with a dash or holding a space is ignored |
 | `agents.<name>.effort` | unset | That CLI's reasoning-effort flag; an unaccepted value is dropped |
 | `agents.codex.transport` | unset (the app-server) | `"exec"` runs Codex through `codex exec` instead of its app-server; see [agents.md § Codex](agents.md#codex-gets-the-browser-tools-as-its-own) |
 

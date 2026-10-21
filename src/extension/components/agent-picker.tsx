@@ -63,7 +63,8 @@ export function AgentPicker() {
 
   if (!daemon?.paired) return null;
 
-  const runners = AGENT_LIST.map(
+  // An older Bridge reports only the agents it can run, and one it never mentions would stay "checking…".
+  const runners = AGENT_LIST.filter((agent) => !state || state.runners.some((runner) => runner.kind === agent.kind)).map(
     (agent) => state?.runners.find((runner) => runner.kind === agent.kind) ?? unknownRunner(agent.kind),
   );
   const active = state?.active;

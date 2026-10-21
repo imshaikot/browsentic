@@ -1,0 +1,7 @@
+# Printed by `dsh --profile headless --json` 0.2.1-rc.2 with no sign-in at all; it exited 1.
+{"type":"session","sessionId":"session-867d6286-8d62-4775-9a54-659fba28e076","cwd":"/Users/you/.browsentic/agents/deepseek/task"}
+{"type":"status","phase":"turn_start","turn":1}
+{"type":"status","phase":"step_start","turn":1,"step":1}
+{"type":"status","phase":"step_end","turn":1,"step":1}
+{"type":"status","phase":"turn_end","turn":1,"reason":{"kind":"error","error":{"message":"llm-deepseek: no API key for provider route \"deepseek-official\"; store DEEPSEEK_API_KEY through the credentials service (the web Models page writes it), or export DEEPSEEK_API_KEY in the launching environment","code":"MISSING_CREDENTIAL"}}}
+{"type":"final","text":""}

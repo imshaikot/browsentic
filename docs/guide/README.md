@@ -32,7 +32,7 @@ Three short steps, about five minutes in total, with no account, no API key and 
 
 | | |
 | --- | --- |
-| [Choosing an agent](agents.md) | The eight agent CLIs the side panel can run on: switching, and what each needs |
+| [Choosing an agent](agents.md) | The nine agent CLIs the side panel can run on: switching, and what each needs |
 | [MCP clients](mcp-clients.md) | Optional: registering Browsentic with Claude Code, Cursor, Zed, Codex or Gemini CLI |
 | [Configuration](configuration.md) | Every key in `~/.browsentic/config.json` |
 | [Approvals](approvals.md) | Which actions wait for your approval, and how to tune that |

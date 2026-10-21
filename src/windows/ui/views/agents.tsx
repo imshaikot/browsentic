@@ -94,14 +94,26 @@ function AgentCard({ runner, descriptor, active, working, model }: { runner: Run
             </div>
           </div>
         ) : (
-          <ModelRow runner={runner} active={active} working={working} model={model} />
+          <ModelRow runner={runner} descriptor={descriptor} active={active} working={working} model={model} />
         )}
       </div>
     </Card>
   );
 }
 
-function ModelRow({ runner, active, working, model }: { runner: RunnerStatus; active: boolean; working: boolean; model: Model }) {
+function ModelRow({
+  runner,
+  descriptor,
+  active,
+  working,
+  model,
+}: {
+  runner: RunnerStatus;
+  descriptor: AgentDescriptor;
+  active: boolean;
+  working: boolean;
+  model: Model;
+}) {
   const list = offered(runner);
   const pinned = runner.model && !list.ids.includes(runner.model) ? runner.model : null;
   const choose = (next: string | null) => void model.setModel(next, runner.kind);
@@ -113,7 +125,7 @@ function ModelRow({ runner, active, working, model }: { runner: RunnerStatus; ac
           <ModelFilter
             value={runner.model ?? null}
             ids={list.ids}
-            suggested={AGENTS[runner.kind].models.filter((id) => list.ids.includes(id))}
+            suggested={descriptor.models.filter((id) => list.ids.includes(id))}
             pinned={pinned}
             disabled={working}
             onModel={choose}
