@@ -27,7 +27,8 @@ message you already sent, and **Schedule** on a recording, do the same.
 every weekday at 09:00, open github.com/pulls and summarise what is waiting on my review
 ```
 
-Each run opens its own background tab on the task's page, does the job and closes the tab. The result
+Each run opens its own background tab on the task's page, does the job and closes the tabs it opened;
+a tab you added to its conversation stays open. The result
 arrives as a notice on the page you are looking at. Every run is added to the task's history (when it
 ran, how it went, its one-line result and, for the last three runs, the whole transcript), never to
 the History tab.

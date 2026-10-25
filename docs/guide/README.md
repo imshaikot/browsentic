@@ -16,7 +16,7 @@ Three short steps, about five minutes in total, with no account, no API key and 
 
 | | |
 | --- | --- |
-| [Conversations](features/conversations.md) | Voice, text, one conversation per tab, history |
+| [Conversations](features/conversations.md) | Voice, text, conversations across your tabs, history |
 | [Instant commands](features/instant-commands.md) | Commands that run in the browser in milliseconds, without an agent |
 | [Page actions](features/page-actions.md) | What the agent can do on a page |
 | [Screenshots](features/screenshots.md) | Capturing the viewport, the full page, or one element |

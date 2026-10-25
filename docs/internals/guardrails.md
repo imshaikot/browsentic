@@ -183,6 +183,13 @@ arrives without a `url`, so it gets the blank-tab scope; the extension still ref
 for the `leaves-pinned-tab` rule. A bare `page.switchTab` with no arguments only *lists* tabs, so it
 is not a move.
 
+A conversation that spans several tabs sends their roster with the instruction. Its ids become
+`sharedTabIds`: `page.switchTab` to one of them is not a move either, but `page.closeTab` on one
+still confirms, and so does a `match` that names no id. Only a tab the user put in the conversation
+(`chosen`) adds its host to the run's hosts, since that is an act in the browser's own interface
+that no page can perform. A tab a page or the agent opened into the conversation is listed but
+widens nothing.
+
 ---
 
 ## Fencing

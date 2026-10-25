@@ -173,7 +173,7 @@ dialling. It never deletes the stored key; only pairing again or `disconnect` re
 
 ## Protocol version
 
-Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **25**). They used to have to match
+Both sides compile in `SOCKET_PROTOCOL_VERSION` (currently **26**). They used to have to match
 exactly. A store copy updates when its browser decides to, not when the daemon does, so the
 extension and the daemon are routinely a version apart, and the daemon accepts a **window**:
 
@@ -192,6 +192,13 @@ bumps `SOCKET_PROTOCOL_VERSION`, and the new frame is sent only to a peer whose 
 a change neither side can do without raises a minimum. A refusal must never strand a browser: the
 v0.8.0 store build unpairs on any refusal and does not retry, so no daemon may refuse protocol 22
 until a store build that retries has replaced it.
+
+### Protocol 26: the conversation's tabs
+
+A side-panel conversation can span several tabs the user chose. From 26, `instruct` carries them in
+`context.tabs`: id, title, host, which one is current and which ones the user chose. The extension
+sends it only to a daemon that speaks 26 (`TABS_PROTOCOL`), and only when there is more than one tab.
+An older daemon gets no roster, so its runs ask before switching to the user's other tabs, as before.
 
 ### Protocol 25: an agent the extension does not know
 

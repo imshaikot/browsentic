@@ -32,16 +32,45 @@ subject.
 
 ---
 
-## One conversation per tab
+## Conversations and tabs
 
 Each tab gets its own conversation, and several can run at once.
 
-A conversation is **bound to the tab it started in**. It keeps working there while you read something
-else, and its actions stay in that tab instead of following whichever tab you are looking at, so you
-can start a slow job and switch to other work.
+A conversation is **bound to its tabs**: the tab it started in, any tabs you add to it, and the tabs
+its runs open. It keeps working there while you read something else, and its actions stay in its own
+tabs instead of following whichever tab you are looking at, so you can start a slow job and switch to
+other work.
 
 **The side panel follows the tab in front.** Switch tabs and the chat switches to that tab's
-conversation, or to a new empty one if it has none.
+conversation, or to a new empty one if it has none. Moving between tabs of the same conversation
+keeps the panel where it is.
+
+### Adding your own tabs
+
+Related work often sits in several tabs: a Jira issue, the Zendesk ticket about it, the runbook. Put
+them in one conversation and the panel stays on it as you move between them.
+
+- **The tabs button** in the composer, beside the paperclip, lists the conversation's tabs and adds
+  more; `/tabs` opens it too. Its picker lists this window's other web pages, and the tabs you
+  selected in the tab strip (Ctrl or Shift click, ⌘ click on a Mac) come already ticked.
+- **Right-click a page** and choose **Add this tab to**, then the conversation. When the tab is part
+  of a selection in the tab strip, the whole selection goes. Firefox also offers it when you
+  right-click a tab itself. It can be switched off in Settings → Extension.
+
+On a tab with no conversation yet, adding tabs starts one there, so you can gather the tabs before
+the first message.
+
+A tab belongs to one conversation at a time. Adding a tab another conversation holds moves it; if
+that leaves the other conversation with no tab, it goes to **History** and a note says so. A tab a
+running conversation is working in stays where it is.
+
+Once a conversation has more than one tab, the button shows their icons. Open it to jump to one, or
+take one out with **×**; the tab stays open. Nothing can be taken out while a run is going.
+
+**What the agent is told.** With more than one tab, each message tells the agent the conversation's
+tabs: their ids, titles and sites, and which one it is working in. The tab you send a message from
+becomes the one it works in. It moves between them without asking you; switching to any other tab,
+or closing one of yours, still asks. A tab on a [blocked site](blocked-sites.md) is never listed.
 
 ### The sessions strip
 
@@ -77,18 +106,19 @@ While a conversation is working, its tab is marked in two places, a dot on the B
 icon and a dot drawn on the tab's own favicon, so a run you have moved away from still shows in the
 tab strip.
 
-### Subtabs
+### Tabs the agent opens
 
-If a conversation opens a tab of its own, that tab joins the session as a subtab and its work goes
-into the same transcript. A run will not act in a tab another conversation has claimed; trying
-returns `TAB_IN_USE`.
+If a run opens a tab of its own, that tab joins the conversation and its work goes into the same
+transcript. A run will not act in a tab another conversation has claimed; trying returns
+`TAB_IN_USE`.
 
 ### Closing things
 
 | | |
 | --- | --- |
 | **Closing the panel** | Stops nothing. The tab is the anchor. |
-| **Closing the tab** | Ends the session: the run is cancelled and the transcript moves to **History**. |
+| **Closing the tab it started in** | Hands the conversation to another tab you put in it, with a note. With none left, the session ends: the run is cancelled and the transcript moves to **History**. |
+| **Closing another of its tabs** | Takes that tab out. The conversation carries on. |
 | **Cancelling** | Stops the run in the conversation you are looking at. The others keep going. |
 
 ### Limits

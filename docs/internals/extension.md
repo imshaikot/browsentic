@@ -512,15 +512,17 @@ leaves out both entrypoints. No new permission was needed.
 
 ## Tab scoping
 
-A panel conversation is **bound to the tab it started in**.
+A panel conversation is **bound to its tabs**: the tab it started in, the tabs the user added, and
+the tabs its runs reached.
 
 The background keeps a registry of tab sessions in `browser.storage.session` under
 `browsentic/tabSessions`. Each entry maps a `sessionId` to:
 
-- its main tab,
-- the subtabs its runs opened,
-- the tab its next action should land on,
-- the live tab title,
+- its main tab, and `tabIds`, every tab it spans,
+- `userTabIds`, the tabs the user put there (the main tab, picker and right-click adds),
+- `openedTabIds`, the tabs its runs or its task opened,
+- the tab its next action should land on (`currentTabId`),
+- the live title of its main tab,
 - the run currently going in it, if any.
 
 Every frame the daemon sends for an agent run carries that run's `runId`, and the extension resolves
@@ -529,7 +531,10 @@ elsewhere, and two sessions in two tabs act independently.
 
 | Situation | Behaviour |
 | --- | --- |
-| A run opens a tab with `page.openTab` | Adopted as a subtab of the same session |
+| The user adds tabs (`addTabs` on the run port, or the right-click item) | Joined to `userTabIds`; a tab held by an idle session moves, and a session left with none is filed to History. A running, phone or task session keeps its tabs |
+| The user sends from one of the session's tabs while it is idle | That tab becomes `currentTabId` (`focusTab`) |
+| A run opens a tab with `page.openTab` | Adopted into the same session and recorded in `openedTabIds` |
+| `page.switchTab` onto a tab no session holds | Adopted, but in neither list |
 | `page.switchTab` onto a tab another session owns | Refused with `TAB_IN_USE` |
 | Every tab of a session is gone | Its actions fail with `SESSION_TAB_CLOSED` |
 | A ninth session is opened | `SESSION_LIMIT` (the cap is 8) |
@@ -545,10 +550,21 @@ that must never be navigated, reloaded or injected into.
 A site-mapping run keeps its own older pin, threading a literal `tabId` and failing with
 `MAPPING_TAB_CHANGED` if that tab goes away.
 
+When a session spans more than one tab, `startTurn` sends the daemon its roster in `context.tabs`
+(protocol 26 and later): this window's tabs in tab-strip order, each with its id, sealed title and
+host, the current one marked, and `chosen` on the user's tabs. Tabs on a blocked site are left out
+entirely. The daemon lists them in the prompt and lets `page.switchTab` reach them without asking
+(see [guardrails.md](guardrails.md#scope)).
+
 ### Lifecycle
 
-Closing a tab ends its session: the run is cancelled, the transcript is flushed to history, and the
-entry leaves the registry.
+Closing the main tab hands the session to its first heir that is still open, outside a closing
+window: the current tab if the user chose it, then the user's other tabs, then tabs a run reached
+but did not open. The session takes the heir's title and gets a note; a run working in the closed tab
+is cancelled. With no heir, and always for a task's or the phone's session, closing the main tab ends
+the session: the run is cancelled, the transcript is flushed to history, and the entry leaves the
+registry. Closing any other tab only takes it out. A finished scheduled task closes `openedTabIds`
+only, so a tab the user added stays open.
 
 Closing the side panel does **not**: the tab is the anchor. While a run is going, its tab carries a
 dot on the toolbar badge and on its favicon.
