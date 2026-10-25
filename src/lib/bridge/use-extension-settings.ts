@@ -70,6 +70,15 @@ export function useBlockedPattern(url: string | undefined): string | null {
   return useMemo(() => blockedBy(url, compileBlockedSites(patterns) ?? []), [url, patterns]);
 }
 
+/** One compiled list for checking many pages, such as every tab in a window. */
+export function useBlockedCheck(): (url: string | undefined) => boolean {
+  const [patterns] = useBlockedSites();
+  return useMemo(() => {
+    const list = compileBlockedSites(patterns) ?? [];
+    return (url) => blockedBy(url, list) !== null;
+  }, [patterns]);
+}
+
 export function openBlockedSites(): void {
   void browser.tabs.create({ url: `${browser.runtime.getURL('/options.html')}#blocked` });
 }

@@ -15,6 +15,8 @@ import {
   HANDS_FREE_DESCRIPTION,
   REMOVE_TOOLS_COMMAND,
   REMOVE_TOOLS_DESCRIPTION,
+  TABS_COMMAND,
+  TABS_DESCRIPTION,
 } from '@/lib/bridge/commands';
 import type { SavedToolMeta } from '@/lib/bridge/saved-tools';
 import { hostMatchesDomains, hostnameOf } from '@/lib/skills/format';
@@ -63,7 +65,7 @@ export function skillMenuItems(
   tabUrl: string,
   query: string,
   tools: readonly SavedToolMeta[] = [],
-  { handsFree = false, android }: { handsFree?: boolean; android?: AndroidOption } = {},
+  { handsFree = false, android, tabs = false }: { handsFree?: boolean; android?: AndroidOption; tabs?: boolean } = {},
 ): SkillMenuItem[] {
   const host = hostnameOf(tabUrl);
   const items: SkillMenuItem[] = [
@@ -75,6 +77,9 @@ export function skillMenuItems(
       command: CONTEXT_COMMAND,
     },
   ];
+  if (tabs) {
+    items.push({ key: 'command:tabs', group: 'command', name: 'tabs', description: TABS_DESCRIPTION, command: TABS_COMMAND });
+  }
   if (handsFree) {
     items.push({
       key: 'command:hands-free',

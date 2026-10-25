@@ -38,6 +38,8 @@ export interface Run {
   items: RunItem[];
   running: boolean;
   sessionId: string | null;
+  /** The conversation of the tab in front, when it has one. */
+  session: TabSession | null;
   sessions: TabSession[];
   /** The latest turn an agent saw through to the end, in any conversation, as it happened — never from a replay. */
   completed: CompletedTurn | null;
@@ -69,6 +71,9 @@ export interface Run {
   runTool: (id: string) => void;
   /** Gives a file the panel has stored to the conversation of the tab in front, which reads it. */
   attachFile: (file: NewFile) => void;
+  /** Puts open tabs in the conversation of the tab in front, starting one there if need be. */
+  addTabs: (tabIds: number[]) => void;
+  removeTab: (tabId: number) => void;
   detachFile: (fileId: string) => void;
   reanalyzeFile: (fileId: string) => void;
 }
@@ -251,6 +256,7 @@ export function useRun(pinned?: ActiveTab): Run {
     items,
     running: displayed?.runId != null,
     sessionId,
+    session: displayed,
     sessions,
     completed,
     send,
@@ -316,6 +322,20 @@ export function useRun(pinned?: ActiveTab): Run {
         }
       },
       [post, tab],
+    ),
+    addTabs: useCallback(
+      (tabIds: number[]) => {
+        if (tab.tabId != null) {
+          post({ op: 'addTabs', tabIds, tab: { tabId: tab.tabId, url: tab.url, windowId: tab.windowId, title: tab.title } });
+        }
+      },
+      [post, tab],
+    ),
+    removeTab: useCallback(
+      (tabId: number) => {
+        if (sessionId) post({ op: 'removeTab', sessionId, tabId });
+      },
+      [post, sessionId],
     ),
     detachFile: useCallback((fileId: string) => post({ op: 'detach', fileId }), [post]),
     reanalyzeFile: useCallback((fileId: string) => post({ op: 'reanalyze', fileId }), [post]),
