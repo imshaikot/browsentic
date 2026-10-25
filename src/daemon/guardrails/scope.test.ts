@@ -51,6 +51,34 @@ describe('scopeFor', () => {
   });
 });
 
+describe('scopeFor with the conversation’s tabs', () => {
+  const tabs = [
+    { tabId: 7, host: 'a.com', chosen: true },
+    { tabId: 8, host: 'www.b.com:8443', chosen: true },
+    { tabId: 9, host: 'opened-by-agent.com' },
+  ];
+
+  test('a tab the user chose brings its site, port and www dropped', () => {
+    expect(scopeFor({ url: 'https://a.com/', tabs }).hosts).toEqual(['a.com', 'b.com']);
+  });
+
+  test('every listed tab is one the run may switch to', () => {
+    expect(scopeFor({ url: 'https://a.com/', tabs }).sharedTabIds).toEqual([7, 8, 9]);
+  });
+
+  test('a blank start with chosen tabs is confined to them', () => {
+    expect(scopeFor({ tabs: [{ tabId: 7, chosen: true }, { tabId: 8, host: 'b.com', chosen: true }] }).hosts).toEqual(['b.com']);
+  });
+
+  test('config "*" still lists the shared tabs', () => {
+    expect(scopeFor({ url: 'https://a.com/', extraHosts: ['*'], tabs }).sharedTabIds).toEqual([7, 8, 9]);
+  });
+
+  test('no tabs is today’s scope', () => {
+    expect(scopeFor({ url: 'https://a.com/', tabId: 7, pinTab: true })).toEqual({ hosts: ['a.com'], tabId: 7 });
+  });
+});
+
 test('url payload counts query and fragment', () => {
   expect(urlPayloadBytes(new URL('https://a.com/p?q=12345#ab'))).toBe(11);
 });

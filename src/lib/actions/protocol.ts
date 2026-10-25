@@ -15,7 +15,7 @@ import type { DeviceNotice } from '@/lib/notices';
 export const ACTION_CHANNEL = 'browsentic/action';
 export const BRIDGE_CHANNEL = 'browsentic/bridge';
 
-export const SOCKET_PROTOCOL_VERSION = 25;
+export const SOCKET_PROTOCOL_VERSION = 26;
 
 /** The first protocol with the Android frames: `androidInfo`, the phone requests, `cdpEvent` and `phoneClosed`. */
 export const ANDROID_PROTOCOL = 23;
@@ -25,6 +25,9 @@ export const ANDROID_PROTOCOL = 23;
  * An older panel looks every agent up by kind, so it is never told about one it does not know.
  */
 export const AGENT_PROTOCOL: Partial<Record<AgentKind, number>> = { deepseek: 25 };
+
+/** The first protocol whose daemon reads `RunContext.tabs`, the tabs a conversation spans as a turn begins. */
+export const TABS_PROTOCOL = 26;
 
 /**
  * The oldest extension the daemon lets in. A store copy updates when its browser decides to, so it
@@ -141,6 +144,18 @@ export interface FocusedElement {
 
 export const focusName = (focus: FocusedElement): string => focus.label?.trim() || focus.role || focus.tag;
 
+/** One of the tabs a conversation spans, as its turn begins. */
+export interface ConversationTab {
+  tabId: number;
+  /** What the page calls itself: written by the page, so flattened, clipped and sealed before it is sent. */
+  title: string;
+  host?: string;
+  /** Where an action that names no tab lands. */
+  current?: true;
+  /** The user put it in the conversation themselves, so its site is one this run is about. */
+  chosen?: true;
+}
+
 export interface SavedRecording {
   id: string;
   name: string;
@@ -186,6 +201,8 @@ export interface RunContext {
   task?: TaskContext;
   /** Set when the run drives Chrome on an Android phone through the mirror tab. */
   phone?: PhoneContext;
+  /** The conversation's tabs in tab-strip order, sent only when it spans more than one. */
+  tabs?: ConversationTab[];
 }
 
 /** One skill from the active agent CLI's own library. Title and handle only — the file's path and content stay on the daemon's side. */

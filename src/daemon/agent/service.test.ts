@@ -236,6 +236,47 @@ describe('answering a captcha', () => {
   });
 });
 
+describe('a conversation across several tabs', () => {
+  test('switches among its own tabs without asking, and still asks to leave them or close one', async () => {
+    const agent = stubCli(join(dirname(configPath), 'agent-across-tabs'), 'setTimeout(() => {}, 30_000);');
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
+    const events: RunEvent[] = [];
+    const invoked: unknown[] = [];
+    const across = new AgentSession({
+      invoke: async (action, input) => {
+        invoked.push([action, input]);
+        return success({ done: true });
+      },
+      emit: (_runId: string, event: RunEvent) => void events.push(event),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    const tabs = [
+      { tabId: 3, title: 'Board', host: 'jira.example.com', current: true, chosen: true },
+      { tabId: 9, title: 'Ticket', host: 'zendesk.example.com', chosen: true },
+      { tabId: 9, title: 'the same tab again' },
+      { tabId: 'x', title: 'not a tab' },
+      null,
+    ] as never;
+    across.handle({ t: 'instruct', id: 'r1', text: 'match the ticket to its issue', context: { sessionId: 's1', url: 'https://jira.example.com/b', tabId: 3, tabs } });
+    await vi.waitFor(() => expect(across.offerFor('r1')).not.toBeNull());
+
+    await across.invokeForRun('r1', 'page.switchTab', { tabId: 9 });
+    await across.invokeForRun('r1', 'page.navigate', { url: 'https://zendesk.example.com/t/4411' });
+    void across.invokeForRun('r1', 'page.closeTab', { tabId: 9 });
+    await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
+    across.dispose();
+
+    expect({
+      invoked,
+      asked: events.flatMap((event) => (event.kind === 'approval' ? [event.action] : [])),
+    }).toEqual({
+      invoked: [['page.switchTab', { tabId: 9 }], ['page.navigate', { url: 'https://zendesk.example.com/t/4411' }]],
+      asked: ['page.closeTab'],
+    });
+  });
+});
+
 // Cursor abandons a tool call at 60 s, so an approval cannot simply hold the call open until the user answers.
 describe('an approval, on an agent that abandons a call before the user answers', () => {
   const tracked = async (agent: 'cursor' | 'claude') => {

@@ -4,6 +4,7 @@ import {
   failure,
   success,
   type ActionResult,
+  type ConversationTab,
   type FocusedElement,
   type SavedRecording,
   type ExtensionRequest,
@@ -51,7 +52,7 @@ import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
 import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
-import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
+import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, tabsBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
 import { agentState, RUNNERS } from './runners';
 import type { CallLimits } from './runners/types';
@@ -484,12 +485,14 @@ export class AgentSession {
 
     const overlayNames = routed.overlays.map((overlay) => overlay.name);
     const policy = policyFrom(config.guardrails, config.requireApproval);
+    const roster = mapping ? undefined : rosterFrom(context);
     const scope = scopeFor({
       url: context?.url,
       tabId: context?.tabId,
       instruction: text,
       extraHosts: config.guardrails?.hosts,
       pinTab: true,
+      tabs: roster,
     });
     let markListed = () => {};
     const listed = new Promise<void>((resolve) => (markListed = resolve));
@@ -557,6 +560,7 @@ export class AgentSession {
           profile: profileBlock(profile),
           attached,
           focus: focusBlock(context?.focus),
+          tabs: tabsBlock(roster),
           attachments: handover.known,
           recordings: recordingsBlock(context?.recordings),
           scheduled: scheduledBlock(context?.task),
@@ -860,6 +864,30 @@ function sessionFrom(context: RunContext | undefined, agent: AgentKind): string 
   if (context?.agent !== agent) return null;
   const id = context.agentSessionId;
   return typeof id === 'string' && SESSION_ID.test(id) ? id : null;
+}
+
+const MAX_ROSTER = 20;
+
+const TAB_HOST = /^(?:[a-z0-9-]+(?:\.[a-z0-9-]+)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i;
+
+/** The conversation's tabs as the browser sent them, kept only when well-formed and more than one, and never on the phone. */
+function rosterFrom(context: RunContext | undefined): ConversationTab[] | undefined {
+  if (!Array.isArray(context?.tabs) || context.phone) return undefined;
+  const seen = new Set<number>();
+  const roster: ConversationTab[] = [];
+  for (const entry of context.tabs.slice(0, MAX_ROSTER)) {
+    const tab = (entry ?? {}) as Partial<ConversationTab>;
+    if (!Number.isSafeInteger(tab.tabId) || seen.has(tab.tabId!) || typeof tab.title !== 'string') continue;
+    seen.add(tab.tabId!);
+    roster.push({
+      tabId: tab.tabId!,
+      title: tab.title,
+      ...(typeof tab.host === 'string' && TAB_HOST.test(tab.host) ? { host: tab.host } : {}),
+      ...(tab.current === true ? { current: true as const } : {}),
+      ...(tab.chosen === true ? { chosen: true as const } : {}),
+    });
+  }
+  return roster.length > 1 ? roster : undefined;
 }
 
 function fetchedBlock(origin: string, index: SiteIndex): string {
