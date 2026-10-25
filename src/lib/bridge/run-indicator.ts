@@ -24,8 +24,10 @@ export async function syncRunIndicator(): Promise<void> {
   for (const session of Object.values(await readTabSessions())) {
     if (session.runId) for (const tabId of session.tabIds) busy.add(tabId);
   }
-  for (const tabId of busy) if (!marked.has(tabId)) await paint(tabId, true);
-  for (const tabId of [...marked]) if (!busy.has(tabId)) await paint(tabId, false);
+  await Promise.all([
+    ...[...busy].filter((tabId) => !marked.has(tabId)).map((tabId) => paint(tabId, true)),
+    ...[...marked].filter((tabId) => !busy.has(tabId)).map((tabId) => paint(tabId, false)),
+  ]);
   await syncRail();
 }
 

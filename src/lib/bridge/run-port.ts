@@ -3,8 +3,10 @@ import {
   EXTERNAL_RUN_ID,
   failure,
   success,
+  TABS_PROTOCOL,
   type ActionResult,
   type AttachedFile,
+  type ConversationTab,
   type FocusedElement,
   type RunEvent,
   type SavedRecording,
@@ -48,6 +50,7 @@ import {
 import { currentRecording, onRecordingState, startActiveTabRecording, stopRecording } from './recorder';
 import { asSavedRecording, listRecordings, readRecordingBody } from './recording-store';
 import { redactInput } from './redact';
+import { sealForPage } from './secret-vault';
 import { forgetTab, syncRunIndicator } from './run-indicator';
 import { attachPreview, monitorNotice, nextId, notice, patchTool, reduce, type RunItem } from './run-items';
 import { onScreenshotPreview, type ScreenshotPreview } from './screenshot-preview';
@@ -69,6 +72,7 @@ import { onToastAnswer } from './toast';
 import {
   activateSiteMap,
   cancelRun,
+  daemonSpeaks,
   discardSiteMap,
   onPhoneClosed,
   onRunEvent,
@@ -81,14 +85,18 @@ import {
   sendInstruction,
 } from './socket';
 import {
+  addTabs,
   bindStoredSession,
   dropSession,
   ensureSessionForTab,
+  focusTab,
+  heirsOf,
   hostOf,
   patchSession,
   readTabSessions,
   releaseTab,
   remapTab,
+  removeTab,
   sessionForRun,
   sessionForTab,
   siteUrlOf,
@@ -110,6 +118,10 @@ const MAX_EXTERNAL_ITEMS = 100;
 
 const TAB_LOAD_WAIT_MS = 15_000;
 
+const MAX_ROSTER = 20;
+
+const MAX_ROSTER_TITLE = 120;
+
 export type RunCommand =
   | { op: 'instruct'; text: string; tab: TabAnchor; agentSkillId?: string; focus?: FocusedElement; liveTools?: boolean }
   | { op: 'cancel'; sessionId: string }
@@ -117,6 +129,8 @@ export type RunCommand =
   | { op: 'endSession'; sessionId: string }
   | { op: 'replay'; sessionId: string }
   | { op: 'restore'; sessionId: string; tab: TabAnchor }
+  | { op: 'addTabs'; tabIds: number[]; tab: TabAnchor }
+  | { op: 'removeTab'; sessionId: string; tabId: number }
   | { op: 'activateMap'; stagingId: string; exactHost?: boolean }
   | { op: 'discardMap'; stagingId: string }
   | { op: 'startRecording'; captureValues: boolean }
@@ -300,6 +314,39 @@ function turnOver(tabId: number, items: readonly RunItem[]): void {
   for (const watch of settleWatchers) watch(tabId, items);
 }
 
+/** The right-click menu's add, into a conversation already open on another tab. */
+export function addTabsTo(sessionId: string, tabIds: number[]): Promise<void> {
+  return serialized(() => gather(sessionId, tabIds));
+}
+
+/** Tabs the user put in a conversation: only web pages they have not blocked, and none another conversation is working in. */
+async function gather(sessionId: string, tabIds: number[]): Promise<void> {
+  const blocked = await siteCheck();
+  const tabs = await Promise.all(tabIds.map((tabId) => browser.tabs.get(tabId).catch(() => null)));
+  const usable = tabs.flatMap((tab) => (tab?.id != null && hostOf(tab.url) && !blocked(...tabUrls(tab)) ? [tab.id] : []));
+  const outcome = await addTabs(sessionId, usable);
+  if (!outcome) return;
+  for (const absorbed of outcome.absorbed) {
+    await fileAway(absorbed);
+    if (absorbed.turns > 0) await append(sessionId, notice('info', `“${absorbed.title}” joined. Its own conversation is in History.`));
+  }
+  if (outcome.refused.length) {
+    const count = outcome.refused.length;
+    await append(sessionId, notice('info', `${count === 1 ? 'A tab' : `${count} tabs`} stayed where ${count === 1 ? 'it was' : 'they were'}: another conversation is working there.`));
+  }
+  await syncRunIndicator();
+}
+
+/** An idle conversation leaves the open tabs for History, as when another takes over its tab. */
+async function fileAway(session: TabSession): Promise<void> {
+  await persist(session.sessionId, session);
+  await dropSession(session.sessionId);
+  await dropTimersForSession(session.sessionId);
+  await dropDiagnosticsForSession(session.sessionId);
+  buffers.delete(session.sessionId);
+  orphanDrafts(session.sessionId);
+}
+
 /** The orb's attach, answered once the file belongs to a conversation, or with why it cannot. */
 export function attachFile(file: NewFile, anchor: TabAnchor): Promise<Attached> {
   return serialized(() => attach(file, anchor));
@@ -331,6 +378,18 @@ function handle(command: RunCommand): void {
       return;
     case 'restore':
       void serialized(() => restore(command.sessionId, command.tab));
+      return;
+    case 'addTabs':
+      void serialized(async () => {
+        const ensured = await ensureConversation(command.tab);
+        if (ensured.ok) await gather(ensured.session.sessionId, command.tabIds);
+        else broadcast({ op: 'event', runId: LOCAL_RUN, event: { kind: 'error', code: 'SESSION_LIMIT', message: ensured.message } });
+      });
+      return;
+    case 'removeTab':
+      void serialized(async () => {
+        if ((await removeTab(command.sessionId, command.tabId)) === 'removed') await syncRunIndicator();
+      });
       return;
     case 'activateMap':
     case 'discardMap': {
@@ -583,7 +642,8 @@ async function instruct(
     return;
   }
 
-  const outcome = await startTurn(ensured.session, text, { agentSkillId, focus, liveTools, fastPath: true });
+  const session = (await focusTab(sessionId, anchor)) ?? ensured.session;
+  const outcome = await startTurn(session, text, { agentSkillId, focus, liveTools, fastPath: true });
   if (outcome === 'busy') {
     await append(
       sessionId,
@@ -618,6 +678,7 @@ async function startTurn(
 
     const current = await browser.tabs.get(session.currentTabId).catch(() => null);
     const hidden = await siteBlocked(session.url, ...tabUrls(current), focus?.url);
+    const tabs = daemonSpeaks(TABS_PROTOCOL) ? await rosterOf(session, current) : undefined;
     const runId = sendInstruction(text, {
       url: hidden ? undefined : siteUrlOf(session.url),
       tabId: session.currentTabId,
@@ -631,6 +692,7 @@ async function startTurn(
       recordings: session.phone ? undefined : await attachedRecordings(),
       task,
       phone: await phoneContext(session),
+      tabs,
     });
     if (!runId) {
       await append(
@@ -649,6 +711,30 @@ async function startTurn(
   } finally {
     busy.delete(sessionId);
   }
+}
+
+/** The conversation's tabs as the agent may use them: this window's, in tab-strip order, with blocked sites left out entirely. */
+async function rosterOf(session: TabSession, current: Browser.tabs.Tab | null): Promise<ConversationTab[] | undefined> {
+  if (session.phone || session.tabIds.length < 2 || current?.windowId == null) return undefined;
+  const blocked = await siteCheck();
+  const tabs = (await browser.tabs.query({ windowId: current.windowId }))
+    .filter((tab) => tab.id != null && session.tabIds.includes(tab.id) && !blocked(...tabUrls(tab)))
+    .sort((a, b) => a.index - b.index);
+  const roster: ConversationTab[] = [];
+  for (const tab of tabs) {
+    const host = hostOf(tab.url);
+    const isCurrent = tab.id === session.currentTabId;
+    if (!host && !isCurrent) continue;
+    const { value: title } = await sealForPage((tab.title ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_ROSTER_TITLE), host);
+    roster.push({
+      tabId: tab.id!,
+      title,
+      ...(host ? { host } : {}),
+      ...(isCurrent ? { current: true as const } : {}),
+      ...(session.userTabIds.includes(tab.id!) ? { chosen: true as const } : {}),
+    });
+  }
+  return roster.length > 1 ? roster.slice(0, MAX_ROSTER) : undefined;
 }
 
 async function handledLocally(text: string, session: TabSession): Promise<boolean> {
@@ -731,12 +817,7 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
     );
     return;
   }
-  if (owner) {
-    await persist(owner.sessionId);
-    await dropSession(owner.sessionId);
-    buffers.delete(owner.sessionId);
-    orphanDrafts(owner.sessionId);
-  }
+  if (owner) await fileAway(owner);
 
   const meta = (await listSessions()).find((s) => s.id === sessionId);
   if (!meta) return;
@@ -758,6 +839,7 @@ async function restore(sessionId: string, anchor: TabAnchor): Promise<void> {
       title: titleOf(meta) ?? anchored.title,
     },
     anchored,
+    owner,
   );
   if (serial) await patchSession(sessionId, { phone: { serial } });
   broadcast({ op: 'items', sessionId, items: buffers.get(sessionId) ?? [] });
@@ -820,10 +902,11 @@ async function persist(sessionId: string, known?: TabSession): Promise<void> {
 }
 
 export function serveTabSessions(): void {
-  browser.tabs.onRemoved.addListener((tabId) => {
+  browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
     forgetTab(tabId);
     void serialized(async () => {
-      const { closed } = await releaseTab(tabId);
+      const { closed, handed, wasCurrent } = await releaseTab(tabId, await survivors(tabId, removeInfo));
+      if (handed) await carryOn(handed, wasCurrent);
       if (!closed) return await syncRunIndicator();
       cancelAnalysesFor(await filesFor(closed.sessionId));
       if (closed.runId) {
@@ -843,6 +926,31 @@ export function serveTabSessions(): void {
       await syncRunIndicator();
     });
   });
+
+  /** The tabs that could carry a conversation on once its main tab closes: still open, and not going with their window. */
+  async function survivors(tabId: number, removeInfo: { windowId: number; isWindowClosing: boolean }): Promise<number[]> {
+    const session = await sessionForTab(tabId);
+    if (session?.mainTabId !== tabId) return [];
+    const open = await Promise.all(heirsOf(session, tabId).map((id) => browser.tabs.get(id).catch(() => null)));
+    return open.flatMap((tab) =>
+      tab?.id != null && !(removeInfo.isWindowClosing && tab.windowId === removeInfo.windowId) ? [tab.id] : [],
+    );
+  }
+
+  /** Its first tab went, so the conversation lives on in another of the user's tabs and takes that tab's name. */
+  async function carryOn(session: TabSession, wasCurrent: boolean): Promise<void> {
+    const tab = await browser.tabs.get(session.mainTabId).catch(() => null);
+    await patchSession(session.sessionId, {
+      ...(tab?.title ? { title: tab.title } : {}),
+      ...(tab?.windowId != null ? { windowId: tab.windowId } : {}),
+      ...(wasCurrent && tab?.url ? { url: tab.url, host: hostOf(tab.url) } : {}),
+    });
+    if (session.runId && wasCurrent) {
+      await stopRun(session.sessionId);
+      await append(session.sessionId, notice('error', 'CANCELLED: The tab it was working in was closed, so that run is over.'));
+    }
+    await append(session.sessionId, notice('info', `The tab it began on was closed. It carries on in “${tab?.title ?? session.title}”.`));
+  }
 
   onPhoneClosed(() => {
     void serialized(async () => {
@@ -908,7 +1016,7 @@ async function openTaskSession(order: TaskOrder): Promise<ActionResult<{ session
     startedAt: Date.now(),
     ...(order.previous ? { previous: order.previous } : {}),
   };
-  await patchSession(ensured.session.sessionId, { task });
+  await patchSession(ensured.session.sessionId, { task, userTabIds: [], openedTabIds: [tab.id] });
   return success({ sessionId: ensured.session.sessionId, tabId: tab.id });
 }
 
@@ -1045,12 +1153,12 @@ async function finishTask(session: TabSession, verdict: TaskVerdict): Promise<vo
   await persist(session.sessionId);
   void announceTask(task, result, session.currentTabId);
   if (task.keepTab) await patchSession(session.sessionId, { task: undefined });
-  else await browser.tabs.remove(session.tabIds).catch(() => undefined);
+  else await browser.tabs.remove(session.openedTabIds).catch(() => undefined);
 }
 
 async function abandonTask(session: TabSession): Promise<void> {
   if (session.task) await patchSession(session.sessionId, { task: { ...session.task, done: true } });
-  await browser.tabs.remove(session.tabIds).catch(() => undefined);
+  await browser.tabs.remove(session.openedTabIds).catch(() => undefined);
 }
 
 function reportAbandoned(session: TabSession, reason: string): void {

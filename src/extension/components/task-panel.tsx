@@ -164,7 +164,7 @@ export function TaskPanel({
               onEdit={() => setView({ kind: 'edit', task })}
               onHistory={() => setView({ kind: 'runs', taskId: task.id })}
               onWatch={session ? () => onWatch(session.sessionId) : undefined}
-              onStop={session ? () => void browser.tabs.remove(session.tabIds).catch(() => undefined) : undefined}
+              onStop={session ? () => void browser.tabs.remove(session.openedTabIds).catch(() => undefined) : undefined}
             />
           );
         })

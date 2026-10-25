@@ -24,6 +24,8 @@ describe('syncRunIndicator', () => {
         sessionId: 'running',
         mainTabId: tab.id!,
         tabIds: [tab.id!, frozen.id!],
+        userTabIds: [tab.id!],
+        openedTabIds: [frozen.id!],
         currentTabId: tab.id!,
         windowId: -1,
         title: 'Example',
