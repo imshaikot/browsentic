@@ -16,6 +16,7 @@ import { findSearch } from '@/lib/actions/page/find-search';
 import { focusInput } from '@/lib/actions/page/focus-input';
 import { getPageInfo } from '@/lib/actions/page/get-page-info';
 import { highlightElement } from '@/lib/actions/page/highlight-element';
+import { probeClick } from '@/lib/actions/page/probe-click';
 import { hoverElement } from '@/lib/actions/page/hover-element';
 import { injectCode } from '@/lib/actions/page/inject-code';
 import { listDownloads } from '@/lib/actions/page/list-downloads';
@@ -182,6 +183,8 @@ const RULES = new Map<string, Rule>([
   [pickElement.name, quench],
 
   [highlightElement.name, none],
+  // The Bridge probes before every click, so a cue here would show each click twice.
+  [probeClick.name, none],
   [openTab.name, none],
   [switchTab.name, none],
   [closeTab.name, none],
