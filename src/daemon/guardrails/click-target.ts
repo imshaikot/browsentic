@@ -21,9 +21,14 @@ export async function readClickTarget(probe: Probe, action: string, input: unkno
   try {
     const result = await probe(PROBE_ACTION, { target, point });
     if (!result.ok) return UNREAD;
-    const { submits, text } = (result.data ?? {}) as { submits?: unknown; text?: unknown };
-    if (typeof submits !== 'boolean') return UNREAD;
-    return { submits, ...(typeof text === 'string' ? { text } : {}) };
+    const { submits, text, href, pageUrl } = (result.data ?? {}) as Record<string, unknown>;
+    if (typeof submits !== 'boolean' || typeof pageUrl !== 'string') return UNREAD;
+    return {
+      submits,
+      pageUrl,
+      ...(typeof text === 'string' ? { text } : {}),
+      ...(typeof href === 'string' ? { href } : {}),
+    };
   } catch {
     return UNREAD;
   }

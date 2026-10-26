@@ -56,6 +56,10 @@ export interface ClickTarget {
   readonly submits: boolean;
   /** Its visible or accessible text. */
   readonly text?: string;
+  /** Where the click leads by itself, as an absolute address: a link, or what a submit control posts to. */
+  readonly href?: string;
+  /** The address of the page the click is made on. */
+  readonly pageUrl?: string;
   /** The page could not be asked, so nothing is known about the target. */
   readonly unread?: boolean;
 }
@@ -77,6 +81,18 @@ export type Condition = (request: GuardrailRequest, policy: Policy) => boolean;
  */
 const COMMIT_LABEL =
   /\b(send|submit|buy|pay|purchase|place order|order now|check ?out|confirm|delete|remove|publish|post|transfer|donate|subscribe|sign ?up)\b/i;
+
+function leavesScope(address: string | undefined, hosts: readonly string[]): boolean {
+  if (!address) return false;
+  let url: URL;
+  try {
+    url = new URL(address);
+  } catch {
+    return false;
+  }
+  if (url.protocol === 'http:' || url.protocol === 'https:') return !hostAllowed(url.hostname, hosts);
+  return url.protocol === 'data:' || url.protocol === 'file:';
+}
 
 export const CONDITIONS = {
   /** Internal actions that only the daemon may originate. */
@@ -116,6 +132,18 @@ export const CONDITIONS = {
     if (request.action === DOWNLOAD_ACTION) return false;
     const target = targetUrl(request.action, request.input);
     return !!target?.url && urlPayloadBytes(target.url) > policy.urlPayloadBytes;
+  },
+
+  /**
+   * A click that leaves the sites the run is about. `off-scope-navigation` reads the request, and
+   * a click carries no address, so the probe supplies two: where the control leads, and where the
+   * page already is. The second catches what the first cannot see, a script that navigates on
+   * click, and a page the run was carried to by an earlier one. Only http(s) hosts are compared;
+   * `data:` and `file:` destinations are off scope whatever the scope says.
+   */
+  clicksOffScope: (request) => {
+    if (!CLICK_ACTIONS.has(request.action) || !request.target) return false;
+    return [request.target.href, request.target.pageUrl].some((address) => leavesScope(address, request.scope.hosts));
   },
 
   /** Anything that commits a form, however it is spelled. */
@@ -268,6 +296,13 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Submits a form',
     reason: 'Submitting a form is a consequential action.',
+  },
+  {
+    id: 'click-off-scope',
+    when: 'clicksOffScope',
+    effect: 'confirm',
+    title: 'Clicks its way off the sites this run is about',
+    reason: 'That click leads to a site outside this run\'s scope, or the page it is made on already is one.',
   },
   {
     id: 'click-commits',

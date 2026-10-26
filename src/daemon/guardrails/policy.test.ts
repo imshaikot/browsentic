@@ -66,6 +66,55 @@ describe('a click on a control that commits', () => {
   });
 });
 
+describe('a click that leaves the run scope', () => {
+  const clickTo = (target: { submits: boolean; href?: string; pageUrl?: string }, action = 'page.clickElement', policy?: Policy) =>
+    decide({ action, input: {}, caller: 'agent', scope, target }, policy);
+  const HOME = 'https://example.com/';
+
+  test('a link to another site confirms', () => {
+    expect(rules(clickTo({ submits: false, href: 'https://evil.com/x', pageUrl: HOME }))).toEqual(['click-off-scope']);
+    expect(clickTo({ submits: false, href: 'https://evil.com/x', pageUrl: HOME }, 'page.trustedClick').effect).toBe('confirm');
+  });
+
+  test('a link within the scope, or to a subdomain of it, is allowed', () => {
+    expect(clickTo({ submits: false, href: 'https://app.example.com/x', pageUrl: HOME }).effect).toBe('allow');
+    expect(clickTo({ submits: false, href: 'https://example.com/pricing', pageUrl: HOME }).effect).toBe('allow');
+  });
+
+  test('a link that merely contains the host in its path is another site', () => {
+    expect(clickTo({ submits: false, href: 'https://evil.com/example.com', pageUrl: HOME }).effect).toBe('confirm');
+    expect(clickTo({ submits: false, href: 'https://example.com.evil.com/', pageUrl: HOME }).effect).toBe('confirm');
+  });
+
+  test('a page the run was already carried to confirms, whatever the control leads to', () => {
+    expect(rules(clickTo({ submits: false, pageUrl: 'https://evil.com/landing' }))).toEqual(['click-off-scope']);
+  });
+
+  test('a form that posts to another site confirms', () => {
+    expect(rules(clickTo({ submits: true, href: 'https://collect.evil.com/', pageUrl: HOME })).sort()).toEqual(['click-commits', 'click-off-scope']);
+  });
+
+  test('data and file destinations are off scope', () => {
+    expect(clickTo({ submits: false, href: 'data:text/html,hi', pageUrl: HOME }).effect).toBe('confirm');
+    expect(clickTo({ submits: false, href: 'file:///etc/passwd', pageUrl: HOME }).effect).toBe('confirm');
+  });
+
+  test('script and mail links name no site, and about:blank is not one either', () => {
+    expect(clickTo({ submits: false, href: 'javascript:void(0)', pageUrl: HOME }).effect).toBe('allow');
+    expect(clickTo({ submits: false, href: 'mailto:a@b.com', pageUrl: 'about:blank' }).effect).toBe('allow');
+  });
+
+  test('an unconfined run is never off scope', () => {
+    const decision = decide({ action: 'page.clickElement', input: {}, caller: 'agent', scope: ANYWHERE, target: { submits: false, href: 'https://evil.com/', pageUrl: 'https://x.com/' } });
+    expect(decision.effect).toBe('allow');
+  });
+
+  test('config can switch it off', () => {
+    const off = policyFrom({ rules: { 'click-off-scope': 'allow' } });
+    expect(clickTo({ submits: false, href: 'https://evil.com/', pageUrl: HOME }, 'page.clickElement', off).effect).toBe('allow');
+  });
+});
+
 describe('decisions for a watched run', () => {
   test('in-scope navigation allowed', () => {
     expect(agent('page.navigate', { url: 'https://app.example.com/x' }).effect).toBe('allow');

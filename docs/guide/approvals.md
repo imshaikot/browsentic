@@ -56,6 +56,7 @@ declaration order.
 | `off-scope-navigation` | Navigating off the sites this run is about, however the URL is spelled | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
+| `click-off-scope` | A `page_clickElement` or `page_trustedClick` on a link or submit control that leads to a site outside this run's scope, or made on a page that already is one. Read with `page_probeClick` first | confirm |
 | `click-commits` | A `page_clickElement` or `page_trustedClick` on a submit button, or on a button labelled like send, pay, buy, delete or post. The Bridge reads the target with `page_probeClick` first; a target it cannot read counts as one that commits | confirm |
 | `site-tool-call` | `page_callSiteTool`: running a tool the site registered through WebMCP | confirm |
 | `file-upload` | `page_attachFile`: putting one of your files into a page | confirm |

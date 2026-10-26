@@ -8,12 +8,12 @@ describe('reading the target of a click', () => {
     const target = await readClickTarget(
       async (action, input) => {
         asked.push([action, input]);
-        return success({ submits: true, text: 'Send' });
+        return success({ submits: true, text: 'Send', pageUrl: 'https://a.com/' });
       },
       'page.trustedClick',
       { target: { text: 'Send' }, button: 'left', holdMs: 50 },
     );
-    expect(target).toEqual({ submits: true, text: 'Send' });
+    expect(target).toEqual({ submits: true, text: 'Send', pageUrl: 'https://a.com/' });
     expect(asked).toEqual([[PROBE_ACTION, { target: { text: 'Send' }, point: undefined }]]);
   });
 
@@ -40,8 +40,14 @@ describe('reading the target of a click', () => {
     ).toEqual(UNREAD);
   });
 
+  test('carries where the click leads and where the page is', async () => {
+    const answer = { submits: false, href: 'https://evil.com/x', pageUrl: 'https://a.com/' };
+    expect(await readClickTarget(async () => success(answer), 'page.clickElement', {})).toEqual(answer);
+  });
+
   test('an answer of the wrong shape leaves the target unread', async () => {
     expect(await readClickTarget(async () => success({ text: 'Send' }), 'page.clickElement', {})).toEqual(UNREAD);
+    expect(await readClickTarget(async () => success({ submits: true }), 'page.clickElement', {})).toEqual(UNREAD);
     expect(await readClickTarget(async () => success(null), 'page.clickElement', {})).toEqual(UNREAD);
   });
 });

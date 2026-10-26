@@ -224,7 +224,7 @@ describe('clicking a button that commits', () => {
   };
 
   test('asks first when the probe says it submits, and clicks only after a yes', async () => {
-    const { waiting, events, invoked } = await clickRun(success({ submits: true, text: 'Send' }));
+    const { waiting, events, invoked } = await clickRun(success({ submits: true, text: 'Send', pageUrl: 'https://example.com/' }));
     const clicking = waiting.invokeForRun('r1', 'page.clickElement', { target: { text: 'Send' } });
     await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
     expect(invoked).toEqual(['page.probeClick']);
@@ -244,7 +244,7 @@ describe('clicking a button that commits', () => {
   });
 
   test('clicks an ordinary control without asking', async () => {
-    const { waiting, events, invoked } = await clickRun(success({ submits: false, text: 'Next page' }));
+    const { waiting, events, invoked } = await clickRun(success({ submits: false, text: 'Next page', pageUrl: 'https://example.com/' }));
     await waiting.invokeForRun('r1', 'page.clickElement', { target: { text: 'Next page' } });
     waiting.dispose();
     expect({ prompts: events.filter((event) => event.kind === 'approval').length, invoked }).toEqual({

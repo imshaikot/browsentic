@@ -387,7 +387,7 @@ widget to act on, and with `INVALID_INPUT` for an answer that does not fit the o
 ### page_probeClick
 
 Look at what a click would land on, without clicking. Returns the element's tag, role, selector,
-text and `submits`, whether clicking it would submit a form. Changes nothing on the page. Give it
+text, `submits` (whether clicking it would submit a form), `href` (the address a link or submit control leads to) and `pageUrl` (the address of the page). Changes nothing on the page. Give it
 either a `target` or a viewport `point`, as for [`page_trustedClick`](#page_trustedclick).
 
 The Bridge calls this itself before every `page_clickElement` and `page_trustedClick`, to decide
