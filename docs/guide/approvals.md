@@ -3,7 +3,7 @@
 Which agent actions wait for your approval, which are refused outright, and how to change either in
 `config.json` or the settings page.
 
-In short: reading and clicking need no approval, anything that commits something or sends data
+In short: reading and ordinary clicking need no approval, anything that commits something or sends data
 somewhere pauses and asks, and a handful of things are refused whatever you say.
 
 ---
@@ -56,6 +56,7 @@ declaration order.
 | `off-scope-navigation` | Navigating off the sites this run is about, however the URL is spelled | confirm |
 | `url-payload` | A navigation whose query string or fragment exceeds `urlPayloadBytes` (512 by default) | confirm |
 | `form-submission` | Anything that commits a form, however spelled | confirm |
+| `click-commits` | A `page_clickElement` or `page_trustedClick` on a submit button, or on a button labelled like send, pay, buy, delete or post. The Bridge reads the target with `page_probeClick` first; a target it cannot read counts as one that commits | confirm |
 | `site-tool-call` | `page_callSiteTool`: running a tool the site registered through WebMCP | confirm |
 | `file-upload` | `page_attachFile`: putting one of your files into a page | confirm |
 | `file-download` | `page_captureDownload`: letting a page write a file to your disk | confirm |

@@ -37,6 +37,7 @@ export const NETWORK_ACTION = 'page.readNetwork';
 export const INJECT_ACTION = 'page.injectCode';
 export const RUN_CODE_ACTION = 'page.runCode';
 export const SITE_TOOL_ACTION = 'page.callSiteTool';
+export const CLICK_ACTIONS: ReadonlySet<string> = new Set(['page.clickElement', 'page.trustedClick']);
 
 /** One definition, shared with the settings screen that renders it. */
 export type Effect = RuleEffect;
@@ -49,11 +50,23 @@ export type Effect = RuleEffect;
  */
 export type Caller = 'agent' | 'external';
 
+/** What a click would land on, read from the page before the click is made. */
+export interface ClickTarget {
+  /** The element is a submit control inside a form. */
+  readonly submits: boolean;
+  /** Its visible or accessible text. */
+  readonly text?: string;
+  /** The page could not be asked, so nothing is known about the target. */
+  readonly unread?: boolean;
+}
+
 export interface GuardrailRequest {
   readonly action: string;
   readonly input: unknown;
   readonly caller: Caller;
   readonly scope: Scope;
+  /** Set by the caller for a click action, from a dry run. Absent means the target was not read. */
+  readonly target?: ClickTarget;
 }
 
 export type Condition = (request: GuardrailRequest, policy: Policy) => boolean;
@@ -62,6 +75,9 @@ export type Condition = (request: GuardrailRequest, policy: Policy) => boolean;
  * Every predicate a rule may name. Closed on purpose: a rule cannot express anything
  * that is not in here, which keeps the policy inspectable rather than arbitrary code.
  */
+const COMMIT_LABEL =
+  /\b(send|submit|buy|pay|purchase|place order|order now|check ?out|confirm|delete|remove|publish|post|transfer|donate|subscribe|sign ?up)\b/i;
+
 export const CONDITIONS = {
   /** Internal actions that only the daemon may originate. */
   reservedAction: (request) => request.action.startsWith(RESERVED_PREFIX),
@@ -104,6 +120,18 @@ export const CONDITIONS = {
 
   /** Anything that commits a form, however it is spelled. */
   submitsForm: (request) => submitsForm(request.action, request.input),
+
+  /**
+   * A click on a control that commits something. `submitsForm` cannot see this: it reads the
+   * request, and a click names its target only by selector or text. The caller reads the target
+   * first and hands it in. A page whose "Send" is a script button inside no form still reads as
+   * one by its label, so the label counts too. A target that could not be read counts as committing.
+   * A request with no `target` at all is not a click that was probed, and is not matched here.
+   */
+  clicksCommit: (request) => {
+    if (!CLICK_ACTIONS.has(request.action) || !request.target) return false;
+    return request.target.unread === true || request.target.submits || COMMIT_LABEL.test(request.target.text ?? '');
+  },
 
   /** Putting one of the user's files into a page. */
   uploadsFile: (request) => request.action === UPLOAD_ACTION,
@@ -240,6 +268,13 @@ export const DEFAULT_RULES: readonly Rule[] = [
     effect: 'confirm',
     title: 'Submits a form',
     reason: 'Submitting a form is a consequential action.',
+  },
+  {
+    id: 'click-commits',
+    when: 'clicksCommit',
+    effect: 'confirm',
+    title: 'Clicks a button that commits something',
+    reason: 'That click lands on a submit control, or one labelled like a send, pay or delete button.',
   },
   {
     id: 'site-tool-call',

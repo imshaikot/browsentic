@@ -26,6 +26,46 @@ describe('submitsForm', () => {
   }
 });
 
+describe('a click on a control that commits', () => {
+  const click = (target: { submits: boolean; text?: string; unread?: boolean } | undefined, action = 'page.clickElement', policy?: Policy) =>
+    decide({ action, input: { target: { text: 'x' } }, caller: 'agent', scope, ...(target ? { target } : {}) }, policy);
+
+  test('a submit button confirms', () => {
+    expect(rules(click({ submits: true, text: 'Go' }))).toEqual(['click-commits']);
+  });
+
+  test('a script button labelled like a send button confirms', () => {
+    expect(click({ submits: false, text: 'Send message' }).effect).toBe('confirm');
+    expect(click({ submits: false, text: 'Place order' }, 'page.trustedClick').effect).toBe('confirm');
+  });
+
+  test('an ordinary control is allowed', () => {
+    expect(click({ submits: false, text: 'Next page' }).effect).toBe('allow');
+    expect(click({ submits: false }).effect).toBe('allow');
+  });
+
+  test('a target the page could not be asked about confirms', () => {
+    expect(click({ submits: false, unread: true }).effect).toBe('confirm');
+  });
+
+  test('a request carrying no target is not judged as a click', () => {
+    expect(click(undefined).effect).toBe('allow');
+  });
+
+  test('other actions are not judged by a target', () => {
+    expect(click({ submits: true }, 'page.hoverElement').effect).toBe('allow');
+  });
+
+  test('an unattended caller is refused, as with a form', () => {
+    const decision = decide({ action: 'page.clickElement', input: {}, caller: 'external', scope: ANYWHERE, target: { submits: true } });
+    expect(decision.effect).toBe('deny');
+  });
+
+  test('config can switch it off', () => {
+    expect(click({ submits: true }, 'page.clickElement', policyFrom({ rules: { 'click-commits': 'allow' } })).effect).toBe('allow');
+  });
+});
+
 describe('decisions for a watched run', () => {
   test('in-scope navigation allowed', () => {
     expect(agent('page.navigate', { url: 'https://app.example.com/x' }).effect).toBe('allow');

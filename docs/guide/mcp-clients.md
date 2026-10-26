@@ -45,7 +45,7 @@ surprise here.
 
 ## What the client gets
 
-- **All 52 page tools**, each listed with its parameters in [reference/tools.md](../reference/tools.md)
+- **All 53 page tools**, each listed with its parameters in [reference/tools.md](../reference/tools.md)
 - **`browsentic_status`**: whether the extension is connected, its version, the active tab, any
   running monitors, and a `hint` naming the fix when something is wrong. Call it first when a page
   tool fails.

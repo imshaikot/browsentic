@@ -35,11 +35,13 @@ import {
   normalizeHost,
   RUN_CODE_ACTION,
   policyFrom,
+  readClickTarget,
   scopeFor,
   sealSecrets,
   summary as summarizeDecision,
   unanswered,
   type Policy,
+  type Probe,
   type Scope,
 } from '../guardrails';
 import type { ToolDelivery } from '../control';
@@ -314,7 +316,12 @@ export class AgentSession {
     }
 
     const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
-    const decision = decide({ action, input, caller: 'agent', scope }, run.policy);
+    // The phone has no probe, so a click there reads as unread and is confirmed.
+    const probe: Probe = run.phone
+      ? async () => failure('NOT_ON_PHONE', 'A click cannot be probed on the phone.')
+      : (probed, probedInput) => this.deps.invoke(probed, probedInput, { runId: run.id, hosts: scope.hosts });
+    const target = await readClickTarget(probe, action, input);
+    const decision = decide({ action, input, caller: 'agent', scope, ...(target ? { target } : {}) }, run.policy);
     if (decision.effect === 'deny') {
       log(`agent run ${runId} blocked ${action}: ${describeDecision(decision)}`);
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });

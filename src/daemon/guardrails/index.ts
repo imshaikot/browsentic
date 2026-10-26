@@ -22,6 +22,7 @@ export type { NavigationTarget, Scope, ScopeSeed } from './scope';
 
 export {
   CAPTCHA_ACTION,
+  CLICK_ACTIONS,
   CONDITIONS,
   DEFAULT_RULES,
   DOWNLOAD_ACTION,
@@ -34,8 +35,10 @@ export {
   policyFrom,
   submitsForm,
 } from './policy';
-export type { Caller, Condition, ConditionName, Effect, FencePolicy, GuardrailConfig, GuardrailRequest, Policy, Rule } from './policy';
+export type { Caller, ClickTarget, Condition, ConditionName, Effect, FencePolicy, GuardrailConfig, GuardrailRequest, Policy, Rule } from './policy';
 
+export { PROBE_ACTION, readClickTarget } from './click-target';
+export type { Probe } from './click-target';
 export { DECLINED_MESSAGE, blocked, decide, declined, describe, summary, unanswered } from './decide';
 export type { Decision } from './decide';
 

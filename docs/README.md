@@ -53,7 +53,7 @@ How the parts work, for contributors and integrators.
 
 | | |
 | --- | --- |
-| [Tools](reference/tools.md) | All 52 page tools with their parameters, plus the resources |
+| [Tools](reference/tools.md) | All 53 page tools with their parameters, plus the resources |
 | [CLI](reference/cli.md) | Every `browsentic` command |
 | [Errors](reference/errors.md) | Every error code, what caused it, what to do |
 

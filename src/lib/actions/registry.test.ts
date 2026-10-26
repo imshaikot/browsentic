@@ -41,6 +41,13 @@ const schemaOf = (name: string) =>
     properties: Record<string, { properties?: Record<string, Record<string, unknown>> } & Record<string, unknown>>;
   };
 
+describe('the click probe', () => {
+  test('is on offer in both browsers and changes nothing', () => {
+    expect(names(describeActions('firefox'))).toContain('page.probeClick');
+    expect(actions.get('page.probeClick')!.description).toContain('without clicking');
+  });
+});
+
 describe('the described schemas', () => {
   test('none carries the JSON Schema dialect URL', () => {
     expect(JSON.stringify(describeActions())).not.toContain('$schema');
