@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { failure, success } from '@/lib/actions/protocol';
 import { SAVE_SITE_MAP_ACTION } from '@/lib/actions/reserved';
-import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
+import { gateMappingClick, gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 
 const mapRun = (settings: Partial<MapRun['settings']> = {}, visited: string[] = []): MapRun => ({
   target: { host: 'www.example.com', origin: 'https://www.example.com', domain: 'example.com', name: 'example-com' },
@@ -34,6 +34,23 @@ describe('what a mapping run may do', () => {
 
   test('clicking is refused unless the settings allow it', () => {
     expect([verdict(mapRun(), 'page.clickElement'), verdict(mapRun({ allowClicks: true }), 'page.clickElement')]).toEqual(['MAPPING_READ_ONLY', 'allowed']);
+  });
+
+  test('an allowed click is still refused when it would commit something or leave the site', () => {
+    const run = mapRun({ allowClicks: true });
+    const click = (target: Parameters<typeof gateMappingClick>[2]) => {
+      const gate = gateMappingClick(run, { target: { selector: 'button' } }, target);
+      return gate.allow ? 'allowed' : gate.result.ok ? 'allowed' : gate.result.error.code;
+    };
+    const page = 'https://www.example.com/';
+    expect([
+      click({ submits: false, text: 'Pricing', href: 'https://www.example.com/pricing', pageUrl: page }),
+      click({ submits: false, text: 'Open menu', pageUrl: page }),
+      click({ submits: true, text: 'Go', pageUrl: page }),
+      click({ submits: false, text: 'Delete account', pageUrl: page }),
+      click({ submits: false, unread: true }),
+      click({ submits: false, text: 'Docs', href: 'https://docs.example.com/', pageUrl: page }),
+    ]).toEqual(['allowed', 'allowed', 'MAPPING_READ_ONLY', 'MAPPING_READ_ONLY', 'MAPPING_READ_ONLY', 'MAPPING_OFF_SITE']);
   });
 
   test('handing in the report is always allowed, and no other reserved action is', () => {

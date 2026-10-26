@@ -51,7 +51,7 @@ import { grouped } from '../tool-groups';
 import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
-import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
+import { gateMappingClick, gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
 import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
@@ -299,7 +299,12 @@ export class AgentSession {
     }
 
     if (run.map) {
-      const gate = gateMappingInvoke(run.map, action, input);
+      let gate = gateMappingInvoke(run.map, action, input);
+      if (gate.allow) {
+        const map = run.map;
+        const target = await readClickTarget((probed, probedInput) => this.deps.invoke(probed, probedInput, { tabId: map.tabId }), action, input);
+        if (target) gate = gateMappingClick(map, input, target);
+      }
       if (!gate.allow) {
         log(`mapping run ${runId} refused ${action}: ${gate.result.ok ? '' : gate.result.error.code}`);
         emit({ kind: 'toolResult', toolId, ok: false, summary: summarize(input, gate.result) });

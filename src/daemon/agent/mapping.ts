@@ -1,6 +1,7 @@
 import { failure, type ActionResult } from '@/lib/actions/protocol';
 import { RESERVED_PREFIX } from '@/lib/actions/reserved';
 import { SAVE_SITE_MAP_ACTION } from '@/lib/skills/site-map';
+import { ANYWHERE, CONDITIONS, type ClickTarget } from '../guardrails';
 import { log } from '../log';
 import type { SiteMapSettings } from './config';
 import type { MapTarget, Staging } from './site-map-store';
@@ -105,6 +106,37 @@ function gateNavigate(run: MapRun, input: unknown): Gate {
     );
   }
   return { allow: true };
+}
+
+/**
+ * A click the mapping gate let through, judged on what it lands on. `decide()` never sees a mapping
+ * run, so `click-commits` would not either: a read-only run refuses outright what an ordinary run
+ * would ask about, and a link off the mapped origin goes the way `page.navigate` to it would.
+ */
+export function gateMappingClick(run: MapRun, input: unknown, target: ClickTarget): Gate {
+  if (CONDITIONS.clicksCommit({ action: CLICK_ACTION, input, caller: 'agent', scope: ANYWHERE, target })) {
+    return deny(
+      'MAPPING_READ_ONLY',
+      target.unread
+        ? 'A mapping run cannot click what it could not look at first. Navigate to the route with page_navigate instead.'
+        : `A mapping run may only look at pages, not change them — that click lands on a control that commits something${target.text ? ` (“${target.text.slice(0, 60)}”)` : ''}. Leave it and move on.`,
+    );
+  }
+  if (target.href && leavesOrigin(target.href, run.target.origin)) {
+    return deny('MAPPING_OFF_SITE', `That click leads off ${run.target.origin}. This run may only visit pages on the site being mapped.`);
+  }
+  return { allow: true };
+}
+
+function leavesOrigin(address: string, origin: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(address);
+  } catch {
+    return false;
+  }
+  if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin !== origin;
+  return url.protocol === 'data:' || url.protocol === 'file:';
 }
 
 function gateScreenshot(run: MapRun): Gate {
