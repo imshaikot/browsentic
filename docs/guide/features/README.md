@@ -23,7 +23,7 @@ If you have not set Browsentic up yet, start with [Install](../install.md), [Pai
 
 | | |
 | --- | --- |
-| [Page actions](page-actions.md) | The 52 things it can do to a page, grouped by task |
+| [Page actions](page-actions.md) | The 53 things it can do to a page, grouped by task |
 | [Screenshots](screenshots.md) | Viewport, full page or one element, and when a capture is written to disk |
 | [Theming](theming.md) | Dark mode on a site that has none, and a WCAG contrast audit |
 | [Captchas](captcha.md) | What it will and will not do at a "verify you are human" block |

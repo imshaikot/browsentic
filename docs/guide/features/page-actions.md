@@ -1,6 +1,6 @@
 # Page actions
 
-The 52 page tools the agent uses to read, click, type, move between tabs and script a page. You do
+The 53 page tools the agent uses to read, click, type, move between tabs and script a page. You do
 not name them in an instruction, since the agent picks the tool, but knowing what exists tells you
 what is worth asking for.
 

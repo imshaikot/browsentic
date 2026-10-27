@@ -96,6 +96,7 @@ import {
   decide,
   describe as describeDecision,
   policyFrom,
+  readClickTarget,
   sealSecrets,
   summary as summarizeDecision,
 } from './guardrails';
@@ -1163,8 +1164,9 @@ export async function startDaemon({ version, idleExit = true, android = androidO
     // An external MCP client has no run and no approval channel, so it is unscoped and
     // its confirms resolve through the policy's `unattended` setting.
     const config = readAgentConfig();
+    const clickTarget = await readClickTarget((probed, probedInput) => invokeOn(target, probed, probedInput), action, input);
     const decision = decide(
-      { action, input, caller: 'external', scope: ANYWHERE },
+      { action, input, caller: 'external', scope: ANYWHERE, ...(clickTarget ? { target: clickTarget } : {}) },
       policyFrom(config.guardrails, config.requireApproval),
     );
     if (decision.effect === 'deny') {

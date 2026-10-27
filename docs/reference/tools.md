@@ -25,7 +25,7 @@ Tools by group:
 | --- | --- |
 | [Status and guides](#status-and-guides) | `browsentic_status`, `browsentic_openSkill`, `browsentic_use` |
 | [Reading](#reading) | `page_getPageInfo`, `page_extractText`, `page_waitForElement`, `page_findProgress`, `page_findSearch`, `page_pickElement`, `page_screenshot` |
-| [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
+| [Acting](#acting) | `page_clickElement`, `page_trustedClick`, `page_probeClick`, `page_findCaptcha`, `page_solveCaptcha`, `page_hoverElement`, `page_dragElement`, `page_focusInput`, `page_fillInput`, `page_typeText`, `page_selectOption`, `page_selectText`, `page_pressKey`, `page_submitForm`, `page_highlightElement` |
 | [Scripting](#scripting) | `page_injectCode`, `page_runCode` |
 | [Site tools (WebMCP)](#site-tools-webmcp) | `page_listSiteTools`, `page_callSiteTool` |
 | [Moving](#moving) | `page_searchSite`, `page_navigate`, `page_scrollTo`, `page_openTab`, `page_switchTab`, `page_closeTab` |
@@ -383,6 +383,21 @@ Returns the same fields as `page_findCaptcha`, plus `clicked` and, when the anal
 `imageHeight`, `errors` (the vendor refused the last answer) and, for a grid that swaps picked
 tiles, `fresh` (the tiles that just changed). Fails with `CAPTCHA_NOT_FOUND` when there is no
 widget to act on, and with `INVALID_INPUT` for an answer that does not fit the open challenge.
+
+### page_probeClick
+
+Look at what a click would land on, without clicking. Returns the element's tag, role, selector,
+text, `submits` (whether clicking it would submit a form), `href` (the address a link or submit control leads to) and `pageUrl` (the address of the page). Changes nothing on the page. Give it
+either a `target` or a viewport `point`, as for [`page_trustedClick`](#page_trustedclick).
+
+The Bridge calls this itself before every `page_clickElement` and `page_trustedClick`, to decide
+whether the click needs your approval (see the `click-commits` rule in
+[Approvals and guardrails](../guide/approvals.md#the-rules)).
+
+| Parameter | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `target` | [target](#element-targets) | none | Element to inspect. Give this or `point`, never both |
+| `point` | `{ x, y }` | none | Viewport coordinates in CSS pixels |
 
 ### page_hoverElement
 

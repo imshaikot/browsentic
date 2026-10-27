@@ -93,8 +93,8 @@ run, and the message carries the *fix*. In the **Origin** column, Daemon is Brow
 | `SITE_BLOCKED` | Extension | The page is on the user's Blocked sites list, or the action would take the browser to a blocked site or ended up on one. Also returned for every page action while that list cannot be read. **Final**: do not retry or reach it another way; tell the user. [Guide](../guide/features/blocked-sites.md) |
 | `SECRET_NOT_RELEASABLE` | Extension | A sealed secret placeholder was passed somewhere it cannot be released. Only `page_fillInput`'s `value` and `page_typeText`'s `text` release one |
 | `SECRET_EXPIRED` | Extension | That placeholder is no longer held: it aged out, or it was read in an earlier browser session. Read the value again |
-| `MAPPING_READ_ONLY` | Mapping gate | A mapping run may only call the 14 read-only actions (plus `page_clickElement` when `allowClicks` is on) |
-| `MAPPING_OFF_SITE` | Mapping gate | Navigation must be an absolute URL on the mapped origin, `back` and `forward` included |
+| `MAPPING_READ_ONLY` | Mapping gate | A mapping run may only call the 14 read-only actions (plus `page_clickElement` when `allowClicks` is on), and a click that would submit, commit or could not be read first |
+| `MAPPING_OFF_SITE` | Mapping gate | Navigation must be an absolute URL on the mapped origin, `back` and `forward` included; a click on a link off that origin is refused the same way |
 | `MAPPING_BUDGET` | Mapping gate | The page or screenshot budget is spent |
 | `MAPPING_TAB_CHANGED` | Mapping gate | The tab the run was pinned to is gone |
 

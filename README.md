@@ -146,7 +146,7 @@ The desktop apps for [macOS](docs/guide/mac-app.md) and [Windows](docs/guide/win
 - 📚 [Documentation](docs/)
 - 🚀 [Install and Pair](docs/guide/install.md)
 - ✨ [Features](docs/guide/features/)
-- 🧰 [All 52 Page Tools](docs/reference/tools.md)
+- 🧰 [All 53 Page Tools](docs/reference/tools.md)
 - 🔌 [Optional: Drive It From Claude Code, Cursor or Zed Over MCP](docs/guide/mcp-clients.md)
 - 🛡️ [Approvals and Guardrails](docs/guide/approvals.md)
 - 🏗️ [Architecture](docs/internals/)

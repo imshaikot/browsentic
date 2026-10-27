@@ -122,7 +122,7 @@ settings page shows but will not change.
 | Key | Default | Ceiling | Notes |
 | --- | --- | --- | --- |
 | `siteMap.research` | `true` | n/a | Lets a mapping run use web search for public background on the domain. Turn it off to keep everything inside the browser |
-| `siteMap.allowClicks` | `false` | n/a | Lets a mapping run reach routes that only exist behind an interaction |
+| `siteMap.allowClicks` | `false` | n/a | Lets a mapping run reach routes that only exist behind an interaction. Clicks that submit, commit (send, pay, delete…) or leave the site are still refused |
 | `siteMap.maxPages` | 15 | 40 | |
 | `siteMap.maxScreenshots` | 10 | 24 | |
 | `siteMap.timeoutMs` | 600 000 (10 min) | 1 800 000 (30 min) | |

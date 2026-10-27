@@ -70,7 +70,7 @@ Two switches change what a run may do:
 
 | | Default | Effect |
 | --- | --- | --- |
-| `allowClicks` | off | Lets it reach routes that only exist behind an interaction |
+| `allowClicks` | off | Lets it reach routes that only exist behind an interaction. Clicks that submit, commit (send, pay, delete…) or leave the site are still refused |
 | `research` | on | Lets it use web search for public background on the domain |
 
 `research` is the one case where a run both reads pages and makes outbound requests. Turn it off to

@@ -50,6 +50,7 @@ import { submitForm } from './page/submit-form';
 import { switchFrame } from './page/switch-frame';
 import { switchTab } from './page/switch-tab';
 import { timerStatus } from './page/timer-status';
+import { probeClick } from './page/probe-click';
 import { trustedClick } from './page/trusted-click';
 import { typeText } from './page/type-text';
 import { waitForElement } from './page/wait-for-element';
@@ -61,6 +62,7 @@ export const actions: ReadonlyMap<string, AnyAction> = new Map(
       scrollTo,
       clickElement,
       trustedClick,
+      probeClick,
       findCaptcha,
       solveCaptcha,
       hoverElement,

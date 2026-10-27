@@ -35,11 +35,13 @@ import {
   normalizeHost,
   RUN_CODE_ACTION,
   policyFrom,
+  readClickTarget,
   scopeFor,
   sealSecrets,
   summary as summarizeDecision,
   unanswered,
   type Policy,
+  type Probe,
   type Scope,
 } from '../guardrails';
 import type { ToolDelivery } from '../control';
@@ -49,7 +51,7 @@ import { grouped } from '../tool-groups';
 import { resolveAgentSkill } from './agent-skills';
 import { isGranted, rememberGrant } from './approvals';
 import { maxConcurrentRuns, readAgentConfig, siteMapSettings, type AgentConfig } from './config';
-import { gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
+import { gateMappingClick, gateMappingInvoke, noteMappingResult, type MapRun } from './mapping';
 import { handOver, type Handover } from './attachments';
 import { buildSystemPrompt, phoneBlock, profileBlock, promptUpdate, scheduledBlock, turnMessage, type BuiltPrompt, type PromptSection } from './prompt';
 import { RunError, runInstruction } from './runner';
@@ -297,7 +299,12 @@ export class AgentSession {
     }
 
     if (run.map) {
-      const gate = gateMappingInvoke(run.map, action, input);
+      let gate = gateMappingInvoke(run.map, action, input);
+      if (gate.allow) {
+        const map = run.map;
+        const target = await readClickTarget((probed, probedInput) => this.deps.invoke(probed, probedInput, { tabId: map.tabId }), action, input);
+        if (target) gate = gateMappingClick(map, input, target);
+      }
       if (!gate.allow) {
         log(`mapping run ${runId} refused ${action}: ${gate.result.ok ? '' : gate.result.error.code}`);
         emit({ kind: 'toolResult', toolId, ok: false, summary: summarize(input, gate.result) });
@@ -314,7 +321,12 @@ export class AgentSession {
     }
 
     const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
-    const decision = decide({ action, input, caller: 'agent', scope }, run.policy);
+    // The phone has no probe, so a click there reads as unread and is confirmed.
+    const probe: Probe = run.phone
+      ? async () => failure('NOT_ON_PHONE', 'A click cannot be probed on the phone.')
+      : (probed, probedInput) => this.deps.invoke(probed, probedInput, { runId: run.id, hosts: scope.hosts });
+    const target = await readClickTarget(probe, action, input);
+    const decision = decide({ action, input, caller: 'agent', scope, ...(target ? { target } : {}) }, run.policy);
     if (decision.effect === 'deny') {
       log(`agent run ${runId} blocked ${action}: ${describeDecision(decision)}`);
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });

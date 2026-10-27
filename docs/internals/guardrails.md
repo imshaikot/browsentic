@@ -606,6 +606,7 @@ rather than in the prompt:
 | | |
 | --- | --- |
 | Only 13 read-only actions are reachable | `MAPPING_READ_ONLY` otherwise. `page.clickElement` joins them when `allowClicks` is on |
+| A click is probed before it is made | `MAPPING_READ_ONLY` for a submit control, a commit-style label (send, pay, delete…) or a target that could not be read; `MAPPING_OFF_SITE` for a link off the mapped origin. `decide()` never sees a mapping run, so this is where `click-commits` applies to one |
 | Navigation must be an absolute URL on the mapped origin | `MAPPING_OFF_SITE`, including for `back` and `forward`, which walk history off-site |
 | Page and screenshot budgets are enforced | `MAPPING_BUDGET` |
 | The run is pinned to one tab | `MAPPING_TAB_CHANGED` |

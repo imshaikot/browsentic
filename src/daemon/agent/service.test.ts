@@ -203,6 +203,57 @@ fs.copyFileSync('.vibe/config.toml', ${JSON.stringify(`${dir}/config.toml`)});`,
   });
 });
 
+describe('clicking a button that commits', () => {
+  const clickRun = async (probed: ReturnType<typeof success> | ReturnType<typeof failure>) => {
+    const agent = stubCli(join(dirname(configPath), 'agent-that-waits'), 'setTimeout(() => {}, 30_000);');
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
+    const events: RunEvent[] = [];
+    const invoked: string[] = [];
+    const waiting = new AgentSession({
+      invoke: async (action) => {
+        invoked.push(action);
+        return action === 'page.probeClick' ? probed : success({ clicked: true });
+      },
+      emit: (_runId: string, event: RunEvent) => void events.push(event),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    waiting.handle({ t: 'instruct', id: 'r1', text: 'write to them', context: { sessionId: 's1' } });
+    await vi.waitFor(() => expect(waiting.offerFor('r1')).not.toBeNull());
+    return { waiting, events, invoked };
+  };
+
+  test('asks first when the probe says it submits, and clicks only after a yes', async () => {
+    const { waiting, events, invoked } = await clickRun(success({ submits: true, text: 'Send', pageUrl: 'https://example.com/' }));
+    const clicking = waiting.invokeForRun('r1', 'page.clickElement', { target: { text: 'Send' } });
+    await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
+    expect(invoked).toEqual(['page.probeClick']);
+    const asked = events.find((event) => event.kind === 'approval') as Extract<RunEvent, { kind: 'approval' }>;
+    waiting.handle({ t: 'decision', id: 'r1', toolId: asked.toolId, allow: true });
+    await clicking;
+    waiting.dispose();
+    expect(invoked).toEqual(['page.probeClick', 'page.clickElement']);
+  });
+
+  test('asks first when the probe fails, because nothing is known about the button', async () => {
+    const { waiting, events, invoked } = await clickRun(failure('UNKNOWN_ACTION', 'old extension'));
+    void waiting.invokeForRun('r1', 'page.clickElement', { target: { text: 'Next' } });
+    await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
+    waiting.dispose();
+    expect(invoked).toEqual(['page.probeClick']);
+  });
+
+  test('clicks an ordinary control without asking', async () => {
+    const { waiting, events, invoked } = await clickRun(success({ submits: false, text: 'Next page', pageUrl: 'https://example.com/' }));
+    await waiting.invokeForRun('r1', 'page.clickElement', { target: { text: 'Next page' } });
+    waiting.dispose();
+    expect({ prompts: events.filter((event) => event.kind === 'approval').length, invoked }).toEqual({
+      prompts: 0,
+      invoked: ['page.probeClick', 'page.clickElement'],
+    });
+  });
+});
+
 describe('answering a captcha', () => {
   test('asks once, then lets the rest of that run’s rounds through without asking again', async () => {
     const agent = stubCli(join(dirname(configPath), 'agent-that-waits'), 'setTimeout(() => {}, 30_000);');
