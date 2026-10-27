@@ -207,6 +207,36 @@ describe('decisions for a watched run', () => {
     expect(agent('page.switchTab', {}).effect).toBe('allow');
   });
 
+  describe('across the conversation’s tabs', () => {
+    const spanning = scopeFor({
+      url: 'https://example.com/',
+      tabId: 3,
+      pinTab: true,
+      tabs: [{ tabId: 3, host: 'example.com', chosen: true }, { tabId: 9, host: 'docs.other.com', chosen: true }, { tabId: 11, host: 'popup.com' }],
+    });
+    const across = (action: string, input: unknown) => decide({ action, input, caller: 'agent', scope: spanning });
+
+    test('switching to one of them is fine', () => {
+      expect(across('page.switchTab', { tabId: 9 }).effect).toBe('allow');
+    });
+
+    test('closing one still confirms', () => {
+      expect(rules(across('page.closeTab', { tabId: 9 }))).toEqual(['leaves-pinned-tab']);
+    });
+
+    test('a tab outside the conversation still confirms', () => {
+      expect(across('page.switchTab', { tabId: 12 }).effect).toBe('confirm');
+    });
+
+    test('a site the user chose is in scope', () => {
+      expect(across('page.navigate', { url: 'https://docs.other.com/guide' }).effect).toBe('allow');
+    });
+
+    test('a site only the agent brought is not', () => {
+      expect(across('page.navigate', { url: 'https://popup.com/' }).effect).toBe('confirm');
+    });
+  });
+
   test('reading text is fine', () => {
     expect(agent('page.extractText', { format: 'text' }).effect).toBe('allow');
   });

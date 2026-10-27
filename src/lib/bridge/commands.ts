@@ -22,6 +22,12 @@ export const isHandsFreeCommand = (text: string): boolean => {
   return typed === HANDS_FREE_COMMAND || HANDS_FREE_ALIASES.some((alias) => typed === `/${alias}`);
 };
 
+export const TABS_COMMAND = '/tabs';
+
+export const TABS_DESCRIPTION = 'Add other open tabs to this conversation, or see the ones it has.';
+
+export const isTabsCommand = (text: string): boolean => text.trim().toLowerCase() === TABS_COMMAND;
+
 export const ANDROID_COMMAND = '/android';
 
 export const ANDROID_ALIASES = ['phone'];

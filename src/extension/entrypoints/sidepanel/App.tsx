@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, PanelRightClose, PictureInPicture2, SlidersHorizontal, SquarePen } from 'lucide-react';
 import { browser } from 'wxt/browser';
 
-import { isAndroidCommand, isHandsFreeCommand, isRemoveToolsCommand } from '@/lib/bridge/commands';
+import { isAndroidCommand, isHandsFreeCommand, isRemoveToolsCommand, isTabsCommand } from '@/lib/bridge/commands';
 import { BRIDGE_CHANNEL, type FocusedElement } from '@/lib/actions/protocol';
 import { MAX_STORED_FILE_BYTES } from '@/lib/files/report';
 import { Wordmark } from '@/extension/components/brand';
 import { BLOCKED_HERE, BlockedSiteNote } from '@/extension/components/blocked-site-note';
 import { Composer, type AttachedSkill } from '@/extension/components/composer';
 import { ConnectionSheet } from '@/extension/components/connection-sheet';
+import { ConversationTabs } from '@/extension/components/conversation-tabs';
 import { DetachVeil } from '@/extension/components/detach-veil';
 import { DropMask } from '@/extension/components/drop-mask';
 import { Greeting } from '@/extension/components/greeting';
@@ -81,6 +82,7 @@ export default function App() {
   const tasks = useStoredTasks();
   const [taskSeed, setTaskSeed] = useState<TaskSeed | null>(null);
   const [scheduling, setScheduling] = useState(false);
+  const [tabsOpen, setTabsOpen] = useState(false);
   const takeSeed = useCallback(() => setTaskSeed(null), []);
   const tabUrl = useActiveTabUrl();
   const phone = useMirroredPhone();
@@ -212,6 +214,12 @@ export default function App() {
   function takeCommand(text: string): boolean {
     if (handsFree && isHandsFreeCommand(text)) {
       detach();
+      return true;
+    }
+    if (isTabsCommand(text) && !onPhone) {
+      voice.setInput('');
+      open('chat');
+      setTabsOpen(true);
       return true;
     }
     if (isAndroidCommand(text)) {
@@ -508,6 +516,18 @@ export default function App() {
             handsFree={handsFree}
             android={androidOption}
             onPhone={onPhone}
+            tabs={
+              !onPhone && (
+                <ConversationTabs
+                  session={run.session}
+                  sessions={run.sessions}
+                  open={tabsOpen}
+                  onOpenChange={setTabsOpen}
+                  onAdd={run.addTabs}
+                  onRemove={run.removeTab}
+                />
+              )
+            }
             onCommand={(command) => {
               if (takeCommand(command)) return;
               if (isRemoveToolsCommand(command)) {

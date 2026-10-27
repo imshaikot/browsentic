@@ -5,12 +5,16 @@ import { cn } from '@/lib/utils';
 /** A select inside the card drops its list into a portal at the end of the body, so presses and Escape there belong to the card. */
 const OPEN_LAYER = '[data-radix-popper-content-wrapper]';
 
-/** A card that drops from whatever it sits beside. Put both in a `relative` box: a press anywhere outside that box, or Escape, closes it. */
+/**
+ * A card that drops from whatever it sits beside, or rises above it with `side="top"`. Put both in one
+ * box, positioned to anchor the card: a press anywhere outside that box, or Escape, closes it.
+ */
 export function Popover({
   open,
   label,
   onClose,
   align = 'end',
+  side = 'bottom',
   className,
   children,
 }: {
@@ -18,6 +22,7 @@ export function Popover({
   label: string;
   onClose: () => void;
   align?: 'start' | 'end';
+  side?: 'top' | 'bottom';
   className?: string;
   children: ReactNode;
 }) {
@@ -48,7 +53,8 @@ export function Popover({
       role="dialog"
       aria-label={label}
       className={cn(
-        'enters absolute top-full z-40 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-line-strong bg-ground-2/95 p-4 shadow-2xl shadow-black/40 backdrop-blur',
+        'enters absolute z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-line-strong bg-ground-2/95 p-4 shadow-2xl shadow-black/40 backdrop-blur',
+        side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2',
         align === 'end' ? 'right-0' : 'left-0',
         className,
       )}

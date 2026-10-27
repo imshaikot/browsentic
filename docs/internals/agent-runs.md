@@ -50,7 +50,7 @@ sequenceDiagram
 
     S->>B: instruction + the tab it was typed on
     B->>B: resolve tab → session, tryFastPath() (grammar)
-    B->>D: {t:"instruct", id, text, context (url, tabId, sessionId, files, recordings)}
+    B->>D: {t:"instruct", id, text, context (url, tabId, sessionId, files, recordings, tabs)}
     D->>D: route skill, derive scope, build system prompt
     D->>K: spawn with --mcp-config {browsentic}, BROWSENTIC_AGENT_RUN=<runId>
     K->>M: stdio (its only MCP server)

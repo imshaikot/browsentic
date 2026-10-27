@@ -299,7 +299,10 @@ async function openSessionTab(input: unknown, owner: TabSession | null): Promise
   if (!result.ok) return result;
   const opened = (result.data as { tabId?: unknown; activeTabId?: unknown }).tabId;
   if (typeof opened === 'number') {
-    await adoptSubtab(owner.sessionId, opened, (result.data as { activeTabId?: unknown }).activeTabId === opened);
+    await adoptSubtab(owner.sessionId, opened, {
+      activate: (result.data as { activeTabId?: unknown }).activeTabId === opened,
+      opened: true,
+    });
   }
   return result;
 }
@@ -324,7 +327,7 @@ async function switchSessionTab(current: TabRef, input: unknown, owner: TabSessi
   if (typeof landed !== 'number' || landed === current.id) return result;
 
   if (owner.tabIds.includes(landed)) await setCurrentTab(owner.sessionId, landed);
-  else if (!(await sessionForTab(landed))) await adoptSubtab(owner.sessionId, landed, true);
+  else if (!(await sessionForTab(landed))) await adoptSubtab(owner.sessionId, landed, { activate: true, opened: false });
   return result;
 }
 

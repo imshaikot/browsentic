@@ -17,6 +17,8 @@ const session = (patch: Partial<TabSession>): TabSession => ({
   sessionId: 's',
   mainTabId: 7,
   tabIds: [7],
+  userTabIds: [7],
+  openedTabIds: [],
   currentTabId: 7,
   windowId: 1,
   title: 'Page',

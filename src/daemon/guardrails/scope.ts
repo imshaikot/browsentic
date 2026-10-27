@@ -2,7 +2,7 @@
  * A run's blast radius: the hosts it may reach and the tab it may drive.
  *
  * Scope is derived once, when a run starts, from things the user controls — the tab
- * they were on, the words they typed, their config. It never widens on its own, and
+ * they were on, the tabs they put in the conversation, the words they typed, their config. It never widens on its own, and
  * nothing read from a page can widen it. That is the whole point: an injected
  * instruction can still be obeyed, but it has nowhere to send what it stole.
  */
@@ -23,6 +23,15 @@ export interface Scope {
   readonly tabId?: number;
   /** Tabs the run opened itself, which count as its own for the pinned-tab rule. */
   readonly ownedTabIds?: readonly number[];
+  /** The conversation's other tabs, which the run may switch to without asking but not close. */
+  readonly sharedTabIds?: readonly number[];
+}
+
+/** A tab of the conversation as the run begins. Only one the user chose brings its site into scope. */
+export interface SharedTab {
+  readonly tabId: number;
+  readonly host?: string;
+  readonly chosen?: boolean;
 }
 
 /** No confinement. What an external MCP client gets: it has no run to be scoped to. */
@@ -38,6 +47,8 @@ export interface ScopeSeed {
   /** Standing allowlist from config. A single `'*'` disables host confinement. */
   extraHosts?: readonly string[];
   pinTab?: boolean;
+  /** The conversation's tabs, when it spans more than one. */
+  tabs?: readonly SharedTab[];
 }
 
 /**
@@ -47,10 +58,11 @@ export interface ScopeSeed {
  */
 export function scopeFor(seed: ScopeSeed): Scope {
   const tabId = seed.pinTab ? seed.tabId : undefined;
+  const shared = seed.tabs?.length ? { sharedTabIds: seed.tabs.map((tab) => tab.tabId) } : {};
   const hosts = new Set<string>();
 
   for (const host of seed.extraHosts ?? []) {
-    if (host === '*') return { hosts: ['*'], tabId };
+    if (host === '*') return { hosts: ['*'], tabId, ...shared };
     const normalized = normalizeHost(host);
     if (normalized) hosts.add(normalized);
   }
@@ -58,12 +70,17 @@ export function scopeFor(seed: ScopeSeed): Scope {
   const start = hostOf(seed.url);
   if (start) hosts.add(start);
 
+  for (const tab of seed.tabs ?? []) {
+    const chosen = tab.chosen && tab.host ? hostOf(`https://${tab.host}/`) : null;
+    if (chosen) hosts.add(chosen);
+  }
+
   for (const [, host] of (seed.instruction ?? '').matchAll(HOST_IN_TEXT)) {
     const normalized = normalizeHost(host);
     if (normalized && !NOT_A_HOST.has(normalized.split('.').pop()!)) hosts.add(normalized);
   }
 
-  return hosts.size ? { hosts: [...hosts], tabId } : { hosts: ['*'], tabId };
+  return { hosts: hosts.size ? [...hosts] : ['*'], tabId, ...shared };
 }
 
 /**
@@ -173,13 +190,15 @@ export function urlPayloadBytes(url: URL): number {
 
 /**
  * Whether an action would move the run off the tab it is pinned to. A bare
- * `page.switchTab` with no arguments only lists the open tabs, so it is not a move.
+ * `page.switchTab` with no arguments only lists the open tabs, so it is not a move,
+ * and switching to another of the conversation's tabs is not one either. Closing one is.
  */
 export function targetsAnotherTab(action: string, input: unknown, scope: Scope): boolean {
   if (scope.tabId === undefined || !TAB_MOVES.has(action)) return false;
   const args = (input ?? {}) as { tabId?: unknown; match?: unknown };
   if (typeof args.tabId === 'number') {
-    return args.tabId !== scope.tabId && !scope.ownedTabIds?.includes(args.tabId);
+    if (args.tabId === scope.tabId || scope.ownedTabIds?.includes(args.tabId)) return false;
+    return !(action === 'page.switchTab' && scope.sharedTabIds?.includes(args.tabId));
   }
   return typeof args.match === 'string' && args.match.length > 0;
 }

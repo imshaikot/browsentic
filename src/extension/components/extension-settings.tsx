@@ -102,6 +102,16 @@ function ContextMenuItems({ handsFree }: { handsFree: boolean }) {
           />
         </Row>
       )}
+      <Row
+        title="Add this tab to"
+        note="Lists the conversations open on other tabs, to bring this tab, or every tab selected with it, into one."
+      >
+        <Switch
+          checked={choice.addTab}
+          label="Show Add this tab to in the right-click menu"
+          onChange={(addTab) => setChoice({ ...choice, addTab })}
+        />
+      </Row>
     </SettingsGroup>
   );
 }

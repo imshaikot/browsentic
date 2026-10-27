@@ -59,6 +59,7 @@ export function Composer({
   placeholder = 'Tell me what to do on this page…',
   size = 'panel',
   accessory,
+  tabs,
   actionCues,
   onToggleActionCues,
   onAttachSkill,
@@ -100,6 +101,8 @@ export function Composer({
   size?: keyof typeof SIZES;
   /** Sits beside the send button. */
   accessory?: ReactNode;
+  /** The conversation's tabs, after the paperclip; it also puts `/tabs` in the menu. */
+  tabs?: ReactNode;
   actionCues: boolean;
   onToggleActionCues: () => void;
   onAttachSkill: (skill: AttachedSkill | null) => void;
@@ -124,8 +127,8 @@ export function Composer({
   const [highlight, setHighlight] = useState(0);
   const menuId = useId();
   const menuItems = useMemo(
-    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools, { handsFree, android }) : []),
-    [menuOpen, catalog, tabUrl, slash, tools, handsFree, android],
+    () => (menuOpen ? skillMenuItems(catalog, tabUrl, slash ?? '', tools, { handsFree, android, tabs: !!tabs }) : []),
+    [menuOpen, catalog, tabUrl, slash, tools, handsFree, android, tabs],
   );
 
   useEffect(() => setHighlight(0), [slash]);
@@ -294,6 +297,7 @@ export function Composer({
           >
             <Paperclip className="size-3.5" />
           </Button>
+          {tabs}
           <Button
             variant={liveTools ? 'subtle' : 'ghost'}
             size="icon-sm"

@@ -63,7 +63,7 @@ function SessionRailRow({
   onFocus: (sessionId: string) => void;
   onEnd: (sessionId: string) => void;
 }) {
-  const subtabs = session.tabIds.length - 1;
+  const tabs = session.tabIds.length;
   return (
     <div
       className={cn(
@@ -87,7 +87,7 @@ function SessionRailRow({
           <span className="block truncate text-ink">{session.title}</span>
           <span className="block font-mono text-[10px] text-ink-faint">
             {session.turns} {session.turns === 1 ? 'message' : 'messages'}
-            {subtabs > 0 && ` · +${subtabs} tab${subtabs === 1 ? '' : 's'}`}
+            {tabs > 1 && ` · ${tabs} tabs`}
             {session.host && ` · ${session.host}`}
           </span>
         </span>
