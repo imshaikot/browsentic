@@ -1,0 +1,3 @@
+# Fixtures are recorded CLI and adb output, compared byte for byte by tests that
+# splice them with "\n". Keep them LF whatever core.autocrlf says on Windows.
+**/fixtures/** text eol=lf
