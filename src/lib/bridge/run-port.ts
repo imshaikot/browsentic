@@ -725,16 +725,22 @@ async function rosterOf(session: TabSession, current: Browser.tabs.Tab | null): 
     const host = hostOf(tab.url);
     const isCurrent = tab.id === session.currentTabId;
     if (!host && !isCurrent) continue;
-    const { value: title } = await sealForPage((tab.title ?? '').replace(/\s+/g, ' ').trim().slice(0, MAX_ROSTER_TITLE), host);
+    const { value: sealed } = await sealForPage((tab.title ?? '').replace(/\s+/g, ' ').trim(), host);
     roster.push({
       tabId: tab.id!,
-      title,
+      title: sealed.slice(0, MAX_ROSTER_TITLE),
       ...(host ? { host } : {}),
       ...(isCurrent ? { current: true as const } : {}),
       ...(session.userTabIds.includes(tab.id!) ? { chosen: true as const } : {}),
     });
   }
-  return roster.length > 1 ? roster.slice(0, MAX_ROSTER) : undefined;
+  return roster.length > 1 ? keepingCurrent(roster) : undefined;
+}
+
+/** The first tabs in tab-strip order, up to the limit, with the one the run is on kept wherever it sits. */
+function keepingCurrent(roster: ConversationTab[]): ConversationTab[] {
+  const current = roster.findIndex((tab) => tab.current);
+  return current < MAX_ROSTER ? roster.slice(0, MAX_ROSTER) : [...roster.slice(0, MAX_ROSTER - 1), roster[current]];
 }
 
 async function handledLocally(text: string, session: TabSession): Promise<boolean> {
