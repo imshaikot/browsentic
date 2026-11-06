@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { clearLockfile, holdWake, isRunning, readLockfile, stateDir, type Lockfile } from './lockfile';
 import { log } from './log';
 import { daemonPorts } from './ports';
+import { startBridgeJob } from './quarantine';
 import { runBridgeTask } from './windows-task';
 
 const SPAWN_TIMEOUT_MS = 8_000;
@@ -17,6 +18,8 @@ export const daemonMainPath = () => join(dirname(fileURLToPath(import.meta.url))
 export interface EnsureOptions {
   /** Start it through Task Scheduler: the caller runs in a job that dies with it (Firefox's native host on Windows). */
   outsideJob?: boolean;
+  /** Start it through launchd: the caller is a browser's native host, quarantined on macOS (see quarantine.ts). */
+  outsideBrowser?: boolean;
 }
 
 /**
@@ -67,17 +70,21 @@ function readStartLock(): [number, number] {
 }
 
 /** One the task started is waited for, never doubled by one spawned in the job that is about to die. */
-async function spawnDaemon({ outsideJob = false }: EnsureOptions): Promise<Lockfile> {
+async function spawnDaemon({ outsideJob = false, outsideBrowser = false }: EnsureOptions): Promise<Lockfile> {
   if (outsideJob && process.platform === 'win32' && runBridgeTask()) {
     log('no daemon reachable; starting one through Task Scheduler');
     return cameUp();
   }
-  log('no daemon reachable; spawning one');
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.BROWSENTIC_AGENT_RUN;
   delete env.CLAUDECODE;
   delete env.CLAUDE_CODE_ENTRYPOINT;
   delete env.NODE_NO_WARNINGS;
+  if (outsideBrowser && process.platform === 'darwin' && startBridgeJob(process.execPath, daemonMainPath(), env)) {
+    log('no daemon reachable; starting one through launchd');
+    return cameUp();
+  }
+  log('no daemon reachable; spawning one');
   const child = spawn(process.execPath, [daemonMainPath()], {
     detached: true,
     stdio: 'ignore',

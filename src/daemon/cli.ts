@@ -154,7 +154,7 @@ switch (command) {
     break;
   case 'native-host':
     await serveNativeHost({
-      ensure: (caller) => ensureDaemon({ outsideJob: caller?.family === 'firefox' }),
+      ensure: (caller) => ensureDaemon({ outsideJob: caller?.family === 'firefox', outsideBrowser: true }),
       held: wakeHeld,
       mode: () => pairingMode(),
       version: pkg.version,
