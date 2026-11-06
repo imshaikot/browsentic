@@ -34,8 +34,8 @@ once more.
 
 ## Submitting an update
 
-1. **Pick a version above every one spent.** The Chrome Web Store has seen 0.7.11, 0.8.0, 0.8.1
-   and 0.8.9, and Edge Add-ons 0.8.0 and 0.8.1. A store refuses a number it has already accepted,
+1. **Pick a version above every one spent.** The Chrome Web Store has seen 0.7.11, 0.8.0, 0.8.1,
+   0.8.9 and 0.9.0, and Edge Add-ons 0.8.0 and 0.8.1. A store refuses a number it has already accepted,
    even for a build it rejected.
 2. **Check the permissions** against the table below. A new permission needs a line here before it
    goes up, and a permission nothing uses comes out (`activeTab` is the current candidate).
@@ -122,7 +122,7 @@ and reuses the same screenshots. The images (five 1280×800 screenshots, a 440×
 | `storage` | Keeps the user's conversations, settings, saved tools and pairing state in the extension's own storage on their computer. |
 | `unlimitedStorage` | Recordings of flows the user shows it, attached files and screenshots are kept locally and can exceed the default storage quota. |
 | `activeTab` | Gives access to the tab the user is on when they open Browsentic from the toolbar button or the right-click menu. |
-| `contextMenus` | Adds one "Open Browsentic" item to the right-click menu, which opens the side panel. |
+| `contextMenus` | Adds right-click items that open or close the side panel, open it in hands-free mode, and add the tab to one of the user's open conversations. |
 | `alarms` | Wakes the service worker to reconnect to Browsentic Bridge on the user's computer, to start the user's scheduled tasks on time, and to run timers and page monitors the user asked for. |
 | `scripting` | Reads and acts on the pages the user asks about: finding elements, filling in fields, clicking and extracting text. |
 | `notifications` | Tells the user when a scheduled task or a timer they set has finished, or when a task needs their approval. |
