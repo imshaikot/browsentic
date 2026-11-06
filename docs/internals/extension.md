@@ -574,7 +574,10 @@ only; **Always on ‹site›** stays in the panel.
 
 `nativeMessaging` is what lets a browser start a daemon that is down. When no port answers,
 `giveUp` calls `wakeDaemon`, which asks the browser to run the `com.browsentic.daemon` host that
-`browsentic setup` registered. That host runs `ensureDaemon` and exits. `browsentic stop` leaves
+`browsentic setup` registered. That host runs `ensureDaemon` and exits. On macOS it starts the daemon
+as a launchd job, not as its own child: a browser runs its native hosts quarantined, and a daemon
+the host spawned would pass that on to every file it and its agents write, so Gatekeeper would
+refuse any code they unpack (`src/daemon/quarantine.ts`). `browsentic stop` leaves
 `~/.browsentic/stopped` behind, and while it is there the host starts nothing; the next daemon to
 start, by any other path, removes it.
 
