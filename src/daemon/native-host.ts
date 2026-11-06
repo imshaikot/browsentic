@@ -21,6 +21,7 @@ import { readAgentConfig } from './agent/config';
 import { stateDir } from './lockfile';
 import { log } from './log';
 import { extensionDir } from './paths';
+import { BRIDGE_JOB, removeBridgeJob, type Launchd } from './quarantine';
 import { BRIDGE_TASK, registerBridgeTask, removeBridgeTask, windowsTasks, type TaskScheduler } from './windows-task';
 
 export { NATIVE_HOST_NAME };
@@ -390,6 +391,8 @@ export interface HostOptions {
   state?: string;
   /** Windows Task Scheduler, which starts the Bridge for Firefox. */
   tasks?: TaskScheduler;
+  /** macOS launchd, which starts the Bridge for a quarantined caller. */
+  jobs?: Launchd;
 }
 
 /**
@@ -519,6 +522,7 @@ export function removeNativeHost(options: HostOptions = {}): string[] {
   const { platform, targets, registry } = machine(options);
   const removed: string[] = [];
   if (platform === 'win32' && removeBridgeTask(options.tasks)) removed.push(`the ${BRIDGE_TASK} task`);
+  if (platform === 'darwin' && removeBridgeJob(options.jobs)) removed.push(`the ${BRIDGE_JOB} launchd job`);
   if (platform === 'win32') {
     const keys = new Set([...targets.map((target) => target.registryKey!), ...RETIRED_WINDOWS_VENDORS.map(windowsKey)]);
     for (const key of keys) {

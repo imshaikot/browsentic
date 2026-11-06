@@ -23,6 +23,7 @@ import {
 } from './native-host';
 import { extensionDir } from './paths';
 import { bits, modeOf } from './test/modes';
+import { BRIDGE_JOB, type Launchd } from './quarantine';
 import type { TaskScheduler } from './windows-task';
 
 const STORE_ORIGINS = ['chrome-extension://cbkjhkgjcpihokphhdkbahilpcjojpdc/', 'chrome-extension://npmocgldfflonjjmdadmdefpnfagnjmp/'];
@@ -274,12 +275,20 @@ describe('registering the host on macOS', () => {
   const home = homedir();
   const support = posix.join(home, 'Library', 'Application Support');
   const manifestIn = (dir: string) => posix.join(support, dir, 'NativeMessagingHosts', `${NATIVE_HOST_NAME}.json`);
+  let bootedOut: string[] = [];
+  const jobs: Launchd = { state: () => 'idle', bootout: (label) => void bootedOut.push(label), bootstrap: () => {} };
   const mac = (installed: string[], forks: { browser: string; app: string; dataDir: string }[] = []) =>
-    ({ platform: 'darwin', home, forks: () => forks, exists: (path: string) => installed.includes(path) }) as const;
+    ({ platform: 'darwin', home, forks: () => forks, exists: (path: string) => installed.includes(path), jobs }) as const;
 
   beforeEach(() => {
     removeNativeHost(mac([]));
     rmSync(support, { recursive: true, force: true });
+  });
+
+  it('takes away the launchd job that starts the Bridge on uninstall', () => {
+    bootedOut = [];
+    expect(removeNativeHost(mac([]))).toContain(`the ${BRIDGE_JOB} launchd job`);
+    expect(bootedOut).toEqual([BRIDGE_JOB]);
   });
 
   it('writes Chrome’s and Mozilla’s folders even when neither browser is installed', () => {

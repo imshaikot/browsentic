@@ -14,12 +14,14 @@ const daemon = await startDaemon({
   process.exit(1);
 });
 
-if (process.platform === 'darwin') {
-  for (const file of dropQuarantinedBunLibraries()) log(`removed ${file}, a library an agent unpacked while the Bridge ran quarantined`);
-}
-
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     void daemon.stop().then(() => process.exit(0));
+  });
+}
+
+if (process.platform === 'darwin') {
+  void dropQuarantinedBunLibraries().then((dropped) => {
+    for (const file of dropped) log(`removed ${file}, a library an agent unpacked while the Bridge ran quarantined`);
   });
 }
