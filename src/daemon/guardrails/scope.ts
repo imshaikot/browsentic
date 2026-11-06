@@ -25,6 +25,8 @@ export interface Scope {
   readonly ownedTabIds?: readonly number[];
   /** The conversation's other tabs, which the run may switch to without asking but not close. */
   readonly sharedTabIds?: readonly number[];
+  /** Where the run's actions land since a tab action moved it, or null when the browser picked the tab. */
+  readonly currentTabId?: number | null;
 }
 
 /** A tab of the conversation as the run begins. Only one the user chose brings its site into scope. */
@@ -191,14 +193,19 @@ export function urlPayloadBytes(url: URL): number {
 /**
  * Whether an action would move the run off the tab it is pinned to. A bare
  * `page.switchTab` with no arguments only lists the open tabs, so it is not a move,
- * and switching to another of the conversation's tabs is not one either. Closing one is.
+ * and switching to another of the conversation's tabs is not one either. Closing one is,
+ * and a bare `page.closeTab` closes whichever tab the run is on now.
  */
 export function targetsAnotherTab(action: string, input: unknown, scope: Scope): boolean {
   if (scope.tabId === undefined || !TAB_MOVES.has(action)) return false;
   const args = (input ?? {}) as { tabId?: unknown; match?: unknown };
   if (typeof args.tabId === 'number') {
-    if (args.tabId === scope.tabId || scope.ownedTabIds?.includes(args.tabId)) return false;
+    if (isRunsOwnTab(args.tabId, scope)) return false;
     return !(action === 'page.switchTab' && scope.sharedTabIds?.includes(args.tabId));
   }
-  return typeof args.match === 'string' && args.match.length > 0;
+  if (typeof args.match === 'string' && args.match.length > 0) return true;
+  return action === 'page.closeTab' && !isRunsOwnTab(scope.currentTabId === undefined ? scope.tabId : scope.currentTabId, scope);
 }
+
+const isRunsOwnTab = (tabId: number | null, scope: Scope) =>
+  tabId !== null && (tabId === scope.tabId || !!scope.ownedTabIds?.includes(tabId));

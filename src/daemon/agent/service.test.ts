@@ -275,6 +275,38 @@ describe('a conversation across several tabs', () => {
       asked: ['page.closeTab'],
     });
   });
+
+  test('asks before closing the tab it switched to when the close names no tab', async () => {
+    const agent = stubCli(join(dirname(configPath), 'agent-bare-close'), 'setTimeout(() => {}, 30_000);');
+    writeFileSync(configPath, JSON.stringify(onlyAgent('claude', agent)));
+    const events: RunEvent[] = [];
+    const invoked: unknown[] = [];
+    const across = new AgentSession({
+      invoke: async (action, input) => {
+        invoked.push([action, input]);
+        return success(action === 'page.switchTab' ? { activeTabId: 9 } : { done: true });
+      },
+      emit: (_runId: string, event: RunEvent) => void events.push(event),
+      draft: () => {},
+      actionNames: () => [],
+    });
+    const tabs = [
+      { tabId: 3, title: 'Board', host: 'jira.example.com', current: true as const, chosen: true as const },
+      { tabId: 9, title: 'Ticket', host: 'zendesk.example.com', chosen: true as const },
+    ];
+    across.handle({ t: 'instruct', id: 'r1', text: 'tidy up', context: { sessionId: 's1', url: 'https://jira.example.com/b', tabId: 3, tabs } });
+    await vi.waitFor(() => expect(across.offerFor('r1')).not.toBeNull());
+
+    await across.invokeForRun('r1', 'page.switchTab', { tabId: 9 });
+    void across.invokeForRun('r1', 'page.closeTab', {});
+    await vi.waitFor(() => expect(events.some((event) => event.kind === 'approval')).toBe(true));
+    across.dispose();
+
+    expect({
+      invoked,
+      asked: events.flatMap((event) => (event.kind === 'approval' ? [event.action] : [])),
+    }).toEqual({ invoked: [['page.switchTab', { tabId: 9 }]], asked: ['page.closeTab'] });
+  });
 });
 
 // Cursor abandons a tool call at 60 s, so an approval cannot simply hold the call open until the user answers.

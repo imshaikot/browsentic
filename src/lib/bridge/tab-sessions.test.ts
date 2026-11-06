@@ -118,6 +118,13 @@ describe('taking a tab out', () => {
     expect(lists((await readTabSessions())[session.sessionId])).toEqual({ main: 2, current: 2, tabs: [2], user: [2], opened: [] });
   });
 
+  test('hands the conversation to a tab the agent opened without making it one the user chose', async () => {
+    const { adoptSubtab, removeTab, readTabSessions, session } = await begun(1);
+    await adoptSubtab(session.sessionId, 2, { activate: false, opened: true });
+    expect(await removeTab(session.sessionId, 1)).toBe('removed');
+    expect(lists((await readTabSessions())[session.sessionId])).toEqual({ main: 2, current: 2, tabs: [2], user: [], opened: [2] });
+  });
+
   test('is refused for the last tab, and while a run is going', async () => {
     const { addTabs, patchSession, removeTab, session } = await begun(1);
     expect(await removeTab(session.sessionId, 1)).toBe('last');
@@ -142,6 +149,13 @@ describe('closing a tab', () => {
     await addTabs(session.sessionId, [3]);
     const released = await releaseTab(1, [2, 3]);
     expect(lists(released.handed)).toEqual({ main: 3, current: 3, tabs: [2, 3], user: [3], opened: [2] });
+  });
+
+  test('the conversation began in hands it to a tab the agent reached without making it one the user chose', async () => {
+    const { adoptSubtab, releaseTab, session } = await begun(1);
+    await adoptSubtab(session.sessionId, 2, { activate: false, opened: false });
+    const released = await releaseTab(1, [2]);
+    expect(lists(released.handed)).toEqual({ main: 2, current: 2, tabs: [2], user: [], opened: [] });
   });
 
   test('with only tabs the agent opened left ends it, as it always did', async () => {

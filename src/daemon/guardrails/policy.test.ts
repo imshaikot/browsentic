@@ -224,6 +224,21 @@ describe('decisions for a watched run', () => {
       expect(rules(across('page.closeTab', { tabId: 9 }))).toEqual(['leaves-pinned-tab']);
     });
 
+    test('closing the one it switched to, by naming no tab, still confirms', () => {
+      const switched = decide({ action: 'page.closeTab', input: {}, caller: 'agent', scope: { ...spanning, currentTabId: 9 } });
+      expect(rules(switched)).toEqual(['leaves-pinned-tab']);
+    });
+
+    test('closing whichever tab the browser left it on confirms', () => {
+      expect(decide({ action: 'page.closeTab', input: {}, caller: 'agent', scope: { ...spanning, currentTabId: null } }).effect).toBe('confirm');
+    });
+
+    test('closing its own tab by naming no tab is fine', () => {
+      expect(across('page.closeTab', {}).effect).toBe('allow');
+      const opened = { ...spanning, ownedTabIds: [20], currentTabId: 20 };
+      expect(decide({ action: 'page.closeTab', input: {}, caller: 'agent', scope: opened }).effect).toBe('allow');
+    });
+
     test('a tab outside the conversation still confirms', () => {
       expect(across('page.switchTab', { tabId: 12 }).effect).toBe('confirm');
     });

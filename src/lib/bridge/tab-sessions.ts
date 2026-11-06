@@ -318,7 +318,6 @@ function leave(session: TabSession, tabId: number, heirs: readonly number[]): bo
     const heir = heirs.find((id) => session.tabIds.includes(id));
     if (heir === undefined) return false;
     session.mainTabId = heir;
-    if (!session.userTabIds.includes(heir)) session.userTabIds.push(heir);
   }
   if (session.currentTabId === tabId) session.currentTabId = session.mainTabId;
   return true;

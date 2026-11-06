@@ -14,10 +14,12 @@ import {
 import { awaitMonitor } from '@/lib/actions/page/await-monitor';
 import { callSiteTool } from '@/lib/actions/page/call-site-tool';
 import { captureDownload } from '@/lib/actions/page/capture-download';
+import { closeTab } from '@/lib/actions/page/close-tab';
 import { openTab } from '@/lib/actions/page/open-tab';
 import { pickElement } from '@/lib/actions/page/pick-element';
 import { runCode } from '@/lib/actions/page/run-code';
 import { solveCaptcha } from '@/lib/actions/page/solve-captcha';
+import { switchTab } from '@/lib/actions/page/switch-tab';
 import { waitForElement } from '@/lib/actions/page/wait-for-element';
 import { notOnPhone, phoneOffers } from '@/lib/phone/features';
 import { FOCUS_SHOT_ACTION, READ_SITEMAP_ACTION } from '@/lib/actions/reserved';
@@ -97,6 +99,8 @@ interface ActiveRun {
   pending: Map<string, (answer: Decision) => void>;
   /** Tabs this run opened itself, which its own scope may therefore reach. */
   ownedTabIds: number[];
+  /** The tab a tab action left it on, null when the browser chose one; unset until it first moves. */
+  currentTabId?: number | null;
   /** Host of the tab this run started on — what "this site" means on an approval card. */
   site?: string;
   map?: MapRun;
@@ -123,6 +127,11 @@ const FOCUS_SHOT_TOOL_NAME = toolNameFor(FOCUS_SHOT_ACTION);
 
 /** Getting past a captcha takes a call per round; one yes covers every round of that run. */
 const HELD_FOR_RUN = new Set([CAPTCHA_ACTION]);
+
+/** Each reports the tab the browser shows afterwards, which is where the run's next action lands. */
+const TAB_ACTIONS = new Set([openTab.name, switchTab.name, closeTab.name]);
+
+const scopeOf = (run: ActiveRun): Scope => ({ ...run.scope, ownedTabIds: run.ownedTabIds, currentTabId: run.currentTabId });
 
 /** Actions whose `timeoutMs` is how long the call itself waits, not how long something runs after it. */
 const WAITS = [awaitMonitor, pickElement, solveCaptcha, waitForElement, runCode, callSiteTool, captureDownload];
@@ -314,8 +323,7 @@ export class AgentSession {
       return result;
     }
 
-    const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
-    const decision = decide({ action, input, caller: 'agent', scope }, run.policy);
+    const decision = decide({ action, input, caller: 'agent', scope: scopeOf(run) }, run.policy);
     if (decision.effect === 'deny') {
       log(`agent run ${runId} blocked ${action}: ${describeDecision(decision)}`);
       emit({ kind: 'toolResult', toolId, ok: false, summary: `blocked: ${summarizeDecision(decision)}` });
@@ -367,11 +375,14 @@ export class AgentSession {
   }
 
   private async perform(run: ActiveRun, toolId: string, action: string, input: unknown, startedAt: number): Promise<ActionResult> {
-    const scope = run.ownedTabIds.length ? { ...run.scope, ownedTabIds: run.ownedTabIds } : run.scope;
-    const result = await this.deps.invoke(action, this.withinCall(run, action, input, startedAt), { runId: run.id, hosts: scope.hosts });
+    const result = await this.deps.invoke(action, this.withinCall(run, action, input, startedAt), { runId: run.id, hosts: run.scope.hosts });
     if (action === openTab.name && result.ok) {
       const opened = (result.data as { tabId?: unknown } | null)?.tabId;
       if (typeof opened === 'number') run.ownedTabIds.push(opened);
+    }
+    if (TAB_ACTIONS.has(action) && result.ok) {
+      const landed = (result.data as { activeTabId?: unknown } | null)?.activeTabId;
+      run.currentTabId = typeof landed === 'number' ? landed : null;
     }
     log(`agent → ${action} ${result.ok ? 'ok' : result.error.code}`);
     this.deps.emit(run.id, { kind: 'toolResult', toolId, ok: result.ok, summary: summarize(input, result) });
