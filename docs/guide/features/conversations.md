@@ -50,6 +50,8 @@ keeps the panel where it is.
 Related work often sits in several tabs: a Jira issue, the Zendesk ticket about it, the runbook. Put
 them in one conversation and the panel stays on it as you move between them.
 
+https://github.com/user-attachments/assets/80ce1dd2-3c06-4706-9f37-1910eb1a4d82
+
 - **The tabs button** in the composer, beside the paperclip, lists the conversation's tabs and adds
   more; `/tabs` opens it too. Its picker lists this window's other web pages, and the tabs you
   selected in the tab strip (Ctrl or Shift click, ⌘ click on a Mac) come already ticked.
