@@ -33,7 +33,11 @@ type Snap = (format: 'png' | 'jpeg', quality: number | undefined) => Promise<Fra
 type TabCapture = { captureTab: (tabId: number, options: { format: string; quality?: number }) => Promise<string> };
 
 const LEFT_THE_FRONT = 'TAB_LEFT_THE_FRONT';
-const DEBUGGER_CAPTURE_TIMEOUT_MS = 10_000;
+// A tab Chrome has hidden paints no frames, so the debugger never answers for it. The wait is
+// short because the way out is to borrow the front for a moment, not to keep waiting.
+const NOT_RENDERING = 'TAB_NOT_RENDERING';
+const DEBUGGER_CAPTURE_TIMEOUT_MS = 4_000;
+const STALLED_MESSAGE = 'Chrome did not render the background tab in time — bring the tab to the front and retry';
 
 const FIREFOX_HINT = 'Capturing a background tab through the debugger is Chrome-only — Firefox captures it directly.';
 
@@ -48,7 +52,39 @@ export async function screenshotTab(
     const shot = await shoot(tab.id, input, runId, snapWhileInFront(tab));
     if (shot.ok || shot.error.code !== LEFT_THE_FRONT) return shot;
   }
-  return withDebugger(tab.id, FIREFOX_HINT, (session) => shoot(tab.id, input, runId, snapThroughDebugger(session)));
+  const viaDebugger = await withDebugger(tab.id, FIREFOX_HINT, (session) =>
+    shoot(tab.id, input, runId, snapThroughDebugger(session)),
+  );
+  if (viaDebugger.ok || viaDebugger.error.code !== NOT_RENDERING) return viaDebugger;
+
+  const borrowed = await shootFromTheFront(tab, input, runId);
+  return borrowed.ok ? borrowed : failure('CAPTURE_FAILED', STALLED_MESSAGE);
+}
+
+/**
+ * Task and mapping runs open their tab behind the one the person is using, and Chrome does not
+ * render a hidden tab, so the debugger capture stalls. Bring the tab forward just long enough
+ * for `captureVisibleTab`, then hand the front back to whichever tab had it.
+ */
+async function shootFromTheFront(
+  tab: { id: number; windowId?: number },
+  input: unknown,
+  runId: string | undefined,
+): Promise<ActionResult> {
+  const query = tab.windowId == null ? { active: true } : { active: true, windowId: tab.windowId };
+  const previous = (await browser.tabs.query(query).catch(() => []))[0];
+  try {
+    await browser.tabs.update(tab.id, { active: true });
+  } catch {
+    return failure('CAPTURE_FAILED', STALLED_MESSAGE);
+  }
+  try {
+    return await shoot(tab.id, input, runId, snapWhileInFront(tab));
+  } finally {
+    if (previous?.id != null && previous.id !== tab.id) {
+      await browser.tabs.update(previous.id, { active: true }).catch(() => undefined);
+    }
+  }
 }
 
 async function inFront(tabId: number): Promise<boolean> {
@@ -75,12 +111,7 @@ function snapThroughDebugger(session: DebuggerSession): Snap {
     const stalled = new Promise<never>((_, reject) => {
       timer = setTimeout(
         () =>
-          reject(
-            new ActionError(
-              'Chrome did not render the background tab in time — bring the tab to the front and retry',
-              'CAPTURE_FAILED',
-            ),
-          ),
+          reject(new ActionError(STALLED_MESSAGE, NOT_RENDERING)),
         DEBUGGER_CAPTURE_TIMEOUT_MS,
       );
     });
