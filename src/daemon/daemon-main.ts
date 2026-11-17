@@ -1,7 +1,10 @@
+import { warmBundledSkills } from './agent/skills';
 import { startAndroid } from './android/service';
 import { startDaemon } from './daemon';
 import { log } from './log';
 import pkg from './package.json';
+
+warmBundledSkills();
 
 const daemon = await startDaemon({
   version: pkg.version,

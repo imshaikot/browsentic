@@ -63,16 +63,33 @@ export const SKILL_FILE = 'SKILL.md';
 
 const EXPLICIT = /^@([a-z0-9][a-z0-9-]*)\s+/i;
 
+// The package ships with the daemon, but a self-update (or an npx cache clean) can delete the
+// directory it is running from. Keep the first good read so a live daemon never loses its skills.
+let bundledSnapshot: Skill[] | undefined;
+
+function bundledSkills(): Skill[] {
+  if (bundledSnapshot) return bundledSnapshot;
+  const read = readDir(bundledDir, 'bundled');
+  if (read.length) bundledSnapshot = read;
+  return read;
+}
+
+/** Read the bundled skills now, while the files are certainly still there. */
+export function warmBundledSkills(): void {
+  bundledSkills();
+}
+
 export function loadSkills(): Skill[] {
   const byName = new Map<string, Skill>();
   for (const { dir, source } of skillDirs()) {
-    for (const skill of readDir(dir, source)) byName.set(skill.name, skill);
+    const found = source === 'bundled' ? bundledSkills() : readDir(dir, source);
+    for (const skill of found) byName.set(skill.name, skill);
   }
   return [...byName.values()];
 }
 
 export function bundledSkillNames(): string[] {
-  return readDir(bundledDir, 'bundled').map((skill) => skill.name);
+  return bundledSkills().map((skill) => skill.name);
 }
 
 function readDir(dir: string, source: SkillSource): Skill[] {
