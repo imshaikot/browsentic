@@ -220,7 +220,7 @@ const STYLES = `
     gap: 8px;
     width: 320px;
     max-width: calc(100vw - 32px);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     pointer-events: none;
   }
   .card {
@@ -257,7 +257,7 @@ const STYLES = `
   .cue { display: block; margin-top: 6px; font: 500 11px/1.4 inherit; color: var(--brand); }
   .detail {
     margin-top: 6px;
-    font: 500 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 500 11px/1.4 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--ink);
     overflow-wrap: anywhere;
   }

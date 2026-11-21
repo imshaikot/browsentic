@@ -11,7 +11,7 @@ export const STYLES = `
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
     --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --shade: rgb(0 0 0 / 70%);
-    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     font-family: var(--sans);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
@@ -159,7 +159,7 @@ export const STYLES = `
     border: 1px solid var(--line);
     background: var(--ground);
     color: var(--inkDim);
-    font: 600 8.5px/12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 600 8.5px/12px "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     letter-spacing: 0.04em;
     text-align: center;
     text-transform: uppercase;
@@ -241,7 +241,7 @@ export const STYLES = `
     border-radius: 999px;
     background: var(--brand);
     color: var(--ground);
-    font: 700 9px/16px ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 700 9px/16px "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     text-align: center;
     display: none;
   }
@@ -294,7 +294,7 @@ export const STYLES = `
     display: flex;
     align-items: center;
     gap: 6px;
-    font: 600 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 600 9.5px/1 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--tone, var(--inkFaint));
@@ -392,14 +392,14 @@ export const STYLES = `
   .pop-head { display: flex; align-items: center; gap: 8px; }
   .pop-head svg { width: 16px; height: 16px; flex: none; color: var(--ember); }
   .pop-title { font: 600 13px/1.35 var(--sans); color: var(--ink); }
-  .pop-site { margin: 3px 0 0 24px; font: 500 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--inkFaint); }
+  .pop-site { margin: 3px 0 0 24px; font: 500 10.5px/1.4 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--inkFaint); }
   .pop-detail {
     margin-top: 9px;
     padding: 7px 9px;
     border-radius: 8px;
     background: color-mix(in oklch, var(--ground) 70%, transparent);
     border: 1px solid var(--line);
-    font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 11px/1.5 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--inkDim);
     overflow-wrap: anywhere;
   }
@@ -412,7 +412,7 @@ export const STYLES = `
     border-radius: 8px;
     background: color-mix(in oklch, var(--ground) 80%, transparent);
     border: 1px solid var(--line);
-    font: 10.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    font: 10.5px/1.5 "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--inkDim);
     white-space: pre;
     tab-size: 2;
